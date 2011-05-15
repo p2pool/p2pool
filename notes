@@ -1,0 +1,8 @@
+* use local IP address transactions in order to reduce space when coins are used later
+
+different configurations
+    local bitcoind
+        get pubkey from bitcoind using ip transaction and generate to it
+    no local bitcoind
+        generate to specific address
+        generate to specific pubkeygla
