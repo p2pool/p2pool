@@ -66,22 +66,11 @@ p2pool_protocol = (args.p2pool_port, args.p2pool_nodes)
 
 current_work = util.Variable(None)
 
-@repr
-@apply
-@defer.inlineCallbacks
-def _():
-    while True:
-        try:
-            work = conv.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
-        except:
-            traceback.print_exc()
-            yield util.sleep(1)
-        else:
-            work2 = work.getwork(100)
-            current_work.set(work2)
-            yield util.sleep(.1)
+def compute(work):
+    ba = conv.BlockAttempt(work['version'], work['
 
 def got_response(data):
+    # broadcast to p2p network and bitcoind if great
     print data
     return True
 

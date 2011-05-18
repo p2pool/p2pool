@@ -119,7 +119,7 @@ class Server(util.DeferredResource):
                 raise Error(-32099, u"Unknown error")
             
             request.write(json.dumps({
-                #'jsonrpc': '2.0',
+                'jsonrpc': '2.0',
                 'id': id_,
                 'result': result,
                 'error': None,

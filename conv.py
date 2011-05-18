@@ -14,7 +14,10 @@ class BlockAttempt(object):
     def __init__(self, version, prev_block, merkle_root, timestamp, bits):
         self.version, self.prev_block, self.merkle_root, self.timestamp, self.bits = version, prev_block, merkle_root, timestamp, bits
     
-    def getwork(self, target_multiplier=1):
+    def __repr__(self):
+        return "<BlockAttempt %s>" % (' '.join('%s=%s' % (k, hex(v))) for k, v in self.__dict__.iteritems())
+    
+    def getwork(self, target_multiplier=1, _check=2):
         target = bits_to_target(self.bits) * target_multiplier
         
         prev_block2 = reverse_chunks('%064x' % self.prev_block, 8).decode('hex')
@@ -25,30 +28,48 @@ class BlockAttempt(object):
         merkle_root3 = ('%064x' % self.merkle_root).decode('hex')[::-1]
         data2 = struct.pack("<I32s32s", self.version, prev_block3, merkle_root3)
         
-        return {
+        getwork = {
             "data": data,
             "hash1": "00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000",
             "target": ('%064x' % (target,)).decode('hex')[::-1].encode('hex'),
             "midstate": reverse_chunks(sha256.process(data2[:64])[::-1], 4).encode('hex'),
         }
+        
+        if _check:
+            self2 = self.__class__.from_getwork(getwork, _check=_check - 1, _check_multiplier=target_multiplier)
+            if self2.__dict__ != self.__dict__:
+                raise ValueError("failed check - input invalid or implementation error")
+        
+        return getwork
     
     @classmethod
-    def from_getwork(cls, getwork):
+    def from_getwork(cls, getwork, _check=2, _check_multiplier=1):
         version, prev_block, merkle_root, timestamp, bits, nonce = struct.unpack(">I32s32sIII", getwork['data'][:160].decode('hex'))
         prev_block = int(reverse_chunks(prev_block.encode('hex'), 8), 16)
         merkle_root = int(reverse_chunks(merkle_root.encode('hex'), 8), 16)
         
         ba = cls(version, prev_block, merkle_root, timestamp, bits)
         
-        getwork2 = ba.getwork()
-        if getwork2 != getwork:
-            print ba.__dict__
-            for k in getwork:
-                print k
-                print getwork[k]
-                print getwork2[k]
-                print getwork[k] == getwork2[k]
-                print
-            raise ValueError("nonsensical getwork request response")
+        if _check:
+            getwork2 = ba.getwork(_check_multiplier, _check=_check - 1)
+            if getwork2 != getwork:
+                raise ValueError("failed check - input invalid or implementation error")
         
         return ba
+
+if __name__ == "__main__":
+    ba = BlockAttempt(
+        1,
+        0x000000000000148135e10208db85abb62754341a392eab1f186aab077a831cf7,
+        0x534ea08be1ab529f484369344b6d5423ef5a0767db9b3ebb4e182bbb67962520,
+        1305759879,
+        440711666,
+    )
+    ba.getwork(1, 100)
+    ba.getwork(10, 100)
+    ba.from_getwork({
+      "target": "0000000000000000000000000000000000000000000000f2b944000000000000",
+      "midstate": "5982f893102dec03e374b472647c4f19b1b6d21ae4b2ac624f3d2f41b9719404",
+      "hash1": "00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000",
+      "data": "0000000163930d52a5ffca79b29b95a659a302cd4e1654194780499000002274000000002e133d9e51f45bc0886d05252038e421e82bff18b67dc14b90d9c3c2f422cd5c4dd4598e1a44b9f200000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000"
+   }, _check=100)

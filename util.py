@@ -4,7 +4,6 @@ from twisted.web import server, resource
 class DeferredResource(resource.Resource):
     def render(self, request): 
         def finish(x):
-            assert isinstance(x, str)
             if x is not None:
                 request.write(x)
             request.finish()
