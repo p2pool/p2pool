@@ -1,34 +1,43 @@
-import util
+import random
+import time
+import traceback
 
 from entangled.kademlia import node, datastore
+from twisted.internet import defer
 
-class OldDictDataStore(datastore.DictDataStore):
-    def __init__(self, inner):
-        self._dict = inner
+import util
 
-class UnDNSNode(node.Node):
+class Node(node.Node):
     @property
     def peers(self):
         for bucket in self._routingTable._buckets:
             for contact in bucket._contacts:
                 yield contact
     
-    def __init__(self, udpPort=None):
-        if udpPort is None:
-            udpPort = random.randrange(49152, 65536)
-        
+    def __init__(self, blockCallback, **kwargs):
+        self.blockCallback = blockCallback
+        node.Node.__init__(self, **kwargs)
         self.clock_offset = 0
-        node.Node.__init__(self, udpPort=udpPort, dataStore=OldDictDataStore(db.PickleValueWrapper(db.SQLiteDict(config_db, 'node'))))
+    
+    # time
     
     def joinNetwork(self, *args, **kwargs):
         node.Node.joinNetwork(self, *args, **kwargs)
-        self._joinDeferred.addBoth(lambda _: (self.joined(), _)[1])
+        
+        def go(res):
+            self.joined()
+            return res
+        self._joinDeferred.addBoth(go)
     
     def joined(self):
         self.time_task()
     
     def get_my_time(self):
         return time.time() - self.clock_offset
+    
+    @node.rpcmethod
+    def get_time(self):
+        return time.time()
     
     @defer.inlineCallbacks
     def time_task(self):
@@ -38,7 +47,7 @@ class UnDNSNode(node.Node):
             for peer, request in [(peer, peer.get_time().addCallback(lambda res: (time.time(), res))) for peer in self.peers]:
                 try:
                     t_recv, response = yield request
-                    t = .5 * (t_send + t_recv)
+                    t = (t_send + t_recv)/2
                     clock_deltas[(peer.id, peer.address, peer.port)] = (t, float(response))
                 except:
                     traceback.print_exc()
@@ -46,15 +55,23 @@ class UnDNSNode(node.Node):
             
             self.clock_offset = util.median(mine - theirs for mine, theirs in clock_deltas.itervalues())
             
-            yield util.sleep(random.expovariate(1/100))
+            yield util.sleep(random.expovariate(1/500.))
+    
+    # disable data storage
     
     @node.rpcmethod
     def store(self, key, value, originalPublisherID=None, age=0, **kwargs):
         return
     
     @node.rpcmethod
-    def get_time(self):
-        return time.time()
+    def findValue(self, key, value, originalPublisherID=None, age=0, **kwargs):
+        return
     
     def _republishData(self, *args):
         return defer.succeed(None)
+    
+    # meat
+    
+    @node.rpcmethod
+    def block(self, block_data):
+        self.blockCallback(block_data)

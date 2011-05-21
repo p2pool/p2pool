@@ -11,22 +11,33 @@ def reverse_chunks(s, l):
     return ''.join(reversed([s[x:x+l] for x in xrange(0, len(s), l)]))
 
 class BlockAttempt(object):
-    def __init__(self, version, prev_block, merkle_root, timestamp, bits):
-        self.version, self.prev_block, self.merkle_root, self.timestamp, self.bits = version, prev_block, merkle_root, timestamp, bits
+    def __init__(self, version, previous_block, merkle_root, timestamp, bits):
+        self.version, self.previous_block, self.merkle_root, self.timestamp, self.bits = version, previous_block, merkle_root, timestamp, bits
     
     def __repr__(self):
         return "<BlockAttempt %s>" % (' '.join('%s=%s' % (k, hex(v))) for k, v in self.__dict__.iteritems())
     
+    def __eq__(self, other):
+        if not isinstance(other, BlockAttempt):
+            raise ValueError("comparisons only valid with other BlockAttempts")
+        return self.__dict__ == other.__dict__
+    
+    def __ne__(self, other):
+        return not (self == other)
+    
+    def __repr__(self):
+        return "BlockAttempt(%s)" % (', '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
+    
     def getwork(self, target_multiplier=1, _check=2):
         target = bits_to_target(self.bits) * target_multiplier
         
-        prev_block2 = reverse_chunks('%064x' % self.prev_block, 8).decode('hex')
+        previous_block2 = reverse_chunks('%064x' % self.previous_block, 8).decode('hex')
         merkle_root2 = reverse_chunks('%064x' % self.merkle_root, 8).decode('hex')
-        data = struct.pack(">I32s32sIII", self.version, prev_block2, merkle_root2, self.timestamp, self.bits, 0).encode('hex') + "000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000"
+        data = struct.pack(">I32s32sIII", self.version, previous_block2, merkle_root2, self.timestamp, self.bits, 0).encode('hex') + "000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000"
         
-        prev_block3 = ('%064x' % self.prev_block).decode('hex')[::-1]
+        previous_block3 = ('%064x' % self.previous_block).decode('hex')[::-1]
         merkle_root3 = ('%064x' % self.merkle_root).decode('hex')[::-1]
-        data2 = struct.pack("<I32s32s", self.version, prev_block3, merkle_root3)
+        data2 = struct.pack("<I32s32s", self.version, previous_block3, merkle_root3)
         
         getwork = {
             "data": data,
@@ -37,18 +48,17 @@ class BlockAttempt(object):
         
         if _check:
             self2 = self.__class__.from_getwork(getwork, _check=_check - 1, _check_multiplier=target_multiplier)
-            if self2.__dict__ != self.__dict__:
+            if self2 != self:
                 raise ValueError("failed check - input invalid or implementation error")
         
         return getwork
     
     @classmethod
     def from_getwork(cls, getwork, _check=2, _check_multiplier=1):
-        version, prev_block, merkle_root, timestamp, bits, nonce = struct.unpack(">I32s32sIII", getwork['data'][:160].decode('hex'))
-        prev_block = int(reverse_chunks(prev_block.encode('hex'), 8), 16)
-        merkle_root = int(reverse_chunks(merkle_root.encode('hex'), 8), 16)
+        attrs = decode_data(getwork['data'])
+        attrs.pop('nonce')
         
-        ba = cls(version, prev_block, merkle_root, timestamp, bits)
+        ba = cls(**attrs)
         
         if _check:
             getwork2 = ba.getwork(_check_multiplier, _check=_check - 1)
@@ -56,6 +66,12 @@ class BlockAttempt(object):
                 raise ValueError("failed check - input invalid or implementation error")
         
         return ba
+
+def decode_data(data):
+    version, previous_block, merkle_root, timestamp, bits, nonce = struct.unpack(">I32s32sIII", data[:160].decode('hex'))
+    previous_block = int(reverse_chunks(previous_block.encode('hex'), 8), 16)
+    merkle_root = int(reverse_chunks(merkle_root.encode('hex'), 8), 16)
+    return dict(version=version, previous_block=previous_block, merkle_root=merkle_root, timestamp=timestamp, bits=bits, nonce=nonce)
 
 if __name__ == "__main__":
     ba = BlockAttempt(

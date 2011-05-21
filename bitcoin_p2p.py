@@ -5,7 +5,7 @@ import StringIO
 import hashlib
 import time
 
-from twisted.internet import protocol, reactor
+from twisted.internet import protocol, reactor, defer
 from twisted.python import failure
 
 def hex(n):
@@ -223,13 +223,16 @@ def merkle_hash(txn_list):
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
 
+def block_hash(headers):
+    return doublesha(block_headers.pack(headers))
+
 class Protocol(protocol.Protocol):
     _prefix = '\xf9\xbe\xb4\xd9'
     version = 0
     buf = ""
     
     def connectionMade(self):
-        self.checkorder = GenericDeferrer(5, lambda id, (order,): self.sendPacket("checkorder", dict(hash=id, order=order))
+        self.checkorder = GenericDeferrer(5, lambda id, order: self.sendPacket("checkorder", dict(hash=id, order=order)), 2**256)
         self.receiver = self.dataReceiver()
         self.receiver_wants = self.receiver.next()
         self.receiver_buf = ""
@@ -252,7 +255,7 @@ class Protocol(protocol.Protocol):
             sub_version_num="",
             start_height=0,
         ))
-        reactor.callLater(1, self.sendPacket, "checkorder", dict(hash=42, order='\0'*60))
+        #reactor.callLater(1, self.sendPacket, "checkorder", dict(hash=42, order='\0'*60))
     
     def dataReceived(self, data):
         pos = 0
@@ -325,6 +328,11 @@ class Protocol(protocol.Protocol):
     
     def handle_verack(self, payload):
         self.version = self.version_after
+        
+        if hasattr(self.factory, "resetDelay"):
+            self.factory.resetDelay()
+        if hasattr(self.factory, "gotConnection"):
+            self.factory.gotConnection(self)
     
     def handle_inv(self, payload):
         for item in payload:
@@ -336,13 +344,14 @@ class Protocol(protocol.Protocol):
             pass#print "ADDR", addr
     
     def handle_reply(self, payload):
-        print "REPLY", payload
+        hash_ = payload.pop('hash')
+        self.checkorder.gotResponse(hash_, payload)
     
     def handle_tx(self, payload):
-        pass#print "TX", hex(doublesha(tx.pack(payload))), payload
+        pass#print "TX", hex(merkle_hash([payload])), payload
     
     def handle_block(self, payload):
-        #print "BLOCK", hex(doublesha(block_headers.pack(payload['headers'])))
+        #print "BLOCK", hex(block_hash(payload['headers']))
         #print payload
         #print merkle_hash(payload['txns'])
         #print
@@ -363,33 +372,88 @@ class Protocol(protocol.Protocol):
         self.transport.write(data)
         #print "SEND", command, repr(payload.encode('hex'))
 
+class ProtocolInv(Protocol):
+    inv = None
+    
+    def handle_getdata(invs):
+        if self.inv is None: self.inv = {}
+        for inv in invs:
+            type_, hash_ = inv['type'], inv['hash']
+            if (type_, hash_) in self.inv:
+                self.sendPacket(type_, self.inv[(type_, hash_)])
+    
+    def addInv(self, type_, data):
+        if self.inv is None: self.inv = {}
+        if type_ == "block":
+            hash_ = block_hash(data['headers'])
+        elif type_ == "tx":
+            hash_ = merkle_hash([data])
+        else:
+            raise ValueError("invalid type: %r" % (type_,))
+        self.inv[(type_, hash_)] = data
+        self.sendPacket("inv", [dict(type=type_, hash=hash_)])
+
 class GenericDeferrer(object):
     def __init__(self, timeout, func, max_id):
         self.timeout = timeout
         self.func = func
         self.max_id = max_id
         self.map = {}
-    def __call__(self, *ask):
+    def __call__(self, *args, **kwargs):
         while True:
             id = random.randrange(self.max_id)
             if id not in self.map:
                 break
         df = defer.Deferred()
         def timeout():
+            self.map.pop(id)
             df.errback(fail.Failure(defer.TimeoutError()))
         timer = reactor.callLater(self.timeout, timeout)
-        self.func(id, ask)
+        self.func(id, *args, **kwargs)
         self.map[id] = df, timer
         return df
     def gotResponse(self, id, resp):
         if id not in self.map:
+            print "got id without request", id, resp
             return # XXX
-        df = self.map[id]
+        df, timer = self.map.pop(id)
+        timer.cancel()
         df.callback(resp)
 
+class ClientFactory(protocol.ReconnectingClientFactory):
+    protocol = ProtocolInv
+    
+    maxDelay = 15
+    
+    conn = None
+    waiters = None
+    
+    def gotConnection(self, conn):
+        self.conn = conn
+        if conn is not None:
+            if self.waiters is None:
+                self.waiters = []
+            
+            waiters = self.waiters
+            self.waiters = []
+            
+            for df in waiters:
+                df.callback(conn)
+    
+    def getProtocol(self):
+        df = defer.Deferred()
+        
+        if self.conn is not None:
+            df.callback(self.conn)
+        else:
+            if self.waiters is None:
+                self.waiters = []
+            self.waiters.append(df)
+        
+        return df
+
 if __name__ == "__main__":
-    factory = protocol.ClientFactory()
-    factory.protocol = Protocol
+    factory = ClientFactory()
     reactor.connectTCP("127.0.0.1", 8333, factory)
     
     reactor.run()

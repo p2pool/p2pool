@@ -5,14 +5,15 @@ import util
 import json
 
 class LongPollingWorkerInterface(util.DeferredResource):
-    def __init__(self, work):
+    def __init__(self, work, compute):
         self.work = work
+        self.compute = compute
     
     @defer.inlineCallbacks
     def render_GET(self, request):
         request.setHeader('X-Long-Polling', '/long-polling')
         
-        res = self.compute(yield self.work.get_deferred())
+        res = self.compute((yield self.work.get_deferred()))
         
         request.write(json.dumps({
             'jsonrpc': '2.0',
@@ -38,7 +39,6 @@ class WorkerInterface(jsonrpc.Server):
             LongPollingWorkerInterface(self.work, self.compute))
         self.putChild('', self)
     
-    @defer.inlineCallbacks
     def rpc_getwork(self, data=None):
         if data is not None:
             return self.response_callback(data)
