@@ -2,10 +2,22 @@ import random
 import time
 import traceback
 
-from entangled.kademlia import node, datastore
+from entangled.kademlia import node, datastore, encoding, protocol
 from twisted.internet import defer
 
 import util
+
+class CustomBencode(encoding.Bencode):
+    def __init__(self, prefix=""):
+        self.prefix = prefix
+    
+    def encode(self, data):
+        return self.prefix + encoding.Bencode.encode(data)
+    
+    def decode(self, data):
+        if not data.startswith(self.prefix):
+            raise ValueError("invalid prefix")
+        return encoding.Bencode.decode(data[len(self.prefix):])
 
 class Node(node.Node):
     @property
@@ -15,8 +27,8 @@ class Node(node.Node):
                 yield contact
     
     def __init__(self, blockCallback, **kwargs):
+        node.Node.__init__(self, networkProtocol=protocol.KademliaProtocol(self, msgEncoder=CustomBencode("p2pool")), **kwargs)
         self.blockCallback = blockCallback
-        node.Node.__init__(self, **kwargs)
         self.clock_offset = 0
     
     # time

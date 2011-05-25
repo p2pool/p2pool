@@ -4,9 +4,12 @@ import random
 import StringIO
 import hashlib
 import time
+import traceback
 
 from twisted.internet import protocol, reactor, defer
 from twisted.python import failure
+
+import util
 
 def hex(n):
     return '0x%x' % n
@@ -39,7 +42,7 @@ class VarStrType(object):
         length = VarIntType().read(file)
         res = file.read(length)
         if len(res) != length:
-            raise ValueError()
+            raise ValueError("var str not long enough %r" % ((length, len(res), res),))
         return res
     def pack(self, item):
         return VarIntType().pack(len(item)) + item
@@ -48,7 +51,10 @@ class FixedStrType(object):
     def __init__(self, length):
         self.length = length
     def read(self, file):
-        return file.read(self.length)
+        res = file.read(self.length)
+        if len(res) != self.length:
+            raise ValueError("early EOF!")
+        return res
     def pack(self, item):
         if len(item) != self.length:
             raise ValueError("incorrect length!")
@@ -65,7 +71,7 @@ class EnumType(object):
     def pack(self, item):
         return self.inner.pack(self.revmap[item])
 
-class Hash(object):
+class HashType(object):
     def read(self, file):
         data = file.read(256//8)
         if len(data) != 256//8:
@@ -106,6 +112,7 @@ class ComposedType(object):
         result = {}
         for key, type in self.fields:
             result[key] = type.read(file)
+            #print key, repr(result[key])
         return result
     def pack(self, item):
         return ''.join(type.pack(item[key]) for key, type in self.fields)
@@ -117,17 +124,17 @@ address = ComposedType([
 ])
 
 merkle_record = ComposedType([
-    ('left', Hash()),
-    ('right', Hash()),
+    ('left', HashType()),
+    ('right', HashType()),
 ])
 
 inv_vector = ComposedType([
     ('type', EnumType(StructType('<I'), {1: "tx", 2: "block"})),
-    ('hash', Hash()),
+    ('hash', HashType()),
 ])
 
 outpoint = ComposedType([
-    ('hash', Hash()),
+    ('hash', HashType()),
     ('index', StructType('<I')),
 ])
 
@@ -151,11 +158,16 @@ tx = ComposedType([
 
 block_headers = ComposedType([
     ('version', StructType('<I')),
-    ('previous_block', Hash()),
-    ('merkle_root', Hash()),
+    ('previous_block', HashType()),
+    ('merkle_root', HashType()),
     ('timestamp', StructType('<I')),
     ('bits', StructType('<I')),
     ('nonce', StructType('<I')),
+])
+
+block = ComposedType([
+    ('headers', block_headers),
+    ('txns', ListType(tx)),
 ])
 
 message_types = {
@@ -178,31 +190,28 @@ message_types = {
     'getdata': ListType(inv_vector),
     'getblocks': ComposedType([
         # XXX has version here?
-        ('have', ListType(Hash())),
-        ('last', Hash()),
+        ('have', ListType(HashType())),
+        ('last', HashType()),
     ]),
     'getheaders': ComposedType([
         # XXX has version here?
-        ('have', ListType(Hash())),
-        ('last', Hash()),
+        ('have', ListType(HashType())),
+        ('last', HashType()),
     ]),
     'tx': tx,
-    'block': ComposedType([
-        ('headers', block_headers),
-        ('txns', ListType(tx)),
-    ]),
+    'block': block,
     'headers': ListType(block_headers),
     'getaddr': ComposedType([]),
     'checkorder': ComposedType([
-        ('hash', Hash()),
+        ('hash', HashType()),
         ('order', FixedStrType(60)),
     ]),
     'submitorder': ComposedType([
-        ('hash', Hash()),
+        ('hash', HashType()),
         ('order', FixedStrType(60)),
     ]),
     'reply': ComposedType([
-        ('hash', Hash()),
+        ('hash', HashType()),
         ('reply',  EnumType(StructType('<I'), {0: 'success', 1: 'failure', 2: 'denied'})),
         ('script', VarStrType()),
     ]),
@@ -213,8 +222,17 @@ message_types = {
     ]),
 }
 
+def read_type(type_, payload):
+    f = StringIO.StringIO(payload)
+    payload2 = type_.read(f)
+    
+    if f.tell() != len(payload):
+        raise ValueError("underread " + repr((type_, payload)))
+    
+    return payload2
+
 def doublesha(data):
-    return int(hashlib.sha256(hashlib.sha256(data).digest()).digest()[::-1].encode('hex'), 16)
+    return read_type(HashType(), hashlib.sha256(hashlib.sha256(data).digest()).digest())
 
 def merkle_hash(txn_list):
     hash_list = [doublesha(tx.pack(txn)) for txn in txn_list]
@@ -231,11 +249,8 @@ class Protocol(protocol.Protocol):
     version = 0
     buf = ""
     
-    def connectionMade(self):
-        self.checkorder = GenericDeferrer(5, lambda id, order: self.sendPacket("checkorder", dict(hash=id, order=order)), 2**256)
-        self.receiver = self.dataReceiver()
-        self.receiver_wants = self.receiver.next()
-        self.receiver_buf = ""
+    def connectionMade(self):   
+        self.dataReceived = util.DataChunker(self.dataReceiver())
         
         self.sendPacket("version", dict(
             version=32200,
@@ -255,22 +270,6 @@ class Protocol(protocol.Protocol):
             sub_version_num="",
             start_height=0,
         ))
-        #reactor.callLater(1, self.sendPacket, "checkorder", dict(hash=42, order='\0'*60))
-    
-    def dataReceived(self, data):
-        pos = 0
-        receiver_wants = self.receiver_wants
-        buf = self.receiver_buf + data
-        
-        while True:
-            if pos + receiver_wants > len(buf):
-                break
-            new_receiver_wants = self.receiver.send(buf[pos:pos + receiver_wants])
-            pos += receiver_wants
-            receiver_wants = new_receiver_wants
-        
-        self.receiver_buf = buf[pos:]
-        self.receiver_wants = receiver_wants
     
     def dataReceiver(self):
         while True:
@@ -299,19 +298,15 @@ class Protocol(protocol.Protocol):
                     print "INVALID HASH"
                     continue
             
-            type = message_types.get(command, None)
-            if type is None:
+            type_ = message_types.get(command, None)
+            if type_ is None:
                 print "ERROR: NO TYPE FOR", repr(command)
                 continue
-            f = StringIO.StringIO(payload)
+            
             try:
-                payload2 = type.read(f)
+                payload2 = read_type(type_, payload)
             except:
-                import traceback
                 traceback.print_exc()
-                continue
-            if f.tell() != len(payload):
-                print "ERROR: UNDERREAD", repr(command), f.tell(), len(payload)
                 continue
             
             handler = getattr(self, "handle_" + command, None)
@@ -319,7 +314,10 @@ class Protocol(protocol.Protocol):
                 print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 print self, "has no handler for", command
             else:
-                handler(payload2)
+                try:
+                    handler(payload2)
+                except:
+                    traceback.print_exc()
     
     def handle_version(self, payload):
         #print "VERSION", payload
@@ -329,6 +327,8 @@ class Protocol(protocol.Protocol):
     def handle_verack(self, payload):
         self.version = self.version_after
         
+        # connection ready
+        self.checkorder = GenericDeferrer(5, lambda id, order: self.sendPacket("checkorder", dict(hash=id, order=order)), 2**256)
         if hasattr(self.factory, "resetDelay"):
             self.factory.resetDelay()
         if hasattr(self.factory, "gotConnection"):
@@ -356,6 +356,7 @@ class Protocol(protocol.Protocol):
         #print merkle_hash(payload['txns'])
         #print
         pass
+        self.factory.new_block.happened(payload)
     
     def handle_ping(self, payload):
         pass
@@ -427,6 +428,10 @@ class ClientFactory(protocol.ReconnectingClientFactory):
     
     conn = None
     waiters = None
+    
+    def __init__(self):
+        #protocol.ReconnectingClientFactory.__init__(self)
+        self.new_block = util.Event()
     
     def gotConnection(self, conn):
         self.conn = conn
