@@ -112,6 +112,12 @@ class ExpiringDict(object):
     def __delitem__(self, key):
         del self.d[key]
     
+    def get(self, key, default_value):
+        if key in self.d:
+            return self[key]
+        else:
+            return default_value
+    
     def setdefault(self, key, default_value):
         old_timestamp, value = self.d.get(key, (None, default_value))
         self[key] = value
@@ -133,8 +139,36 @@ def _DataChunker(receiver):
             wants = new_wants
         
         buf = buf[pos:]
-
 def DataChunker(receiver):
     x = _DataChunker(receiver)
     x.next()
     return x.send
+
+class GenericDeferrer(object):
+    def __init__(self, max_id, func, timeout=5):
+        self.max_id = max_id
+        self.func = func
+        self.timeout = timeout
+        self.map = {}
+    
+    def __call__(self, *args, **kwargs):
+        while True:
+            id = random.randrange(self.max_id)
+            if id not in self.map:
+                break
+        df = defer.Deferred()
+        def timeout():
+            self.map.pop(id)
+            df.errback(fail.Failure(defer.TimeoutError()))
+        timer = reactor.callLater(self.timeout, timeout)
+        self.func(id, *args, **kwargs)
+        self.map[id] = df, timer
+        return df
+    
+    def gotResponse(self, id, resp):
+        if id not in self.map:
+            print "got id without request", id, resp
+            return # XXX
+        df, timer = self.map.pop(id)
+        timer.cancel()
+        df.callback(resp)

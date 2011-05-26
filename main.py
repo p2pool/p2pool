@@ -63,9 +63,10 @@ bitcoind_group.add_argument(metavar="BITCOIND_RPC_PASSWORD",
 
 TARGET_MULTIPLIER = 1000000000
 
-class Node(object)):
+class Node(object):
     def __init__(self, block):
         self.block = block
+        self.shared = False
     def hash(self):
         return bitcoin_p2p.block_hash(self.block)
     def previous_hash(self):
@@ -73,6 +74,8 @@ class Node(object)):
         if hash_ == 2**256 - 1:
             return None
         return hash_
+    def share(self):
+        a
 
 class Chain(object):
     def __init__(self):
@@ -81,42 +84,51 @@ class Chain(object):
         self.highest_height = -1
         
     def accept(self, node):
-        hash_ = node.hash()
         previous_hash = node.previous_hash()
         
         if previous_hash is None:
-            self.nodes[hash_] = 
+            self.nodes[node.hash()] = (0, node)
+            if 0 > self.highest_height:
+                self.highest_height, self.highest.value = 0, node
+            return
         
         if previous_hash not in self.nodes:
-            return False
+            raise ValueError("missing referenced previous_node")
         
         previous_height, previous_node = self.nodes[previous_hash]
-        
-        self.nodes[node] = (height, item)
+        self.nodes[node.hash()] = (previous_height + 1, node)
+        if previous_height + 1 > self.highest_height:
+            self.highest_height, self.highest.value = 0, node
+
+@defer.inlineCallbacks
+def getwork(bitcoind, chains):
+    while True:
+        try:
+            getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
+            getwork, height = conv.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
+        except:
+            traceback.print_exc()
+            yield util.sleep(1)
+            continue
+        defer.returnValue((
+            ((getwork.version, getwork.previous_block, getwork.bits), height, chains.get(getwork.previous_block, Chain()).highest),
+            (getwork.timestamp,),
+        ))
 
 @defer.inlineCallbacks
 def main(args):
     try:
         print name
         
+        chains = util.ExpiringDict()
+        
+        # connect to bitcoind over JSON-RPC and do initial getwork
         bitcoind = jsonrpc.Proxy('http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port), (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         
-        @defer.inlineCallbacks
-        def getwork():
-            while True:
-                try:
-                    getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
-                    getwork, height = conv.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
-                except:
-                    traceback.print_exc()
-                    yield util.sleep(1)
-                    continue
-                defer.returnValue((
-                    ((getwork[0].version, getwork[0].previous_block, getwork[0].bits), height, chains.get(getwork[0].previous_block, Chain()).highest),
-                    (getwork[0].timestamp,),
-                ))
-        initial = yield getwork()
+        current_work = util.Variable(None)
+        current_work.value, current_work2 = yield getwork(bitcoind, chains)
         
+        # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
         factory = bitcoin_p2p.ClientFactory()
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         
@@ -133,8 +145,7 @@ def main(args):
                 break
             yield util.sleep(1)
         
-        current_work = util.Variable(((initial[0].version, initial[0].previous_block, initial[0].bits), {}))
-        current_work2 = (initial_getwork.timestamp,)
+        # setup worker logic
         
         def incr_dict(d, key, step=1):
             d = dict(d)
@@ -176,9 +187,8 @@ def main(args):
             transactions = merkle_root_to_transactions[headers['merkle_root']]
             block = {'header': headers, 'txns': transactions}
             return p2pCallback(bitcoin_p2p.block.pack(block))
-
         
-        chains = util.ExpiringDict()
+        # setup p2p logic and join p2pool network
         
         def p2pCallback(block_data):
             block = bitcoin_p2p.block.read(StringIO.StringIO(block_data))
@@ -190,7 +200,7 @@ def main(args):
             chains.setdefault(block['headers']['previous_block'], Chain()).accept(Node(block))
             
             if hash_ <= conv.bits_to_target(initial_getwork.bits):
-                # broadcast to bitcoin
+                # send to bitcoind
                 if factory.conn is not None:
                     factory.conn.addInv("block", block)
             
@@ -203,22 +213,17 @@ def main(args):
         
         node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
         node.joinNetwork(args.p2pool_nodes)
-        
-        def do_getwork():
-            a
-        
-        def new_block(block):
-            p2pCallback(bitcoin_p2p.block.pack(block))
-        
-        factory.new_block.watch(new_block)
-        
-        (yield factory.getProtocol()).sendPacket("getdata", [dict(type="block", hash=initial_getwork.previous_block)])
-        
         yield node._joinDeferred
+        
+        # start listening for workers with a JSON-RPC server
         
         reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
         
         print "Started successfully!"
+        
+        while True:
+            current_work.value, current_work2 = yield getwork(bitcoind, chains)
+            yield util.sleep(1)
     except:
         traceback.print_exc()
         reactor.stop()

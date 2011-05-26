@@ -110,12 +110,11 @@ class ComposedType(object):
         self.fields = fields
     def read(self, file):
         result = {}
-        for key, type in self.fields:
-            result[key] = type.read(file)
-            #print key, repr(result[key])
+        for key, type_ in self.fields:
+            result[key] = type_.read(file)
         return result
     def pack(self, item):
-        return ''.join(type.pack(item[key]) for key, type in self.fields)
+        return ''.join(type_.pack(item[key]) for key, type_ in self.fields)
 
 address = ComposedType([
     ('services', StructType('<Q')),
@@ -203,11 +202,13 @@ message_types = {
     'headers': ListType(block_headers),
     'getaddr': ComposedType([]),
     'checkorder': ComposedType([
-        ('hash', HashType()),
+        # XXX
+        ('id', HashType()),
         ('order', FixedStrType(60)),
     ]),
     'submitorder': ComposedType([
-        ('hash', HashType()),
+        # XXX
+        ('id', HashType()),
         ('order', FixedStrType(60)),
     ]),
     'reply': ComposedType([
@@ -328,7 +329,9 @@ class Protocol(protocol.Protocol):
         self.version = self.version_after
         
         # connection ready
-        self.checkorder = GenericDeferrer(5, lambda id, order: self.sendPacket("checkorder", dict(hash=id, order=order)), 2**256)
+        self.checkorder = util.GenericDeferrer(2**256, lambda id, order: self.sendPacket("checkorder", dict(id=id, order=order)))
+        self.submitorder = util.GenericDeferrer(2**256, lambda id, order: self.sendPacket("submitorder", dict(id=id, order=order)))
+        
         if hasattr(self.factory, "resetDelay"):
             self.factory.resetDelay()
         if hasattr(self.factory, "gotConnection"):
@@ -393,33 +396,6 @@ class ProtocolInv(Protocol):
             raise ValueError("invalid type: %r" % (type_,))
         self.inv[(type_, hash_)] = data
         self.sendPacket("inv", [dict(type=type_, hash=hash_)])
-
-class GenericDeferrer(object):
-    def __init__(self, timeout, func, max_id):
-        self.timeout = timeout
-        self.func = func
-        self.max_id = max_id
-        self.map = {}
-    def __call__(self, *args, **kwargs):
-        while True:
-            id = random.randrange(self.max_id)
-            if id not in self.map:
-                break
-        df = defer.Deferred()
-        def timeout():
-            self.map.pop(id)
-            df.errback(fail.Failure(defer.TimeoutError()))
-        timer = reactor.callLater(self.timeout, timeout)
-        self.func(id, *args, **kwargs)
-        self.map[id] = df, timer
-        return df
-    def gotResponse(self, id, resp):
-        if id not in self.map:
-            print "got id without request", id, resp
-            return # XXX
-        df, timer = self.map.pop(id)
-        timer.cancel()
-        df.callback(resp)
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = ProtocolInv
