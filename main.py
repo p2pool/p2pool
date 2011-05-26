@@ -4,14 +4,12 @@ import argparse
 import subprocess
 import os
 import sys
-import time
 import traceback
 import random
 import StringIO
 
-from twisted.internet import reactor, defer, task
-from twisted.web import server, resource, client
-from twisted.python import failure
+from twisted.internet import reactor, defer
+from twisted.web import server
 
 import jsonrpc
 import conv
@@ -53,7 +51,7 @@ bitcoind_group.add_argument("--bitcoind-rpc-port", metavar="BITCOIND_RPC_PORT",
 bitcoind_group.add_argument("--bitcoind-p2p-port", metavar="BITCOIND_P2P_PORT",
     help="connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333)",
     type=int, action="store", default=8333, dest="bitcoind_p2p_port")
-    
+
 bitcoind_group.add_argument(metavar="BITCOIND_RPC_USERNAME",
     help="bitcoind RPC interface username",
     type=str, action="store", dest="bitcoind_rpc_username")
@@ -82,7 +80,7 @@ class Chain(object):
         self.nodes = {} # hash -> (height, node)
         self.highest = util.Variable(None)
         self.highest_height = -1
-        
+    
     def accept(self, node):
         previous_hash = node.previous_hash()
         

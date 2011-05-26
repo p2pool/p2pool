@@ -7,7 +7,6 @@ import time
 import traceback
 
 from twisted.internet import protocol, reactor, defer
-from twisted.python import failure
 
 import util
 
@@ -250,7 +249,7 @@ class Protocol(protocol.Protocol):
     version = 0
     buf = ""
     
-    def connectionMade(self):   
+    def connectionMade(self):
         self.dataReceived = util.DataChunker(self.dataReceiver())
         
         self.sendPacket("version", dict(

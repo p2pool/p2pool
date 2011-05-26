@@ -2,7 +2,7 @@ import random
 import time
 import traceback
 
-from entangled.kademlia import node, datastore, encoding, protocol
+from entangled.kademlia import node, encoding, protocol
 from twisted.internet import defer
 
 import util
