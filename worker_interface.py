@@ -13,7 +13,7 @@ class LongPollingWorkerInterface(util.DeferredResource):
     def render_GET(self, request):
         request.setHeader('X-Long-Polling', '/long-polling')
         
-        res = self.compute((yield self.work.get_deferred()))
+        res = self.compute((yield self.work.changed.get_deferred()))
         
         request.write(json.dumps({
             'jsonrpc': '2.0',

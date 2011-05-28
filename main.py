@@ -60,21 +60,25 @@ bitcoind_group.add_argument(metavar="BITCOIND_RPC_PASSWORD",
     help="bitcoind RPC interface password",
     type=str, action="store", dest="bitcoind_rpc_password")
 
-TARGET_MULTIPLIER = 1000000000
+TARGET_MULTIPLIER = 1000000000 # 100
 
 class Node(object):
     def __init__(self, block):
         self.block = block
         self.shared = False
+    
     def hash(self):
         return bitcoin_p2p.block_hash(self.block)
+    
     def previous_hash(self):
         hash_ = bitcoin_p2p.Hash().read(StringIO.StringIO(self.block['transactions'][0]['tx_ins']['script']))
         if hash_ == 2**256 - 1:
             return None
         return hash_
+    
     def check(self, height, previous_node):
         ah
+    
     def share(self):
         if self.shared:
             return
@@ -135,16 +139,25 @@ def getwork(bitcoind, chains):
 def main(args):
     try:
         print name
+        print
         
-        chains = util.ExpiringDict()
+        chains = expiring_dict.ExpiringDict()
+        current_work = util.Variable(None)
+        current_work2 = None
         
         # connect to bitcoind over JSON-RPC and do initial getwork
+        print "Testing bitcoind RPC connection..."
         bitcoind = jsonrpc.Proxy('http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port), (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         
-        current_work = util.Variable(None)
-        current_work.value, current_work2 = yield getwork(bitcoind, chains)
+        current_work_new, current_work2 = yield getwork(bitcoind, chains)
+        current_work.set(current_work_new)
+        
+        print "    ...success!"
+        print "    Current block hash: %x height: %i" % (current_work.value[0][1], current_work.value[1])
+        print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
+        print "Testing bitcoind P2P connection..."
         factory = bitcoin_p2p.ClientFactory()
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         
@@ -161,14 +174,11 @@ def main(args):
                 break
             yield util.sleep(1)
         
-        # setup worker logic
+        print "    ...success!"
+        print "    Payout script:", my_pubkey.encode('hex')
+        print
         
-        def incr_dict(d, key, step=1):
-            d = dict(d)
-            if key not in d:
-                d[key] = 0
-            d[key] += 1
-            return d
+        # setup worker logic
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict()
         
@@ -190,7 +200,7 @@ def main(args):
             return transactions
         
         def compute(((version, previous_block, timestamp, bits), log)):
-            log2 = incr_dict(log, my_pubkey)
+            log2 = util.incr_dict(log, my_pubkey)
             transactions = transactions_from_shares(log2)
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions
@@ -230,18 +240,32 @@ def main(args):
                 return True
             return False
         
+        print "Joining p2pool network..."
+        
         p2p_node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
         p2p_node.joinNetwork(args.p2pool_nodes)
         yield p2p_node._joinDeferred
         
+        print "    ...success!"
+        print
+        
         # start listening for workers with a JSON-RPC server
+        
+        print "Listening for workers on port %i..." % (args.worker_port,)
         
         reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
         
+        print "    ...success!"
+        print
+        
+        # done!
+        
         print "Started successfully!"
+        print
         
         while True:
-            current_work.value, current_work2 = yield getwork(bitcoind, chains)
+            current_work_new, current_work2 = yield getwork(bitcoind, chains)
+            current_work.set(current_work_new)
             yield util.sleep(1)
     except:
         traceback.print_exc()

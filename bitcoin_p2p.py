@@ -310,6 +310,7 @@ class Protocol(protocol.Protocol):
             try:
                 payload2 = read_type(type_, payload)
             except:
+                print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 traceback.print_exc()
                 continue
             
@@ -342,7 +343,7 @@ class Protocol(protocol.Protocol):
     
     def handle_inv(self, payload):
         for item in payload:
-            print "INV", item['type'], hex(item['hash'])
+            #print "INV", item['type'], hex(item['hash'])
             self.sendPacket("getdata", [item])
     
     def handle_addr(self, payload):
@@ -361,7 +362,6 @@ class Protocol(protocol.Protocol):
         #print payload
         #print merkle_hash(payload['txns'])
         #print
-        pass
         self.factory.new_block.happened(payload)
     
     def handle_ping(self, payload):
@@ -378,6 +378,10 @@ class Protocol(protocol.Protocol):
         data = self._prefix + struct.pack("<12sI", command, len(payload)) + checksum + payload
         self.transport.write(data)
         #print "SEND", command, repr(payload.encode('hex'))
+    
+    def connectionLost(self, reason):
+        if hasattr(self.factory, "gotConnection"):
+            self.factory.gotConnection(None)
 
 class ProtocolInv(Protocol):
     inv = None

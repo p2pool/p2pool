@@ -24,21 +24,20 @@ class Event(object):
         self.observers = []
         self.one_time_observers = []
     
-    def watch(self, callable):
-        self.observers.append(callable)
-        return callable
+    def watch(self, func):
+        self.observers.append(func)
     
-    def watch_one_time(self, callable):
-        self.one_time_observers.append(callable)
-        return callable
+    def watch_one_time(self, func):
+        self.one_time_observers.append(func)
     
     def happened(self, event):
-        for callable in self.observers:
-            callable(event)
+        for func in self.observers:
+            func(event)
+        
         one_time_observers = self.one_time_observers
         self.one_time_observers = []
-        for callable in one_time_observers:
-            callable(event)
+        for func in one_time_observers:
+            func(event)
     
     def get_deferred(self):
         df = defer.Deferred()
@@ -47,32 +46,17 @@ class Event(object):
 
 class Variable(object):
     def __init__(self, value):
-        self._value = value
-        self.observers = []
-    
-    def get(self):
-        return self._value
+        self.value = value
+        
+        self.changed = Event()
     
     def set(self, value):
-        if value == self._value:
+        if value == self.value:
             return
-        self._value = value
         
-        observers = self.observers
-        self.observers = []
+        self.value = value
         
-        for observer in observers:
-            observer(value)
-    
-    value = property(get, set)
-    
-    def watch(self, callback):
-        self.observers.append(callback)
-    
-    def get_deferred(self):
-        df = defer.Deferred()
-        self.watch(df.callback)
-        return df
+        self.changed.happened(value)
 
 def sleep(t):
     d = defer.Deferred()
@@ -130,8 +114,15 @@ class GenericDeferrer(object):
     
     def gotResponse(self, id, resp):
         if id not in self.map:
-            print "got id without request", id, resp
+            #print "got id without request", id, resp
             return # XXX
         df, timer = self.map.pop(id)
         timer.cancel()
         df.callback(resp)
+    
+def incr_dict(d, key, step=1):
+    d = dict(d)
+    if key not in d:
+        d[key] = 0
+    d[key] += 1
+        return d
