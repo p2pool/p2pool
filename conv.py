@@ -1,3 +1,7 @@
+"""
+Representation of a getwork request/reply
+"""
+
 import struct
 
 import sha256

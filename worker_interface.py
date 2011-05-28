@@ -43,6 +43,6 @@ class WorkerInterface(jsonrpc.Server):
         if data is not None:
             return self.response_callback(data)
         
-        res = self.compute(self.work.get())
+        res = self.compute(self.work.value)
         
         return res

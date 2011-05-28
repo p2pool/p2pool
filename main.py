@@ -17,6 +17,7 @@ import worker_interface
 import util
 import bitcoin_p2p
 import p2p
+import expiring_dict
 
 try:
     __version__ = subprocess.Popen(["svnversion", os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
@@ -72,7 +73,12 @@ class Node(object):
         if hash_ == 2**256 - 1:
             return None
         return hash_
+    def check(self, height, previous_node):
+        ah
     def share(self):
+        if self.shared:
+            return
+        self.shared = True
         a
 
 class Chain(object):
@@ -80,23 +86,35 @@ class Chain(object):
         self.nodes = {} # hash -> (height, node)
         self.highest = util.Variable(None)
         self.highest_height = -1
+        self.shared = set()
     
-    def accept(self, node):
+    def accept(self, node, is_current):
+        hash_ = node.hash()
+        
+        if hash_ in self.nodes:
+            return
+        
         previous_hash = node.previous_hash()
         
         if previous_hash is None:
-            self.nodes[node.hash()] = (0, node)
-            if 0 > self.highest_height:
-                self.highest_height, self.highest.value = 0, node
+            previous_height, previous_node = -1, None
+        elif previous_hash not in self.nodes:
+            raise ValueError("missing referenced previous_node")
+        else:
+            previous_height, previous_node = self.nodes[previous_hash]
+        
+        height = previous_height + 1
+        
+        if not node.check(height, previous_node):
             return
         
-        if previous_hash not in self.nodes:
-            raise ValueError("missing referenced previous_node")
+        self.nodes[hash_] = (height, node)
         
-        previous_height, previous_node = self.nodes[previous_hash]
-        self.nodes[node.hash()] = (previous_height + 1, node)
-        if previous_height + 1 > self.highest_height:
-            self.highest_height, self.highest.value = 0, node
+        if hieght > self.highest_height:
+            self.highest_height, self.highest.value = height, node
+        
+        if is_current:
+            node.share()
 
 @defer.inlineCallbacks
 def getwork(bitcoind, chains):
@@ -152,7 +170,7 @@ def main(args):
             d[key] += 1
             return d
         
-        merkle_root_to_transactions = util.ExpiringDict()
+        merkle_root_to_transactions = expiring_dict.ExpiringDict()
         
         def transactions_from_shares(shares):
             nHeight = 0 # XXX
@@ -195,7 +213,10 @@ def main(args):
             if block['headers']['version'] != 1:
                 return False
             
-            chains.setdefault(block['headers']['previous_block'], Chain()).accept(Node(block))
+            node = Node(block)
+            chains.setdefault(block['headers']['previous_block'], Chain()).accept(node)
+            if block['headers']['previous_block'] in chains:
+                node.share(p2p_node)
             
             if hash_ <= conv.bits_to_target(initial_getwork.bits):
                 # send to bitcoind
@@ -209,9 +230,9 @@ def main(args):
                 return True
             return False
         
-        node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
-        node.joinNetwork(args.p2pool_nodes)
-        yield node._joinDeferred
+        p2p_node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
+        p2p_node.joinNetwork(args.p2pool_nodes)
+        yield p2p_node._joinDeferred
         
         # start listening for workers with a JSON-RPC server
         

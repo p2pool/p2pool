@@ -1,3 +1,7 @@
+"""
+Implementation of Bitcoin's p2p protocol
+"""
+
 import struct
 import socket
 import random
