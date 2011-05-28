@@ -2,30 +2,30 @@ import time
 
 class Node(object):
     def __init__(self, contents, prev=None, next=None):
-       self.contents, self.prev, self.next = contents, prev, next
+        self.contents, self.prev, self.next = contents, prev, next
     
     def insert_before(self, contents):
-       self.prev.next = self.prev = node = Node(contents, self.prev, self)
-       return node
-
+        self.prev.next = self.prev = node = Node(contents, self.prev, self)
+        return node
+    
     def insert_after(self, contents):
-       self.next.prev = self.next = node = Node(contents, self, self.next)
-       return node
+        self.next.prev = self.next = node = Node(contents, self, self.next)
+        return node
     
     @staticmethod
     def connect(prev, next):
         if prev.next is not None or next.prev is not None:
             raise ValueError("node already connected")
         prev.next, next.prev = next, prev
-
+    
     def replace(self, contents):
         self.contents = contents
-
+    
     def delete(self):
-       if self.prev.next is None or self.next.prev is None:
+        if self.prev.next is None or self.next.prev is None:
             raise ValueError("node not connected")
-       self.prev.next, self.next.prev = self.next, self.prev
-       self.next = self.prev = None
+        self.prev.next, self.next.prev = self.next, self.prev
+        self.next = self.prev = None
 
 
 class LinkedList(object):
@@ -49,7 +49,7 @@ class LinkedList(object):
     
     def __len__(self):
         return sum(1 for x in self)
-
+    
     def __reversed__(self):
         cur = self.end.prev
         while True:

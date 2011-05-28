@@ -1,5 +1,3 @@
-import time
-import collections
 import random
 
 from twisted.internet import defer, reactor
