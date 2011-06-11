@@ -126,20 +126,20 @@ class ReplyMatcher(object):
         self.map = {}
     
     def __call__(self, id):
-      try:
-        self.func(id)
-        uniq = random.randrange(2**256)
-        df = defer.Deferred()
-        def timeout():
-            df, timer = self.map[id].pop(uniq)
-            df.errback(failure.Failure(defer.TimeoutError()))
-            if not self.map[id]:
-                del self.map[id]
-        self.map.setdefault(id, {})[uniq] = (df, reactor.callLater(self.timeout, timeout))
-        return df
-      except:
-        import traceback
-        traceback.print_exc()
+        try:
+            self.func(id)
+            uniq = random.randrange(2**256)
+            df = defer.Deferred()
+            def timeout():
+                df, timer = self.map[id].pop(uniq)
+                df.errback(failure.Failure(defer.TimeoutError()))
+                if not self.map[id]:
+                    del self.map[id]
+            self.map.setdefault(id, {})[uniq] = (df, reactor.callLater(self.timeout, timeout))
+            return df
+        except:
+            import traceback
+            traceback.print_exc()
     
     def got_response(self, id, resp):
         if id not in self.map:
@@ -183,3 +183,21 @@ def incr_dict(d, key, step=1):
         d[key] = 0
     d[key] += 1
     return d
+
+
+class DeferredCacher(object):
+    # XXX should combine requests
+    def __init__(self, func, backing=None):
+        if backing is None:
+            backing = {}
+        
+        self.func = func
+        self.backing = backing
+    
+    @defer.inlineCallbacks
+    def __call__(self, key):
+        if key in self.backing:
+            defer.returnValue(self.backing[key])
+        value = yield self.func(key)
+        self.backing[key] = value
+        defer.returnValue(value)

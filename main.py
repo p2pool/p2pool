@@ -60,50 +60,50 @@ bitcoind_group.add_argument(metavar="BITCOIND_RPC_PASSWORD",
     type=str, action="store", dest="bitcoind_rpc_password")
 
 TARGET_MULTIPLIER = 1000000000 # 100
+SCRIPT = "410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac".decode('hex')
+
+coinbase_type = bitcoin_p2p.ComposedType([
+    ('previous_p2pool_block', bitcoin_p2p.HashType()),
+    ('previous_p2pool_share', bitcoin_p2p.HashType()),
+    ('subsidy', bitcoin_p2p.StructType('<Q')),
+    ('last_share_index', bitcoin_p2p.StructType('<I')),
+    ('nonce', bitcoin_p2p.HashType()),
+])
 
 class Node(object):
-    def __init__(self, block, shares):
+    def __init__(self, block):
         self.block = block
-        self.coinbase = coinbase_type.read(self.block['txns'][0]['tx_ins'][0]['script'], ignore_extra=True)
-        self.shares = shares
-    
-    #@classmethod
-    #def accept(
+        self.coinbase = coinbase_type.unpack(self.block['txns'][0]['tx_ins'][0]['script'], ignore_extra=True)
     
     def hash(self):
         return bitcoin_p2p.block_hash(self.block['headers'])
     
     def previous_hash(self):
-        hash_ = self.coinbase['previous_block2']
+        hash_ = self.coinbase['previous_share']
         if hash_ == 2**256 - 1:
             return None
         return hash_
     
     def check(self, chain, height2, previous_node):
-        if self.block['headers']['version'] != chain.version: return False
-        if self.block['headers']['previous_block'] != chain.previous_block: return False
-        if self.block['headers']['merkle_root'] != bitcoin_p2p.merkle_hash(self.block['txns']): return False
-        if self.block['headers']['bits'] != chain.bits: return False
+        # check bits and target
         
-        if not self.block['txns']: return False
-        if len(self.block['txns'][0]['tx_ins']) != 1: return False
-        
-        okay, self.shares = check_transaction(self.block['txns'][0], {} if previous_node is None else previous_node.shares)
-        
-        return okay
-    
-    def share(self):
-        if self.shared:
-            return
-        self.shared = True
-        a
+        t = self.block['txns'][0]
+        t2, shares = generate_transaction(
+            shares=previous_node.shares if previous_node is not None else [SCRIPT]*100,
+            add_pubkey=t['tx_outs'][self.coinbase['last_share_index']]['script'],
+            subsidy=coinbase['subsidy'],
+            previous_block2=coinbase['previous_block2']
+        )
+        if t2 != t:
+            raise ValueError("invalid generate txn")
+        return shares
 
 class Chain(object):
-    def __init__(self, version, previous_block, bits, height):
-        self.version, self.previous_block1, self.bits, self.height1 = version, previous_block, bits, height
+    def __init__(self, previous_p2pool_block):
+        self.previous_p2pool_block = previous_p2pool_block
         
         self.nodes = {} # hash -> (height, node)
-        self.highest = util.Variable(None) # (height, node)
+        self.highest = util.Variable(None) # (height, node) could be hash
         self.shared = set()
     
     def accept(self, node, is_current):
@@ -134,20 +134,18 @@ class Chain(object):
         if is_current:
             node.share()
 
-def check_transaction(t, shares):
-    coinbase = coinbase_type.read(t['tx_ins'][0]['script'], ignore_extra=True)
-    t2, new_shares = generate_transaction(shares, t['tx_outs'][coinbase['last_share_index']]['script'], coinbase['subsidy'], coinbase['previous_block2'])
-    return t2 == t, shares
-
-def generate_transaction(shares, add_pubkey, subsidy, previous_block2):
-    shares = shares[1:-1] + [add_pubkey, add_pubkey]
-    total_shares = len(shares)
+def generate_transaction(previous_shares, add_share, subsidy, previous_block2):
+    shares = previous_shares[1:] + [add_share]
     
-    grouped_shares = {}
-    for script in shares:
-        grouped_shares[script]
-    amounts = dict((pubkey, subsidy*shares//total_shares) for (pubkey, shares) in shares.iteritems())
-    amounts = incr_dict(amounts, "XXX", subsidy - sum(amounts.itervalues()))
+    dest_weights = {}
+    for script, difficulty in shares:
+        dest_weights[script] = dest_weights.get(script, 0) + difficulty
+    total_weight = sum(dest_weights.itervalues())
+    
+    amounts = dict((script, subsidy*weight*63//(64*total_weight)) for (script, weight) in dest_weights.iteritems())
+    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
+    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    
     dests = sorted(amounts.iterkeys())
     
     return dict(
@@ -156,40 +154,22 @@ def generate_transaction(shares, add_pubkey, subsidy, previous_block2):
             previous_output=dict(index=4294967295, hash=0),
             sequence=4294967295,
             script=coinbase_type.pack(dict(
-                version=1,
+                previous_p2pool_block=previous_p2pool_block,
+                previous_p2pool_share=previous_p2pool_share,
                 subsidy=subsidy,
-                previous_block2=previous_block2,
                 last_share_index=dests.index(add_pubkey),
                 nonce=random.randrange(2**256) if nonce is None else nonce,
             )),
         )],
-        tx_outs=[dict(value=amount, script=pubkey) for (pubkey, amount) in dests],
+        tx_outs=[dict(value=amounts[pubkey], script=pubkey) for pubkey in dests if amounts[pubkey]],
         lock_time=0,
     ), shares
-
-class DeferredCacher(object):
-    # XXX should combine requests
-    def __init__(self, func, backing=None):
-        if backing is None:
-            backing = {}
-        
-        self.func = func
-        self.backing = backing
-    
-    @defer.inlineCallbacks
-    def __call__(self, key):
-        if key in self.backing:
-            defer.returnValue(self.backing[key])
-        value = yield self.func(key)
-        self.backing[key] = value
-        defer.returnValue(value)
 
 @defer.inlineCallbacks
 def get_last_p2pool_block(current_block_hash, get_block):
     block_hash = current_block_hash
     while True:
-        print hex(block_hash)
-        if block_hash == 0x2c0117ac4e1f784761bc010f5d69c2b107c659a672d0107df64:
+        if block_hash == 0x174784b4188975e572237bbedc98e9eed1a0d5670a37ba163ea1:
             defer.returnValue(block_hash)
         block = yield get_block(block_hash)
         if block == 5:
@@ -212,13 +192,6 @@ def getwork(bitcoind, chains):
             (getwork.timestamp,),
         ))
 
-coinbase_type = bitcoin_p2p.ComposedType([
-    ('subsidy', bitcoin_p2p.StructType('<Q')),
-    ('previous_block2', bitcoin_p2p.HashType()),
-    ('last_share_index', bitcoin_p2p.StructType('<I')),
-    ('nonce', bitcoin_p2p.HashType()),
-])
-
 @defer.inlineCallbacks
 def main(args):
     try:
@@ -234,19 +207,9 @@ def main(args):
         bitcoind = jsonrpc.Proxy('http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port), (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         
         work, height = yield getwork(bitcoind, chains)
-        current_work.set(dict(
-            version=work.version,
-            previous_block=work.previous_block,
-            bits=work.bits,
-            height=height,
-            highest_block2=None,
-        ))
-        current_work2 = dict(
-            timestamp=work.timestamp,
-        )
         
         print "    ...success!"
-        print "    Current block hash: %x height: %i" % (current_work.value['previous_block'], current_work.value['height'])
+        print "    Current block hash: %x height: %i" % (work.previous_block, height)
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
@@ -256,7 +219,7 @@ def main(args):
         
         while True:
             try:
-                res = yield (yield factory.getProtocol()).check_order(order='\0'*60)
+                res = yield (yield factory.getProtocol()).check_order(order=bitcoin_p2p.Protocol.null_order)
                 if res['reply'] != 'success':
                     print "error in checkorder reply:", res
                     continue
@@ -271,8 +234,32 @@ def main(args):
         print "    Payout script:", my_pubkey.encode('hex')
         print
         
-        get_block = DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((yield (yield factory.getProtocol()).get_block(block_hash)))), expiring_dict.ExpiringDict(3600))
-        print (yield get_last_p2pool_block(conv.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())).previous_block, get_block))
+        @defer.inlineCallbacks
+        def real_get_block(block_hash):
+            block = yield (yield factory.getProtocol()).get_block(block_hash)
+            print "    Got block %x" % (block_hash,)
+            defer.returnValue(block)
+        get_block = util.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
+        
+        chains = util.ExpiringDict(100)
+        
+        print "Searching for last p2pool-generated block..."
+        work, height = yield getwork(bitcoind, chains)
+        p2pool_block_hash = (yield get_last_p2pool_block(work.previous_block, get_block))
+        current_work.set(dict(
+            version=work.version,
+            previous_block=work.previous_block,
+            bits=work.bits,
+            height=height+1,
+            current_chain=chains.setdefault(p2pool_block_hash, Chain(p2pool_block_hash)),
+            highest_secondary_block=None,
+        ))
+        current_work2 = dict(
+            timestamp=work.timestamp,
+        )
+        print "    ...success!"
+        print "    Matched block %x" % (p2pool_block_hash,)
+        print
         
         # setup worker logic
         
@@ -280,14 +267,14 @@ def main(args):
         
         def compute(state, state2):
             transactions = [generate_transaction(
-                shares=state['highest'].shares if state['highest'] is not None else {},
+                shares=state['highest_secondary_block'].shares if state['highest'] is not None else {},
                 add_pubkey=my_pubkey,
-                subsidy=50*100000000 >> height//210000,
+                subsidy=50*100000000 >> state['height']//210000,
                 previous_block2=state['highest'].hash() if state['highest'] is not None else {},
             )]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = transactions
-            ba = conv.BlockAttempt(version, previous_block, merkle_root, timestamp, bits)
+            merkle_root_to_transactions[merkle_root] = transactions # will stay for 100 seconds
+            ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, state2['timestamp'], state['bits'])
             return ba.getwork(TARGET_MULTIPLIER)
         
         def got_response(data):

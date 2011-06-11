@@ -360,6 +360,8 @@ class Protocol(BaseProtocol):
         ]),
     }
     
+    null_order = '\0'*60
+    
     def connectionMade(self):
         BaseProtocol.connectionMade(self)
         
