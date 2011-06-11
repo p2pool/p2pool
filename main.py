@@ -6,7 +6,6 @@ import os
 import sys
 import traceback
 import random
-import StringIO
 
 from twisted.internet import reactor, defer
 from twisted.web import server
@@ -63,21 +62,35 @@ bitcoind_group.add_argument(metavar="BITCOIND_RPC_PASSWORD",
 TARGET_MULTIPLIER = 1000000000 # 100
 
 class Node(object):
-    def __init__(self, block):
+    def __init__(self, block, shares):
         self.block = block
-        self.shared = False
+        self.coinbase = coinbase_type.read(self.block['txns'][0]['tx_ins'][0]['script'], ignore_extra=True)
+        self.shares = shares
+    
+    #@classmethod
+    #def accept(
     
     def hash(self):
-        return bitcoin_p2p.block_hash(self.block)
+        return bitcoin_p2p.block_hash(self.block['headers'])
     
     def previous_hash(self):
-        hash_ = bitcoin_p2p.Hash().read(StringIO.StringIO(self.block['transactions'][0]['tx_ins']['script']))
+        hash_ = self.coinbase['previous_block2']
         if hash_ == 2**256 - 1:
             return None
         return hash_
     
-    def check(self, height, previous_node):
-        ah
+    def check(self, chain, height2, previous_node):
+        if self.block['headers']['version'] != chain.version: return False
+        if self.block['headers']['previous_block'] != chain.previous_block: return False
+        if self.block['headers']['merkle_root'] != bitcoin_p2p.merkle_hash(self.block['txns']): return False
+        if self.block['headers']['bits'] != chain.bits: return False
+        
+        if not self.block['txns']: return False
+        if len(self.block['txns'][0]['tx_ins']) != 1: return False
+        
+        okay, self.shares = check_transaction(self.block['txns'][0], {} if previous_node is None else previous_node.shares)
+        
+        return okay
     
     def share(self):
         if self.shared:
@@ -86,10 +99,11 @@ class Node(object):
         a
 
 class Chain(object):
-    def __init__(self):
+    def __init__(self, version, previous_block, bits, height):
+        self.version, self.previous_block1, self.bits, self.height1 = version, previous_block, bits, height
+        
         self.nodes = {} # hash -> (height, node)
-        self.highest = util.Variable(None)
-        self.highest_height = -1
+        self.highest = util.Variable(None) # (height, node)
         self.shared = set()
     
     def accept(self, node, is_current):
@@ -109,16 +123,78 @@ class Chain(object):
         
         height = previous_height + 1
         
-        if not node.check(height, previous_node):
+        if not node.check(self, height, previous_node):
             return
         
         self.nodes[hash_] = (height, node)
         
-        if hieght > self.highest_height:
-            self.highest_height, self.highest.value = height, node
+        if height > self.highest.value[0]:
+            self.highest.set((height, node))
         
         if is_current:
             node.share()
+
+def check_transaction(t, shares):
+    coinbase = coinbase_type.read(t['tx_ins'][0]['script'], ignore_extra=True)
+    t2, new_shares = generate_transaction(shares, t['tx_outs'][coinbase['last_share_index']]['script'], coinbase['subsidy'], coinbase['previous_block2'])
+    return t2 == t, shares
+
+def generate_transaction(shares, add_pubkey, subsidy, previous_block2):
+    shares = shares[1:-1] + [add_pubkey, add_pubkey]
+    total_shares = len(shares)
+    
+    grouped_shares = {}
+    for script in shares:
+        grouped_shares[script]
+    amounts = dict((pubkey, subsidy*shares//total_shares) for (pubkey, shares) in shares.iteritems())
+    amounts = incr_dict(amounts, "XXX", subsidy - sum(amounts.itervalues()))
+    dests = sorted(amounts.iterkeys())
+    
+    return dict(
+        version=1,
+        tx_ins=[dict(
+            previous_output=dict(index=4294967295, hash=0),
+            sequence=4294967295,
+            script=coinbase_type.pack(dict(
+                version=1,
+                subsidy=subsidy,
+                previous_block2=previous_block2,
+                last_share_index=dests.index(add_pubkey),
+                nonce=random.randrange(2**256) if nonce is None else nonce,
+            )),
+        )],
+        tx_outs=[dict(value=amount, script=pubkey) for (pubkey, amount) in dests],
+        lock_time=0,
+    ), shares
+
+class DeferredCacher(object):
+    # XXX should combine requests
+    def __init__(self, func, backing=None):
+        if backing is None:
+            backing = {}
+        
+        self.func = func
+        self.backing = backing
+    
+    @defer.inlineCallbacks
+    def __call__(self, key):
+        if key in self.backing:
+            defer.returnValue(self.backing[key])
+        value = yield self.func(key)
+        self.backing[key] = value
+        defer.returnValue(value)
+
+@defer.inlineCallbacks
+def get_last_p2pool_block(current_block_hash, get_block):
+    block_hash = current_block_hash
+    while True:
+        print hex(block_hash)
+        if block_hash == 0x2c0117ac4e1f784761bc010f5d69c2b107c659a672d0107df64:
+            defer.returnValue(block_hash)
+        block = yield get_block(block_hash)
+        if block == 5:
+            defer.returnValue(block_hash)
+        block_hash = block['headers']['previous_block']
 
 @defer.inlineCallbacks
 def getwork(bitcoind, chains):
@@ -130,10 +206,18 @@ def getwork(bitcoind, chains):
             traceback.print_exc()
             yield util.sleep(1)
             continue
+        defer.returnValue((getwork, height))
         defer.returnValue((
-            ((getwork.version, getwork.previous_block, getwork.bits), height, chains.get(getwork.previous_block, Chain()).highest),
+            ((getwork.version, getwork.previous_block, getwork.bits), height, chains.get(getwork.previous_block, Chain()).highest.value),
             (getwork.timestamp,),
         ))
+
+coinbase_type = bitcoin_p2p.ComposedType([
+    ('subsidy', bitcoin_p2p.StructType('<Q')),
+    ('previous_block2', bitcoin_p2p.HashType()),
+    ('last_share_index', bitcoin_p2p.StructType('<I')),
+    ('nonce', bitcoin_p2p.HashType()),
+])
 
 @defer.inlineCallbacks
 def main(args):
@@ -149,11 +233,20 @@ def main(args):
         print "Testing bitcoind RPC connection..."
         bitcoind = jsonrpc.Proxy('http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port), (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         
-        current_work_new, current_work2 = yield getwork(bitcoind, chains)
-        current_work.set(current_work_new)
+        work, height = yield getwork(bitcoind, chains)
+        current_work.set(dict(
+            version=work.version,
+            previous_block=work.previous_block,
+            bits=work.bits,
+            height=height,
+            highest_block2=None,
+        ))
+        current_work2 = dict(
+            timestamp=work.timestamp,
+        )
         
         print "    ...success!"
-        print "    Current block hash: %x height: %i" % (current_work.value[0][1], current_work.value[1])
+        print "    Current block hash: %x height: %i" % (current_work.value['previous_block'], current_work.value['height'])
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
@@ -163,14 +256,14 @@ def main(args):
         
         while True:
             try:
-                res = yield (yield factory.getProtocol()).checkorder(order='\0'*60)
+                res = yield (yield factory.getProtocol()).check_order(order='\0'*60)
                 if res['reply'] != 'success':
                     print "error in checkorder reply:", res
                     continue
+                my_pubkey = res['script']
             except:
                 traceback.print_exc()
             else:
-                my_pubkey = res['script']
                 break
             yield util.sleep(1)
         
@@ -178,30 +271,20 @@ def main(args):
         print "    Payout script:", my_pubkey.encode('hex')
         print
         
+        get_block = DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((yield (yield factory.getProtocol()).get_block(block_hash)))), expiring_dict.ExpiringDict(3600))
+        print (yield get_last_p2pool_block(conv.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())).previous_block, get_block))
+        
         # setup worker logic
         
-        merkle_root_to_transactions = expiring_dict.ExpiringDict()
+        merkle_root_to_transactions = expiring_dict.ExpiringDict(100)
         
-        def transactions_from_shares(shares):
-            nHeight = 0 # XXX
-            subsidy = (50*100000000) >> (nHeight / 210000)
-            total_shares = sum(shares.itervalues())
-            amounts = dict((pubkey, subsidy*shares//total_shares) for (pubkey, shares) in shares.iteritems())
-            total_amount = sum(amounts.itervalues())
-            amount_left = subsidy - total_amount
-            incr_dict(amounts, "XXX", amount_left)
-            
-            transactions = [{
-                'version': 1,
-                'tx_ins': [{'previous_output': {'index': 4294967295, 'hash': 0}, 'sequence': 4294967295, 'script': bitcoin_p2p.Hash().pack(random.randrange(2**256))}],
-                'tx_outs': [dict(value=amount, script=pubkey) for (pubkey, amount) in sorted(amounts.iteritems())],
-                'lock_time': 0,
-            }]
-            return transactions
-        
-        def compute(((version, previous_block, timestamp, bits), log)):
-            log2 = util.incr_dict(log, my_pubkey)
-            transactions = transactions_from_shares(log2)
+        def compute(state, state2):
+            transactions = [generate_transaction(
+                shares=state['highest'].shares if state['highest'] is not None else {},
+                add_pubkey=my_pubkey,
+                subsidy=50*100000000 >> height//210000,
+                previous_block2=state['highest'].hash() if state['highest'] is not None else {},
+            )]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions
             ba = conv.BlockAttempt(version, previous_block, merkle_root, timestamp, bits)
@@ -211,14 +294,24 @@ def main(args):
             # match up with transactions
             headers = conv.decode_data(data)
             transactions = merkle_root_to_transactions[headers['merkle_root']]
-            block = {'header': headers, 'txns': transactions}
+            block = dict(headers=headers, txns=transactions)
             return p2pCallback(bitcoin_p2p.block.pack(block))
         
         # setup p2p logic and join p2pool network
         
+        seen = set() # grows indefinitely!
+        
         def p2pCallback(block_data):
-            block = bitcoin_p2p.block.read(StringIO.StringIO(block_data))
+            block = bitcoin_p2p.block.unpack(block_data)
             hash_ = bitcoin_p2p.block_hash(block['headers'])
+            
+            # early out for worthless
+            if hash_ < 2**256//2**32:
+                return
+            
+            if hash_ in seen:
+                return
+            seen.add(hash_)
             
             if block['headers']['version'] != 1:
                 return False
@@ -243,7 +336,12 @@ def main(args):
         print "Joining p2pool network..."
         
         p2p_node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
-        p2p_node.joinNetwork(args.p2pool_nodes)
+        def parse(x):
+            ip, port = x.split(':')
+            return ip, int(port)
+        
+        nodes = [('72.14.191.28', 21519)]*0
+        p2p_node.joinNetwork(map(parse, args.p2pool_nodes) + nodes)
         yield p2p_node._joinDeferred
         
         print "    ...success!"
@@ -264,8 +362,17 @@ def main(args):
         print
         
         while True:
-            current_work_new, current_work2 = yield getwork(bitcoind, chains)
-            current_work.set(current_work_new)
+            work, height = yield getwork(bitcoind, chains)
+            current_work.set(dict(
+                version=work.version,
+                previous_block=work.previous_block,
+                bits=work.bits,
+                height=height,
+                highest_block2=None,
+            ))
+            current_work2 = dict(
+                timestamp=work.timestamp,
+            )
             yield util.sleep(1)
     except:
         traceback.print_exc()

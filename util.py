@@ -1,6 +1,8 @@
 import random
+import collections
 
 from twisted.internet import defer, reactor
+from twisted.python import failure
 from twisted.web import server, resource
 
 class DeferredResource(resource.Resource):
@@ -47,7 +49,6 @@ class Event(object):
 class Variable(object):
     def __init__(self, value):
         self.value = value
-        
         self.changed = Event()
     
     def set(self, value):
@@ -55,7 +56,6 @@ class Variable(object):
             return
         
         self.value = value
-        
         self.changed.happened(value)
 
 def sleep(t):
@@ -70,26 +70,83 @@ def median(x):
     right = len(y)//2
     return (y[left] + y[right])/2
 
+class StringBuffer(object):
+    "Buffer manager with great worst-case behavior"
+    
+    def __init__(self, data=""):
+        self.buf = collections.deque([data])
+        self.buf_len = len(data)
+        self.pos = 0
+    
+    def __len__(self):
+        return self.buf_len - self.pos
+    
+    def add(self, data):
+        self.buf.append(data)
+        self.buf_len += len(data)
+    
+    def get(self, wants):
+        if self.buf_len - self.pos < wants:
+            raise IndexError("not enough data")
+        data = []
+        while wants:
+            seg = self.buf[0][self.pos:self.pos+wants]
+            self.pos += len(seg)
+            while self.buf and self.pos >= len(self.buf[0]):
+                x = self.buf.popleft()
+                self.buf_len -= len(x)
+                self.pos -= len(x)
+            
+            data.append(seg)
+            wants -= len(seg)
+        return ''.join(data)
+
 def _DataChunker(receiver):
     wants = receiver.next()
-    buf = ""
+    buf = StringBuffer()
     
     while True:
-        buf += yield
-        pos = 0
-        
-        while True:
-            if pos + wants > len(buf):
-                break
-            new_wants = receiver.send(buf[pos:pos + wants])
-            pos += wants
-            wants = new_wants
-        
-        buf = buf[pos:]
+        if len(buf) >= wants:
+            wants = receiver.send(buf.get(wants))
+        else:
+            buf.add((yield))
 def DataChunker(receiver):
+    """
+    Produces a function that accepts data that is input into a generator
+    (receiver) in response to the receiver yielding the size of data to wait on
+    """
     x = _DataChunker(receiver)
     x.next()
     return x.send
+
+class ReplyMatcher(object):
+    def __init__(self, func, timeout=5):
+        self.func = func
+        self.timeout = timeout
+        self.map = {}
+    
+    def __call__(self, id):
+      try:
+        self.func(id)
+        uniq = random.randrange(2**256)
+        df = defer.Deferred()
+        def timeout():
+            df, timer = self.map[id].pop(uniq)
+            df.errback(failure.Failure(defer.TimeoutError()))
+            if not self.map[id]:
+                del self.map[id]
+        self.map.setdefault(id, {})[uniq] = (df, reactor.callLater(self.timeout, timeout))
+        return df
+      except:
+        import traceback
+        traceback.print_exc()
+    
+    def got_response(self, id, resp):
+        if id not in self.map:
+            return
+        for df, timer in self.map[id].itervalues():
+            timer.cancel()
+            df.callback(resp)
 
 class GenericDeferrer(object):
     def __init__(self, max_id, func, timeout=5):
@@ -106,23 +163,23 @@ class GenericDeferrer(object):
         df = defer.Deferred()
         def timeout():
             self.map.pop(id)
-            df.errback(fail.Failure(defer.TimeoutError()))
+            df.errback(failure.Failure(defer.TimeoutError()))
         timer = reactor.callLater(self.timeout, timeout)
         self.func(id, *args, **kwargs)
         self.map[id] = df, timer
         return df
     
-    def gotResponse(self, id, resp):
+    def got_response(self, id, resp):
         if id not in self.map:
             #print "got id without request", id, resp
             return # XXX
         df, timer = self.map.pop(id)
         timer.cancel()
         df.callback(resp)
-    
+
 def incr_dict(d, key, step=1):
     d = dict(d)
     if key not in d:
         d[key] = 0
     d[key] += 1
-        return d
+    return d

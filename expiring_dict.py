@@ -39,26 +39,25 @@ class LinkedList(object):
     def __repr__(self):
         return "LinkedList(%r)" % (list(self),)
     
-    def __iter__(self):
-        cur = self.start.next
-        while True:
-            if cur is self.end:
-                break
-            yield cur.contents
-            cur = cur.next
-    
     def __len__(self):
         return sum(1 for x in self)
     
+    def __iter__(self):
+        cur = self.start.next
+        while cur is not self.end:
+            cur2 = cur
+            cur = cur.next
+            yield cur2 # in case cur is deleted, but items inserted after are ignored
+    
     def __reversed__(self):
         cur = self.end.prev
-        while True:
-            if cur is self.start:
-                break
+        while cur is not self.start:
+            cur2 = cur
             cur = cur.prev
-            yield cur.contents
+            yield cur2
     
     def __getitem__(self, index):
+        # odd one out - probably should return Node instance instead of its contents
         if index < 0:
             cur = self.end
             for i in xrange(-index):
@@ -71,7 +70,7 @@ class LinkedList(object):
                 cur = cur.next
                 if cur is self.end:
                     raise IndexError("index out of range")
-        return cur.contents
+        return cur
     
     def appendleft(self, item):
         return self.start.insert_after(item)
@@ -95,53 +94,76 @@ class LinkedList(object):
 
 
 class ExpiringDict(object):
-    def __init__(self, expiry_time=600):
-        self.d = dict()
+    def __init__(self, expiry_time=100, get_touches=True):
         self.expiry_time = expiry_time
+        self.get_touches = get_touches
+        
         self.expiry_deque = LinkedList()
-        self.key_to_node = {}
+        self.d = dict() # key -> node, value
     
     def __repr__(self):
-        self._expire()
+        self.expire()
         return "ExpiringDict" + repr(self.__dict__)
     
-    def _touch(self, key):
-        if key in self.key_to_node:
-            self.key_to_node[key].delete()
-        self.key_to_node[key] = self.expiry_deque.append((time.time(), key))
+    def __len__(self):
+        self.expire()
+        return len(self.d)
     
-    def _expire(self):
-        while self.expiry_deque and self.expiry_deque[0][0] < time.time() - self.expiry_time:
+    _nothing = object()
+    def touch(self, key, value=_nothing):
+        "Updates expiry node, optionally replacing value, returning new value"
+        if value is self._nothing or key in self.d:
+            node, old_value = self.d[key]
+            node.delete()
+        
+        new_value = old_value if value is self._nothing else value
+        self.d[key] = self.expiry_deque.append((time.time(), key)), new_value
+        return new_value
+    
+    def expire(self):
+        for node in self.expiry_deque:
+            timestamp, key = node.contents
+            if timestamp + self.expiry_time > time.time():
+                break
+            del self.d[key]
+        while self.expiry_deque and self.expiry_deque[0].contents[0] < time.time() - self.expiry_time:
             timestamp, key = self.expiry_deque.popleft()
             del self.d[key]
-            del self.key_to_node[key]
+    
+    def __contains__(self, key):
+        return key in self.d
     
     def __getitem__(self, key):
-        value = self.d[key]
-        self._touch(key)
-        self._expire()
+        if self.get_touches:
+            value = self.touch(key)
+        else:
+            node, value = self.d[key]
+        self.expire()
         return value
     
     def __setitem__(self, key, value):
-        self.d[key] = value
-        self._touch(key)
-        self._expire()
+        self.touch(key, value)
+        self.expire()
     
     def __delitem__(self, key):
-        del self.d[key]
-        self.key_to_node.pop(key).delete()
-        self._expire()
+        node, value = self.d.pop(key)
+        node.delete()
+        self.expire()
     
-    def get(self, key, default_value):
+    def get(self, key, default_value=None):
+        if key in self.d:
+            res = self[key]
+        else:
+            res = default_value
+            self.expire()
+        return default_value
+    
+    def setdefault(self, key, default_value):
         if key in self.d:
             return self[key]
         else:
+            self[key] = default_value
             return default_value
-    
-    def setdefault(self, key, default_value):
-        value = self.d.get(key, default_value)
-        self[key] = value
-        return value
 
 if __name__ == '__main__':
     x = ExpiringDict(5)
