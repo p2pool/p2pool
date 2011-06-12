@@ -66,7 +66,7 @@ args = parser.parse_args()
 if args.testnet:
     TARGET_MULTIPLIER = 100
     ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
-    SCRIPT = '410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac'.decode('hex')
+    SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
 else:
     TARGET_MULTIPLIER = 1000000 # 100
