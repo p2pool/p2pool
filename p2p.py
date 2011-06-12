@@ -24,7 +24,8 @@ class Node(node.Node):
                 yield contact
     
     def __init__(self, blockCallback, **kwargs):
-        node.Node.__init__(self, networkProtocol=protocol.KademliaProtocol(self, msgEncoder=CustomBencode("p2pool")), **kwargs)
+        #node.Node.__init__(self, networkProtocol=protocol.KademliaProtocol(self, msgEncoder=CustomBencode("p2pool")), **kwargs)
+        node.Node.__init__(self, **kwargs)
         self.blockCallback = blockCallback
     
     # disable data storage

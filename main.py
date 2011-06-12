@@ -170,7 +170,7 @@ def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subs
     amounts = dict((script, subsidy*weight*63//(64*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
     amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-    print "generate_transaction. amounts:", amounts.values()
+    print "generate_transaction. amounts:", [x/100000000 for x in amounts.itervalues()]
     
     dests = sorted(amounts.iterkeys())
     
@@ -367,6 +367,7 @@ def main(args):
         nodes = [('72.14.191.28', 21519)] # XXX
         p2p_node.joinNetwork(map(parse, args.p2pool_nodes) + nodes)
         yield p2p_node._joinDeferred
+        p2p_node.printContacts()
         
         print "    ...success!"
         print
