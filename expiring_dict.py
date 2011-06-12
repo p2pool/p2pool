@@ -164,7 +164,7 @@ class ExpiringDict(object):
         else:
             self[key] = default_value
             return default_value
-        
+    
     def keys(self):
         return self.d.keys()
 
