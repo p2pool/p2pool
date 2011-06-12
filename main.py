@@ -143,7 +143,7 @@ class Chain(object):
         if previous_hash is None:
             previous_height, previous_node = -1, None
         elif previous_hash not in self.nodes:
-            raise False
+            return False
         else:
             previous_height, previous_node = self.nodes[previous_hash]
         
@@ -333,6 +333,7 @@ def main(args):
         seen = set() # grows indefinitely!
         
         def p2pCallback(block):
+            print block
             if bitcoin_p2p.block_hash(block['headers']) <= conv.bits_to_target(block['headers']['bits']):
                 print "Got block! Passing to bitcoind!"
                 if factory.conn is not None:
