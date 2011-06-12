@@ -356,9 +356,10 @@ def main(args):
             
             return bitcoin_p2p.block_hash(block['headers']) <= TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
         
-        print "Joining p2pool network..."
+        port = random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port
+        print "Joining p2pool network using UDP port %i..." % (port,)
         
-        p2p_node = p2p.Node(p2pCallback, udpPort=random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port)
+        p2p_node = p2p.Node(p2pCallback, udpPort=port)
         def parse(x):
             ip, port = x.split(':')
             return ip, int(port)

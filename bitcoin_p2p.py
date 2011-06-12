@@ -459,7 +459,10 @@ class ProtocolInv(Protocol):
         for inv in invs:
             type_, hash_ = inv['type'], inv['hash']
             if (type_, hash_) in self.inv:
+                print "bitcoind requested %s %x, sent" % (type_, hash_)
                 self.sendPacket(type_, self.inv[(type_, hash_)])
+            else:
+                print "bitcoind requested %s %x, but not found" % (type_, hash_)
     
     def addInv(self, type_, data):
         if self.inv is None: self.inv = {}

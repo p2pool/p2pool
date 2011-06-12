@@ -11,6 +11,7 @@ class CustomBencode(encoding.Bencode):
         return self.prefix + encoding.Bencode.encode(self, data)
     
     def decode(self, data):
+        print repr(data)
         if not data.startswith(self.prefix):
             raise ValueError("invalid prefix")
         return encoding.Bencode.decode(self, data[len(self.prefix):])
