@@ -333,7 +333,7 @@ def main():
         
         # setup worker logic
         
-        merkle_root_to_transactions = expiring_dict.ExpiringDict(1)
+        merkle_root_to_transactions = expiring_dict.ExpiringDict(1000)
         
         def compute(state):
             transactions = [generate_transaction(
@@ -344,7 +344,7 @@ def main():
                 nonce=random.randrange(2**64),
             )[0]]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = transactions # will stay for 100 seconds
+            merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
             return ba.getwork(TARGET_MULTIPLIER)
         
