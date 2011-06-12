@@ -227,12 +227,19 @@ block = ComposedType([
 def doublesha(data):
     return HashType().unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
 
+merkle_record = ComposedType([
+    ('left', HashType()),
+    ('right', HashType()),
+])
+
 def merkle_hash(txn_list):
-    merkle_record = ComposedType([
-        ('left', HashType()),
-        ('right', HashType()),
-    ])
-    
+    hash_list = [doublesha(tx.pack(txn)) for txn in txn_list]
+    while len(hash_list) > 1:
+        hash_list = [doublesha(merkle_record.pack(dict(left=left, right=left if right is None else right)))
+            for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
+    return hash_list[0]
+
+def merkle_branch(txn_list, index):
     hash_list = [doublesha(tx.pack(txn)) for txn in txn_list]
     while len(hash_list) > 1:
         hash_list = [doublesha(merkle_record.pack(dict(left=left, right=left if right is None else right)))
@@ -310,7 +317,11 @@ class BaseProtocol(protocol.Protocol):
         #print "SEND", command, payload2
 
 class Protocol(BaseProtocol):
-    _prefix = '\xf9\xbe\xb4\xd9'
+    def __init__(self, testnet=False):
+        if testnet:
+            self._prefix = 'fabfb5da'.decode('hex')
+        else:
+            self._prefix = 'f9beb4d9'.decode('hex')
     
     version = 0
     
@@ -483,9 +494,15 @@ class ClientFactory(protocol.ReconnectingClientFactory):
     conn = None
     waiters = None
     
-    def __init__(self):
+    def __init__(self, testnet=False):
         #protocol.ReconnectingClientFactory.__init__(self)
+        self.testnet = testnet
         self.new_block = util.Event()
+    
+    def buildProtocol(self, addr):
+        p = self.protocol(self.testnet)
+        p.factory = self
+        return p
     
     def gotConnection(self, conn):
         self.conn = conn
