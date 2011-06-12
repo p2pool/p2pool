@@ -1,6 +1,8 @@
 from entangled.kademlia import node, encoding, protocol
 from twisted.internet import defer
 
+import bitcoin_p2p
+
 class CustomBencode(encoding.Bencode):
     def __init__(self, prefix=""):
         self.prefix = prefix
@@ -41,4 +43,4 @@ class Node(node.Node):
     
     @node.rpcmethod
     def block(self, block_data):
-        self.blockCallback(block_data)
+        self.blockCallback(bitcoin_p2p.block.unpack(block_data))

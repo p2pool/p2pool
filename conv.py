@@ -9,6 +9,9 @@ import sha256
 def bits_to_target(bits):
     return (bits & 0x00ffffff) * 2 ** (8 * ((bits >> 24) - 3))
 
+def target_to_attempts(target):
+    return (2**257 + target + 1)//(2*target + 2)
+
 def reverse_chunks(s, l):
     return ''.join(reversed([s[x:x+l] for x in xrange(0, len(s), l)]))
 

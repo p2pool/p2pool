@@ -1,5 +1,7 @@
 import time
 
+from twisted.internet import reactor
+
 class Node(object):
     def __init__(self, contents, prev=None, next=None):
         self.contents, self.prev, self.next = contents, prev, next
@@ -102,11 +104,11 @@ class ExpiringDict(object):
         self.d = dict() # key -> node, value
     
     def __repr__(self):
-        self.expire()
+        reactor.callLater(0, self.expire)
         return "ExpiringDict" + repr(self.__dict__)
     
     def __len__(self):
-        self.expire()
+        reactor.callLater(0, self.expire)
         return len(self.d)
     
     _nothing = object()
@@ -126,9 +128,7 @@ class ExpiringDict(object):
             if timestamp + self.expiry_time > time.time():
                 break
             del self.d[key]
-        while self.expiry_deque and self.expiry_deque[0].contents[0] < time.time() - self.expiry_time:
-            timestamp, key = self.expiry_deque.popleft()
-            del self.d[key]
+            node.delete()
     
     def __contains__(self, key):
         return key in self.d
@@ -138,25 +138,25 @@ class ExpiringDict(object):
             value = self.touch(key)
         else:
             node, value = self.d[key]
-        self.expire()
+        reactor.callLater(0, self.expire)
         return value
     
     def __setitem__(self, key, value):
         self.touch(key, value)
-        self.expire()
+        reactor.callLater(0, self.expire)
     
     def __delitem__(self, key):
         node, value = self.d.pop(key)
         node.delete()
-        self.expire()
+        reactor.callLater(0, self.expire)
     
     def get(self, key, default_value=None):
         if key in self.d:
             res = self[key]
         else:
             res = default_value
-            self.expire()
-        return default_value
+            reactor.callLater(0, self.expire)
+        return res
     
     def setdefault(self, key, default_value):
         if key in self.d:
@@ -164,6 +164,9 @@ class ExpiringDict(object):
         else:
             self[key] = default_value
             return default_value
+        
+    def keys(self):
+        return self.d.keys()
 
 if __name__ == '__main__':
     x = ExpiringDict(5)

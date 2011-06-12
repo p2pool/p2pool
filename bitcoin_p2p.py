@@ -14,6 +14,12 @@ from twisted.internet import protocol, reactor, defer
 
 import util
 
+class EarlyEnd(Exception):
+    pass
+
+class LateEnd(Exception):
+    pass
+
 class Type(object):
     def _unpack(self, data, ignore_extra=False):
         f = StringIO.StringIO(data)
@@ -21,7 +27,7 @@ class Type(object):
         
         if not ignore_extra:
             if f.tell() != len(data):
-                raise ValueError("underread " + repr((self, data)))
+                raise LateEnd("underread " + repr((self, data)))
         
         return obj
     
@@ -45,15 +51,19 @@ class Type(object):
 
 class VarIntType(Type):
     def read(self, file):
-        first, = struct.unpack("<B", file.read(1))
-        if first == 0xff:
-            return struct.unpack("<Q", file.read(8))[0]
-        elif first == 0xfe:
-            return struct.unpack("<I", file.read(4))[0]
-        elif first == 0xfd:
-            return struct.unpack("<H", file.read(2))[0]
-        else:
-            return first
+        data = file.read(1)
+        if len(data) != 1:
+            raise EarlyEnd()
+        first, = struct.unpack("<B", data)
+        if first == 0xff: desc = "<Q"
+        elif first == 0xfe: desc = "<I"
+        elif first == 0xfd: desc = "<H"
+        else: return first
+        length = struct.calcsize(desc)
+        data = file.read(length)
+        if len(data) != length:
+            raise EarlyEnd()
+        return struct.unpack(desc, data)[0]
     
     def write(self, file, item):
         if item < 0xfd:
@@ -72,7 +82,7 @@ class VarStrType(Type):
         length = VarIntType().read(file)
         res = file.read(length)
         if len(res) != length:
-            raise ValueError("var str not long enough %r" % ((length, len(res), res),))
+            raise EarlyEnd("var str not long enough %r" % ((length, len(res), res),))
         return res
     
     def write(self, file, item):
@@ -86,7 +96,7 @@ class FixedStrType(Type):
     def read(self, file):
         res = file.read(self.length)
         if len(res) != self.length:
-            raise ValueError("early EOF!")
+            raise EarlyEnd("early EOF!")
         return res
     
     def write(self, file, item):
@@ -115,7 +125,7 @@ class HashType(Type):
     def read(self, file):
         data = file.read(256//8)
         if len(data) != 256//8:
-            raise ValueError("incorrect length!")
+            raise EarlyEnd("incorrect length!")
         return int(data[::-1].encode('hex'), 16)
     
     def write(self, file, item):
@@ -137,9 +147,12 @@ class ListType(Type):
 class StructType(Type):
     def __init__(self, desc):
         self.desc = desc
+        self.length = struct.calcsize(self.desc)
     
     def read(self, file):
-        data = file.read(struct.calcsize(self.desc))
+        data = file.read(self.length)
+        if len(data) != self.length:
+            raise EarlyEnd()
         res, = struct.unpack(self.desc, data)
         return res
     
@@ -152,7 +165,10 @@ class StructType(Type):
 
 class IPV6AddressType(Type):
     def read(self, file):
-        return socket.inet_ntop(socket.AF_INET6, file.read(16))
+        data = file.read(16)
+        if len(data) != 16:
+            raise EarlyEnd()
+        return socket.inet_ntop(socket.AF_INET6, data)
     
     def write(self, file, item):
         file.write(socket.inet_pton(socket.AF_INET6, item))
@@ -438,7 +454,7 @@ class Protocol(BaseProtocol):
 class ProtocolInv(Protocol):
     inv = None
     
-    def handle_getdata(invs):
+    def handle_getdata(self, invs):
         if self.inv is None: self.inv = {}
         for inv in invs:
             type_, hash_ = inv['type'], inv['hash']

@@ -171,19 +171,10 @@ class GenericDeferrer(object):
     
     def got_response(self, id, resp):
         if id not in self.map:
-            #print "got id without request", id, resp
-            return # XXX
+            return
         df, timer = self.map.pop(id)
         timer.cancel()
         df.callback(resp)
-
-def incr_dict(d, key, step=1):
-    d = dict(d)
-    if key not in d:
-        d[key] = 0
-    d[key] += 1
-    return d
-
 
 class DeferredCacher(object):
     # XXX should combine requests
@@ -193,11 +184,21 @@ class DeferredCacher(object):
         
         self.func = func
         self.backing = backing
+        self.waiting = {}
     
     @defer.inlineCallbacks
     def __call__(self, key):
+        if key in self.waiting:
+            yield self.waiting[key]
+        
         if key in self.backing:
             defer.returnValue(self.backing[key])
-        value = yield self.func(key)
+        else:
+            self.waiting[key] = defer.Deferred()
+            try:
+                value = yield self.func(key)
+            finally:
+                self.waiting.pop(key).callback(None)
+        
         self.backing[key] = value
         defer.returnValue(value)
