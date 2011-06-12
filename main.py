@@ -80,7 +80,7 @@ coinbase_type = bitcoin_p2p.ComposedType([
     ('previous_p2pool_share_hash', bitcoin_p2p.HashType()),
     ('subsidy', bitcoin_p2p.StructType('<Q')),
     ('last_share_index', bitcoin_p2p.StructType('<I')),
-    ('nonce', bitcoin_p2p.HashType()),
+    ('nonce', bitcoin_p2p.StructType('<Q')),
 ])
 
 class Node(object):
@@ -318,7 +318,7 @@ def main():
                 previous_node=state['highest_p2pool_share'],
                 add_script=my_script,
                 subsidy=50*100000000 >> state['height']//210000,
-                nonce=random.randrange(2**256),
+                nonce=random.randrange(2**64),
             )[0]]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 100 seconds
