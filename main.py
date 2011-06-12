@@ -64,8 +64,8 @@ bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
 args = parser.parse_args()
 
 if args.testnet:
-    TARGET_MULTIPLIER = 15
-    SPREAD = 15
+    TARGET_MULTIPLIER = 32
+    SPREAD = 32
     ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
