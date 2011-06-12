@@ -221,7 +221,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block):
                     payouts[tx_out['script']] = payouts.get(tx_out['script'], 0) + tx_out['value']
                 subsidy = sum(payouts.itervalues())
                 if coinbase['subsidy'] == subsidy:
-                    if payouts[SCRIPT] >= subsidy//64:
+                    if payouts.get(SCRIPT, 0) >= subsidy//64:
                         defer.returnValue(block_hash)
         block_hash = block['headers']['previous_block']
 
