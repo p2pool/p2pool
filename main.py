@@ -215,9 +215,14 @@ def get_last_p2pool_block_hash(current_block_hash, get_block):
         except bitcoin_p2p.EarlyEnd:
             pass
         else:
-            print coinbase
             if coinbase['identifier'] == IDENTIFIER:
-                defer.returnValue(block_hash)
+                payouts = {}
+                for tx_out in block['txns'][0]['tx_outs']:
+                    payouts[tx_out['script']] = payouts.get(tx_out['script'], 0) + tx_out['value']
+                subsidy = sum(payouts.itervalues())
+                if coinbase['subsidy'] == subsidy:
+                    if payouts[SCRIPT] >= subsidy//64:
+                        defer.returnValue(block_hash)
         block_hash = block['headers']['previous_block']
 
 @defer.inlineCallbacks
