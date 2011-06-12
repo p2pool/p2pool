@@ -64,12 +64,14 @@ bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
 args = parser.parse_args()
 
 if args.testnet:
-    TARGET_MULTIPLIER = 100
+    TARGET_MULTIPLIER = 15
+    SPREAD = 15
     ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
 else:
     TARGET_MULTIPLIER = 1000000 # 100
+    SPREAD = 100
     ROOT_BLOCK = 0xe891d9dfc38eca8f13e2e6d81e3e68c018c2500230961462cb0
     SCRIPT = '410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac'.decode('hex')
     IDENTIFIER = 0x49ddc0b4938708ad
@@ -170,7 +172,7 @@ class Chain(object):
         return True
 
 def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subsidy, nonce):
-    shares = (previous_node.shares[1:] if previous_node is not None else [SCRIPT]*100) + [add_script]
+    shares = (previous_node.shares[1:] if previous_node is not None else [SCRIPT]*SPREAD) + [add_script]
     
     dest_weights = {}
     for script in shares:
@@ -225,8 +227,9 @@ def get_last_p2pool_block_hash(current_block_hash, get_block):
                         if payouts.get(SCRIPT, 0) >= subsidy//64:
                             defer.returnValue(block_hash)
             except Exception:
-                print "Error matching block"
-                print block
+                print
+                print "Error matching block:"
+                print "block:", block
                 traceback.print_exc()
                 print
         block_hash = block['headers']['previous_block']
@@ -238,7 +241,10 @@ def getwork(bitcoind):
             getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
             getwork, height = conv.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
         except:
+            print
+            print "Error getting work from bitcoind:"
             traceback.print_exc()
+            print
             yield util.sleep(1)
             continue
         defer.returnValue((getwork, height))
@@ -269,11 +275,17 @@ def main():
             try:
                 res = yield (yield factory.getProtocol()).check_order(order=bitcoin_p2p.Protocol.null_order)
                 if res['reply'] != 'success':
-                    print 'error in checkorder reply:', res
+                    print
+                    print "Error getting payout script:"
+                    print res
+                    print
                     continue
                 my_script = res['script']
             except:
+                print
+                print "Error getting payout script:"
                 traceback.print_exc()
+                print
             else:
                 break
             yield util.sleep(1)
@@ -321,7 +333,7 @@ def main():
         
         # setup worker logic
         
-        merkle_root_to_transactions = expiring_dict.ExpiringDict(100) # XXX
+        merkle_root_to_transactions = expiring_dict.ExpiringDict(1)
         
         def compute(state):
             transactions = [generate_transaction(
@@ -347,7 +359,10 @@ def main():
             try:
                 return p2pCallback(block)
             except:
+                print
+                print "Error processing data received from worker:"
                 traceback.print_exc()
+                print
                 return False
         
         # setup p2p logic and join p2pool network
@@ -413,7 +428,10 @@ def main():
             yield get_real_work()
             yield util.sleep(1)
     except:
+        print
+        print "Fatal error:"
         traceback.print_exc()
+        print
         reactor.stop()
 
 reactor.callWhenRunning(main)
