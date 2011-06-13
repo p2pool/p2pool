@@ -144,7 +144,7 @@ class ReplyMatcher(object):
     def got_response(self, id, resp):
         if id not in self.map:
             return
-        for df, timer in self.map[id].itervalues():
+        for df, timer in self.map.pop(id).itervalues():
             timer.cancel()
             df.callback(resp)
 
@@ -177,7 +177,6 @@ class GenericDeferrer(object):
         df.callback(resp)
 
 class DeferredCacher(object):
-    # XXX should combine requests
     def __init__(self, func, backing=None):
         if backing is None:
             backing = {}

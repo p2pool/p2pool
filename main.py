@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 import random
+import bsddb
 
 from twisted.internet import reactor, defer
 from twisted.web import server
@@ -28,7 +29,11 @@ name = 'p2pool (version %s)' % (__version__,)
 parser = argparse.ArgumentParser(description=name)
 parser.add_argument('--version', action='version', version=__version__)
 parser.add_argument('-t', '--testnet',
+    help='use the testnet; make sure you change the ports too',
     action='store_true', default=False, dest='testnet')
+parser.add_argument('-s', '--store-shares', metavar='FILENAME',
+    help='write shares to a database (not needed for normal usage)',
+    type=str, action='append', default=[], dest='store_shares')
 
 p2pool_group = parser.add_argument_group('p2pool interface')
 p2pool_group.add_argument('-p', '--p2pool-port', metavar='PORT',
@@ -307,6 +312,8 @@ def main():
         # information affecting work that should not trigger a long-polling update
         current_work2 = util.Variable(None)
         
+        share_dbs = [bsddb.hashopen(filename) for filename in args.store_shares]
+        
         def work_changed(new_work):
             print "Work changed:", new_work
         current_work.changed.watch(work_changed)
@@ -392,6 +399,9 @@ def main():
                     if peer is contact:
                         continue
                     peer.block(block_data)
+                hash_data = bitcoin_p2p.HashType().pack(node.hash())
+                for share_db in share_dbs:
+                    share_db[hash_data] = block_data
             else:
                 print 'Got share referencing unknown share, requesting past shares from peer', node.hash()
                 contact.get_blocks(node.chain_id(), chain.highest.value[1])
