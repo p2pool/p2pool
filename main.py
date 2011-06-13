@@ -339,8 +339,7 @@ def main():
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(1000)
         
-        def compute(state_unused):
-            state = current_work.value
+        def compute(state):
             transactions = [generate_transaction(
                 last_p2pool_block_hash=state['last_p2pool_block_hash'],
                 previous_node=state['highest_p2pool_share'],

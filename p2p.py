@@ -49,5 +49,7 @@ class Node(node.Node):
         self.blockCallback(bitcoin_p2p.block.unpack(block_data), _rpcNodeContact)
     
     @node.rpcmethod
-    def get_blocks(self, chain_id, _rpcNodeID, _rpcNodeContact):
+    def get_blocks(self, *args, **kwargs):
+        #chain_id, _rpcNodeID, _rpcNodeContact
+        print args, kwargs
         self.getBlocksCallback(chain_id, _rpcNodeContact)
