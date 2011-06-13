@@ -339,17 +339,18 @@ def main():
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(1000)
         
-        def compute(current_work_unused):
+        def compute(state_unused):
+            state = current_work.value
             transactions = [generate_transaction(
-                last_p2pool_block_hash=current_work['last_p2pool_block_hash'],
-                previous_node=current_work['highest_p2pool_share'],
+                last_p2pool_block_hash=state['last_p2pool_block_hash'],
+                previous_node=state['highest_p2pool_share'],
                 add_script=my_script,
-                subsidy=50*100000000 >> current_work['height']//210000,
+                subsidy=50*100000000 >> state['height']//210000,
                 nonce=random.randrange(2**64),
             )[0]]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
-            ba = conv.BlockAttempt(current_work['version'], current_work['previous_block'], merkle_root, current_work2.value['timestamp'], current_work['bits'])
+            ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
             return ba.getwork(TARGET_MULTIPLIER)
         
         def got_response(data):
