@@ -411,7 +411,7 @@ def main():
                 previous_hash = node.previous_hash()
                 if previous_hash is None:
                     break
-                node = chain.nodes[previous_hash]
+                node = chain.nodes[previous_hash][1]
             
             for block in reversed(blocks):
                 contact.block(bitcoin_p2p.block.pack(block))
