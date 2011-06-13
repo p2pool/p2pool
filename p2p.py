@@ -53,4 +53,5 @@ class Node(node.Node):
         try:
             self.getBlocksCallback(chain_id, _rpcNodeContact)
         except:
+            import traceback
             traceback.print_exc()
