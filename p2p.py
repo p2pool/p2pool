@@ -1,3 +1,5 @@
+import traceback
+
 from entangled.kademlia import node, encoding, protocol
 from twisted.internet import defer
 
@@ -46,8 +48,14 @@ class Node(node.Node):
     
     @node.rpcmethod
     def block(self, block_data, _rpcNodeID, _rpcNodeContact):
-        self.blockCallback(bitcoin_p2p.block.unpack(block_data), _rpcNodeContact)
+        try:
+            self.blockCallback(bitcoin_p2p.block.unpack(block_data), _rpcNodeContact)
+        except:
+            traceback.print_exc()
     
     @node.rpcmethod
     def get_blocks(self, chain_id, _rpcNodeID, _rpcNodeContact):
-        self.getBlocksCallback(tuple(chain_id), _rpcNodeContact)
+        try:
+            self.getBlocksCallback(tuple(chain_id), _rpcNodeContact)
+        except:
+            traceback.print_exc()
