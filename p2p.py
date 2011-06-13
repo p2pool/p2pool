@@ -50,8 +50,4 @@ class Node(node.Node):
     
     @node.rpcmethod
     def get_blocks(self, chain_id, _rpcNodeID, _rpcNodeContact):
-        try:
-            self.getBlocksCallback(chain_id, _rpcNodeContact)
-        except:
-            import traceback
-            traceback.print_exc()
+        self.getBlocksCallback(tuple(chain_id), _rpcNodeContact)
