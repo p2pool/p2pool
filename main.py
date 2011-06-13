@@ -426,8 +426,8 @@ def main():
                 contact.block(bitcoin_p2p.block.pack(block))
                 yield util.sleep(.05)
         
-        def getBlocksCallback(chain_id, contact):
-            getBlocksCallback2(chain_id, contact)
+        def getBlocksCallback(chain_id, highest, contact):
+            getBlocksCallback2(chain_id, highest, contact)
         
         port = random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port
         print 'Joining p2pool network using UDP port %i...' % (port,)
