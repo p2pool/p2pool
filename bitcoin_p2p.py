@@ -131,6 +131,16 @@ class HashType(Type):
     def write(self, file, item):
         file.write(('%064x' % (item,)).decode('hex')[::-1])
 
+class ShortHashType(Type):
+    def read(self, file):
+        data = file.read(160//8)
+        if len(data) != 160//8:
+            raise EarlyEnd("incorrect length!")
+        return int(data[::-1].encode('hex'), 16)
+    
+    def write(self, file, item):
+        file.write(('%020x' % (item,)).decode('hex')[::-1])
+
 class ListType(Type):
     def __init__(self, type):
         self.type = type
@@ -226,6 +236,9 @@ block = ComposedType([
 
 def doublesha(data):
     return HashType().unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
+
+def ripemdsha(data):
+    return ShortHashType().unpack(hashlib.new('ripemd160', hashlib.sha256(data).digest()).digest())
 
 merkle_record = ComposedType([
     ('left', HashType()),

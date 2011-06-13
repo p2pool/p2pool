@@ -19,62 +19,15 @@ import bitcoin_p2p
 import p2p
 import expiring_dict
 
-try:
-    __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
-except IOError:
-    __version__ = 'unknown'
-
-name = 'p2pool (version %s)' % (__version__,)
-
-parser = argparse.ArgumentParser(description=name)
-parser.add_argument('--version', action='version', version=__version__)
-parser.add_argument('-t', '--testnet',
-    help='use the testnet; make sure you change the ports too',
-    action='store_true', default=False, dest='testnet')
-parser.add_argument('-s', '--store-shares', metavar='FILENAME',
-    help='write shares to a database (not needed for normal usage)',
-    type=str, action='append', default=[], dest='store_shares')
-
-p2pool_group = parser.add_argument_group('p2pool interface')
-p2pool_group.add_argument('-p', '--p2pool-port', metavar='PORT',
-    help='use UDP port PORT to connect to other p2pool nodes and listen for connections (default: random)',
-    type=int, action='store', default=None, dest='p2pool_port')
-p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR:PORT',
-    help='connect to existing p2pool node at ADDR listening on UDP port PORT, in addition to builtin addresses',
-    type=str, action='append', default=[], dest='p2pool_nodes')
-
-worker_group = parser.add_argument_group('worker interface')
-worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-    help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 8338)',
-    type=int, action='store', default=8338, dest='worker_port')
-
-bitcoind_group = parser.add_argument_group('bitcoind interface')
-bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
-    help='connect to a bitcoind at this address (default: 127.0.0.1)',
-    type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
-bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-    help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332)',
-    type=int, action='store', default=8332, dest='bitcoind_rpc_port')
-bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-    help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333)',
-    type=int, action='store', default=8333, dest='bitcoind_p2p_port')
-
-bitcoind_group.add_argument(metavar='BITCOIND_RPC_USERNAME',
-    help='bitcoind RPC interface username',
-    type=str, action='store', dest='bitcoind_rpc_username')
-bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
-    help='bitcoind RPC interface password',
-    type=str, action='store', dest='bitcoind_rpc_password')
-
-args = parser.parse_args()
-
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
-if args.testnet:
+
+class Testnet(object):
     TARGET_MULTIPLIER = SPREAD = 32
     ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
-else:
+
+class Main(object):
     TARGET_MULTIPLIER = SPREAD = 256
     ROOT_BLOCK = 0xe891d9dfc38eca8f13e2e6d81e3e68c018c2500230961462cb0
     SCRIPT = '410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac'.decode('hex')
@@ -111,7 +64,7 @@ class Node(object):
         # check bits and target
         if self.chain_id() != (chain.last_p2pool_block_hash, chain.bits):
             raise ValueError('wrong chain')
-        if self.block_hash > TARGET_MULTIPLIER*conv.bits_to_target(chain.bits):
+        if self.block_hash > net.TARGET_MULTIPLIER*conv.bits_to_target(chain.bits):
             raise ValueError('not enough work!')
         
         t = self.block['txns'][0]
@@ -144,23 +97,20 @@ class Chain(object):
         self.shared = set()
     
     def accept(self, node):
-        # returns False if history is missing
-        # returns True is ok
-        # raises exception otherwise
         if node.chain_id() != (self.last_p2pool_block_hash, self.bits):
             raise ValueError('block does not belong to this chain')
         
         hash_ = node.hash()
         
         if hash_ in self.nodes:
-            raise ValueError('already seen')
+            return "dup"
         
         previous_hash = node.previous_hash()
         
         if previous_hash is None:
             previous_height, previous_node = -1, None
         elif previous_hash not in self.nodes:
-            return False
+            return "orphan"
         else:
             previous_height, previous_node = self.nodes[previous_hash]
         
@@ -174,10 +124,10 @@ class Chain(object):
         if height > self.highest.value[0]:
             self.highest.set((height, node))
         
-        return True
+        return "good"
 
 def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subsidy, nonce):
-    shares = (previous_node.shares[1:] if previous_node is not None else [SCRIPT]*SPREAD) + [add_script]
+    shares = (previous_node.shares if previous_node is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [add_script, add_script]
     
     dest_weights = {}
     for script in shares:
@@ -185,9 +135,9 @@ def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subs
     total_weight = sum(dest_weights.itervalues())
     
     amounts = dict((script, subsidy*weight*63//(64*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
-    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-    print 'generate_transaction. height:', 0 if previous_node is None else previous_node.height2 + 1, 'amounts:', [x/100000000 for x in amounts.itervalues()]
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    #print 'generate_transaction. height:', 0 if previous_node is None else previous_node.height2 + 1, 'amounts:', [x/100000000 for x in amounts.itervalues()]
     
     dests = sorted(amounts.iterkeys())
     
@@ -197,7 +147,7 @@ def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subs
             previous_output=dict(index=4294967295, hash=0),
             sequence=4294967295,
             script=coinbase_type.pack(dict(
-                identifier=IDENTIFIER,
+                identifier=net.IDENTIFIER,
                 last_p2pool_block_hash=last_p2pool_block_hash,
                 previous_p2pool_share_hash=previous_node.hash() if previous_node is not None else 2**256 - 1,
                 subsidy=subsidy,
@@ -213,7 +163,7 @@ def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subs
 def get_last_p2pool_block_hash(current_block_hash, get_block):
     block_hash = current_block_hash
     while True:
-        if block_hash == ROOT_BLOCK:
+        if block_hash == net.ROOT_BLOCK:
             defer.returnValue(block_hash)
         block = yield get_block(block_hash)
         coinbase_data = block['txns'][0]['tx_ins'][0]['script']
@@ -223,13 +173,13 @@ def get_last_p2pool_block_hash(current_block_hash, get_block):
             pass
         else:
             try:
-                if coinbase['identifier'] == IDENTIFIER:
+                if coinbase['identifier'] == net.IDENTIFIER:
                     payouts = {}
                     for tx_out in block['txns'][0]['tx_outs']:
                         payouts[tx_out['script']] = payouts.get(tx_out['script'], 0) + tx_out['value']
                     subsidy = sum(payouts.itervalues())
                     if coinbase['subsidy'] == subsidy:
-                        if payouts.get(SCRIPT, 0) >= subsidy//64:
+                        if payouts.get(net.SCRIPT, 0) >= subsidy//64:
                             defer.returnValue(block_hash)
             except Exception:
                 print
@@ -314,9 +264,9 @@ def main():
         
         share_dbs = [bsddb.hashopen(filename) for filename in args.store_shares]
         
-        def work_changed(new_work):
-            print "Work changed:", new_work
-        current_work.changed.watch(work_changed)
+        #def work_changed(new_work):
+        #    print "Work changed:", new_work
+        #current_work.changed.watch(work_changed)
         
         @defer.inlineCallbacks
         def get_real_work():
@@ -347,17 +297,19 @@ def main():
         merkle_root_to_transactions = expiring_dict.ExpiringDict(1000)
         
         def compute(state):
-            transactions = [generate_transaction(
+            generate_txn, shares = generate_transaction(
                 last_p2pool_block_hash=state['last_p2pool_block_hash'],
                 previous_node=state['highest_p2pool_share'],
                 add_script=my_script,
                 subsidy=50*100000000 >> state['height']//210000,
                 nonce=random.randrange(2**64),
-            )[0]]
+            )
+            print "Generating, have", shares.count(my_script) - 1, "shares in current chain"
+            transactions = [generate_txn] # XXX
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
-            return ba.getwork(TARGET_MULTIPLIER)
+            return ba.getwork(net.TARGET_MULTIPLIER)
         
         def got_response(data):
             # match up with transactions
@@ -391,26 +343,31 @@ def main():
             node = Node(block)
             
             chain = chains.setdefault(node.chain_id(), Chain(node.chain_id()))
-            
-            if chain.accept(node):
+            res = chain.accept(node)
+            if res == "good":
                 print 'Accepted share, passing to peers. Hash: %x' % (node.hash(),)
                 block_data = bitcoin_p2p.block.pack(block)
                 for peer in p2p_node.peers:
                     if peer is contact:
                         continue
-                    peer.block(block_data)
+                    peer.block(block_data) #.addErrback(lambda fail: None)
                 hash_data = bitcoin_p2p.HashType().pack(node.hash())
                 for share_db in share_dbs:
                     share_db[hash_data] = block_data
-            else:
+                    share_db.sync()
+            elif res == "dup":
+                print "Got duplicate share, ignoring", node.hash()
+            elif res == "orphan":
                 print 'Got share referencing unknown share, requesting past shares from peer', node.hash()
-                contact.get_blocks(node.chain_id(), chain.highest.value[1])
+                contact.get_blocks(node.chain_id(), chain.highest.value[1].hash() if chain.highest.value[1] is not None else None) #.addErrback(lambda fail: None)
+            else:
+                raise ValueError("unknown result from chain.accept - %r" % (res,))
             
             w = dict(current_work.value)
             w['highest_p2pool_share'] = w['current_chain'].highest.value[1]
             current_work.set(w)
             
-            return bitcoin_p2p.block_hash(block['headers']) <= TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
+            return bitcoin_p2p.block_hash(block['headers']) <= net.TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
         
         @defer.inlineCallbacks
         def getBlocksCallback2(chain_id, highest, contact):
@@ -452,6 +409,16 @@ def main():
         yield p2p_node._joinDeferred
         p2p_node.printContacts()
         
+        @defer.inlineCallbacks
+        def send_pings():
+            while True:
+                yield util.sleep(random.expovariate(1/60))
+                for peer in p2p_node.peers:
+                    print "pinged", peer
+                    peer.ping()
+                p2p_node.iterativeFindNode(p2p_node._generateID())
+        send_pings()
+        
         print '    ...success!'
         print
         
@@ -477,7 +444,59 @@ def main():
         print "Fatal error:"
         traceback.print_exc()
         print
-        reactor.stop()
+    reactor.stop()
 
-reactor.callWhenRunning(main)
-reactor.run()
+if __name__ == "__main__":
+    try:
+        __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
+    except IOError:
+        __version__ = 'unknown'
+    
+    name = 'p2pool (version %s)' % (__version__,)
+    
+    parser = argparse.ArgumentParser(description=name)
+    parser.add_argument('--version', action='version', version=__version__)
+    parser.add_argument('-t', '--testnet',
+        help='use the testnet; make sure you change the ports too',
+        action='store_true', default=False, dest='testnet')
+    parser.add_argument('-s', '--store-shares', metavar='FILENAME',
+        help='write shares to a database (not needed for normal usage)',
+        type=str, action='append', default=[], dest='store_shares')
+    
+    p2pool_group = parser.add_argument_group('p2pool interface')
+    p2pool_group.add_argument('-p', '--p2pool-port', metavar='PORT',
+        help='use UDP port PORT to connect to other p2pool nodes and listen for connections (default: random)',
+        type=int, action='store', default=None, dest='p2pool_port')
+    p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR:PORT',
+        help='connect to existing p2pool node at ADDR listening on UDP port PORT, in addition to builtin addresses',
+        type=str, action='append', default=[], dest='p2pool_nodes')
+    
+    worker_group = parser.add_argument_group('worker interface')
+    worker_group.add_argument('-w', '--worker-port', metavar='PORT',
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 8338)',
+        type=int, action='store', default=8338, dest='worker_port')
+    
+    bitcoind_group = parser.add_argument_group('bitcoind interface')
+    bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
+        help='connect to a bitcoind at this address (default: 127.0.0.1)',
+        type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
+    bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
+        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332)',
+        type=int, action='store', default=8332, dest='bitcoind_rpc_port')
+    bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
+        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333)',
+        type=int, action='store', default=8333, dest='bitcoind_p2p_port')
+    
+    bitcoind_group.add_argument(metavar='BITCOIND_RPC_USERNAME',
+        help='bitcoind RPC interface username',
+        type=str, action='store', dest='bitcoind_rpc_username')
+    bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
+        help='bitcoind RPC interface password',
+        type=str, action='store', dest='bitcoind_rpc_password')
+    
+    args = parser.parse_args()
+    
+    net = Testnet if args.testnet else Main
+    
+    reactor.callWhenRunning(main)
+    reactor.run()

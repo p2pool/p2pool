@@ -1,5 +1,6 @@
 import random
 import collections
+import hashlib
 
 from twisted.internet import defer, reactor
 from twisted.python import failure
@@ -201,3 +202,36 @@ class DeferredCacher(object):
         
         self.backing[key] = value
         defer.returnValue(value)
+
+def pubkey_to_address(pubkey, testnet):
+    if len(pubkey) != 65:
+        raise ValueError("invalid pubkey")
+    version = 111 if testnet else 0
+    key_hash = chr(version) + hashlib.new('ripemd160', hashlib.sha256(pubkey).digest()).digest()
+    checksum = hashlib.sha256(hashlib.sha256(key_hash).digest()).digest()[:4]
+    return base58_encode(key_hash + checksum)
+
+def base58_encode(data):
+    return "1"*(len(data) - len(data.lstrip(chr(0)))) + natural_to_string(string_to_natural(data), "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+
+def natural_to_string(n, alphabet=None, min_width=1):
+    if alphabet is None:
+        s = '%x' % (n,)
+        if len(s) % 2:
+            s = '\0' + x
+        return s.decode('hex').rjust(min_width, '\x00')
+    res = []
+    while n:
+        n, x = divmod(n, len(alphabet))
+        res.append(alphabet[x])
+    res.reverse()
+    return ''.join(res).rjust(min_width, '\x00')
+
+def string_to_natural(s, alphabet=None):
+    if alphabet is None:
+        s = s.encode('hex')
+        return int(s, 16)
+    if not s or (s != alphabet[0] and s.startswith(alphabet[0])):
+        raise ValueError()
+    return sum(alphabet.index(char) * len(alphabet)**i for i, char in enumerate(reversed(s)))
+
