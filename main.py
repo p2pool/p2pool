@@ -383,7 +383,9 @@ def main():
             
             node = Node(block)
             
-            if chains.setdefault(node.chain_id(), Chain(node.chain_id())).accept(node):
+            chain = chains.setdefault(node.chain_id(), Chain(node.chain_id()))
+            
+            if chain.accept(node):
                 print 'Accepted share, passing to peers. Hash: %x' % (node.hash(),)
                 block_data = bitcoin_p2p.block.pack(block)
                 for peer in p2p_node.peers:
@@ -392,7 +394,7 @@ def main():
                     peer.block(block_data)
             else:
                 print 'Got share referencing unknown share, requesting past shares from peer', node.hash()
-                contact.get_blocks(node.chain_id())
+                contact.get_blocks(node.chain_id(), chain.highest.value[1])
             
             w = dict(current_work.value)
             w['highest_p2pool_share'] = w['current_chain'].highest.value[1]
@@ -401,20 +403,26 @@ def main():
             return bitcoin_p2p.block_hash(block['headers']) <= TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
         
         @defer.inlineCallbacks
-        def getBlocksCallback2(chain_id, contact):
+        def getBlocksCallback2(chain_id, highest, contact):
             chain = chains.setdefault(chain_id, Chain(chain_id))
-            blocks = []
-            node = chain.highest.value[1]
-            if node is None:
-                return
-            while True:
-                blocks.append(node.block)
-                previous_hash = node.previous_hash()
-                if previous_hash is None:
-                    break
-                node = chain.nodes[previous_hash][1]
+            
+            def get_down(node_hash):
+                blocks = []
+                while node_hash in chain.nodes:
+                    node = chain.nodes[node_hash][1]
+                    blocks.append(node_hash)
+                    
+                    node_hash = node.previous_hash()
+                    if node_hash is None:
+                        break
+                return blocks
+            
+            blocks = get_down(chain.highest.value[1].hash())
+            have = set(get_down(highest) if highest is not None else [])
             
             for block in reversed(blocks):
+                if block in have:
+                    continue
                 contact.block(bitcoin_p2p.block.pack(block))
                 yield util.sleep(.05)
         

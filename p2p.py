@@ -54,8 +54,8 @@ class Node(node.Node):
             traceback.print_exc()
     
     @node.rpcmethod
-    def get_blocks(self, chain_id, _rpcNodeID, _rpcNodeContact):
+    def get_blocks(self, chain_id, highest, _rpcNodeID, _rpcNodeContact):
         try:
-            self.getBlocksCallback(tuple(chain_id), _rpcNodeContact)
+            self.getBlocksCallback(tuple(chain_id), highest, _rpcNodeContact)
         except:
             traceback.print_exc()
