@@ -304,7 +304,7 @@ def main():
                 subsidy=50*100000000 >> state['height']//210000,
                 nonce=random.randrange(2**64),
             )
-            print "Generating, have", shares.count(my_script) - 1, "shares in current chain"
+            print "Generating, have", shares.count(my_script) - 2, "share(s) in the current chain."
             transactions = [generate_txn] # XXX
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
