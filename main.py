@@ -423,7 +423,7 @@ def main():
             for block in reversed(blocks):
                 if block in have:
                     continue
-                contact.block(bitcoin_p2p.block.pack(chain.nodes[block][1]))
+                contact.block(bitcoin_p2p.block.pack(chain.nodes[block][1].block))
                 yield util.sleep(.05)
         
         def getBlocksCallback(chain_id, highest, contact):
