@@ -23,10 +23,11 @@ class Node(node.Node):
             for contact in bucket._contacts:
                 yield contact
     
-    def __init__(self, blockCallback, **kwargs):
+    def __init__(self, blockCallback, getBlocksCallback, **kwargs):
         #node.Node.__init__(self, networkProtocol=protocol.KademliaProtocol(self, msgEncoder=CustomBencode("p2pool")), **kwargs)
         node.Node.__init__(self, **kwargs)
         self.blockCallback = blockCallback
+        self.getBlocksCallback = getBlocksCallback
     
     # disable data storage
     
@@ -44,5 +45,9 @@ class Node(node.Node):
     # meat
     
     @node.rpcmethod
-    def block(self, block_data):
-        self.blockCallback(bitcoin_p2p.block.unpack(block_data))
+    def block(self, block_data, _rpcNodeID, _rpcNodeContact):
+        self.blockCallback(bitcoin_p2p.block.unpack(block_data), _rpcNodeContact)
+    
+    @node.rpcmethod
+    def get_blocks(self, chain_id, _rpcNodeID, _rpcNodeContact):
+        self.getBlocksCallback(chain_id, _rpcNodeContact)

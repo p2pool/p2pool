@@ -63,15 +63,14 @@ bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
 
 args = parser.parse_args()
 
+# TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 if args.testnet:
-    TARGET_MULTIPLIER = 32
-    SPREAD = 32
+    TARGET_MULTIPLIER = SPREAD = 32
     ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
 else:
-    TARGET_MULTIPLIER = 1000000 # 100
-    SPREAD = 100
+    TARGET_MULTIPLIER = SPREAD = 256
     ROOT_BLOCK = 0xe891d9dfc38eca8f13e2e6d81e3e68c018c2500230961462cb0
     SCRIPT = '410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac'.decode('hex')
     IDENTIFIER = 0x49ddc0b4938708ad
@@ -127,6 +126,7 @@ class Node(object):
         #print
         #print
         self.shares = shares
+        self.height2 = height2
         return True
 
 class Chain(object):
@@ -182,7 +182,7 @@ def generate_transaction(last_p2pool_block_hash, previous_node, add_script, subs
     amounts = dict((script, subsidy*weight*63//(64*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
     amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-    print 'generate_transaction. amounts:', [x/100000000 for x in amounts.itervalues()]
+    print 'generate_transaction. height:', 0 if previous_node is None else previous_node.height2 + 1, 'amounts:', [x/100000000 for x in amounts.itervalues()]
     
     dests = sorted(amounts.iterkeys())
     
@@ -307,6 +307,10 @@ def main():
         # information affecting work that should not trigger a long-polling update
         current_work2 = util.Variable(None)
         
+        def work_changed(new_work):
+            print "Work changed:", new_work
+        current_work.changed.watch(work_changed)
+        
         @defer.inlineCallbacks
         def get_real_work():
             work, height = yield getwork(bitcoind)
@@ -369,10 +373,11 @@ def main():
         
         seen = set() # grows indefinitely!
         
-        def p2pCallback(block):
-            print block
-            if bitcoin_p2p.block_hash(block['headers']) <= conv.bits_to_target(block['headers']['bits']):
-                print 'Got block! Passing to bitcoind!'
+        def p2pCallback(block, contact=None):
+            hash_ = bitcoin_p2p.block_hash(block['headers'])
+            #print block
+            if hash_ <= conv.bits_to_target(block['headers']['bits']):
+                print 'Got block! Passing to bitcoind!', hash_
                 if factory.conn is not None:
                     factory.conn.addInv('block', block)
             
@@ -382,11 +387,12 @@ def main():
                 print 'Accepted share, passing to peers. Hash: %x' % (node.hash(),)
                 block_data = bitcoin_p2p.block.pack(block)
                 for peer in p2p_node.peers:
+                    if peer is contact:
+                        continue
                     peer.block(block_data)
             else:
-                print 'Got share referencing unknown share, requesting past shares from peer'
-                # missing history
-                0/0
+                print 'Got share referencing unknown share, requesting past shares from peer', node.hash()
+                contact.get_blocks(node.chain_id())
             
             w = dict(current_work.value)
             w['highest_p2pool_share'] = w['current_chain'].highest.value[1]
@@ -394,10 +400,14 @@ def main():
             
             return bitcoin_p2p.block_hash(block['headers']) <= TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
         
+        def getBlocksCallback(chain_id, contact):
+            for x in chains.setdefault(chain_id, Chain(chain_id)).nodes: # XXX
+                contact.block(x)
+        
         port = random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port
         print 'Joining p2pool network using UDP port %i...' % (port,)
         
-        p2p_node = p2p.Node(p2pCallback, udpPort=port)
+        p2p_node = p2p.Node(p2pCallback, getBlocksCallback, udpPort=port)
         def parse(x):
             ip, port = x.split(':')
             return ip, int(port)
