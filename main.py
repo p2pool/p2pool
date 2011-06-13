@@ -401,8 +401,20 @@ def main():
             return bitcoin_p2p.block_hash(block['headers']) <= TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
         
         def getBlocksCallback(chain_id, contact):
-            for height, node in reversed(chains.setdefault(chain_id, Chain(chain_id)).nodes.itervalues()): # XXX
-                contact.block(bitcoin_p2p.block.pack(node.block))
+            chain = chains.setdefault(chain_id, Chain(chain_id))
+            blocks = []
+            node = chain.highest.value[1]
+            if node is None:
+                return
+            while True:
+                blocks.append(node.block)
+                previous_hash = node.previous_hash()
+                if previous_hash is None:
+                    break
+                node = chain.nodes[previous_hash]
+            
+            for block in reversed(blocks):
+                contact.block(bitcoin_p2p.block.pack(block))
         
         port = random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port
         print 'Joining p2pool network using UDP port %i...' % (port,)
