@@ -216,9 +216,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_getaddrs(self, count):
         self.send_addrs(addrs=[
             dict(
-                timestamp=self.node.addr_store[address, port][2],
+                timestamp=self.node.addr_store[host, port][2],
                 address=dict(
-                    services=self.node.addr_store[address, port][0],
+                    services=self.node.addr_store[host, port][0],
                     address=host,
                     port=port,
                 ),
