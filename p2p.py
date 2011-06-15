@@ -122,7 +122,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     @property
     def mode(self):
-        return min(self.node.mode.value, self.other_mode.value)
+        return min(self.node.mode_var.value, self.other_mode_var.value)
     
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
