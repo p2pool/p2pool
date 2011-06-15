@@ -35,7 +35,7 @@ class Chain(object):
         if share.chain_id_data != self.chain_id_data:
             raise ValueError('share does not belong to this chain')
         
-        if share.hash in self.shares:
+        if share.hash in self.share2s:
             return 'dup'
         
         if share.previous_share_hash is None:
