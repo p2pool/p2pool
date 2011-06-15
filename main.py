@@ -230,6 +230,8 @@ def main(args):
                 print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
             elif res == 'orphan':
                 print 'Got share referencing unknown share, requesting past shares from peer. Hash: %x' % (share.hash,)
+                if peer is None:
+                    raise ValueError()
                 peer.getsharesbychain(
                     chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
                     have=chain.highest.value[1].hash() if chain.highest.value[1] is not None else None
@@ -240,6 +242,17 @@ def main(args):
             w = dict(current_work.value)
             w['highest_p2pool_share2'] = w['current_chain'].get_highest_share2()
             current_work.set(w)
+        
+        def p2pCallback2(chain_id_data, hash, peer):
+            chain = get_chain(chain_id_data)
+            if chain is current_work.value['current_chain']:
+                if hash not in chain.shares:
+                    if hash not in chain.requesting:
+                        peer.send_getshares(hashes=[hash])
+                        chain.requesting.add(hash)
+                        reactor.callLater(5, chain.requesting.remove, hash)
+            else:
+                chain.
         
         @defer.inlineCallbacks
         def getBlocksCallback2(chain_id_data, highest, contact):
@@ -285,10 +298,11 @@ def main(args):
             port=args.p2pool_port,
             testnet=args.testnet,
             addr_store=gdbm.open(os.path.join(os.path.dirname(__file__), 'peers.dat'), 'cs'),
-            mode=1 if args.low_bandwidth else 0,
+            mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
         p2p_node.handle_share = p2pCallback
+        p2p_node.handle_share_hash = p2pCallback2
         p2p_node.handle_get_blocks = getBlocksCallback
         
         p2p_node.start()
