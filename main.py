@@ -334,7 +334,7 @@ def main(args):
             header = conv.decode_data(data)
             transactions = merkle_root_to_transactions.get(header['merkle_root'], None)
             if transactions is None:
-                print "Couldn't link returned work's merkle root with transactions - should only happen if you recently restarted p2pool"
+                print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
             share = p2pool.Share(header=header, txns=transactions)
             try:

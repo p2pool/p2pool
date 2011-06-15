@@ -46,6 +46,11 @@ def check_merkle_branch(hash_, branch):
             hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record.pack(dict(left=hash_, right=step['hash'])))
     return hash_
 
+def txns_to_gentx(txns):
+    return dict(
+        tx=txns[0],
+        merkle_branch=calculate_merkle_branch(txn_list, 0),
+    )
 
 class Share(object):
     def __init__(self, header, txns=None, gentx=None):
@@ -61,8 +66,9 @@ class Share(object):
             else:
                 raise ValueError("need either txns or gentx")
         else:
+            self.gentx = txns_to_gentx(txns)
             if gentx is not None:
-                if gentx != txns_to_gentx(txns):
+                if gentx != self.gentx:
                     raise ValueError("invalid gentx")
         
         self.coinbase = coinbase_type.unpack(self.gentx['tx']['tx_ins'][0]['script'], ignore_extra=True)
