@@ -401,9 +401,7 @@ def main():
         def getBlocksCallback(chain_id, highest, contact):
             getBlocksCallback2(chain_id, highest, contact)
         
-        port = {False: 9333, True: 19333}[args.testnet] if args.p2pool_port is None else args.p2pool_port
-        print 'Joining p2pool network using TCP port %i...' % (port,)
-        
+        print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
         def parse(x):
             if ':' in x:
@@ -418,7 +416,7 @@ def main():
             nodes = [('72.14.191.28', 9333)] 
         
         p2p_node = p2p.Node(
-            port=port,
+            port=args.p2pool_port,
             testnet=args.testnet, 
             addr_store=gdbm.open(os.path.join(os.path.dirname(__file__), 'peers.dat'), 'cs'),
             mode=1 if args.low_bandwidth else 0,
@@ -520,6 +518,9 @@ if __name__ == '__main__':
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = {False: 8333, True: 18333}[args.testnet]
+    
+    if args.p2pool_port is None:
+        args.p2pool_port = {False: 9333, True: 19333}[args.testnet]
     
     net = Testnet if args.testnet else Main
     
