@@ -49,7 +49,7 @@ def check_merkle_branch(hash_, branch):
 def txns_to_gentx(txns):
     return dict(
         tx=txns[0],
-        merkle_branch=calculate_merkle_branch(txn_list, 0),
+        merkle_branch=calculate_merkle_branch(txns, 0),
     )
 
 class Share(object):
