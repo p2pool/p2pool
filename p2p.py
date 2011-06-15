@@ -233,7 +233,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share1s(self, share1s):
         for share1 in share1s:
             hash_ = bitcoin_p2p.block_hash(share1['header'])
-            if hash_ <= bitcoin_p2p.target_to_bits(share1['header']['bits']):
+            if hash_ <= conv.bits_to_target(share1['header']['bits']):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
@@ -241,7 +241,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share2s(self, share2s):
         for share2 in share2s:
             hash_ = bitcoin_p2p.block_hash(share2['header'])
-            if not hash_ <= bitcoin_p2p.target_to_bits(share1['header']['bits']):
+            if not hash_ <= conv.bits_to_target(share1['header']['bits']):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
@@ -249,7 +249,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def send_share(self, share):
         hash_ = bitcoin_p2p.block_hash(share['header'])
-        if hash_ <= bitcoin_p2p.target_to_bits(share['header']['bits']):
+        if hash_ <= conv.bits_to_target(share['header']['bits']):
             if 'txns' not in share:
                 raise ValueError("partial block matching bits passed to send_share")
             self.send_share2s([share])
