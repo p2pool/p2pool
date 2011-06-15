@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from __future__ import division
 
 import argparse
@@ -493,8 +495,8 @@ if __name__ == '__main__':
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 8338)',
-        type=int, action='store', default=8338, dest='worker_port')
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 9332)',
+        type=int, action='store', default=9332, dest='worker_port')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
@@ -504,8 +506,8 @@ if __name__ == '__main__':
         help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332)',
         type=int, action='store', default=8332, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333)',
-        type=int, action='store', default=8333, dest='bitcoind_p2p_port')
+        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 normally. 18333 for testnet)',
+        type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPC_USERNAME',
         help='bitcoind RPC interface username',
@@ -515,6 +517,9 @@ if __name__ == '__main__':
         type=str, action='store', dest='bitcoind_rpc_password')
     
     args = parser.parse_args()
+    
+    if args.bitcoind_p2p_port is None:
+        args.bitcoind_p2p_port = {False: 8333, True: 18333}[args.testnet]
     
     net = Testnet if args.testnet else Main
     

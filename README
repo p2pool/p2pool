@@ -4,14 +4,12 @@ configurations, using p2p should be as simple as:
 
     python main.py <rpc_username> <rpc_password>
 
-Then run your miner program, connecting to 127.0.0.1 on port 8338 with any
+Then run your miner program, connecting to 127.0.0.1 on port 9332 with any
 username and password.
 
 
-If you are behind a NAT, it will help to enable UDP port forwarding on your
-router. Forward any random port to the host running p2pool.py and then use:
-
-    python main.py -p <PORT> <rpc_username> <rpc_password>
+If you are behind a NAT, it will help to enable TCP port forwarding on your
+router. Forward port 9333 to the host running p2pool.py.
 
 
 Use
