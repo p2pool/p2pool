@@ -42,7 +42,7 @@ def calculate_merkle_branch(txn_list, index):
                 zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
         ]
     
-    assert check_merkle_branch(bitcoin_p2p.doublesha(bitcoin_p2p.tx.pack(txn_list[index])), hash_list[0][2]) == hash_list[0][0]
+    assert check_merkle_branch(txn_list[index], hash_list[0][2]) == hash_list[0][0]
     
     return hash_list[0][2]
 
