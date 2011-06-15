@@ -1,6 +1,7 @@
 import random
 import collections
 import hashlib
+import itertools
 
 from twisted.internet import defer, reactor
 from twisted.python import failure
@@ -24,22 +25,31 @@ class DeferredResource(resource.Resource):
 
 class Event(object):
     def __init__(self):
-        self.observers = []
-        self.one_time_observers = []
+        self.observers = {}
+        self.one_time_observers = {}
+        self.id_generator = itertools.count()
     
     def watch(self, func):
-        self.observers.append(func)
+        id = self.id_generator.next()
+        self.observers[id] = func
+        return id
+    def unwatch(self, id):
+        self.observers.pop(id)
     
     def watch_one_time(self, func):
-        self.one_time_observers.append(func)
+        id = self.id_generator.next()
+        self.one_timeobservers[id] = func
+        return id
+    def unwatch_one_time(self, id):
+        self.one_time_observers.pop(id)
     
-    def happened(self, event):
-        for func in self.observers:
+    def happened(self, event=None):
+        for func in self.observers.itervalues():
             func(event)
         
         one_time_observers = self.one_time_observers
-        self.one_time_observers = []
-        for func in one_time_observers:
+        self.one_time_observers = {}
+        for func in one_time_observers.itervalues():
             func(event)
     
     def get_deferred(self):
@@ -235,3 +245,34 @@ def string_to_natural(s, alphabet=None):
         raise ValueError()
     return sum(alphabet.index(char) * len(alphabet)**i for i, char in enumerate(reversed(s)))
 
+
+class DictWrapper(object):
+    def encode_key(self, key):
+        return key
+    def decode_key(self, encoded_key):
+        return encoded_key
+    def encode_value(self, value):
+        return value
+    def decode_value(self, encoded_value):
+        return encoded_value
+    
+    def __init__(self, inner):
+        self.inner = inner
+    
+    def __len__(self):
+        return len(self.inner)
+    
+    def __contains__(self, key):
+        return self.encode_key(key) in self.inner
+    
+    def __getitem__(self, key):
+        return self.decode_value(self.inner[self.encode_key(key)])
+    
+    def __setitem__(self, key, value):
+        self.inner[self.encode_key(key)] = self.encode_value(value)
+    
+    def __delitem__(self, key):
+        del self.inner[self.encode_key(key)]
+    
+    def keys(self):
+        return map(self.decode_key, self.inner.keys())

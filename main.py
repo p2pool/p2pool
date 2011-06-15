@@ -6,7 +6,7 @@ import os
 import sys
 import traceback
 import random
-import bsddb
+import gdbm
 
 from twisted.internet import reactor, defer
 from twisted.web import server
@@ -23,7 +23,7 @@ import expiring_dict
 
 class Testnet(object):
     TARGET_MULTIPLIER = SPREAD = 32
-    ROOT_BLOCK = 0x201e963d56e4becd1d8fc3fd72a53f23d80898cdacdabae2c4fde24
+    ROOT_BLOCK = 0x3575d1e7b40fe37ad12d41169a1012d26df5f3c35486e2abfbe9d2c
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7
 
@@ -46,7 +46,7 @@ class Node(object):
     def __init__(self, block):
         self.block = block
         self.block_data = bitcoin_p2p.block.pack(block)
-        self.block_hash = bitcoin_p2p.block_hash(block['headers'])
+        self.block_hash = bitcoin_p2p.block_hash(block['header'])
         self.coinbase = coinbase_type.unpack(self.block['txns'][0]['tx_ins'][0]['script'], ignore_extra=True)
         self.shared = False
     
@@ -60,7 +60,7 @@ class Node(object):
         return hash_
     
     def chain_id(self):
-        return (self.coinbase['last_p2pool_block_hash'], self.block['headers']['bits'])
+        return (self.coinbase['last_p2pool_block_hash'], self.block['header']['bits'])
     
     def check(self, chain, height2, previous_node):
         # check bits and target
@@ -191,7 +191,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block):
                 print 'block:', block
                 traceback.print_exc()
                 print
-        block_hash = block['headers']['previous_block']
+        block_hash = block['header']['previous_block']
 
 @defer.inlineCallbacks
 def getwork(bitcoind):
@@ -266,7 +266,7 @@ def main():
         # information affecting work that should not trigger a long-polling update
         current_work2 = util.Variable(None)
         
-        share_dbs = [bsddb.hashopen(filename) for filename in args.store_shares]
+        share_dbs = [gdbm.open(filename, 'cs') for filename in args.store_shares]
         
         @defer.inlineCallbacks
         def get_real_work():
@@ -313,12 +313,12 @@ def main():
         
         def got_response(data):
             # match up with transactions
-            headers = conv.decode_data(data)
-            transactions = merkle_root_to_transactions.get(headers['merkle_root'], None)
+            header = conv.decode_data(data)
+            transactions = merkle_root_to_transactions.get(header['merkle_root'], None)
             if transactions is None:
                 print "Couldn't link returned work's merkle root with transactions - should only happen if you recently restarted p2pool"
                 return False
-            block = dict(headers=headers, txns=transactions)
+            block = dict(header=header, txns=transactions)
             try:
                 return p2pCallback(block)
             except:
@@ -334,13 +334,13 @@ def main():
             for peer in p2p_node.peers:
                 if peer is ignore_peer:
                     continue
-                peer.block(node.block_data) #.addErrback(lambda fail: None)
+                peer.send_share(node.block)
             node.flag_shared()
         
         def p2pCallback(block, contact=None):
-            hash_ = bitcoin_p2p.block_hash(block['headers'])
+            hash_ = bitcoin_p2p.block_hash(block['header'])
             #print block
-            if hash_ <= conv.bits_to_target(block['headers']['bits']):
+            if hash_ <= conv.bits_to_target(block['header']['bits']):
                 print 'Got block! Passing to bitcoind!', hash_
                 if factory.conn is not None:
                     factory.conn.addInv('block', block)
@@ -371,7 +371,7 @@ def main():
             w['highest_p2pool_share'] = w['current_chain'].highest.value[1]
             current_work.set(w)
             
-            return bitcoin_p2p.block_hash(block['headers']) <= net.TARGET_MULTIPLIER*conv.bits_to_target(block['headers']['bits'])
+            return bitcoin_p2p.block_hash(block['header']) <= net.TARGET_MULTIPLIER*conv.bits_to_target(block['header']['bits'])
         
         @defer.inlineCallbacks
         def getBlocksCallback2(chain_id, highest, contact):
@@ -395,23 +395,37 @@ def main():
                 if block in have:
                     continue
                 contact.block(chain.nodes[block][1].block_data)
-                yield util.sleep(.05)
         
         def getBlocksCallback(chain_id, highest, contact):
             getBlocksCallback2(chain_id, highest, contact)
         
-        port = random.randrange(49152, 65536) if args.p2pool_port is None else args.p2pool_port
-        print 'Joining p2pool network using UDP port %i...' % (port,)
+        port = {False: 9333, True: 19333}[args.testnet] if args.p2pool_port is None else args.p2pool_port
+        print 'Joining p2pool network using TCP port %i...' % (port,)
         
-        p2p_node = p2p.Node(p2pCallback, getBlocksCallback, udpPort=port)
+        
         def parse(x):
-            ip, port = x.split(':')
-            return ip, int(port)
+            if ':' in x:
+                ip, port = x.split(':')
+                return ip, int(port)
+            else:
+                return ip, {False: 9333, True: 19333}[args.testnet]
         
-        nodes = [('72.14.191.28', 21519)] # XXX
-        p2p_node.joinNetwork(map(parse, args.p2pool_nodes) + nodes)
-        yield p2p_node._joinDeferred
-        #p2p_node.printContacts()
+        if args.testnet:
+            nodes = [('72.14.191.28', 19333)] 
+        else:
+            nodes = [('72.14.191.28', 9333)] 
+        
+        p2p_node = p2p.Node(
+            port=port,
+            testnet=args.testnet, 
+            addr_store=gdbm.open(os.path.join(os.path.dirname(__file__), 'peers.dat'), 'cs'),
+            mode=1 if args.low_bandwidth else 0,
+            preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
+        )
+        p2p_node.handle_share = p2pCallback
+        p2p_node.handle_get_blocks = getBlocksCallback
+        
+        p2p_node.start()
         
         # send nodes when the chain changes to their chain
         def work_changed(new_work):
@@ -422,16 +436,6 @@ def main():
                     share_node(node)
         current_work.changed.watch(work_changed)
         
-        @defer.inlineCallbacks
-        def send_pings():
-            while True:
-                yield util.sleep(random.expovariate(1/60))
-                for peer in p2p_node.peers:
-                    print 'Pinged p2pool peer %s:%i' % (peer.address, peer.port)
-                    peer.ping()
-                p2p_node.iterativeFindNode(p2p_node._generateID())
-        send_pings()
-        
         print '    ...success!'
         print
         
@@ -439,7 +443,7 @@ def main():
         
         print 'Listening for workers on port %i...' % (args.worker_port,)
         
-        yield reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
+        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
         
         print '    ...success!'
         print
@@ -478,11 +482,14 @@ if __name__ == '__main__':
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('-p', '--p2pool-port', metavar='PORT',
-        help='use UDP port PORT to connect to other p2pool nodes and listen for connections (default: random)',
+        help='use TCP port PORT to listen for connections (default: 9333 normally, 19333 for testnet) (forward this port from your router!)',
         type=int, action='store', default=None, dest='p2pool_port')
-    p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR:PORT',
-        help='connect to existing p2pool node at ADDR listening on UDP port PORT, in addition to builtin addresses',
+    p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
+        help='connect to existing p2pool node at ADDR listening on TCP port PORT (defaults to 9333 normally, 19333 for testnet), in addition to builtin addresses',
         type=str, action='append', default=[], dest='p2pool_nodes')
+    parser.add_argument('-l', '--low-bandwidth',
+        help='trade lower bandwidth usage for higher latency (reduced efficiency)',
+        action='store_true', default=False, dest='low_bandwidth')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',

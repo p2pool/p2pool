@@ -220,7 +220,7 @@ tx = ComposedType([
     ('lock_time', StructType('<I')),
 ])
 
-block_headers = ComposedType([
+block_header = ComposedType([
     ('version', StructType('<I')),
     ('previous_block', HashType()),
     ('merkle_root', HashType()),
@@ -230,7 +230,7 @@ block_headers = ComposedType([
 ])
 
 block = ComposedType([
-    ('headers', block_headers),
+    ('header', block_header),
     ('txns', ListType(tx)),
 ])
 
@@ -252,15 +252,39 @@ def merkle_hash(txn_list):
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
 
-def merkle_branch(txn_list, index):
-    hash_list = [doublesha(tx.pack(txn)) for txn in txn_list]
-    while len(hash_list) > 1:
-        hash_list = [doublesha(merkle_record.pack(dict(left=left, right=left if right is None else right)))
-            for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
-    return hash_list[0]
+merkle_branch = ListType(ComposedType([
+    ('side', StructType('<B')),
+    ('hash', HashType()),
+]))
 
-def block_hash(headers):
-    return doublesha(block_headers.pack(headers))
+def calculate_merkle_branch(txn_list, index):
+    hash_list = [(doublesha(tx.pack(data)), i == index, []) for i, data in enumerate(txn_list)]
+    
+    while len(hash_list) > 1:
+        hash_list = [
+            (
+                doublesha(merkle_record.pack(dict(left=left, right=right))),
+                left_f or right_f,
+                (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
+            )
+            for (left, left_f, left_l), (right, right_f, right_l) in
+                zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
+        ]
+    
+    assert check_merkle_branch(doublesha(tx.pack(txn_list[index])), hash_list[0][2]) == hash_list[0][0]
+    
+    return hash_list[0][2]
+
+def check_merkle_branch(hash_, branch):
+    for step in branch:
+        if not step['side']:
+            hash_ = doublesha(merkle_record.pack(dict(left=step['hash'], right=hash_)))
+        else:
+            hash_ = doublesha(merkle_record.pack(dict(left=hash_, right=step['hash'])))
+    return hash_
+
+def block_hash(header):
+    return doublesha(block_header.pack(header))
 
 class BaseProtocol(protocol.Protocol):
     def connectionMade(self):
@@ -270,7 +294,7 @@ class BaseProtocol(protocol.Protocol):
         while True:
             start = ""
             while start != self._prefix:
-                start = (start + (yield 1))[-4:]
+                start = (start + (yield 1))[-len(self._prefix):]
             
             command = (yield 12).rstrip('\0')
             length, = struct.unpack("<I", (yield 4))
@@ -307,11 +331,10 @@ class BaseProtocol(protocol.Protocol):
                 print "NO HANDLER FOR", command
                 continue
             
-            
             #print "RECV", command, payload2
             
             try:
-                handler(payload2)
+                handler(**payload2)
             except:
                 print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 traceback.print_exc()
@@ -328,6 +351,14 @@ class BaseProtocol(protocol.Protocol):
         data = self._prefix + struct.pack("<12sI", command, len(payload)) + checksum + payload
         self.transport.write(data)
         #print "SEND", command, payload2
+    
+    def __getattr__(self, attr):
+        prefix = "send_"
+        if attr.startswith(prefix):
+            command = attr[len(prefix):]
+            return lambda **payload2: self.sendPacket(command, payload2)
+        #return protocol.Protocol.__getattr__(self, attr)
+        raise AttributeError(attr)
 
 class Protocol(BaseProtocol):
     def __init__(self, testnet=False):
@@ -354,18 +385,24 @@ class Protocol(BaseProtocol):
             ('start_height', StructType('<I')),
         ]),
         'verack': ComposedType([]),
-        'addr': ListType(ComposedType([
-            ('timestamp', StructType('<I')),
-            ('address', address),
-        ])),
-        'inv': ListType(ComposedType([
-            ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
-            ('hash', HashType()),
-        ])),
-        'getdata': ListType(ComposedType([
-            ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
-            ('hash', HashType()),
-        ])),
+        'addr': ComposedType([
+            ('addrs', ListType(ComposedType([
+                ('timestamp', StructType('<I')),
+                ('address', address),
+            ]))),
+        ]),
+        'inv': ComposedType([
+            ('invs', ListType(ComposedType([
+                ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
+                ('hash', HashType()),
+            ]))),
+        ]),
+        'getdata': ComposedType([
+            ('requests', ListType(ComposedType([
+                ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
+                ('hash', HashType()),
+            ]))),
+        ]),
         'getblocks': ComposedType([
             ('version', StructType('<I')),
             ('have', ListType(HashType())),
@@ -376,9 +413,15 @@ class Protocol(BaseProtocol):
             ('have', ListType(HashType())),
             ('last', HashType()),
         ]),
-        'tx': tx,
-        'block': block,
-        'headers': ListType(block_headers),
+        'tx': ComposedType([
+            ('tx', tx),
+        ]),
+        'block': ComposedType([
+            ('block', block),
+        ]),
+        'headers': ComposedType([
+            ('headers', ListType(block_header)),
+        ]),
         'getaddr': ComposedType([]),
         'checkorder': ComposedType([
             ('id', HashType()),
@@ -405,7 +448,7 @@ class Protocol(BaseProtocol):
     def connectionMade(self):
         BaseProtocol.connectionMade(self)
         
-        self.sendPacket("version", dict(
+        self.send_version(
             version=32200,
             services=1,
             time=int(time.time()),
@@ -422,53 +465,48 @@ class Protocol(BaseProtocol):
             nonce=random.randrange(2**64),
             sub_version_num="",
             start_height=0,
-        ))
+        )
     
-    def handle_version(self, payload):
-        #print "VERSION", payload
-        self.version_after = payload['version']
-        self.sendPacket("verack")
+    def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
+        #print "VERSION", locals()
+        self.version_after = version
+        self.send_verack()
     
-    def handle_verack(self, payload):
+    def handle_verack(self):
         self.version = self.version_after
         
         # connection ready
-        self.check_order = util.GenericDeferrer(2**256, lambda id, order: self.sendPacket("checkorder", dict(id=id, order=order)))
-        self.submit_order = util.GenericDeferrer(2**256, lambda id, order: self.sendPacket("submitorder", dict(id=id, order=order)))
-        self.get_block = util.ReplyMatcher(lambda hash: self.sendPacket("getdata", [dict(type="block", hash=hash)]))
-        self.get_block_headers = util.ReplyMatcher(lambda hash: self.sendPacket("getdata", [dict(type="block", hash=hash)]))
+        self.check_order = util.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
+        self.submit_order = util.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
+        self.get_block = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type="block", hash=hash)]))
+        self.get_block_header = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type="block", hash=hash)]))
         
         if hasattr(self.factory, "resetDelay"):
             self.factory.resetDelay()
         if hasattr(self.factory, "gotConnection"):
             self.factory.gotConnection(self)
     
-    def handle_inv(self, payload):
-        for item in payload:
+    def handle_inv(self, invs):
+        for inv in invs:
             #print "INV", item['type'], hex(item['hash'])
-            self.sendPacket("getdata", [item])
+            self.send_getdata([inv])
     
-    def handle_addr(self, payload):
-        for addr in payload:
+    def handle_addr(self, addrs):
+        for addr in addrs:
             pass#print "ADDR", addr
     
-    def handle_reply(self, payload):
-        hash_ = payload.pop('hash')
-        self.check_order.got_response(hash_, payload)
-        self.submit_order.got_response(hash_, payload)
+    def handle_reply(self, hash, reply, script):
+        self.check_order.got_response(hash, dict(reply=reply, script=script))
+        self.submit_order.got_response(hash, dict(reply=reply, script=script))
     
-    def handle_tx(self, payload):
-        pass#print "TX", hex(merkle_hash([payload])), payload
+    def handle_tx(self, tx):
+        pass#print "TX", hex(merkle_hash([tx])), tx
     
-    def handle_block(self, payload):
-        self.get_block.got_response(block_hash(payload['headers']), payload)
-        #print "BLOCK", hex(block_hash(payload['headers']))
-        #print payload
-        #print merkle_hash(payload['txns'])
-        #print
-        self.factory.new_block.happened(payload)
+    def handle_block(self, block):
+        self.get_block.got_response(block_hash(block['header']), block)
+        self.factory.new_block.happened(block)
     
-    def handle_ping(self, payload):
+    def handle_ping(self):
         pass
     
     def connectionLost(self, reason):
@@ -491,13 +529,13 @@ class ProtocolInv(Protocol):
     def addInv(self, type_, data):
         if self.inv is None: self.inv = {}
         if type_ == "block":
-            hash_ = block_hash(data['headers'])
+            hash_ = block_hash(data['header'])
         elif type_ == "tx":
             hash_ = merkle_hash([data])
         else:
             raise ValueError("invalid type: %r" % (type_,))
         self.inv[(type_, hash_)] = data
-        self.sendPacket("inv", [dict(type=type_, hash=hash_)])
+        self.send_inv([dict(type=type_, hash=hash_)])
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = ProtocolInv
