@@ -218,7 +218,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share0s(self, chains):
         for chain in chains:
             for hash_ in chain['hashes']:
-                self.node.handle_share_hash((chain['chain_id']['previous_p2pool_block'], chain['chain_id']['bits']), hash_)
+                self.node.handle_share_hash(p2pool.chain_id_type.pack(chain['chain_id']), hash_)
     def handle_share1s(self, share1s):
         for share1 in share1s:
             hash_ = bitcoin_p2p.block_hash(share1['header'])
@@ -432,6 +432,10 @@ class Node(object):
             self.addr_store[host, port] = services, old_first_seen, max(old_last_seen, timestamp)
         else:
             self.addr_store[host, port] = services, timestamp, timestamp
+    
+    
+    def handle_share_hash(self, chain_id_data, hash):
+        print (chain_id_data, hash)
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)

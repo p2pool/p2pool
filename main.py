@@ -238,10 +238,8 @@ def main(args):
                 raise ValueError('unknown result from chain.accept - %r' % (res,))
             
             w = dict(current_work.value)
-            w['highest_p2pool_share'] = w['current_chain'].get_highest_share()
+            w['highest_p2pool_share2'] = w['current_chain'].get_highest_share2()
             current_work.set(w)
-            
-            return bitcoin_p2p.block_hash(block['header']) <= net.TARGET_MULTIPLIER*conv.bits_to_target(block['header']['bits'])
         
         @defer.inlineCallbacks
         def getBlocksCallback2(chain_id_data, highest, contact):
@@ -341,13 +339,15 @@ def main(args):
                 return False
             share = p2pool.Share(header=header, txns=transactions)
             try:
-                return p2pCallback(share)
+                p2pCallback(share)
             except:
                 print
                 print 'Error processing data received from worker:'
                 traceback.print_exc()
                 print
                 return False
+            else:
+                return True
         
         reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
         
