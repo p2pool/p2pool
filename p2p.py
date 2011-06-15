@@ -105,6 +105,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     other_version = None
     node_var_watch = None
+    connected2 = False
     
     @property
     def mode(self):
@@ -115,7 +116,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if isinstance(self.factory, ClientFactory):
             draw_line(self.node.port, self.transport.getPeer().port, (128, 128, 128))
         
-        chain = self.node.current_work['current_chain']
+        chain = self.node.current_work.value['current_chain']
         highest_share2 = chain.get_highest_share2()
         self.send_version(
             version=self.version,
@@ -143,8 +144,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         )
         
         self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
-        
-        self.connected2 = False
         
         self._think()
         self._think2()
@@ -314,7 +313,7 @@ class AddrStore(util.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, port, testnet, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100):
+    def __init__(self, current_work, port, testnet, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100):
         if addr_store is None:
             addr_store = {}
         
@@ -325,8 +324,7 @@ class Node(object):
         self.mode_var = util.Variable(mode)
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts
-        
-        self.current_work = dict(current_chain=None)
+        self.current_work = current_work
         
         self.nonce = random.randrange(2**64)
         self.attempts = {}

@@ -299,6 +299,7 @@ def main(args):
             nodes = [('72.14.191.28', 9333)]
         
         p2p_node = p2p.Node(
+            current_work=current_work,
             port=args.p2pool_port,
             testnet=args.testnet,
             addr_store=gdbm.open(os.path.join(os.path.dirname(__file__), 'peers.dat'), 'cs'),
