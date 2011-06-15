@@ -348,6 +348,7 @@ class Node(object):
         self.listen_port = reactor.listenTCP(self.port, ServerFactory(self))
         
         self._think()
+        self._think2()
     
     @defer.inlineCallbacks
     def _think(self):
@@ -368,13 +369,18 @@ class Node(object):
             except:
                 traceback.print_exc()
             
+            yield util.sleep(random.expovariate(1/5))
+    
+    @defer.inlineCallbacks
+    def _think2(self):
+        while self.running:
             try:
                 if len(self.addr_store) < self.preferred_addrs and self.peers:
-                    random.choice(self.peers.values()).send_getaddrs()
+                    random.choice(self.peers.values()).send_getaddrs(count=8)
             except:
                 traceback.print_exc()
             
-            yield util.sleep(random.expovariate(1/5))
+            yield util.sleep(random.expovariate(1/20))
     
     def stop(self):
         if not self.running:
