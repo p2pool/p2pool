@@ -47,7 +47,7 @@ class Chain(object):
         
         height = previous_height + 1
         
-        share2 = share.check(self, height, previous_share2) # raises exceptions
+        share2 = share.check(self, height, previous_share2, net) # raises exceptions
         
         if share2.share is not share:
             raise ValueError()

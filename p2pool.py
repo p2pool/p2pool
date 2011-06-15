@@ -80,7 +80,7 @@ class Share(object):
             raise ValueError("share does not contain all txns")
         return dict(header=self.header, txns=self.txns)
     
-    def check(self, chain, height, previous_share, net):
+    def check(self, chain, height, previous_share2, net):
         if self.chain_id_data != chain.chain_id_data:
             raise ValueError('wrong chain')
         if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(chain.bits):
@@ -89,7 +89,7 @@ class Share(object):
         t = self.gentx['tx']
         t2, shares = generate_transaction(
             last_p2pool_block_hash=chain.last_p2pool_block_hash,
-            previous_share=previous_share,
+            previous_share2=previous_share2,
             add_script=t['tx_outs'][self.coinbase['last_share_index']]['script'],
             subsidy=self.coinbase['subsidy'],
             nonce=self.coinbase['nonce'],
