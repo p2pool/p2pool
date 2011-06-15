@@ -214,7 +214,17 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             if random.random() < .7 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrs(addrs=[addr_record])
     def handle_getaddrs(self, count):
-        self.send_addrs(random.sample(map(bitcoin_p2p.address.unpack, self.node.addrs.keys()), min(count, len(self.node.addrs))))
+        self.send_addrs(addrs=[
+            dict(
+                timestamp=self.node.addr_store[address, port][2],
+                address=dict(
+                    services=self.node.addr_store[address, port][0],
+                    address=host,
+                    port=port,
+                ),
+            ) for host, port in 
+            random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
+        ])
     
     def handle_share0s(self, share0s):
         for share0 in share0s:
