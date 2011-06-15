@@ -333,7 +333,7 @@ def main():
         # setup p2p logic and join p2pool network
         
         def share_node(node, ignore_peer=None):
-            for peer in p2p_node.peers:
+            for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
                 peer.send_share(node.block)
@@ -413,7 +413,7 @@ def main():
         if args.testnet:
             nodes = [('72.14.191.28', 19333)] 
         else:
-            nodes = [('72.14.191.28', 9333)] 
+            nodes = [('72.14.191.28', 9333)]
         
         p2p_node = p2p.Node(
             port=args.p2pool_port,
