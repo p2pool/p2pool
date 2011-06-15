@@ -116,6 +116,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             draw_line(self.node.port, self.transport.getPeer().port, (128, 128, 128))
         
         chain = self.node.current_work['current_chain']
+        highest_share2 = chain.get_highest_share2()
         self.send_version(
             version=self.version,
             services=0,
@@ -133,13 +134,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             sub_version=self.sub_version,
             mode=self.node.mode_var.value,
             state=dict(
-                chain_id=dict(
-                    last_p2pool_block_hash=0,
-                    bits=0,
-                ),
+                chain_id=p2pool.chain_id_type.unpack(chain.chain_id_data),
                 highest=dict(
-                    hash=0,
-                    height=0,
+                    hash=highest_share2.hash,
+                    height=highest_share2.height,
                 ),
             ),
         )
@@ -226,7 +224,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = Share(share1['header'], gentx=share1['gentx'])
+            share = p2pool.Share(share1['header'], gentx=share1['gentx'])
             self.node.handle_share(share)
     def handle_share2s(self, share2s):
         for share2 in share2s:
@@ -235,7 +233,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = Share(share1['header'], txns=share1['txns'])
+            share = p2pool.Share(share1['header'], txns=share1['txns'])
             self.node.handle_share(share)
     
     def send_share(self, share):
