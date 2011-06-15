@@ -87,6 +87,7 @@ class Share(object):
             add_script=t['tx_outs'][self.coinbase['last_share_index']]['script'],
             subsidy=self.coinbase['subsidy'],
             nonce=self.coinbase['nonce'],
+            net=net,
         )
         if t2 != t:
             raise ValueError('invalid generate txn')

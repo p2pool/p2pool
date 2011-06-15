@@ -320,6 +320,7 @@ def main(args):
                 add_script=my_script,
                 subsidy=50*100000000 >> state['height']//210000,
                 nonce=random.randrange(2**64),
+                net=net,
             )
             print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain.'
             transactions = [generate_txn] # XXX
