@@ -7,6 +7,7 @@ import traceback
 from twisted.internet import defer, reactor, protocol, task
 
 import bitcoin_p2p
+import conv
 import util
 
 # mode
