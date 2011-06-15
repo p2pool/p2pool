@@ -38,7 +38,7 @@ class Event(object):
     
     def watch_one_time(self, func):
         id = self.id_generator.next()
-        self.one_timeobservers[id] = func
+        self.one_time_observers[id] = func
         return id
     def unwatch_one_time(self, id):
         self.one_time_observers.pop(id)
