@@ -99,7 +99,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ('share1s', bitcoin_p2p.ListType(p2pool.share1)),
         ]),
         'share2s': bitcoin_p2p.ComposedType([
-            ('share1s', bitcoin_p2p.ListType(bitcoin_p2p.block)),
+            ('share2s', bitcoin_p2p.ListType(bitcoin_p2p.block)),
         ]),
     }
     
@@ -216,7 +216,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ])
     
     def handle_share0s(self, chains):
-        for chain in chainss:
+        for chain in chains:
             for hash_ in chain['hashes']:
                 self.node.handle_share_hash((chain['chain_id']['previous_p2pool_block'], chain['chain_id']['bits']), hash_)
     def handle_share1s(self, share1s):

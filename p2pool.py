@@ -119,6 +119,10 @@ class Share2(object):
         self.shares = shares
         self.height = height
         self.chain = chain
+        self.shared = False
+    
+    def flag_shared(self):
+        self.shared = True
 
 def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, subsidy, nonce, net):
     shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [add_script, add_script]

@@ -29,8 +29,6 @@ class Chain(object):
         
         self.share2s = {} # hash -> share2
         self.highest = util.Variable(None)
-        
-        self.shared = set() # set of hashes of shared shares
     
     def accept(self, share, net):
         if share.chain_id_data != self.chain_id_data:
@@ -204,7 +202,7 @@ def main(args):
                 if peer is ignore_peer:
                     continue
                 peer.send_share(share2.share)
-            share2.chain.shared.add(share2.share.hash)
+            share2.flag_shared()
         
         def p2pCallback(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
@@ -217,6 +215,7 @@ def main(args):
             chain = get_chain(share.chain_id_data)
             res = chain.accept(share, net)
             if res == 'good':
+                share2 = chain.share2s[share.hash]
                 hash_data = bitcoin_p2p.HashType().pack(share.hash)
                 share1_data = p2pool.share1.pack(share.as_share1())
                 for share_db in share_dbs:
@@ -224,7 +223,7 @@ def main(args):
                     share_db.sync()
                 if chain is current_work.value['current_chain']:
                     print 'Accepted share, passing to peers. Hash: %x' % (share.hash,)
-                    share_share(share, peer)
+                    share_share2(share2, peer)
                 else:
                     print 'Accepted share to non-current chain. Hash: %x' % (share.hash,)
             elif res == 'dup':
@@ -301,7 +300,7 @@ def main(args):
             #print 'Work changed:', new_work
             chain = new_work['current_chain']
             for share2 in chain.share2s.itervalues():
-                if share2.share.hash not in chain.shared:
+                if not share2.shared:
                     print "Sharing share of switched to chain. Hash:", share2.share.hash
                     share_share2(share2)
         current_work.changed.watch(work_changed)
