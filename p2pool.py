@@ -1,7 +1,8 @@
 import bitcoin_p2p
+import conv
 
 chain_id_type = bitcoin_p2p.ComposedType([
-    ('previous_p2pool_block', bitcoin_p2p.HashType()),
+    ('last_p2pool_block_hash', bitcoin_p2p.HashType()),
     ('bits', bitcoin_p2p.StructType('<I')),
 ])
 
@@ -14,11 +15,18 @@ coinbase_type = bitcoin_p2p.ComposedType([
     ('nonce', bitcoin_p2p.StructType('<Q')),
 ])
 
-
 merkle_branch = bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
     ('side', bitcoin_p2p.StructType('<B')),
     ('hash', bitcoin_p2p.HashType()),
 ]))
+
+share1 = bitcoin_p2p.ComposedType([
+    ('header', bitcoin_p2p.block_header),
+    ('gentx', bitcoin_p2p.ComposedType([
+        ('tx', bitcoin_p2p.tx),
+        ('merkle_branch', merkle_branch),
+    ])),
+])
 
 def calculate_merkle_branch(txn_list, index):
     hash_list = [(bitcoin_p2p.doublesha(bitcoin_p2p.tx.pack(data)), i == index, []) for i, data in enumerate(txn_list)]
@@ -73,17 +81,20 @@ class Share(object):
         
         self.coinbase = coinbase_type.unpack(self.gentx['tx']['tx_ins'][0]['script'], ignore_extra=True)
         self.previous_share_hash = self.coinbase['previous_p2pool_share_hash'] if self.coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
-        self.chain_id_data = chain_id_type.pack(dict(previous_p2pool_block=self.coinbase['last_p2pool_block_hash'], bits=self.header['bits']))
+        self.chain_id_data = chain_id_type.pack(dict(last_p2pool_block_hash=self.coinbase['last_p2pool_block_hash'], bits=self.header['bits']))
     
     def as_block(self):
         if self.txns is None:
             raise ValueError("share does not contain all txns")
         return dict(header=self.header, txns=self.txns)
     
+    def as_share1(self):
+        return dict(header=self.header, gentx=self.gentx)
+    
     def check(self, chain, height, previous_share2, net):
         if self.chain_id_data != chain.chain_id_data:
             raise ValueError('wrong chain')
-        if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(chain.bits):
+        if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(self.header['bits']):
             raise ValueError('not enough work!')
         
         t = self.gentx['tx']

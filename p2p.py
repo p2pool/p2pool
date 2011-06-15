@@ -96,13 +96,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ]))),
         ]),
         'share1s': bitcoin_p2p.ComposedType([
-            ('share1s', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
-                ('header', bitcoin_p2p.block_header),
-                ('gentx', bitcoin_p2p.ComposedType([
-                    ('tx', bitcoin_p2p.tx),
-                    ('merkle_branch', p2pool.merkle_branch),
-                ])),
-            ]))),
+            ('share1s', bitcoin_p2p.ListType(p2pool.share1)),
         ]),
         'share2s': bitcoin_p2p.ComposedType([
             ('share1s', bitcoin_p2p.ListType(bitcoin_p2p.block)),
@@ -140,7 +134,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             mode=self.node.mode_var.value,
             state=dict(
                 chain_id=dict(
-                    previous_p2pool_block=0,
+                    last_p2pool_block_hash=0,
                     bits=0,
                 ),
                 highest=dict(
@@ -152,7 +146,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
         
-        self.connected = False
+        self.connected2 = False
         
         self._think()
         self._think2()
@@ -160,19 +154,19 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         reactor.callLater(10, self._connect_timeout)
     
     def _connect_timeout(self):
-        if not self.connected and self.transport.connected:
+        if not self.connected2 and self.transport.connected:
             print "Handshake timed out, disconnecting"
             self.transport.loseConnection()
     
     @defer.inlineCallbacks
     def _think(self):
-        while self.transport.connected:
+        while self.connected2:
             self.send_ping()
             yield util.sleep(random.expovariate(1/100))
     
     @defer.inlineCallbacks
     def _think2(self):
-        while self.transport.connected:
+        while self.connected2:
             self.send_addrme(port=self.node.port)
             yield util.sleep(random.expovariate(1/100))
     
@@ -188,7 +182,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         # XXX use state
         
-        self.connected = True
+        self.connected2 = True
         self.node.got_conn(self, services)
         if isinstance(self.factory, ClientFactory):
             draw_line(self.node.port, self.transport.getPeer().port, (0, 255, 0))
@@ -250,13 +244,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         else:
             if self.mode == 0:
                 self.send_share0s(chains=[dict(
-                    chain_id=p2pool.chain_id_type.unpack(node.chain_id),
-                    hashes=node.hash,
+                    chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
+                    hashes=[share.hash],
                 )])
             elif self.mode == 1:
                 self.send_share1s(share1s=[dict(
-                    header=node.header,
-                    gentx=node.gentx,
+                    header=share.header,
+                    gentx=share.gentx,
                 )])
             else:
                 raise ValueError(self.mode)
@@ -265,7 +259,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if self.node_var_watch is not None:
             self.node.mode_var.changed.unwatch(self.node_var_watch)
         
-        if self.connected:
+        if self.connected2:
             self.node.lost_conn(self)
         
         if isinstance(self.factory, ClientFactory):

@@ -25,6 +25,7 @@ import p2pool
 class Chain(object):
     def __init__(self, chain_id_data):
         self.chain_id_data = chain_id_data
+        self.last_p2pool_block_hash = p2pool.chain_id_type.unpack(chain_id_data)['last_p2pool_block_hash']
         
         self.share2s = {} # hash -> share2
         self.highest = util.Variable(None)
@@ -43,7 +44,8 @@ class Chain(object):
         elif share.previous_share_hash not in self.share2s:
             return 'orphan'
         else:
-            previous_height, previous_share2 = self.share2s[share.previous_share_hash]
+            previous_share2 = self.share2s[share.previous_share_hash]
+            previous_height = previous_share2.height
         
         height = previous_height + 1
         
@@ -175,7 +177,7 @@ def main(args):
         def set_real_work():
             work, height = yield getwork(bitcoind)
             last_p2pool_block_hash = (yield get_last_p2pool_block_hash(work.previous_block, get_block, net))
-            chain = get_chain(p2pool.chain_id_type.pack(dict(previous_p2pool_block=last_p2pool_block_hash, bits=work.bits)))
+            chain = get_chain(p2pool.chain_id_type.pack(dict(last_p2pool_block_hash=last_p2pool_block_hash, bits=work.bits)))
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -202,7 +204,7 @@ def main(args):
                 if peer is ignore_peer:
                     continue
                 peer.send_share(share2.share)
-            share2.chain.shared.add(share.hash)
+            share2.chain.shared.add(share2.share.hash)
         
         def p2pCallback(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
@@ -216,8 +218,9 @@ def main(args):
             res = chain.accept(share, net)
             if res == 'good':
                 hash_data = bitcoin_p2p.HashType().pack(share.hash)
+                share1_data = p2pool.share1.pack(share.as_share1())
                 for share_db in share_dbs:
-                    share_db[hash_data] = share.block_data
+                    share_db[hash_data] = share1_data
                     share_db.sync()
                 if chain is current_work.value['current_chain']:
                     print 'Accepted share, passing to peers. Hash: %x' % (share.hash,)
