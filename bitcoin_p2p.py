@@ -489,7 +489,7 @@ class Protocol(BaseProtocol):
     def handle_inv(self, invs):
         for inv in invs:
             #print "INV", item['type'], hex(item['hash'])
-            self.send_getdata(invs=[inv])
+            self.send_getdata(requests=[inv])
     
     def handle_addr(self, addrs):
         for addr in addrs:
@@ -516,9 +516,9 @@ class Protocol(BaseProtocol):
 class ProtocolInv(Protocol):
     inv = None
     
-    def handle_getdata(self, invs):
+    def handle_getdata(self, requests):
         if self.inv is None: self.inv = {}
-        for inv in invs:
+        for inv in requests:
             type_, hash_ = inv['type'], inv['hash']
             if (type_, hash_) in self.inv:
                 print "bitcoind requested %s %x, sent" % (type_, hash_)

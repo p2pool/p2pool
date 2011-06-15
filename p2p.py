@@ -189,7 +189,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.other_mode_var = util.Variable(mode)
         
         if nonce == self.node.nonce:
-            print "Detected connection to self, disconnecting"
+            #print "Detected connection to self, disconnecting"
             self.transport.loseConnection()
             return
         
