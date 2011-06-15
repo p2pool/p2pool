@@ -336,9 +336,9 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with transactions - should only happen if you recently restarted p2pool"
                 return False
-            block = dict(header=header, txns=transactions)
+            share = p2pool.Share(header=header, txns=transactions)
             try:
-                return p2pCallback(block)
+                return p2pCallback(share)
             except:
                 print
                 print 'Error processing data received from worker:'
