@@ -13,15 +13,18 @@ import util
 #     0: send hash first (high latency, low bandwidth)
 #     1: send entire share (low latency, high bandwidth)
 
-import pygame
-d = pygame.display.set_mode((512, 512))
-task.LoopingCall(pygame.display.update).start(.1)
-def draw_circle(id, color=(255,0,0)):
-    id = repr(id)
-    pygame.draw.circle(d, (255, 0, 0), (hash(id)%512, hash(id)//512%512), 4)
-def draw_line(id, id2, color):
-    id = repr(id)
-    pygame.draw.line(d, color, (hash(id)%512, hash(id)//512%512), (hash(id2)%512, hash(id2)//512%512))
+if 0:
+    import pygame
+    d = pygame.display.set_mode((512, 512))
+    task.LoopingCall(pygame.display.update).start(.1)
+    def draw_circle(id, color=(255,0,0)):
+        id = repr(id)
+        pygame.draw.circle(d, (255, 0, 0), (hash(id)%512, hash(id)//512%512), 4)
+    def draw_line(id, id2, color):
+        id = repr(id)
+        pygame.draw.line(d, color, (hash(id)%512, hash(id)//512%512), (hash(id2)%512, hash(id2)//512%512))
+else:
+    draw_circle = draw_line = lambda *args, **kwargs: None
 
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 0
