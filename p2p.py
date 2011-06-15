@@ -206,12 +206,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def handle_addrme(self, port):
         self.node.got_addr(('::ffff:' + self.transport.getPeer().host, port), self.other_services, int(time.time()))
-        if random.random() < .7:
+        if random.random() < .7 and self.node.peers:
             random.choice(self.node.peers.values()).send_addrs(addrs=[dict(address=dict(services=self.other_services, address='::ffff:' + self.transport.getPeer().host, port=port), timestamp=int(time.time()))])
     def handle_addrs(self, addrs):
         for addr_record in addrs:
             self.node.got_addr((addr_record['address']['address'], addr_record['address']['port']), addr_record['address']['services'], min(int(time.time()), addr_record['timestamp']))
-            if random.random() < .7:
+            if random.random() < .7 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrs(addrs=[addr_record])
     def handle_getaddrs(self, count):
         self.send_addrs(random.sample(map(bitcoin_p2p.address.unpack, self.node.addrs.keys()), min(count, len(self.node.addrs))))

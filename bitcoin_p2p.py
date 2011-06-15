@@ -489,7 +489,7 @@ class Protocol(BaseProtocol):
     def handle_inv(self, invs):
         for inv in invs:
             #print "INV", item['type'], hex(item['hash'])
-            self.send_getdata([inv])
+            self.send_getdata(invs=[inv])
     
     def handle_addr(self, addrs):
         for addr in addrs:
@@ -522,7 +522,7 @@ class ProtocolInv(Protocol):
             type_, hash_ = inv['type'], inv['hash']
             if (type_, hash_) in self.inv:
                 print "bitcoind requested %s %x, sent" % (type_, hash_)
-                self.sendPacket(type_, self.inv[(type_, hash_)])
+                self.sendPacket(type_, {type_: self.inv[(type_, hash_)]})
             else:
                 print "bitcoind requested %s %x, but not found" % (type_, hash_)
     
@@ -535,7 +535,7 @@ class ProtocolInv(Protocol):
         else:
             raise ValueError("invalid type: %r" % (type_,))
         self.inv[(type_, hash_)] = data
-        self.send_inv([dict(type=type_, hash=hash_)])
+        self.send_inv(invs=[dict(type=type_, hash=hash_)])
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = ProtocolInv
