@@ -158,7 +158,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ),
         )
         
-        self.node_var_watch = self.node.mode_var.changed.watch(self.send_set_mode)
+        self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
         
         self.connected = False
         
@@ -253,12 +253,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if hash_ <= conv.bits_to_target(share['header']['bits']):
             if 'txns' not in share:
                 raise ValueError("partial block matching bits passed to send_share")
-            self.send_share2s([share])
+            self.send_share2s(share2s=[share])
         else:
             if self.mode == 0:
-                self.send_share0s([hash_])
+                self.send_share0s(share0s=[hash_])
             elif self.mode == 1:
-                self.send_share1s([dict(
+                self.send_share1s(share1s=[dict(
                     header=share['header'],
                     gentx=dict(
                         tx=share['txns'][0],
