@@ -74,7 +74,7 @@ class Share(object):
             raise ValueError("share does not contain all txns")
         return dict(header=self.header, txns=self.txns)
     
-    def check(self, chain, height2, previous_share, net):
+    def check(self, chain, height, previous_share, net):
         if self.chain_id_data != chain.chain_id_data:
             raise ValueError('wrong chain')
         if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(chain.bits):
@@ -91,13 +91,16 @@ class Share(object):
         if t2 != t:
             raise ValueError('invalid generate txn')
         
-        return Share2(self, shares)
+        return Share2(self, chain, shares, height)
 
 class Share2(object):
     """Share with associated data"""
-    def __init__(self, share, shares):
+    
+    def __init__(self, share, chain, shares, height):
         self.share = share
         self.shares = shares
+        self.height = height
+        self.chain = chain
 
 def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, subsidy, nonce, net):
     shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [add_script, add_script]

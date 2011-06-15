@@ -26,7 +26,7 @@ class Chain(object):
     def __init__(self, chain_id_data):
         self.chain_id_data = chain_id_data
         
-        self.shares = {} # hash -> (height, share)
+        self.share2s = {} # hash -> share2
         self.highest = util.Variable(None)
         
         self.shared = set() # set of hashes of shared shares
@@ -39,26 +39,28 @@ class Chain(object):
             return 'dup'
         
         if share.previous_share_hash is None:
-            previous_height, previous_share = -1, None
-        elif share.previous_share_hash not in self.shares:
+            previous_height, previous_share2 = -1, None
+        elif share.previous_share_hash not in self.share2s:
             return 'orphan'
         else:
-            previous_height, previous_share = self.shares[share.previous_share_hash]
+            previous_height, previous_share2 = self.share2s[share.previous_share_hash]
         
         height = previous_height + 1
         
-        if not share.check(self, height, previous_share):
-            raise ValueError('share check failed')
+        share2 = share.check(self, height, previous_share2) # raises exceptions
         
-        self.shares[share.hash] = (height, share)
+        if share2.share is not share:
+            raise ValueError()
         
-        if self.highest.value is None or height > self.shares[self.highest.value][0]:
-            self.highest.set(shareh.hash)
+        self.share2s[share.hash] = share2
+        
+        if self.highest.value is None or height > self.share2s[self.highest.value].height:
+            self.highest.set(share.hash)
         
         return 'good'
     
-    def get_highest_share(self):
-        return self.shares[self.highest.value] if self.highest.value is not None else None
+    def get_highest_share2(self):
+        return self.share2s[self.highest.value] if self.highest.value is not None else None
 
 @defer.inlineCallbacks
 def get_last_p2pool_block_hash(current_block_hash, get_block, net):
@@ -180,7 +182,7 @@ def main(args):
                 bits=work.bits,
                 height=height + 1,
                 current_chain=chain,
-                highest_p2pool_share=chain.get_highest_share(),
+                highest_p2pool_share2=chain.get_highest_share2(),
                 last_p2pool_block_hash=last_p2pool_block_hash,
             ))
             current_work2.set(dict(
@@ -195,12 +197,12 @@ def main(args):
         
         # setup p2p logic and join p2pool network
         
-        def share_share(share, ignore_peer=None):
+        def share_share2(share2, ignore_peer=None):
             for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
-                peer.send_share(share)
-            get_chain(share.chain_id_data).shared.add(share.hash)
+                peer.send_share(share2.share)
+            share2.chain.shared.add(share.hash)
         
         def p2pCallback(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
@@ -209,8 +211,6 @@ def main(args):
                     factory.conn.addInv('block', share.as_block())
                 else:
                     print "No bitcoind connection! Erp!"
-            
-            share = Share(block)
             
             res = chain.accept(share)
             if res == 'good':
@@ -316,7 +316,7 @@ def main(args):
         def compute(state):
             generate_txn, shares = p2pool.generate_transaction(
                 last_p2pool_block_hash=state['last_p2pool_block_hash'],
-                previous_share=state['highest_p2pool_share'],
+                previous_share2=state['highest_p2pool_share2'],
                 add_script=my_script,
                 subsidy=50*100000000 >> state['height']//210000,
                 nonce=random.randrange(2**64),
