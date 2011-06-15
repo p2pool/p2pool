@@ -70,6 +70,8 @@ class Share(object):
             if gentx is not None:
                 self.gentx = gentx
                 if check_merkle_branch(gentx['tx'], gentx['merkle_branch']) != header['merkle_root']:
+                    print '%x' % check_merkle_branch(gentx['tx'], gentx['merkle_branch'])
+                    print '%x' % header['merkle_root']
                     raise ValueError("gentx doesn't match header")
             else:
                 raise ValueError("need either txns or gentx")

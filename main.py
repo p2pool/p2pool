@@ -249,7 +249,7 @@ def main(args):
         def p2pCallback2(chain_id_data, hash, peer):
             chain = get_chain(chain_id_data)
             if chain is current_work.value['current_chain']:
-                if hash not in chain.shares:
+                if hash not in chain.share2s:
                     if hash not in chain.requesting:
                         peer.send_getshares(hashes=[hash])
                         chain.requesting.add(hash)
