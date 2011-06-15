@@ -73,7 +73,7 @@ class Share(object):
         
         self.coinbase = coinbase_type.unpack(self.gentx['tx']['tx_ins'][0]['script'], ignore_extra=True)
         self.previous_share_hash = self.coinbase['previous_p2pool_share_hash'] if self.coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
-        self.chain_id_data = chain_id_type.pack(dict(previous_p2pool_share_hash=self.coinbase['last_p2pool_block_hash'], bits=self.block['header']['bits']))
+        self.chain_id_data = chain_id_type.pack(dict(previous_p2pool_share_hash=self.coinbase['last_p2pool_block_hash'], bits=self.header['bits']))
     
     def as_block(self):
         if self.txns is None:
