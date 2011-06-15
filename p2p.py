@@ -177,10 +177,16 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.transport.loseConnection()
             return
         
-        # XXX use state
         
         self.connected2 = True
         self.node.got_conn(self, services)
+        
+        if state['highest']['hash'] != 2**256 - 1:
+            self.handle_share0s(chains=[dict(
+                chain_id=state['chain_id'],
+                hashes=[state['highest']['hash']],
+            )])
+        
         if isinstance(self.factory, ClientFactory):
             draw_line(self.node.port, self.transport.getPeer().port, (0, 255, 0))
     

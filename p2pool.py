@@ -69,7 +69,7 @@ class Share(object):
         if txns is None:
             if gentx is not None:
                 self.gentx = gentx
-                if bitcoin_p2p.check_merkle_branch(gentx['tx'], gentx['merkle_branch']) != bitcoin_p2p.block_hash(header):
+                if check_merkle_branch(gentx['tx'], gentx['merkle_branch']) != bitcoin_p2p.block_hash(header):
                     raise ValueError("gentx doesn't match header")
             else:
                 raise ValueError("need either txns or gentx")
