@@ -29,6 +29,9 @@ class Chain(object):
         
         self.share2s = {} # hash -> share2
         self.highest = util.Variable(None)
+        
+        self.requesting = set()
+        self.request_map = {}
     
     def accept(self, share, net):
         if share.chain_id_data != self.chain_id_data:
@@ -252,7 +255,8 @@ def main(args):
                         chain.requesting.add(hash)
                         reactor.callLater(5, chain.requesting.remove, hash)
             else:
-                chain.
+                if hash not in chain.request_map:
+                    chain.request_map[hash] = peer
         
         @defer.inlineCallbacks
         def getBlocksCallback2(chain_id_data, highest, contact):
@@ -315,6 +319,9 @@ def main(args):
                 if not share2.shared:
                     print "Sharing share of switched to chain. Hash:", share2.share.hash
                     share_share2(share2)
+            for hash, peer in chain.request_map.iteritems():
+                if hash not in chain.share2s:
+                    peer.get_shares(hashes=[hash])
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
