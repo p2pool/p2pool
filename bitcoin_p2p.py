@@ -252,37 +252,6 @@ def merkle_hash(txn_list):
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
 
-merkle_branch = ListType(ComposedType([
-    ('side', StructType('<B')),
-    ('hash', HashType()),
-]))
-
-def calculate_merkle_branch(txn_list, index):
-    hash_list = [(doublesha(tx.pack(data)), i == index, []) for i, data in enumerate(txn_list)]
-    
-    while len(hash_list) > 1:
-        hash_list = [
-            (
-                doublesha(merkle_record.pack(dict(left=left, right=right))),
-                left_f or right_f,
-                (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
-            )
-            for (left, left_f, left_l), (right, right_f, right_l) in
-                zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
-        ]
-    
-    assert check_merkle_branch(doublesha(tx.pack(txn_list[index])), hash_list[0][2]) == hash_list[0][0]
-    
-    return hash_list[0][2]
-
-def check_merkle_branch(hash_, branch):
-    for step in branch:
-        if not step['side']:
-            hash_ = doublesha(merkle_record.pack(dict(left=step['hash'], right=hash_)))
-        else:
-            hash_ = doublesha(merkle_record.pack(dict(left=hash_, right=step['hash'])))
-    return hash_
-
 def block_hash(header):
     return doublesha(block_header.pack(header))
 

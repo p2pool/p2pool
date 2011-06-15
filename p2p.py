@@ -9,6 +9,7 @@ from twisted.internet import defer, reactor, protocol, task
 import bitcoin_p2p
 import conv
 import util
+import p2pool
 
 # mode
 #     0: send hash first (high latency, low bandwidth)
@@ -53,10 +54,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ('sub_version', bitcoin_p2p.VarStrType()),
             ('mode', bitcoin_p2p.StructType('<I')),
             ('state', bitcoin_p2p.ComposedType([
-                ('chain_id', bitcoin_p2p.ComposedType([
-                    ('previous_p2pool_block', bitcoin_p2p.HashType()),
-                    ('bits', bitcoin_p2p.StructType('<I')),
-                ])),
+                ('chain_id', p2pool.chain_id_type),
                 ('highest', bitcoin_p2p.ComposedType([
                     ('hash', bitcoin_p2p.HashType()),
                     ('height', bitcoin_p2p.StructType('<Q')),
@@ -84,10 +82,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ]),
         
         'getsharesbychain': bitcoin_p2p.ComposedType([
-            ('chain_id', bitcoin_p2p.ComposedType([
-                ('previous_p2pool_block', bitcoin_p2p.HashType()),
-                ('bits', bitcoin_p2p.StructType('<I')),
-            ])),
+            ('chain_id', p2pool.chain_id_type),
             ('have', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
         ]),
         'getshares': bitcoin_p2p.ComposedType([
@@ -95,20 +90,17 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ]),
         
         'share0s': bitcoin_p2p.ComposedType([
-            ('share0s', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
-                ('chain_id', bitcoin_p2p.ComposedType([
-                    ('previous_p2pool_block', bitcoin_p2p.HashType()),
-                    ('bits', bitcoin_p2p.StructType('<I')),
-                ])),
+            ('chains', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
+                ('chain_id', p2pool.chain_id_type),
                 ('hashes', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
             ]))),
-        ]), 
+        ]),
         'share1s': bitcoin_p2p.ComposedType([
             ('share1s', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
                 ('header', bitcoin_p2p.block_header),
                 ('gentx', bitcoin_p2p.ComposedType([
                     ('tx', bitcoin_p2p.tx),
-                    ('merkle_branch', bitcoin_p2p.merkle_branch),
+                    ('merkle_branch', p2pool.merkle_branch),
                 ])),
             ]))),
         ]),
@@ -194,6 +186,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.transport.loseConnection()
             return
         
+        # XXX use state
+        
         self.connected = True
         self.node.got_conn(self, services)
         if isinstance(self.factory, ClientFactory):
@@ -223,14 +217,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     address=host,
                     port=port,
                 ),
-            ) for host, port in 
+            ) for host, port in
             random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
         ])
     
-    def handle_share0s(self, share0s):
-        for share0 in share0s:
-            print share0
-            self.node.handle_share_hash
+    def handle_share0s(self, chains):
+        for chain in chainss:
+            for hash_ in chain['hashes']:
+                self.node.handle_share_hash((chain['chain_id']['previous_p2pool_block'], chain['chain_id']['bits']), hash_)
     def handle_share1s(self, share1s):
         for share1 in share1s:
             hash_ = bitcoin_p2p.block_hash(share1['header'])
@@ -238,7 +232,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share1()
+            share = Share(share1['header'], gentx=share1['gentx'])
+            self.node.handle_share(share)
     def handle_share2s(self, share2s):
         for share2 in share2s:
             hash_ = bitcoin_p2p.block_hash(share2['header'])
@@ -246,24 +241,22 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share1()
+            share = Share(share1['header'], txns=share1['txns'])
+            self.node.handle_share(share)
     
     def send_share(self, share):
-        hash_ = bitcoin_p2p.block_hash(share['header'])
-        if hash_ <= conv.bits_to_target(share['header']['bits']):
-            if 'txns' not in share:
-                raise ValueError("partial block matching bits passed to send_share")
-            self.send_share2s(share2s=[share])
+        if share.hash <= conv.bits_to_target(share.header['bits']):
+            self.send_share2s(share2s=[share.as_block()])
         else:
             if self.mode == 0:
-                self.send_share0s(share0s=[hash_])
+                self.send_share0s(chains=[dict(
+                    chain_id=p2pool.chain_id_type.unpack(node.chain_id),
+                    hashes=node.hash,
+                )])
             elif self.mode == 1:
                 self.send_share1s(share1s=[dict(
-                    header=share['header'],
-                    gentx=dict(
-                        tx=share['txns'][0],
-                        merkle_branch=bitcoin_p2p.calculate_merkle_branch(share['txns'], 0),
-                    ),
+                    header=node.header,
+                    gentx=node.gentx,
                 )])
             else:
                 raise ValueError(self.mode)
