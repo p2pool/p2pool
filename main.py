@@ -213,7 +213,7 @@ def main(args):
                     print "No bitcoind connection! Erp!"
             
             chain = get_chain(share.chain_id_data)
-            res = chain.accept(share)
+            res = chain.accept(share, net)
             if res == 'good':
                 hash_data = bitcoin_p2p.HashType().pack(share.hash)
                 for share_db in share_dbs:
@@ -297,10 +297,10 @@ def main(args):
         def work_changed(new_work):
             #print 'Work changed:', new_work
             chain = new_work['current_chain']
-            for height, share in chain.shares.itervalues():
-                if share.hash not in chain.shared:
-                    print "Sharing share of switched to chain. Hash:", share.hash
-                    share_share(share)
+            for share2 in chain.share2s.itervalues():
+                if share2.share.hash not in chain.shared:
+                    print "Sharing share of switched to chain. Hash:", share2.share.hash
+                    share_share2(share2)
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
