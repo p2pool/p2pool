@@ -47,7 +47,7 @@ def calculate_merkle_branch(txn_list, index):
     return hash_list[0][2]
 
 def check_merkle_branch(txn, branch):
-    hash_ = bitcoind_p2p.doublesha(bitcoin_p2p.tx.pack(txn))
+    hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.tx.pack(txn))
     for step in branch:
         if not step['side']:
             hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record.pack(dict(left=step['hash'], right=hash_)))
