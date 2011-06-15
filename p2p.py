@@ -137,8 +137,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             state=dict(
                 chain_id=p2pool.chain_id_type.unpack(chain.chain_id_data),
                 highest=dict(
-                    hash=highest_share2.share.hash,
-                    height=highest_share2.height,
+                    hash=highest_share2.share.hash if highest_share2 is not None else 2**256-1,
+                    height=highest_share2.height if highest_share2 is not None else 0,
                 ),
             ),
         )
