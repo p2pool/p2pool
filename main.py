@@ -212,6 +212,7 @@ def main(args):
                 else:
                     print "No bitcoind connection! Erp!"
             
+            chain = get_chain(share.chain_id_data)
             res = chain.accept(share)
             if res == 'good':
                 hash_data = bitcoin_p2p.HashType().pack(share.hash)
