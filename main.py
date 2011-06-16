@@ -286,13 +286,13 @@ def main(args):
             for share_hash in reversed(chain_hashes):
                 if share_hash in have2:
                     continue
-                peer.send_share(chain.share2s[share_hash].share)
+                peer.send_share(chain.share2s[share_hash].share, full=True) # doesn't have to be full ... but does that still guarantee ordering?
         
         def p2p_get_shares(chain_id_data, hashes, peer):
             chain = get_chain(chain_id_data)
             for hash_ in hashes:
                 if hash_ in chain.share2s:
-                    peer.send_share(chain.share2s[hash_].share)
+                    peer.send_share(chain.share2s[hash_].share, full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         

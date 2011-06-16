@@ -252,16 +252,16 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             share = p2pool.Share(share2['header'], txns=share2['txns'])
             self.node.handle_share(share, self)
     
-    def send_share(self, share):
+    def send_share(self, share, full=False):
         if share.hash <= conv.bits_to_target(share.header['bits']):
             self.send_share2s(share2s=[share.as_block()])
         else:
-            if self.mode == 0:
+            if self.mode == 0 and not full:
                 self.send_share0s(chains=[dict(
                     chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
                     hashes=[share.hash],
                 )])
-            elif self.mode == 1:
+            elif self.mode == 1 or full:
                 self.send_share1s(share1s=[dict(
                     header=share.header,
                     gentx=share.gentx,
@@ -376,6 +376,7 @@ class Node(object):
                         host = host2[len(prefix):]
                     
                     if (host, port) not in self.attempts:
+                        print "Trying to connect to", host, port
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
                 traceback.print_exc()
