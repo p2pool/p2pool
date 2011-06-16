@@ -228,6 +228,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share0s(self, chains):
         for chain in chains:
             for hash_ in chain['hashes']:
+                print chain
                 self.node.handle_share_hash(p2pool.chain_id_type.pack(chain['chain_id']), hash_, self)
     def handle_share1s(self, share1s):
         for share1 in share1s:
