@@ -392,7 +392,7 @@ class Node(object):
                         host = host2[len(prefix):]
                     
                     if (host, port) not in self.attempts:
-                        #print "Trying to connect to", host, port
+                        print "Trying to connect to", host, port
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
                 traceback.print_exc()
@@ -461,14 +461,17 @@ class Node(object):
         else:
             self.addr_store[host, port] = services, timestamp, timestamp
     
-    def handle_get_to_best(self, chain_id_data, have, peer):
-        pass
-    
-    def handle_get_shares(self, chain_id_data, hashes, peer):
-        pass
+    def handle_share(self, share, peer):
+        print "handle_share", (share, peer)
     
     def handle_share_hash(self, chain_id_data, hash, peer):
-        pass
+        print "handle_share_hash", (chain_id_data, hash, peer)
+    
+    def handle_get_to_best(self, chain_id_data, have, peer):
+        print "handle_get_to_best", (chain_id_data, have, peer)
+    
+    def handle_get_shares(self, chain_id_data, hashes, peer):
+        print "handle_get_shares", (chain_id_data, hashes, peer)
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)

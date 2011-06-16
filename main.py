@@ -158,16 +158,6 @@ def main(args):
         print '    Payout script:', my_script.encode('hex')
         print
         
-        @repr
-        @apply
-        @defer.inlineCallbacks
-        def mem():
-            while True:
-                yield util.sleep(300)
-                from guppy import hpy
-                h = hpy()
-                print h.heap()
-        
         @defer.inlineCallbacks
         def real_get_block(block_hash):
             block = yield (yield factory.getProtocol()).get_block(block_hash)

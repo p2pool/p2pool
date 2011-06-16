@@ -114,16 +114,15 @@ class Share(object):
         if t2 != t:
             raise ValueError('invalid generate txn')
         
-        return Share2(self, chain, shares, height)
+        return Share2(self, shares, height)
 
 class Share2(object):
     """Share with associated data"""
     
-    def __init__(self, share, chain, shares, height):
+    def __init__(self, share, shares, height):
         self.share = share
         self.shares = map(intern, shares)
         self.height = height
-        self.chain = chain
         self.shared = False
     
     def flag_shared(self):
@@ -165,8 +164,8 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, su
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 
 class Testnet(object):
-    TARGET_MULTIPLIER = 300000
-    SPREAD = 300000
+    TARGET_MULTIPLIER = 3000000
+    SPREAD = 300
     ROOT_BLOCK = 0x3575d1e7b40fe37ad12d41169a1012d26df5f3c35486e2abfbe9d2c
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7

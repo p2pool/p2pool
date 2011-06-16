@@ -169,6 +169,9 @@ class ExpiringDict(object):
     
     def keys(self):
         return self.d.keys()
+    
+    def values(self):
+        return [value for node, value in self.d.itervalues()]
 
 if __name__ == '__main__':
     x = ExpiringDict(5)
