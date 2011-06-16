@@ -253,10 +253,16 @@ def main(args):
             if chain is current_work.value['current_chain']:
                 if hash not in chain.share2s:
                     if hash not in chain.requesting:
+                        print "Got share hash, requesting! Hash: %x" % (hash,)
                         peer.send_getshares(chain_id=p2pool.chain_id_type.unpack(chain_id_data), hashes=[hash])
                         chain.requesting.add(hash)
                         reactor.callLater(5, chain.requesting.remove, hash)
+                    else:
+                        print "Got share hash, already requested, ignoring. Hash: %x" % (hash,)
+                else:
+                    print "Got share hash, already have, ignoring. Hash: %x" % (hash,)
             else:
+                print "Got share hash to non-current chain, storing. Hash: %x" % (hash,)
                 if hash not in chain.request_map:
                     chain.request_map[hash] = peer
         

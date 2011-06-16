@@ -21,13 +21,11 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def __init__(self, node):
         self.node = node
-    
-    @property
-    def _prefix(self):
+        
         if self.node.testnet:
-            return 'f77cea5d16a2183f'.decode('hex')
+            self._prefix = 'f77cea5d16a2183f'.decode('hex')
         else:
-            return '95ec1eda53c5e716'.decode('hex')
+            self._prefix = '95ec1eda53c5e716'.decode('hex')
     
     use_checksum = True
     
