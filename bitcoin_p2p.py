@@ -181,10 +181,21 @@ class IPV6AddressType(Type):
         data = file.read(16)
         if len(data) != 16:
             raise EarlyEnd()
-        return socket.inet_ntop(socket.AF_INET6, data)
+        if data[:12] != '00000000000000000000ffff'.decode('hex'):
+            raise ValueError("ipv6 addresses not supported yet")
+        return '::ffff:' + '.'.join(str(ord(x)) for x in data[12:])
     
     def write(self, file, item):
-        file.write(socket.inet_pton(socket.AF_INET6, item))
+        prefix = '::ffff:'
+        if not item.startswith(prefix):
+            raise ValueError("ipv6 addresses not supported yet")
+        item = item[len(prefix):]
+        bits = map(int, item.split('.'))
+        if len(bits) != 4:
+            raise ValueError("invalid address: %r" % (bits,))
+        data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
+        assert len(data) == 16, len(data)
+        file.write(data)
 
 class ComposedType(Type):
     def __init__(self, fields):
