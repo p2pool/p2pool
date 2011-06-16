@@ -209,7 +209,7 @@ def main(args):
         
         def p2p_share(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
-                print 'Got block! Passing to bitcoind!', share.hash
+                print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
                 if factory.conn is not None:
                     factory.conn.addInv('block', share.as_block())
                 else:
@@ -235,7 +235,7 @@ def main(args):
                 print 'Got share referencing unknown share, requesting past shares from peer. Hash: %x' % (share.hash,)
                 if peer is None:
                     raise ValueError()
-                peer.send_gettohighest(
+                peer.send_gettobest(
                     chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
                     have=random.sample(chain.share2s.keys(), min(8, len(chain.share2s))) + [chain.share2s[chain.highest.value].share.hash] if chain.highest.value is not None else [],
                 )
@@ -273,7 +273,7 @@ def main(args):
                     share2 = chain.share2s[share_hash]
                     if share2.share.previous_hash is None:
                         break
-                    share_hash = share2.share.previous_hash
+                    share_hash = share2.share.previous_share_hash
                 
                 return blocks
             
@@ -370,8 +370,10 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
+            share = p2pool.Share(header=header, txns=transactions)
+            print "GOT SHARE! %x" % (share.hash,)
             try:
-                p2p_share(p2pool.Share(header=header, txns=transactions))
+                p2p_share(share)
             except:
                 print
                 print 'Error processing data received from worker:'
