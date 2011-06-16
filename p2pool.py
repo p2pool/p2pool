@@ -165,7 +165,8 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, su
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 
 class Testnet(object):
-    TARGET_MULTIPLIER = SPREAD = 30
+    TARGET_MULTIPLIER = 30
+    SPREAD = 300
     ROOT_BLOCK = 0x3575d1e7b40fe37ad12d41169a1012d26df5f3c35486e2abfbe9d2c
     SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
     IDENTIFIER = 0x808330dc87e313b7

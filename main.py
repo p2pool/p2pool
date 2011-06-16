@@ -114,7 +114,8 @@ def getwork(bitcoind):
 def main(args):
     try:
         net = p2pool.Testnet if args.testnet else p2pool.Main
-        
+        #sqlite3.connect(args.config, isolation_level=None)
+
         print name
         print
         
