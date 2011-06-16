@@ -283,7 +283,7 @@ def main(args):
             for hash_ in have:
                 have2 |= set(get_down(hash_))
             
-            for share_hash in reversed(shares):
+            for share_hash in reversed(chain_hashes):
                 if share_hash in have2:
                     continue
                 peer.send_share(chain.shares2[share_hash].share)
