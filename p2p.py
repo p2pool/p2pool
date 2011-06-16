@@ -81,7 +81,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ('count', bitcoin_p2p.StructType('<I')),
         ]),
         
-        'getsharestohighest': bitcoin_p2p.ComposedType([
+        'gettobest': bitcoin_p2p.ComposedType([
             ('chain_id', p2pool.chain_id_type),
             ('have', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
         ]),
@@ -177,10 +177,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             #print "Detected connection to self, disconnecting"
             self.transport.loseConnection()
             return
+        if nonce in self.node.peers:
+            print "Detected duplicate connection, disconnecting"
+            self.transport.loseConnection()
+            return
         
-        
+        self.nonce = nonce
         self.connected2 = True
-        self.node.got_conn(self, services)
+        self.node.got_conn(self)
         
         if state['highest']['hash'] != 2**256 - 1:
             self.handle_share0s(chains=[dict(
@@ -219,8 +223,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
         ])
     
-    def handle_getsharestohighest(self, chain_id, have):
-        self.node.handle_get_shares_to_highest(p2pool.chain_id_type.pack(chain_id), have, self)
+    def handle_gettobest(self, chain_id, have):
+        self.node.handle_get_to_best(p2pool.chain_id_type.pack(chain_id), have, self)
     
     def handle_getshares(self, chain_id, hashes):
         self.node.handle_get_shares(p2pool.chain_id_type.pack(chain_id), hashes, self)
@@ -237,7 +241,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 self.transport.loseConnection()
                 return
             share = p2pool.Share(share1['header'], gentx=share1['gentx'])
-            self.node.handle_share(share)
+            self.node.handle_share(share, self)
     def handle_share2s(self, share2s):
         for share2 in share2s:
             hash_ = bitcoin_p2p.block_hash(share2['header'])
@@ -246,7 +250,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 self.transport.loseConnection()
                 return
             share = p2pool.Share(share1['header'], txns=share1['txns'])
-            self.node.handle_share(share)
+            self.node.handle_share(share, self)
     
     def send_share(self, share):
         if share.hash <= conv.bits_to_target(share.header['bits']):
@@ -371,7 +375,7 @@ class Node(object):
                             raise ValueError("invalid address")
                         host = host2[len(prefix):]
                     
-                    if (host, port) not in self.attempts and (host, port) not in self.peers:
+                    if (host, port) not in self.attempts:
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
                 traceback.print_exc()
@@ -416,23 +420,21 @@ class Node(object):
         del self.attempts[host, port]
     
     
-    def got_conn(self, conn, services):
-        host, port = conn.transport.getPeer().host, conn.transport.getPeer().port
-        if (host, port) in self.peers:
+    def got_conn(self, conn):
+        if conn.nonce in self.peers:
             raise ValueError("already have peer")
-        self.peers[host, port] = conn
+        self.peers[conn.nonce] = conn
         
-        print "Connected to peer %s:%i" % (host, port)
+        print "Connected to peer %s:%i" % (conn.transport.getPeer().host, conn.transport.getPeer().port)
     
     def lost_conn(self, conn):
-        host, port = conn.transport.getPeer().host, conn.transport.getPeer().port
-        if (host, port) not in self.peers:
+        if conn.nonce not in self.peers:
             raise ValueError("don't have peer")
-        if conn is not self.peers[host, port]:
+        if conn is not self.peers[conn.nonce]:
             raise ValueError("wrong conn")
-        del self.peers[host, port]
+        del self.peers[conn.nonce]
         
-        print "Lost peer %s:%i" % (host, port)
+        print "Lost peer %s:%i" % (conn.transport.getPeer().host, conn.transport.getPeer().port)
     
     
     def got_addr(self, (host, port), services, timestamp):
@@ -442,7 +444,7 @@ class Node(object):
         else:
             self.addr_store[host, port] = services, timestamp, timestamp
     
-    def handle_get_shares_to_highest(self, chain_id_data, have, peer):
+    def handle_get_to_best(self, chain_id_data, have, peer):
         pass
     
     def handle_get_shares(self, chain_id_data, hashes, peer):

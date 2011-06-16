@@ -235,7 +235,7 @@ def main(args):
                 print 'Got share referencing unknown share, requesting past shares from peer. Hash: %x' % (share.hash,)
                 if peer is None:
                     raise ValueError()
-                peer.getsharesbychain(
+                peer.send_gettohighest(
                     chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
                     have=random.sample(chain.share2s.keys(), min(8, len(chain.share2s))) + [chain.share2s[chain.highest.value].share.hash] if chain.highest.value is not None else [],
                 )
@@ -258,7 +258,7 @@ def main(args):
                 if hash not in chain.request_map:
                     chain.request_map[hash] = peer
         
-        def p2p_get_shares_to_highest(chain_id_data, have, peer):
+        def p2p_get_to_best(chain_id_data, have, peer):
             chain = get_chain(chain_id_data)
             if chain.highest.value is None:
                 return
@@ -318,7 +318,7 @@ def main(args):
         )
         p2p_node.handle_share = p2p_share
         p2p_node.handle_share_hash = p2p_share_hash
-        p2p_node.handle_get_shares_to_highest = p2p_get_shares_to_highest
+        p2p_node.handle_get_to_best = p2p_get_to_best
         p2p_node.handle_get_shares = p2p_get_shares
         
         p2p_node.start()
@@ -333,7 +333,7 @@ def main(args):
                     share_share2(share2)
             for hash, peer in chain.request_map.iteritems():
                 if hash not in chain.share2s:
-                    peer.get_shares(hashes=[hash])
+                    peer.send_getshares(hashes=[hash])
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
