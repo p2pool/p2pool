@@ -8,8 +8,7 @@ class SQLiteDict(object):
         self._db.execute('CREATE TABLE IF NOT EXISTS %s(key BLOB PRIMARY KEY NOT NULL, value BLOB NOT NULL)' % (self._table,))
     
     def __len__(self):
-        for row in self._db.execute('SELECT COUNT(key) FROM %s' % (self._table,)):
-            return row[0]
+        return self._db.execute('SELECT COUNT(key) FROM %s' % (self._table,)).fetchone()[0]
     
     def __iter__(self):
         for row in self._db.execute('SELECT key FROM %s' % (self._table,)):
@@ -32,7 +31,7 @@ class SQLiteDict(object):
         return list(self.iteritems())
     
     def __setitem__(self, key, value):
-        self._db.execute('INSERT INTO %s (key, value) VALUES (?, ?) ON CONFLICT REPLACE' % (self._table,), (buffer(key), buffer(value)))
+        self._db.execute('INSERT OR REPLACE INTO %s (key, value) VALUES (?, ?)' % (self._table,), (buffer(key), buffer(value)))
     
     def __getitem__(self, key):
         row = self._db.execute('SELECT value FROM %s WHERE key=?' % (self._table,), (buffer(key),)).fetchone()
