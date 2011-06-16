@@ -32,10 +32,7 @@ class SQLiteDict(object):
         return list(self.iteritems())
     
     def __setitem__(self, key, value):
-        if self._db.execute('SELECT key FROM %s where key=?' % (self._table,), (buffer(key),)).fetchone() is None:
-            self._db.execute('INSERT INTO %s (key, value) VALUES (?, ?)' % (self._table,), (buffer(key), buffer(value)))
-        else:
-            self._db.execute('UPDATE %s SET value=? WHERE key=?' % (self._table,), (buffer(value), buffer(key)))
+        self._db.execute('INSERT INTO %s (key, value) VALUES (?, ?) ON CONFLICT REPLACE' % (self._table,), (buffer(key), buffer(value)))
     
     def __getitem__(self, key):
         row = self._db.execute('SELECT value FROM %s WHERE key=?' % (self._table,), (buffer(key),)).fetchone()
