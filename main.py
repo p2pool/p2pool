@@ -215,7 +215,10 @@ def main(args):
         
         def p2p_share(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
+                print
                 print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
+                #print share.__dict__
+                print
                 if factory.conn is not None:
                     factory.conn.send_block(block=share.as_block())
                 else:
@@ -370,7 +373,7 @@ def main(args):
                 net=net,
             )
             print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain.'
-            transactions = [generate_txn] + [tx.tx for tx in tx_pool.itervalues() if tx.is_good()]
+            transactions = [generate_txn] + [tx.tx for tx in tx_pool.itervalues() if tx.is_good()] # needs to increase subsidy if txns are included
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
@@ -443,7 +446,17 @@ def main(args):
         def new_tx(tx):
             seen_at_block = current_work.value['previous_block']
             tx_pool[bitcoin_p2p.tx_hash(tx)] = Tx(tx, seen_at_block)
-        factory.new_tx.watch(new_tx)
+        #factory.new_tx.watch(new_tx)
+        # disabled for now - txs can rely on past txs that are not yet in the block chain
+        # bitcoin passes those txs along
+        # if a p2pool program was started in between the tx-not-yet-included and the tx-depending-on-that-one
+        # it would need to find the tx-not-yet-included
+        # in fact, it has no way to know if a tx is included...
+        # p2pool has to be able to access the entire blockchain
+        # possibilities
+        #     access bitcoin's data files
+        #     include a few of the parent txns
+        #     patch bitcoind to find the block that includes a given txn hash
         
         print 'Started successfully!'
         print
