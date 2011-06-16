@@ -202,9 +202,24 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         pass
     
     def handle_addrme(self, port):
-        self.node.got_addr(('::ffff:' + self.transport.getPeer().host, port), self.other_services, int(time.time()))
-        if random.random() < .7 and self.node.peers:
-            random.choice(self.node.peers.values()).send_addrs(addrs=[dict(address=dict(services=self.other_services, address='::ffff:' + self.transport.getPeer().host, port=port), timestamp=int(time.time()))])
+        host = self.transport.getPeer().host
+        print "addrme from", host, port
+        if host == '127.0.0.1':
+            if random.random() < .7 and self.node.peers:
+                random.choice(self.node.peers.values()).send_addrme(port=port) # services...
+        else:
+            self.node.got_addr(('::ffff:' + self.transport.getPeer().host, port), self.other_services, int(time.time()))
+            if random.random() < .7 and self.node.peers:
+                random.choice(self.node.peers.values()).send_addrs(addrs=[
+                    dict(
+                        address=dict(
+                            services=self.other_services,
+                            address='::ffff:' + host,
+                            port=port,
+                        ),
+                        timestamp=int(time.time()),
+                    ),
+                ])
     def handle_addrs(self, addrs):
         for addr_record in addrs:
             self.node.got_addr((addr_record['address']['address'], addr_record['address']['port']), addr_record['address']['services'], min(int(time.time()), addr_record['timestamp']))
