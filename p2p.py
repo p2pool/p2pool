@@ -166,6 +166,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def _think2(self):
         while self.connected2:
             self.send_addrme(port=self.node.port)
+            print "sending addrme"
             yield util.sleep(random.expovariate(1/100))
     
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, state):
