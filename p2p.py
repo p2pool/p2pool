@@ -220,10 +220,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ])
     
     def handle_getsharestohighest(self, chain_id, have):
-        self.node.handle_get_shares_to_highest(chain_id, have, self)
+        self.node.handle_get_shares_to_highest(p2pool.chain_id_type.pack(chain_id), have, self)
     
     def handle_getshares(self, chain_id, hashes):
-        self.node.handle_get_shares(chain_id, hashes, self)
+        self.node.handle_get_shares(p2pool.chain_id_type.pack(chain_id), hashes, self)
     
     def handle_share0s(self, chains):
         for chain in chains:
