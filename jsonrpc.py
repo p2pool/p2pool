@@ -1,3 +1,5 @@
+from __future__ import division
+
 import base64
 import json
 import traceback

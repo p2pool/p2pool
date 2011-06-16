@@ -1,3 +1,5 @@
+from __future__ import division
+
 from twisted.internet import defer
 
 import jsonrpc
