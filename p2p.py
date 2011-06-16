@@ -133,7 +133,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def _connect_timeout(self):
         if not self.connected2 and self.transport.connected:
-            print 'Handshake timed out, disconnecting'
+            print 'Handshake timed out, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
             self.transport.loseConnection()
     
     @defer.inlineCallbacks
@@ -146,7 +146,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def _think2(self):
         while self.connected2:
             self.send_addrme(port=self.node.port)
-            print 'sending addrme'
+            #print 'sending addrme'
             yield util.sleep(random.expovariate(1/100))
     
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, state):
@@ -155,11 +155,11 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.other_mode_var = util.Variable(mode)
         
         if nonce == self.node.nonce:
-            #print 'Detected connection to self, disconnecting'
+            #print 'Detected connection to self, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
             self.transport.loseConnection()
             return
         if nonce in self.node.peers:
-            print 'Detected duplicate connection, disconnecting'
+            print 'Detected duplicate connection, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
             self.transport.loseConnection()
             return
         
@@ -184,7 +184,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def handle_addrme(self, port):
         host = self.transport.getPeer().host
-        print 'addrme from', host, port
+        #print 'addrme from', host, port
         if host == '127.0.0.1':
             if random.random() < .7 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrme(port=port) # services...
@@ -367,7 +367,7 @@ class Node(object):
                         host = host2[len(prefix):]
                     
                     if (host, port) not in self.attempts:
-                        print 'Trying to connect to', host, port
+                        #print 'Trying to connect to', host, port
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
                 traceback.print_exc()
