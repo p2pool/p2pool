@@ -398,12 +398,16 @@ def main(args):
         
         # done!
         
+        def new_tx(tx):
+            print tx
+        factory.new_tx.watch(new_tx)
+        
         print 'Started successfully!'
         print
         
         while True:
             yield set_real_work()
-            yield util.sleep(1)
+            yield util.sleep(.5)
     except:
         print
         print 'Fatal error:'

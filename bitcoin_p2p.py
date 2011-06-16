@@ -483,7 +483,8 @@ class Protocol(BaseProtocol):
         self.submit_order.got_response(hash, dict(reply=reply, script=script))
     
     def handle_tx(self, tx):
-        pass#print 'TX', hex(merkle_hash([tx])), tx
+        #print 'TX', hex(merkle_hash([tx])), tx
+        self.factory.new_tx.happened(tx)
     
     def handle_block(self, block):
         self.get_block.got_response(block_hash(block['header']), block)
@@ -533,6 +534,7 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         #protocol.ReconnectingClientFactory.__init__(self)
         self.testnet = testnet
         self.new_block = util.Event()
+        self.new_tx = util.Event()
     
     def buildProtocol(self, addr):
         p = self.protocol(self.testnet)
