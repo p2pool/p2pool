@@ -14,6 +14,7 @@ import traceback
 
 from twisted.internet import defer, protocol, reactor
 
+import expiring_dict
 import util
 
 class EarlyEnd(Exception):
@@ -485,10 +486,12 @@ class Protocol(BaseProtocol):
             self.factory.gotConnection(None)
 
 class ProtocolInv(Protocol):
-    inv = None
+    def __init__(self, *args, **kwargs):
+        Protocol.__init__(self, *args, **kwargs)
+        
+        self.inv = expiring_dict.ExpiringDict(600)
     
     def handle_getdata(self, requests):
-        if self.inv is None: self.inv = {}
         for inv in requests:
             type_, hash_ = inv['type'], inv['hash']
             if (type_, hash_) in self.inv:
@@ -498,7 +501,6 @@ class ProtocolInv(Protocol):
                 print 'bitcoind requested %s %x, but not found' % (type_, hash_)
     
     def addInv(self, type_, data):
-        if self.inv is None: self.inv = {}
         if type_ == 'block':
             hash_ = block_hash(data['header'])
         elif type_ == 'tx':
