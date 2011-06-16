@@ -172,6 +172,10 @@ class ExpiringDict(object):
     
     def values(self):
         return [value for node, value in self.d.itervalues()]
+    
+    def itervalues(self):
+        for node, value in self.d.itervalues():
+            yield value
 
 if __name__ == '__main__':
     x = ExpiringDict(5)

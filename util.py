@@ -189,6 +189,9 @@ class GenericDeferrer(object):
         timer.cancel()
         df.callback(resp)
 
+class NotNowError(Exception):
+    pass
+
 class DeferredCacher(object):
     def __init__(self, func, backing=None):
         if backing is None:
@@ -214,6 +217,23 @@ class DeferredCacher(object):
         
         self.backing[key] = value
         defer.returnValue(value)
+    
+    def call_now(self, key):
+        if key in self.waiting:
+            raise NotNowError()
+        
+        if key in self.backing:
+            return self.backing[key]
+        else:
+            self.waiting[key] = defer.Deferred()
+            def cb(value):
+                self.backing[key] = value
+                self.waiting.pop(key).callback(None)
+            def eb(fail):
+                self.waiting.pop(key).callback(None)
+                fail.printTraceback()
+            self.func(key).addCallback(cb).addErrback(eb)
+            raise NotNowError()
 
 def pubkey_to_address(pubkey, testnet):
     if len(pubkey) != 65:

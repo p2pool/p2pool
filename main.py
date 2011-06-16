@@ -3,6 +3,7 @@
 from __future__ import division
 
 import argparse
+import itertools
 import os
 import random
 import sqlite3
@@ -72,7 +73,11 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
     while True:
         if block_hash == net.ROOT_BLOCK:
             defer.returnValue(block_hash)
-        block = yield get_block(block_hash)
+        try:
+            block = yield get_block(block_hash)
+        except:
+            traceback.print_exc()
+            continue
         coinbase_data = block['txns'][0]['tx_ins'][0]['script']
         try:
             coinbase = p2pool.coinbase_type.unpack(coinbase_data, ignore_extra=True)
@@ -365,7 +370,7 @@ def main(args):
                 net=net,
             )
             print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain.'
-            transactions = [generate_txn] # XXX
+            transactions = [generate_txn] + [tx.tx for tx in tx_pool.itervalues() if tx.is_good()]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
@@ -398,8 +403,46 @@ def main(args):
         
         # done!
         
+        def get_blocks(start_hash):
+            while True:
+                try:
+                    block = get_block.call_now(start_hash)
+                except util.NotNowError:
+                    break
+                yield start_hash, block
+                start_hash = block['header']['previous_block']
+        
+        tx_pool = expiring_dict.ExpiringDict(60, get_touches=False) # hash -> tx
+        
+        class Tx(object):
+            def __init__(self, tx, seen_at_block):
+                self.tx = tx
+                self.seen_at_block = seen_at_block
+                self.mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                print
+                print "%x %r" % (seen_at_block, tx)
+                for mention in self.mentions:
+                    print "%x" % mention
+                print
+            
+            def is_good(self):
+                x = self.is_good2()
+                print "is_good:", x
+                return x
+            
+            def is_good2(self):
+                for block_hash, block in itertools.islice(get_blocks(current_work.value['previous_block']), 10):
+                    if block_hash == self.seen_at_block:
+                        return True
+                    for tx in block['txns']:
+                        mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                        if mentions & self.mentions:
+                            return False
+                return False
+        
         def new_tx(tx):
-            print tx
+            seen_at_block = current_work.value['previous_block']
+            tx_pool[bitcoin_p2p.tx_hash(tx)] = Tx(tx, seen_at_block)
         factory.new_tx.watch(new_tx)
         
         print 'Started successfully!'

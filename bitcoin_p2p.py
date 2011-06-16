@@ -266,6 +266,9 @@ def merkle_hash(txn_list):
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
 
+def tx_hash(tx_):
+    return doublesha(tx.pack(tx_))
+
 def block_hash(header):
     return doublesha(block_header.pack(header))
 
