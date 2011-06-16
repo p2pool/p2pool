@@ -121,7 +121,7 @@ class Share2(object):
     
     def __init__(self, share, chain, shares, height):
         self.share = share
-        self.shares = shares
+        self.shares = map(intern, shares)
         self.height = height
         self.chain = chain
         self.shared = False

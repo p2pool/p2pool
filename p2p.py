@@ -146,9 +146,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
         
-        self._think()
-        self._think2()
-        
         reactor.callLater(10, self._connect_timeout)
     
     def _connect_timeout(self):
@@ -186,6 +183,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.nonce = nonce
         self.connected2 = True
         self.node.got_conn(self)
+        
+        self._think()
+        self._think2()
         
         if state['highest']['hash'] != 2**256 - 1:
             self.handle_share0s(chains=[dict(

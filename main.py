@@ -158,6 +158,16 @@ def main(args):
         print '    Payout script:', my_script.encode('hex')
         print
         
+        @repr
+        @apply
+        @defer.inlineCallbacks
+        def mem():
+            while True:
+                yield util.sleep(300)
+                from guppy import hpy
+                h = hpy()
+                print h.heap()
+        
         @defer.inlineCallbacks
         def real_get_block(block_hash):
             block = yield (yield factory.getProtocol()).get_block(block_hash)
@@ -165,7 +175,7 @@ def main(args):
             defer.returnValue(block)
         get_block = util.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
         
-        chains = expiring_dict.ExpiringDict(1000)
+        chains = expiring_dict.ExpiringDict(300)
         def get_chain(chain_id_data):
             return chains.setdefault(chain_id_data, Chain(chain_id_data))
         # information affecting work that should trigger a long-polling update
@@ -346,7 +356,7 @@ def main(args):
         
         # setup worker logic
         
-        merkle_root_to_transactions = expiring_dict.ExpiringDict(1000)
+        merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
         def compute(state):
             generate_txn, shares = p2pool.generate_transaction(
