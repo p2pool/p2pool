@@ -16,7 +16,7 @@ import util
 #     1: send entire share (low latency, high bandwidth)
 
 class Protocol(bitcoin_p2p.BaseProtocol):
-    version = 0
+    version = 1
     sub_version = ''
     
     def __init__(self, node):
