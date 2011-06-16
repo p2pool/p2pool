@@ -207,7 +207,7 @@ def main(args):
                 peer.send_share(share2.share)
             share2.flag_shared()
         
-        def p2pCallback(share, peer=None):
+        def p2p_share(share, peer=None):
             if share.hash <= conv.bits_to_target(share.header['bits']):
                 print 'Got block! Passing to bitcoind!', share.hash
                 if factory.conn is not None:
@@ -237,7 +237,7 @@ def main(args):
                     raise ValueError()
                 peer.getsharesbychain(
                     chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
-                    have=chain.highest.value[1].hash() if chain.highest.value[1] is not None else None
+                    have=random.sample(chain.share2s.keys(), min(8, len(chain.share2s))) + [chain.share2s[chain.highest.value].share.hash] if chain.highest.value is not None else [],
                 )
             else:
                 raise ValueError('unknown result from chain.accept - %r' % (res,))
@@ -246,7 +246,7 @@ def main(args):
             w['highest_p2pool_share2'] = w['current_chain'].get_highest_share2()
             current_work.set(w)
         
-        def p2pCallback2(chain_id_data, hash, peer):
+        def p2p_share_hash(chain_id_data, hash, peer):
             chain = get_chain(chain_id_data)
             if chain is current_work.value['current_chain']:
                 if hash not in chain.share2s:
@@ -258,31 +258,41 @@ def main(args):
                 if hash not in chain.request_map:
                     chain.request_map[hash] = peer
         
-        @defer.inlineCallbacks
-        def getBlocksCallback2(chain_id_data, highest, contact):
+        def p2p_get_shares_to_highest(chain_id_data, have, peer):
             chain = get_chain(chain_id_data)
+            if chain.highest.value is None:
+                return
             
             def get_down(share_hash):
                 blocks = []
-                while share_hash in chain.shares:
-                    share = chain.shares[share_hash][1]
+                
+                while True:
                     blocks.append(share_hash)
-                    
-                    share_hash = share.previous_hash()
-                    if share_hash is None:
+                    if share_hash not in chain.share2s:
                         break
+                    share2 = chain.share2s[share_hash]
+                    if share2.share.previous_hash is None:
+                        break
+                    share_hash = share2.share.previous_hash
+                
                 return blocks
             
-            blocks = get_down(chain.highest.value[1].hash())
-            have = set(get_down(highest) if highest is not None else [])
+            chain_hashes = get_down(chain.highest.value)
             
-            for block in reversed(blocks):
-                if block in have:
+            have2 = set()
+            for hash_ in have:
+                have2 |= set(get_down(hash_))
+            
+            for share_hash in reversed(shares):
+                if share_hash in have2:
                     continue
-                contact.block(chain.shares[block][1].block_data)
+                peer.send_share(chain.shares2[share_hash].share)
         
-        def getBlocksCallback(chain_id, highest, contact):
-            getBlocksCallback2(chain_id, highest, contact)
+        def p2p_get_shares(chain_id_data, hashes, peer):
+            chain = get_chain(chain_id_data)
+            for hash_ in hashes:
+                if hash_ in chain.share2s:
+                    peer.send_share(chain.share2s[hash_].share)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
@@ -306,9 +316,10 @@ def main(args):
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
-        p2p_node.handle_share = p2pCallback
-        p2p_node.handle_share_hash = p2pCallback2
-        p2p_node.handle_get_blocks = getBlocksCallback
+        p2p_node.handle_share = p2p_share
+        p2p_node.handle_share_hash = p2p_share_hash
+        p2p_node.handle_get_shares_to_highest = p2p_get_shares_to_highest
+        p2p_node.handle_get_shares = p2p_get_shares
         
         p2p_node.start()
         
@@ -359,9 +370,8 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
-            share = p2pool.Share(header=header, txns=transactions)
             try:
-                p2pCallback(share)
+                p2p_share(p2pool.Share(header=header, txns=transactions))
             except:
                 print
                 print 'Error processing data received from worker:'

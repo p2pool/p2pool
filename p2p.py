@@ -81,11 +81,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ('count', bitcoin_p2p.StructType('<I')),
         ]),
         
-        'getsharesbychain': bitcoin_p2p.ComposedType([
+        'getsharestohighest': bitcoin_p2p.ComposedType([
             ('chain_id', p2pool.chain_id_type),
             ('have', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
         ]),
         'getshares': bitcoin_p2p.ComposedType([
+            ('chain_id', p2pool.chain_id_type),
             ('hashes', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
         ]),
         
@@ -217,6 +218,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ) for host, port in
             random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
         ])
+    
+    def handle_getsharestohighest(self, chain_id, have):
+        self.node.handle_get_shares_to_highest(chain_id, have, self)
+    
+    def handle_getshares(self, chain_id, hashes):
+        self.node.handle_get_shares(chain_id, hashes, self)
     
     def handle_share0s(self, chains):
         for chain in chains:
@@ -435,6 +442,11 @@ class Node(object):
         else:
             self.addr_store[host, port] = services, timestamp, timestamp
     
+    def handle_get_shares_to_highest(self, chain_id_data, have, peer):
+        pass
+    
+    def handle_get_shares(self, chain_id_data, hashes, peer):
+        pass
     
     def handle_share_hash(self, chain_id_data, hash, peer):
         pass
