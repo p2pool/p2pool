@@ -4,29 +4,16 @@ import random
 import time
 import traceback
 
-from twisted.internet import defer, reactor, protocol, task
+from twisted.internet import defer, protocol, reactor, task
 
 import bitcoin_p2p
 import conv
-import util
 import p2pool
+import util
 
 # mode
 #     0: send hash first (high latency, low bandwidth)
 #     1: send entire share (low latency, high bandwidth)
-
-if 0:
-    import pygame
-    d = pygame.display.set_mode((512, 512))
-    task.LoopingCall(pygame.display.update).start(.1)
-    def draw_circle(id, color=(255,0,0)):
-        id = repr(id)
-        pygame.draw.circle(d, (255, 0, 0), (hash(id)%512, hash(id)//512%512), 4)
-    def draw_line(id, id2, color):
-        id = repr(id)
-        pygame.draw.line(d, color, (hash(id)%512, hash(id)//512%512), (hash(id2)%512, hash(id2)//512%512))
-else:
-    draw_circle = draw_line = lambda *args, **kwargs: None
 
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 0
@@ -114,8 +101,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
-        if isinstance(self.factory, ClientFactory):
-            draw_line(self.node.port, self.transport.getPeer().port, (128, 128, 128))
         
         chain = self.node.current_work.value['current_chain']
         highest_share2 = chain.get_highest_share2()
@@ -192,9 +177,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 chain_id=state['chain_id'],
                 hashes=[state['highest']['hash']],
             )])
-        
-        if isinstance(self.factory, ClientFactory):
-            draw_line(self.node.port, self.transport.getPeer().port, (0, 255, 0))
     
     def handle_set_mode(self, mode):
         self.other_mode_var.set(mode)
@@ -291,9 +273,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         if self.connected2:
             self.node.lost_conn(self)
-        
-        if isinstance(self.factory, ClientFactory):
-            draw_line(self.node.port, self.transport.getPeer().port, (255, 0, 0))
 
 class ServerFactory(protocol.ServerFactory):
     def __init__(self, node):
@@ -363,8 +342,6 @@ class Node(object):
         self.attempts = {}
         self.peers = {}
         self.running = False
-        
-        draw_circle(self.port)
     
     def start(self):
         if self.running:

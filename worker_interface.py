@@ -2,9 +2,9 @@ from __future__ import division
 
 from twisted.internet import defer
 
+import json
 import jsonrpc
 import util
-import json
 
 class LongPollingWorkerInterface(util.DeferredResource):
     def __init__(self, work, compute):

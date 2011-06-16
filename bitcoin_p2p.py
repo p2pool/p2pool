@@ -4,15 +4,15 @@ Implementation of Bitcoin's p2p protocol
 
 from __future__ import division
 
-import struct
-import socket
-import random
-import cStringIO as StringIO
 import hashlib
+import random
+import StringIO
+import socket
+import struct
 import time
 import traceback
 
-from twisted.internet import protocol, reactor, defer
+from twisted.internet import defer, protocol, reactor
 
 import util
 

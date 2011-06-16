@@ -1,13 +1,13 @@
 from __future__ import division
 
-import random
 import collections
 import hashlib
 import itertools
+import random
 
 from twisted.internet import defer, reactor
 from twisted.python import failure
-from twisted.web import server, resource
+from twisted.web import resource, server
 
 class DeferredResource(resource.Resource):
     def render(self, request):

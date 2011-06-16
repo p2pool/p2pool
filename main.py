@@ -3,24 +3,25 @@
 from __future__ import division
 
 import argparse
-import subprocess
 import os
+import random
+import sqlite3
+import subprocess
 import sys
 import traceback
-import random
-import gdbm
 
-from twisted.internet import reactor, defer
+from twisted.internet import defer, reactor
 from twisted.web import server
 
-import jsonrpc
-import conv
-import worker_interface
-import util
 import bitcoin_p2p
-import p2p
+import conv
+import db
 import expiring_dict
+import jsonrpc
+import p2p
 import p2pool
+import util
+import worker_interface
 
 class Chain(object):
     def __init__(self, chain_id_data):
@@ -28,7 +29,7 @@ class Chain(object):
         self.last_p2pool_block_hash = p2pool.chain_id_type.unpack(chain_id_data)['last_p2pool_block_hash']
         
         self.share2s = {} # hash -> share2
-        self.highest = util.Variable(None)
+        self.highest = util.Variable(None) # hash
         
         self.requesting = set()
         self.request_map = {}
@@ -114,8 +115,7 @@ def getwork(bitcoind):
 def main(args):
     try:
         net = p2pool.Testnet if args.testnet else p2pool.Main
-        #sqlite3.connect(args.config, isolation_level=None)
-
+        
         print name
         print
         
@@ -173,7 +173,7 @@ def main(args):
         # information affecting work that should not trigger a long-polling update
         current_work2 = util.Variable(None)
         
-        share_dbs = [gdbm.open(filename, 'cs') for filename in args.store_shares]
+        share_dbs = [db.SQLiteDict(sqlite3.connect(filename, isolation_level=None), 'shares') for filename in args.store_shares]
         
         @defer.inlineCallbacks
         def set_real_work():
@@ -220,11 +220,12 @@ def main(args):
             res = chain.accept(share, net)
             if res == 'good':
                 share2 = chain.share2s[share.hash]
+                
                 hash_data = bitcoin_p2p.HashType().pack(share.hash)
                 share1_data = p2pool.share1.pack(share.as_share1())
                 for share_db in share_dbs:
                     share_db[hash_data] = share1_data
-                    share_db.sync()
+                
                 if chain is current_work.value['current_chain']:
                     print 'Accepted share, passing to peers. Hash: %x' % (share.hash,)
                     share_share2(share2, peer)
@@ -313,7 +314,7 @@ def main(args):
             current_work=current_work,
             port=args.p2pool_port,
             testnet=args.testnet,
-            addr_store=gdbm.open(os.path.join(os.path.dirname(__file__), 'peers.dat'), 'cs'),
+            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), 'addrs'),
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
