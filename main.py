@@ -286,7 +286,7 @@ def main(args):
             for share_hash in reversed(chain_hashes):
                 if share_hash in have2:
                     continue
-                peer.send_share(chain.shares2[share_hash].share)
+                peer.send_share(chain.share2s[share_hash].share)
         
         def p2p_get_shares(chain_id_data, hashes, peer):
             chain = get_chain(chain_id_data)
