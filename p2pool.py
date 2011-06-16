@@ -77,12 +77,12 @@ class Share(object):
                     print '%x' % header['merkle_root']
                     raise ValueError("gentx doesn't match header")
             else:
-                raise ValueError("need either txns or gentx")
+                raise ValueError('need either txns or gentx')
         else:
             self.gentx = txns_to_gentx(txns)
             if gentx is not None:
                 if gentx != self.gentx:
-                    raise ValueError("invalid gentx")
+                    raise ValueError('invalid gentx')
         
         self.coinbase = coinbase_type.unpack(self.gentx['tx']['tx_ins'][0]['script'], ignore_extra=True)
         self.previous_share_hash = self.coinbase['previous_p2pool_share_hash'] if self.coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
@@ -90,7 +90,7 @@ class Share(object):
     
     def as_block(self):
         if self.txns is None:
-            raise ValueError("share does not contain all txns")
+            raise ValueError('share does not contain all txns')
         return dict(header=self.header, txns=self.txns)
     
     def as_share1(self):
@@ -117,7 +117,7 @@ class Share(object):
         return Share2(self, shares, height)
 
 class Share2(object):
-    """Share with associated data"""
+    '''Share with associated data'''
     
     def __init__(self, share, shares, height):
         self.share = share

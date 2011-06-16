@@ -42,13 +42,7 @@ class WorkerInterface(jsonrpc.Server):
         self.putChild('', self)
     
     def rpc_getwork(self, data=None):
-        try:
-            if data is not None:
-                return self.response_callback(data)
-            
-            res = self.compute(self.work.value)
-            
-            return res
-        except:
-            import traceback
-            traceback.print_exc()
+        if data is not None:
+            return self.response_callback(data)
+        
+        return self.compute(self.work.value)

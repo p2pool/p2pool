@@ -18,7 +18,7 @@ class DeferredResource(resource.Resource):
         
         def finish_error(fail):
             request.setResponseCode(500) # won't do anything if already written to
-            request.write("---ERROR---")
+            request.write('---ERROR---')
             request.finish()
             fail.printTraceback()
         
@@ -84,9 +84,9 @@ def median(x):
     return (y[left] + y[right])/2
 
 class StringBuffer(object):
-    "Buffer manager with great worst-case behavior"
+    'Buffer manager with great worst-case behavior'
     
-    def __init__(self, data=""):
+    def __init__(self, data=''):
         self.buf = collections.deque([data])
         self.buf_len = len(data)
         self.pos = 0
@@ -100,7 +100,7 @@ class StringBuffer(object):
     
     def get(self, wants):
         if self.buf_len - self.pos < wants:
-            raise IndexError("not enough data")
+            raise IndexError('not enough data')
         data = []
         while wants:
             seg = self.buf[0][self.pos:self.pos+wants]
@@ -124,10 +124,10 @@ def _DataChunker(receiver):
         else:
             buf.add((yield))
 def DataChunker(receiver):
-    """
+    '''
     Produces a function that accepts data that is input into a generator
     (receiver) in response to the receiver yielding the size of data to wait on
-    """
+    '''
     x = _DataChunker(receiver)
     x.next()
     return x.send
@@ -217,14 +217,14 @@ class DeferredCacher(object):
 
 def pubkey_to_address(pubkey, testnet):
     if len(pubkey) != 65:
-        raise ValueError("invalid pubkey")
+        raise ValueError('invalid pubkey')
     version = 111 if testnet else 0
     key_hash = chr(version) + hashlib.new('ripemd160', hashlib.sha256(pubkey).digest()).digest()
     checksum = hashlib.sha256(hashlib.sha256(key_hash).digest()).digest()[:4]
     return base58_encode(key_hash + checksum)
 
 def base58_encode(data):
-    return "1"*(len(data) - len(data.lstrip(chr(0)))) + natural_to_string(string_to_natural(data), "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+    return '1'*(len(data) - len(data.lstrip(chr(0)))) + natural_to_string(string_to_natural(data), '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz')
 
 def natural_to_string(n, alphabet=None, min_width=1):
     if alphabet is None:

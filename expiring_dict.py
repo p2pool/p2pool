@@ -19,7 +19,7 @@ class Node(object):
     @staticmethod
     def connect(prev, next):
         if prev.next is not None or next.prev is not None:
-            raise ValueError("node already connected")
+            raise ValueError('node already connected')
         prev.next, next.prev = next, prev
     
     def replace(self, contents):
@@ -27,7 +27,7 @@ class Node(object):
     
     def delete(self):
         if self.prev.next is None or self.next.prev is None:
-            raise ValueError("node not connected")
+            raise ValueError('node not connected')
         self.prev.next, self.next.prev = self.next, self.prev
         self.next = self.prev = None
 
@@ -41,7 +41,7 @@ class LinkedList(object):
             self.append(item)
     
     def __repr__(self):
-        return "LinkedList(%r)" % (list(self),)
+        return 'LinkedList(%r)' % (list(self),)
     
     def __len__(self):
         return sum(1 for x in self)
@@ -67,13 +67,13 @@ class LinkedList(object):
             for i in xrange(-index):
                 cur = cur.prev
                 if cur is self.start:
-                    raise IndexError("index out of range")
+                    raise IndexError('index out of range')
         else:
             cur = self.start
             for i in xrange(index + 1):
                 cur = cur.next
                 if cur is self.end:
-                    raise IndexError("index out of range")
+                    raise IndexError('index out of range')
         return cur
     
     def appendleft(self, item):
@@ -85,14 +85,14 @@ class LinkedList(object):
     def popleft(self):
         node = self.start.next
         if node is self.end:
-            raise IndexError("popleft from empty")
+            raise IndexError('popleft from empty')
         node.delete()
         return node.contents
     
     def pop(self):
         node = self.end.prev
         if node is self.start:
-            raise IndexError("pop from empty")
+            raise IndexError('pop from empty')
         node.delete()
         return node.contents
 
@@ -107,7 +107,7 @@ class ExpiringDict(object):
     
     def __repr__(self):
         reactor.callLater(0, self.expire)
-        return "ExpiringDict" + repr(self.__dict__)
+        return 'ExpiringDict' + repr(self.__dict__)
     
     def __len__(self):
         reactor.callLater(0, self.expire)
@@ -115,7 +115,7 @@ class ExpiringDict(object):
     
     _nothing = object()
     def touch(self, key, value=_nothing):
-        "Updates expiry node, optionally replacing value, returning new value"
+        'Updates expiry node, optionally replacing value, returning new value'
         if value is self._nothing or key in self.d:
             node, old_value = self.d[key]
             node.delete()
@@ -180,13 +180,13 @@ if __name__ == '__main__':
     time.sleep(1)
     
     x[1] = 2
-    print "x[1] = 2"
+    print 'x[1] = 2'
     print x
     
     time.sleep(1)
     
     x[1] = 3
-    print "x[1] = 3"
+    print 'x[1] = 3'
     print x
     
     time.sleep(5)

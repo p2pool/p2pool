@@ -214,7 +214,7 @@ def main(args):
                 if factory.conn is not None:
                     factory.conn.addInv('block', share.as_block())
                 else:
-                    print "No bitcoind connection! Erp!"
+                    print 'No bitcoind connection! Erp!'
             
             chain = get_chain(share.chain_id_data)
             res = chain.accept(share, net)
@@ -331,7 +331,7 @@ def main(args):
             chain = new_work['current_chain']
             for share2 in chain.share2s.itervalues():
                 if not share2.shared:
-                    print "Sharing share of switched to chain. Hash:", share2.share.hash
+                    print 'Sharing share of switched to chain. Hash:', share2.share.hash
                     share_share2(share2)
             for hash, peer in chain.request_map.iteritems():
                 if hash not in chain.share2s:
@@ -373,7 +373,7 @@ def main(args):
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
             share = p2pool.Share(header=header, txns=transactions)
-            print "GOT SHARE! %x" % (share.hash,)
+            print 'GOT SHARE! %x' % (share.hash,)
             try:
                 p2p_share(share)
             except:

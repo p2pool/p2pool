@@ -12,12 +12,12 @@ import util
 class Error(Exception):
     def __init__(self, code, message, data=None):
         if not isinstance(code, int):
-            raise TypeError("code must be an int")
+            raise TypeError('code must be an int')
         if not isinstance(message, unicode):
-            raise TypeError("message must be a unicode")
+            raise TypeError('message must be a unicode')
         self._code, self._message, self._data = code, message, data
     def __str__(self):
-        return "%i %s %r" % (self._code, self._message, self._data)
+        return '%i %s %r' % (self._code, self._message, self._data)
     def _to_obj(self):
         return {
             'code': self._code,
@@ -38,10 +38,10 @@ class Proxy(object):
             'Content-Type': 'text/json',
         }
         if self._auth is not None:
-            headers['Authorization'] = "Basic " + base64.b64encode(':'.join(self._auth))
+            headers['Authorization'] = 'Basic ' + base64.b64encode(':'.join(self._auth))
         resp = json.loads((yield client.getPage(
             url=self._url,
-            method="POST",
+            method='POST',
             headers=headers,
             postdata=json.dumps({
                 'jsonrpc': '2.0',
@@ -52,7 +52,7 @@ class Proxy(object):
         )))
         
         if resp['id'] != id_:
-            raise ValueError("invalid id")
+            raise ValueError('invalid id')
         if 'error' in resp and resp['error'] is not None:
             raise Error(resp['error'])
         defer.returnValue(resp['result'])
@@ -78,7 +78,7 @@ class Server(util.DeferredResource):
             try:
                 req = json.loads(data)
             except Exception:
-                raise RemoteError(-32700, u"Parse error")
+                raise RemoteError(-32700, u'Parse error')
         except Error, e:
             # id unknown
             request.write(json.dumps({
@@ -99,11 +99,11 @@ class Server(util.DeferredResource):
                 if not isinstance(params, list):
                     raise ValueError()
             except Exception:
-                raise Error(-32600, u"Invalid Request")
+                raise Error(-32600, u'Invalid Request')
             
-            method_name = "rpc_" + method
+            method_name = 'rpc_' + method
             if not hasattr(self, method_name):
-                raise Error(-32601, u"Method not found")
+                raise Error(-32601, u'Method not found')
             method_meth = getattr(self, method_name)
             
             df = defer.maybeDeferred(method_meth, *params)
@@ -116,9 +116,9 @@ class Server(util.DeferredResource):
             except Error, e:
                 raise e
             except Exception, e:
-                print "Squelched JSON method error:"
+                print 'Squelched JSON method error:'
                 traceback.print_exc()
-                raise Error(-32099, u"Unknown error")
+                raise Error(-32099, u'Unknown error')
             
             request.write(json.dumps({
                 'jsonrpc': '2.0',

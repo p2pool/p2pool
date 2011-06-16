@@ -1,6 +1,6 @@
-"""
+'''
 Implementation of Bitcoin's p2p protocol
-"""
+'''
 
 from __future__ import division
 
@@ -29,7 +29,7 @@ class Type(object):
         
         if not ignore_extra:
             if f.tell() != len(data):
-                raise LateEnd("underread " + repr((self, data)))
+                raise LateEnd('underread ' + repr((self, data)))
         
         return obj
     
@@ -56,10 +56,10 @@ class VarIntType(Type):
         data = file.read(1)
         if len(data) != 1:
             raise EarlyEnd()
-        first, = struct.unpack("<B", data)
-        if first == 0xff: desc = "<Q"
-        elif first == 0xfe: desc = "<I"
-        elif first == 0xfd: desc = "<H"
+        first, = struct.unpack('<B', data)
+        if first == 0xff: desc = '<Q'
+        elif first == 0xfe: desc = '<I'
+        elif first == 0xfd: desc = '<H'
         else: return first
         length = struct.calcsize(desc)
         data = file.read(length)
@@ -69,22 +69,22 @@ class VarIntType(Type):
     
     def write(self, file, item):
         if item < 0xfd:
-            file.write(struct.pack("<B", item))
+            file.write(struct.pack('<B', item))
         elif item <= 0xffff:
-            file.write(struct.pack("<BH", 0xfd, item))
+            file.write(struct.pack('<BH', 0xfd, item))
         elif item <= 0xffffffff:
-            file.write(struct.pack("<BI", 0xfe, item))
+            file.write(struct.pack('<BI', 0xfe, item))
         elif item <= 0xffffffffffffffff:
-            file.write(struct.pack("<BQ", 0xff, item))
+            file.write(struct.pack('<BQ', 0xff, item))
         else:
-            raise ValueError("int too large for varint")
+            raise ValueError('int too large for varint')
 
 class VarStrType(Type):
     def read(self, file):
         length = VarIntType().read(file)
         res = file.read(length)
         if len(res) != length:
-            raise EarlyEnd("var str not long enough %r" % ((length, len(res), res),))
+            raise EarlyEnd('var str not long enough %r' % ((length, len(res), res),))
         return res
     
     def write(self, file, item):
@@ -98,12 +98,12 @@ class FixedStrType(Type):
     def read(self, file):
         res = file.read(self.length)
         if len(res) != self.length:
-            raise EarlyEnd("early EOF!")
+            raise EarlyEnd('early EOF!')
         return res
     
     def write(self, file, item):
         if len(item) != self.length:
-            raise ValueError("incorrect length!")
+            raise ValueError('incorrect length!')
         file.write(item)
 
 class EnumType(Type):
@@ -114,7 +114,7 @@ class EnumType(Type):
         self.keys = {}
         for k, v in values.iteritems():
             if v in self.keys:
-                raise ValueError("duplicate value in values")
+                raise ValueError('duplicate value in values')
             self.keys[v] = k
     
     def read(self, file):
@@ -127,7 +127,7 @@ class HashType(Type):
     def read(self, file):
         data = file.read(256//8)
         if len(data) != 256//8:
-            raise EarlyEnd("incorrect length!")
+            raise EarlyEnd('incorrect length!')
         return int(data[::-1].encode('hex'), 16)
     
     def write(self, file, item):
@@ -137,7 +137,7 @@ class ShortHashType(Type):
     def read(self, file):
         data = file.read(160//8)
         if len(data) != 160//8:
-            raise EarlyEnd("incorrect length!")
+            raise EarlyEnd('incorrect length!')
         return int(data[::-1].encode('hex'), 16)
     
     def write(self, file, item):
@@ -263,12 +263,12 @@ class BaseProtocol(protocol.Protocol):
     
     def dataReceiver(self):
         while True:
-            start = ""
+            start = ''
             while start != self._prefix:
                 start = (start + (yield 1))[-len(self._prefix):]
             
             command = (yield 12).rstrip('\0')
-            length, = struct.unpack("<I", (yield 4))
+            length, = struct.unpack('<I', (yield 4))
             
             if self.use_checksum:
                 checksum = yield 4
@@ -279,52 +279,52 @@ class BaseProtocol(protocol.Protocol):
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
-                    print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                    print "INVALID HASH"
+                    print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                    print 'INVALID HASH'
                     continue
             
             type_ = self.message_types.get(command, None)
             if type_ is None:
-                print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print "NO TYPE FOR", repr(command)
+                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'NO TYPE FOR', repr(command)
                 continue
             
             try:
                 payload2 = type_.unpack(payload)
             except:
-                print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 traceback.print_exc()
                 continue
             
-            handler = getattr(self, "handle_" + command, None)
+            handler = getattr(self, 'handle_' + command, None)
             if handler is None:
-                print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print "NO HANDLER FOR", command
+                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'NO HANDLER FOR', command
                 continue
             
-            #print "RECV", command, payload2
+            #print 'RECV', command, payload2
             
             try:
                 handler(**payload2)
             except:
-                print "RECV", command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 traceback.print_exc()
                 continue
     
     def sendPacket(self, command, payload2={}):
         payload = self.message_types[command].pack(payload2)
         if len(command) >= 12:
-            raise ValueError("command too long")
+            raise ValueError('command too long')
         if self.use_checksum:
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
         else:
-            checksum = ""
-        data = self._prefix + struct.pack("<12sI", command, len(payload)) + checksum + payload
+            checksum = ''
+        data = self._prefix + struct.pack('<12sI', command, len(payload)) + checksum + payload
         self.transport.write(data)
-        #print "SEND", command, payload2
+        #print 'SEND', command, payload2
     
     def __getattr__(self, attr):
-        prefix = "send_"
+        prefix = 'send_'
         if attr.startswith(prefix):
             command = attr[len(prefix):]
             return lambda **payload2: self.sendPacket(command, payload2)
@@ -364,13 +364,13 @@ class Protocol(BaseProtocol):
         ]),
         'inv': ComposedType([
             ('invs', ListType(ComposedType([
-                ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
+                ('type', EnumType(StructType('<I'), {'tx': 1, 'block': 2})),
                 ('hash', HashType()),
             ]))),
         ]),
         'getdata': ComposedType([
             ('requests', ListType(ComposedType([
-                ('type', EnumType(StructType('<I'), {"tx": 1, "block": 2})),
+                ('type', EnumType(StructType('<I'), {'tx': 1, 'block': 2})),
                 ('hash', HashType()),
             ]))),
         ]),
@@ -434,12 +434,12 @@ class Protocol(BaseProtocol):
                 port=self.transport.getHost().port,
             ),
             nonce=random.randrange(2**64),
-            sub_version_num="",
+            sub_version_num='',
             start_height=0,
         )
     
     def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
-        #print "VERSION", locals()
+        #print 'VERSION', locals()
         self.version_after = version
         self.send_verack()
     
@@ -449,29 +449,29 @@ class Protocol(BaseProtocol):
         # connection ready
         self.check_order = util.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
         self.submit_order = util.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
-        self.get_block = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type="block", hash=hash)]))
-        self.get_block_header = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type="block", hash=hash)]))
+        self.get_block = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
+        self.get_block_header = util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
         
-        if hasattr(self.factory, "resetDelay"):
+        if hasattr(self.factory, 'resetDelay'):
             self.factory.resetDelay()
-        if hasattr(self.factory, "gotConnection"):
+        if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(self)
     
     def handle_inv(self, invs):
         for inv in invs:
-            #print "INV", item['type'], hex(item['hash'])
+            #print 'INV', item['type'], hex(item['hash'])
             self.send_getdata(requests=[inv])
     
     def handle_addr(self, addrs):
         for addr in addrs:
-            pass#print "ADDR", addr
+            pass#print 'ADDR', addr
     
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))
         self.submit_order.got_response(hash, dict(reply=reply, script=script))
     
     def handle_tx(self, tx):
-        pass#print "TX", hex(merkle_hash([tx])), tx
+        pass#print 'TX', hex(merkle_hash([tx])), tx
     
     def handle_block(self, block):
         self.get_block.got_response(block_hash(block['header']), block)
@@ -481,7 +481,7 @@ class Protocol(BaseProtocol):
         pass
     
     def connectionLost(self, reason):
-        if hasattr(self.factory, "gotConnection"):
+        if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(None)
 
 class ProtocolInv(Protocol):
@@ -492,19 +492,19 @@ class ProtocolInv(Protocol):
         for inv in requests:
             type_, hash_ = inv['type'], inv['hash']
             if (type_, hash_) in self.inv:
-                print "bitcoind requested %s %x, sent" % (type_, hash_)
+                print 'bitcoind requested %s %x, sent' % (type_, hash_)
                 self.sendPacket(type_, {type_: self.inv[(type_, hash_)]})
             else:
-                print "bitcoind requested %s %x, but not found" % (type_, hash_)
+                print 'bitcoind requested %s %x, but not found' % (type_, hash_)
     
     def addInv(self, type_, data):
         if self.inv is None: self.inv = {}
-        if type_ == "block":
+        if type_ == 'block':
             hash_ = block_hash(data['header'])
-        elif type_ == "tx":
+        elif type_ == 'tx':
             hash_ = merkle_hash([data])
         else:
-            raise ValueError("invalid type: %r" % (type_,))
+            raise ValueError('invalid type: %r' % (type_,))
         self.inv[(type_, hash_)] = data
         self.send_inv(invs=[dict(type=type_, hash=hash_)])
 
@@ -550,8 +550,8 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         
         return df
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     factory = ClientFactory()
-    reactor.connectTCP("127.0.0.1", 8333, factory)
+    reactor.connectTCP('127.0.0.1', 8333, factory)
     
     reactor.run()
