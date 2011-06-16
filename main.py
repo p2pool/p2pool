@@ -212,7 +212,7 @@ def main(args):
             if share.hash <= conv.bits_to_target(share.header['bits']):
                 print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
                 if factory.conn is not None:
-                    factory.conn.addInv('block', share.as_block())
+                    factory.conn.send_block(block=share.as_block())
                 else:
                     print 'No bitcoind connection! Erp!'
             
