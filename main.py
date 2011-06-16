@@ -271,7 +271,7 @@ def main(args):
                     if share_hash not in chain.share2s:
                         break
                     share2 = chain.share2s[share_hash]
-                    if share2.share.previous_hash is None:
+                    if share2.share.previous_share_hash is None:
                         break
                     share_hash = share2.share.previous_share_hash
                 
