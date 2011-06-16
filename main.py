@@ -251,7 +251,7 @@ def main(args):
             if chain is current_work.value['current_chain']:
                 if hash not in chain.share2s:
                     if hash not in chain.requesting:
-                        peer.send_getshares(hashes=[hash])
+                        peer.send_getshares(chain_id=p2pool.chain_id_type.unpack(chain_id_data), hashes=[hash])
                         chain.requesting.add(hash)
                         reactor.callLater(5, chain.requesting.remove, hash)
             else:
