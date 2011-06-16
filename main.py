@@ -414,7 +414,7 @@ def main(args):
 if __name__ == '__main__':
     try:
         __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
-    except IOError:
+    except:
         __version__ = 'unknown'
     
     name = 'p2pool (version %s)' % (__version__,)
