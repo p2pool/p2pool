@@ -376,7 +376,7 @@ class Node(object):
                         host = host2[len(prefix):]
                     
                     if (host, port) not in self.attempts:
-                        print "Trying to connect to", host, port
+                        #print "Trying to connect to", host, port
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
                 traceback.print_exc()
