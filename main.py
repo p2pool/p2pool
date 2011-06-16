@@ -309,7 +309,7 @@ def main(args):
                 ip, port = x.split(':')
                 return ip, int(port)
             else:
-                return ip, {False: 9333, True: 19333}[args.testnet]
+                return x, {False: 9333, True: 19333}[args.testnet]
         
         if args.testnet:
             nodes = [('72.14.191.28', 19333)]
