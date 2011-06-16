@@ -245,11 +245,11 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share2s(self, share2s):
         for share2 in share2s:
             hash_ = bitcoin_p2p.block_hash(share2['header'])
-            if not hash_ <= conv.bits_to_target(share1['header']['bits']):
+            if not hash_ <= conv.bits_to_target(share2['header']['bits']):
                 print "Dropping peer %s:%i due to invalid share" % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool.Share(share1['header'], txns=share1['txns'])
+            share = p2pool.Share(share2['header'], txns=share2['txns'])
             self.node.handle_share(share, self)
     
     def send_share(self, share):
