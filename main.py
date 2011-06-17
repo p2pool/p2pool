@@ -327,7 +327,6 @@ def main(args):
             nodes.append(((yield reactor.resolve('p2pool.forre.st')), {False: 9333, True: 19333}[args.testnet]))
         except:
             traceback.print_exc()
-        print nodes
         
         p2p_node = p2p.Node(
             current_work=current_work,
