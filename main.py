@@ -553,6 +553,9 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
+    if hasattr(sys, "frozen"):
+        __file__ = sys.executable
+    
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = {False: 8333, True: 18333}[args.testnet]
     
