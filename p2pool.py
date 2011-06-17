@@ -164,14 +164,17 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, su
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 
 class Testnet(object):
-    TARGET_MULTIPLIER = 30
-    SPREAD = 30
-    ROOT_BLOCK = 0x3575d1e7b40fe37ad12d41169a1012d26df5f3c35486e2abfbe9d2c
-    SCRIPT = '410489175c7658845fd7c33d61029ebf4042e8386443ff6e6628fdb5ac938c31072dc61cee691ae1e8355c3a87cb4813cc9bf036fdb09078d35eacf9e9ab52374ebeac'.decode('hex')
-    IDENTIFIER = 0x808330dc87e313b7
+    TARGET_MULTIPLIER = SPREAD = 30
+    ROOT_BLOCK = 0xd5070cd4f2987ad2191af71393731a2b143f094f7b84c9e6aa9a6a
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = 0x1ae3479e4eb6700a
+    PREFIX= 'd19778c812754854'.decode('hex')
+    ADDRS_TABLE = 'addrs_testnet'
 
 class Main(object):
     TARGET_MULTIPLIER = SPREAD = 600
-    ROOT_BLOCK = 0xf78e83f63fd0f4e0f584d3bc2c7010f679834cd8886d61876d
-    SCRIPT = '410441ccbae5ca6ecfaa014028b0c49df2cd5588cb6058ac260d650bc13c9ec466f95c7a6d80a3ea7f7b8e2e87e49b96081e9b20415b06433d7a5b6a156b58690d96ac'.decode('hex')
-    IDENTIFIER = 0x49ddc0b4938708ad
+    ROOT_BLOCK = 0x11a22c6e314b1a3f44cbbf50246187a37756ea8af4d41c43a8d6
+    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
+    IDENTIFIER = 0x7452839666e1f8f8
+    PREFIX = '2d4224bf18c87b87'.decode('hex')
+    ADDRS_TABLE = 'addrs'

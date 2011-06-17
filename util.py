@@ -12,11 +12,15 @@ from twisted.web import resource, server
 class DeferredResource(resource.Resource):
     def render(self, request):
         def finish(x):
+            if request._disconnected:
+                return
             if x is not None:
                 request.write(x)
             request.finish()
         
         def finish_error(fail):
+            if request._disconnected:
+                return
             request.setResponseCode(500) # won't do anything if already written to
             request.write('---ERROR---')
             request.finish()
@@ -289,12 +293,27 @@ class DictWrapper(object):
     
     def __getitem__(self, key):
         return self.decode_value(self.inner[self.encode_key(key)])
-    
     def __setitem__(self, key, value):
         self.inner[self.encode_key(key)] = self.encode_value(value)
-    
     def __delitem__(self, key):
         del self.inner[self.encode_key(key)]
     
+    def __iter__(self):
+        for encoded_key in self.inner:
+            yield self.decode_key(encoded_key)
+    def iterkeys(self):
+        return iter(self)
     def keys(self):
-        return map(self.decode_key, self.inner.keys())
+        return list(self.iterkeys())
+    
+    def itervalue(self):
+        for encoded_value in self.inner.itervalues():
+            yield self.decode_value(encoded_value)
+    def values(self):
+        return list(self.itervalue())
+    
+    def iteritems(self):
+        for key, value in self.inner.iteritems():
+            yield self.decode_key(key), self.decode_value(value)
+    def items(self):
+        return list(self.iteritems())

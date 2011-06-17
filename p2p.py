@@ -22,10 +22,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def __init__(self, node):
         self.node = node
         
-        if self.node.testnet:
-            self._prefix = 'f77cea5d16a2183f'.decode('hex')
-        else:
-            self._prefix = '95ec1eda53c5e716'.decode('hex')
+        self._prefix = self.node.net.PREFIX
     
     use_checksum = True
     
@@ -323,12 +320,12 @@ class AddrStore(util.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, current_work, port, testnet, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100):
         if addr_store is None:
             addr_store = {}
         
         self.port = port
-        self.testnet = testnet
+        self.net = net
         self.addr_store = AddrStore(addr_store)
         self.preferred_addrs = preferred_addrs
         self.mode_var = util.Variable(mode)

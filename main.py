@@ -66,6 +66,20 @@ class Chain(object):
     
     def get_highest_share2(self):
         return self.share2s[self.highest.value] if self.highest.value is not None else None
+    
+    def get_down(self, share_hash):
+        blocks = []
+        
+        while True:
+            blocks.append(share_hash)
+            if share_hash not in self.share2s:
+                break
+            share2 = self.share2s[share_hash]
+            if share2.share.previous_share_hash is None:
+                break
+            share_hash = share2.share.previous_share_hash
+        
+        return blocks
 
 @defer.inlineCallbacks
 def get_last_p2pool_block_hash(current_block_hash, get_block, net):
@@ -115,6 +129,7 @@ def getwork(bitcoind):
             yield util.sleep(1)
             continue
         defer.returnValue((getwork, height))
+
 
 @defer.inlineCallbacks
 def main(args):
@@ -169,6 +184,8 @@ def main(args):
             print 'Got block %x' % (block_hash,)
             defer.returnValue(block)
         get_block = util.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
+        
+        get_raw_transaction = util.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
         
         chains = expiring_dict.ExpiringDict(300)
         def get_chain(chain_id_data):
@@ -235,10 +252,13 @@ def main(args):
                     share_db[hash_data] = share1_data
                 
                 if chain is current_work.value['current_chain']:
-                    print 'Accepted share, passing to peers. Hash: %x' % (share.hash,)
-                    share_share2(share2, peer)
+                    if share.hash == chain.highest.value:
+                        print 'Accepted share, passing to peers. Height: %i Hash: %x' % (share2.height, share.hash,)
+                        share_share2(share2, peer)
+                    else:
+                        print 'Accepted share, not highest. Height: %i Hash: %x' % (share2.height, share.hash,)
                 else:
-                    print 'Accepted share to non-current chain. Hash: %x' % (share.hash,)
+                    print 'Accepted share to non-current chain. Height: %i Hash: %x' % (share2.height, share.hash,)
             elif res == 'dup':
                 print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
             elif res == 'orphan':
@@ -260,44 +280,24 @@ def main(args):
             chain = get_chain(chain_id_data)
             if chain is current_work.value['current_chain']:
                 if hash not in chain.share2s:
-                    if hash not in chain.requesting:
-                        print "Got share hash, requesting! Hash: %x" % (hash,)
-                        peer.send_getshares(chain_id=p2pool.chain_id_type.unpack(chain_id_data), hashes=[hash])
-                        chain.requesting.add(hash)
-                        reactor.callLater(5, chain.requesting.remove, hash)
-                    else:
-                        print "Got share hash, already requested, ignoring. Hash: %x" % (hash,)
+                    print "Got share hash, requesting! Hash: %x" % (hash,)
+                    peer.send_getshares(chain_id=p2pool.chain_id_type.unpack(chain_id_data), hashes=[hash])
                 else:
                     print "Got share hash, already have, ignoring. Hash: %x" % (hash,)
             else:
                 print "Got share hash to non-current chain, storing. Hash: %x" % (hash,)
-                if hash not in chain.request_map:
-                    chain.request_map[hash] = peer
+                chain.request_map.setdefault(hash, []).append(peer)
         
         def p2p_get_to_best(chain_id_data, have, peer):
             chain = get_chain(chain_id_data)
             if chain.highest.value is None:
                 return
             
-            def get_down(share_hash):
-                blocks = []
-                
-                while True:
-                    blocks.append(share_hash)
-                    if share_hash not in chain.share2s:
-                        break
-                    share2 = chain.share2s[share_hash]
-                    if share2.share.previous_share_hash is None:
-                        break
-                    share_hash = share2.share.previous_share_hash
-                
-                return blocks
-            
-            chain_hashes = get_down(chain.highest.value)
+            chain_hashes = chain.get_down(chain.highest.value)
             
             have2 = set()
             for hash_ in have:
-                have2 |= set(get_down(hash_))
+                have2 |= set(chain.get_down(hash_))
             
             for share_hash in reversed(chain_hashes):
                 if share_hash in have2:
@@ -327,8 +327,8 @@ def main(args):
         p2p_node = p2p.Node(
             current_work=current_work,
             port=args.p2pool_port,
-            testnet=args.testnet,
-            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), 'addrs'),
+            net=net,
+            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), net.ADDRS_TABLE),
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
@@ -343,13 +343,15 @@ def main(args):
         def work_changed(new_work):
             #print 'Work changed:', new_work
             chain = new_work['current_chain']
-            for share2 in chain.share2s.itervalues():
-                if not share2.shared:
-                    print 'Sharing share of switched to chain. Hash:', share2.share.hash
-                    share_share2(share2)
-            for hash, peer in chain.request_map.iteritems():
+            if chain.highest.value is not None:
+                for share_hash in chain.get_down(chain.highest.value):
+                    share2 = chain.share2s[share_hash]
+                    if not share2.shared:
+                        print 'Sharing share of switched to chain. Hash:', share2.share.hash
+                        share_share2(share2)
+            for hash, peers in chain.request_map.iteritems():
                 if hash not in chain.share2s:
-                    peer.send_getshares(hashes=[hash])
+                    random.choice(peers).send_getshares(hashes=[hash])
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
@@ -364,16 +366,17 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
         def compute(state):
+            extra_txns = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             generate_txn, shares = p2pool.generate_transaction(
                 last_p2pool_block_hash=state['last_p2pool_block_hash'],
                 previous_share2=state['highest_p2pool_share2'],
                 add_script=my_script,
-                subsidy=50*100000000 >> state['height']//210000,
+                subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txns),
                 nonce=random.randrange(2**64),
                 net=net,
             )
-            print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain.'
-            transactions = [generate_txn] + [tx.tx for tx in tx_pool.itervalues() if tx.is_good()] # needs to increase subsidy if txns are included
+            print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txns)/100000000
+            transactions = [generate_txn] + [tx.tx for tx in extra_txns]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
@@ -415,22 +418,43 @@ def main(args):
                 yield start_hash, block
                 start_hash = block['header']['previous_block']
         
-        tx_pool = expiring_dict.ExpiringDict(60, get_touches=False) # hash -> tx
+        tx_pool = expiring_dict.ExpiringDict(600, get_touches=False) # hash -> tx
         
         class Tx(object):
             def __init__(self, tx, seen_at_block):
+                self.hash = bitcoin_p2p.tx_hash(tx)
                 self.tx = tx
                 self.seen_at_block = seen_at_block
                 self.mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
-                print
-                print "%x %r" % (seen_at_block, tx)
-                for mention in self.mentions:
-                    print "%x" % mention
-                print
+                #print
+                #print "%x %r" % (seen_at_block, tx)
+                #for mention in self.mentions:
+                #    print "%x" % mention
+                #print
+                self.parents_all_in_blocks = False
+                self.value_in = 0
+                #print self.tx
+                self.value_out = sum(txout['value'] for txout in self.tx['tx_outs'])
+                self._find_parents_in_blocks()
+            
+            @defer.inlineCallbacks
+            def _find_parents_in_blocks(self):
+                for tx_in in self.tx['tx_ins']:
+                    try:
+                        raw_transaction = yield get_raw_transaction(tx_in['previous_output']['hash'])
+                    except Exception:
+                        return
+                    self.value_in += raw_transaction['tx']['txouts'][tx_in['previous_output']['index']]['value']
+                    #print raw_transaction
+                    if not raw_transaction['parent_blocks']:
+                        return
+                self.parents_all_in_blocks = True
             
             def is_good(self):
+                if not self.parents_all_in_blocks:
+                    return False
                 x = self.is_good2()
-                print "is_good:", x
+                #print "is_good:", x
                 return x
             
             def is_good2(self):
@@ -446,7 +470,7 @@ def main(args):
         def new_tx(tx):
             seen_at_block = current_work.value['previous_block']
             tx_pool[bitcoin_p2p.tx_hash(tx)] = Tx(tx, seen_at_block)
-        #factory.new_tx.watch(new_tx)
+        factory.new_tx.watch(new_tx)
         # disabled for now - txs can rely on past txs that are not yet in the block chain
         # bitcoin passes those txs along
         # if a p2pool program was started in between the tx-not-yet-included and the tx-depending-on-that-one
