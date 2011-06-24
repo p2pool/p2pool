@@ -242,7 +242,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool.Share(share2['header'], txns=share2['txns'])
+            share = p2pool.Share(share2['header'], txs=share2['txs'])
             self.node.handle_share(share, self)
     
     def send_share(self, share, full=False):

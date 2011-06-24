@@ -8,35 +8,43 @@ chain_id_type = bitcoin_p2p.ComposedType([
     ('bits', bitcoin_p2p.StructType('<I')),
 ])
 
-coinbase_type = bitcoin_p2p.ComposedType([
-    ('identifier', bitcoin_p2p.StructType('<Q')),
+share_data_type = bitcoin_p2p.ComposedType([
     ('last_p2pool_block_hash', bitcoin_p2p.HashType()),
     ('previous_p2pool_share_hash', bitcoin_p2p.HashType()),
-    ('subsidy', bitcoin_p2p.StructType('<Q')),
-    ('last_share_index', bitcoin_p2p.StructType('<I')),
     ('nonce', bitcoin_p2p.StructType('<Q')),
 ])
 
-merkle_branch = bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
+coinbase_type = bitcoin_p2p.ComposedType([
+    ('identifier', bitcoin_p2p.StructType('<Q')),
+    ('share_data', share_data_type),
+])
+
+merkle_branch_type = bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
     ('side', bitcoin_p2p.StructType('<B')),
     ('hash', bitcoin_p2p.HashType()),
 ]))
 
-share1 = bitcoin_p2p.ComposedType([
-    ('header', bitcoin_p2p.block_header),
-    ('gentx', bitcoin_p2p.ComposedType([
-        ('tx', bitcoin_p2p.tx),
-        ('merkle_branch', merkle_branch),
+gentx_info_type = bitcoin_p2p.ComposedType([
+    ('share_info', bitcoin_p2p.ComposedType([
+        ('share_data', share_data_type),
+        ('new_script', bitcoin_p2p.VarStrType()),
+        ('subsidy', bitcoin_p2p.StructType('<Q')),
     ])),
+    ('merkle_branch', merkle_branch_type),
 ])
 
-def calculate_merkle_branch(txn_list, index):
-    hash_list = [(bitcoin_p2p.doublesha(bitcoin_p2p.tx.pack(data)), i == index, []) for i, data in enumerate(txn_list)]
+share1_type = bitcoin_p2p.ComposedType([
+    ('header', bitcoin_p2p.block_header_type),
+    ('gentx_info', gentx_info_type),
+])
+
+def calculate_merkle_branch(tx_list, index):
+    hash_list = [(bitcoin_p2p.doublesha(bitcoin_p2p.tx_type.pack(data)), i == index, []) for i, data in enumerate(tx_list)]
     
     while len(hash_list) > 1:
         hash_list = [
             (
-                bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record.pack(dict(left=left, right=right))),
+                bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=left, right=right))),
                 left_f or right_f,
                 (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
             )
@@ -44,57 +52,73 @@ def calculate_merkle_branch(txn_list, index):
                 zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
         ]
     
-    assert check_merkle_branch(txn_list[index], hash_list[0][2]) == hash_list[0][0]
+    assert hash_list[0][1]
+    assert check_merkle_branch(tx_list[index], hash_list[0][2]) == hash_list[0][0]
     
     return hash_list[0][2]
 
-def check_merkle_branch(txn, branch):
-    hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.tx.pack(txn))
+def check_merkle_branch(tx, branch):
+    hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.tx_type.pack(tx))
     for step in branch:
         if not step['side']:
-            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record.pack(dict(left=step['hash'], right=hash_)))
+            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=step['hash'], right=hash_)))
         else:
-            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record.pack(dict(left=hash_, right=step['hash'])))
+            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=hash_, right=step['hash'])))
     return hash_
 
-def txns_to_gentx(txns):
+def txs_to_gentx_info(txs):
     return dict(
-        tx=txns[0],
-        merkle_branch=calculate_merkle_branch(txns, 0),
+        share_info=dict(
+            share_data=coinbase_type.unpack(txs[0]['tx_ins'][0]['script'])['share_data'],
+            subsidy=sum(tx_out['value'] for tx_out in txs[0]['tx_outs']),
+            new_script=txs[0]['tx_outs'][-1]['script'],
+        ),
+        merkle_branch=calculate_merkle_branch(txs, 0),
     )
 
+def share_info_to_gentx_and_shares(share_info, chain, net):
+    return generate_transaction(
+        last_p2pool_block_hash=share_info['share_data']['last_p2pool_block_hash'],
+        previous_share2=chain.share2s[share_info['share_data']['previous_p2pool_share_hash']],
+        nonce=share_info['share_data']['nonce'],
+        new_script=share_info['new_script'],
+        subsidy=share_info['subsidy'],
+        net=net,
+    )
+
+def gentx_info_to_gentx_shares_and_merkle_root(gentx_info, chain, net):
+    gentx, shares = share_info_to_gentx_and_shares(gentx_info['share_info'], chain, net)
+    return gentx, shares, check_merkle_branch(gentx, gentx_info['merkle_branch'])
+
 class Share(object):
-    def __init__(self, header, txns=None, gentx=None):
+    def __init__(self, header, txs=None, gentx_info=None):
+        if txs is not None:
+            if bitcoin_p2p.merkle_hash(txs) != header['merkle_root']:
+                raise ValueError("txs don't match header")
+        
+        if gentx_info is None:
+            if txs is None:
+                raise ValueError('need either txs or gentx_info')
+            
+            gentx_info = txs_to_gentx_info(txs)
+        
+        coinbase = gentx_info['share_info']['coinbase']
+        
         self.header = header
+        self.txs = txs
+        self.gentx_info = gentx_info
         self.hash = bitcoin_p2p.block_hash(header)
-        
-        self.txns = txns
-        if txns is None:
-            if gentx is not None:
-                self.gentx = gentx
-                if check_merkle_branch(gentx['tx'], gentx['merkle_branch']) != header['merkle_root']:
-                    #print '%x' % check_merkle_branch(gentx['tx'], gentx['merkle_branch'])
-                    #print '%x' % header['merkle_root']
-                    raise ValueError("gentx doesn't match header")
-            else:
-                raise ValueError('need either txns or gentx')
-        else:
-            self.gentx = txns_to_gentx(txns)
-            if gentx is not None:
-                if gentx != self.gentx:
-                    raise ValueError('invalid gentx')
-        
-        self.coinbase = coinbase_type.unpack(self.gentx['tx']['tx_ins'][0]['script'], ignore_extra=True)
-        self.previous_share_hash = self.coinbase['previous_p2pool_share_hash'] if self.coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
-        self.chain_id_data = chain_id_type.pack(dict(last_p2pool_block_hash=self.coinbase['last_p2pool_block_hash'], bits=self.header['bits']))
+        self.previous_share_hash = coinbase['previous_p2pool_share_hash'] if coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
+        self.chain_id_data = chain_id_type.pack(dict(last_p2pool_block_hash=coinbase['last_p2pool_block_hash'], bits=header['bits']))
     
     def as_block(self):
-        if self.txns is None:
-            raise ValueError('share does not contain all txns')
-        return dict(header=self.header, txns=self.txns)
+        if self.txs is None:
+            raise ValueError('share does not contain all txs')
+        
+        return dict(header=self.header, txs=self.txs)
     
     def as_share1(self):
-        return dict(header=self.header, gentx=self.gentx)
+        return dict(header=self.header, gentx_info=self.gentx_info)
     
     def check(self, chain, height, previous_share2, net):
         if self.chain_id_data != chain.chain_id_data:
@@ -102,17 +126,10 @@ class Share(object):
         if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(self.header['bits']):
             raise ValueError('not enough work!')
         
-        t = self.gentx['tx']
-        t2, shares = generate_transaction(
-            last_p2pool_block_hash=chain.last_p2pool_block_hash,
-            previous_share2=previous_share2,
-            add_script=t['tx_outs'][self.coinbase['last_share_index']]['script'],
-            subsidy=self.coinbase['subsidy'],
-            nonce=self.coinbase['nonce'],
-            net=net,
-        )
-        if t2 != t:
-            raise ValueError('invalid generate txn')
+        gentx, shares, merkle_root = gentx_info_to_gentx_shares_and_merkle_root(self.gentx_info, chain, net)
+        
+        if merkle_root != self.header['merkle_root']:
+            raise ValueError("gentx doesn't match header")
         
         return Share2(self, shares, height)
 
@@ -128,8 +145,8 @@ class Share2(object):
     def flag_shared(self):
         self.shared = True
 
-def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, subsidy, nonce, net):
-    shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [add_script, add_script]
+def generate_transaction(last_p2pool_block_hash, previous_share2, new_script, subsidy, nonce, net):
+    shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [new_script, new_script]
     
     dest_weights = {}
     for script in shares:
@@ -141,6 +158,8 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, su
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
     dests = sorted(amounts.iterkeys())
+    dests.remove(new_script)
+    dests = dests + [new_script]
     
     return dict(
         version=1,
@@ -149,11 +168,11 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, add_script, su
             sequence=4294967295,
             script=coinbase_type.pack(dict(
                 identifier=net.IDENTIFIER,
-                last_p2pool_block_hash=last_p2pool_block_hash,
-                previous_p2pool_share_hash=previous_share2.share.hash if previous_share2 is not None else 2**256 - 1,
-                subsidy=subsidy,
-                last_share_index=dests.index(add_script),
-                nonce=nonce,
+                share_data=dict(
+                    last_p2pool_block_hash=last_p2pool_block_hash,
+                    previous_p2pool_share_hash=previous_share2.share.hash if previous_share2 is not None else 2**256 - 1,
+                    nonce=nonce,
+                ),
             )),
         )],
         tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]],

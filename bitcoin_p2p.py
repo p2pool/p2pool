@@ -24,23 +24,26 @@ class LateEnd(Exception):
     pass
 
 class Type(object):
-    def _unpack(self, data, ignore_extra=False):
+    # the same data can have only one unpacked representation, but multiple packed binary representations
+    
+    def _unpack(self, data):
         f = StringIO.StringIO(data)
+        
         obj = self.read(f)
         
-        if not ignore_extra:
-            if f.tell() != len(data):
-                raise LateEnd('underread ' + repr((self, data)))
+        if f.tell() != len(data):
+            raise LateEnd('underread ' + repr((self, data)))
         
         return obj
     
-    def unpack(self, data, ignore_extra=False):
-        obj = self._unpack(data, ignore_extra)
+    def unpack(self, data):
+        obj = self._unpack(data)
         assert self._unpack(self._pack(obj)) == obj
         return obj
     
     def _pack(self, obj):
         f = StringIO.StringIO()
+        
         self.write(f, obj)
         
         data = f.getvalue()
@@ -211,13 +214,13 @@ class ComposedType(Type):
         for key, type_ in self.fields:
             type_.write(file, item[key])
 
-address = ComposedType([
+address_type = ComposedType([
     ('services', StructType('<Q')),
     ('address', IPV6AddressType()),
     ('port', StructType('>H')),
 ])
 
-tx = ComposedType([
+tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
         ('previous_output', ComposedType([
@@ -234,7 +237,7 @@ tx = ComposedType([
     ('lock_time', StructType('<I')),
 ])
 
-block_header = ComposedType([
+block_header_type = ComposedType([
     ('version', StructType('<I')),
     ('previous_block', HashType()),
     ('merkle_root', HashType()),
@@ -243,9 +246,9 @@ block_header = ComposedType([
     ('nonce', StructType('<I')),
 ])
 
-block = ComposedType([
-    ('header', block_header),
-    ('txns', ListType(tx)),
+block_type = ComposedType([
+    ('header', block_header_type),
+    ('txs', ListType(tx_type)),
 ])
 
 def doublesha(data):
@@ -254,20 +257,20 @@ def doublesha(data):
 def ripemdsha(data):
     return ShortHashType().unpack(hashlib.new('ripemd160', hashlib.sha256(data).digest()).digest())
 
-merkle_record = ComposedType([
+merkle_record_type = ComposedType([
     ('left', HashType()),
     ('right', HashType()),
 ])
 
-def merkle_hash(txn_list):
-    hash_list = [doublesha(tx.pack(txn)) for txn in txn_list]
+def merkle_hash(tx_list):
+    hash_list = [doublesha(tx_type.pack(tx)) for tx in tx_list]
     while len(hash_list) > 1:
-        hash_list = [doublesha(merkle_record.pack(dict(left=left, right=left if right is None else right)))
+        hash_list = [doublesha(merkle_record_type.pack(dict(left=left, right=left if right is None else right)))
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
 
-def tx_hash(tx_):
-    return doublesha(tx.pack(tx_))
+def tx_hash(tx):
+    return doublesha(tx_type.pack(tx))
 
 def block_hash(header):
     return doublesha(block_header.pack(header))
@@ -364,8 +367,8 @@ class Protocol(BaseProtocol):
             ('version', StructType('<I')),
             ('services', StructType('<Q')),
             ('time', StructType('<Q')),
-            ('addr_to', address),
-            ('addr_from', address),
+            ('addr_to', address_type),
+            ('addr_from', address_type),
             ('nonce', StructType('<Q')),
             ('sub_version_num', VarStrType()),
             ('start_height', StructType('<I')),
@@ -374,7 +377,7 @@ class Protocol(BaseProtocol):
         'addr': ComposedType([
             ('addrs', ListType(ComposedType([
                 ('timestamp', StructType('<I')),
-                ('address', address),
+                ('address', address_type),
             ]))),
         ]),
         'inv': ComposedType([
@@ -400,13 +403,13 @@ class Protocol(BaseProtocol):
             ('last', HashType()),
         ]),
         'tx': ComposedType([
-            ('tx', tx),
+            ('tx', tx_type),
         ]),
         'block': ComposedType([
-            ('block', block),
+            ('block', block_type),
         ]),
         'headers': ComposedType([
-            ('headers', ListType(block_header)),
+            ('headers', ListType(block_header_type)),
         ]),
         'getaddr': ComposedType([]),
         'checkorder': ComposedType([
@@ -500,42 +503,15 @@ class Protocol(BaseProtocol):
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(None)
 
-class ProtocolInv(Protocol):
-    def __init__(self, *args, **kwargs):
-        Protocol.__init__(self, *args, **kwargs)
-        
-        self.inv = expiring_dict.ExpiringDict(600)
-    
-    def handle_getdata(self, requests):
-        for inv in requests:
-            type_, hash_ = inv['type'], inv['hash']
-            if (type_, hash_) in self.inv:
-                print 'bitcoind requested %s %x, sent' % (type_, hash_)
-                self.sendPacket(type_, {type_: self.inv[(type_, hash_)]})
-            else:
-                print 'bitcoind requested %s %x, but not found' % (type_, hash_)
-    
-    def addInv(self, type_, data):
-        if type_ == 'block':
-            hash_ = block_hash(data['header'])
-        elif type_ == 'tx':
-            hash_ = merkle_hash([data])
-        else:
-            raise ValueError('invalid type: %r' % (type_,))
-        self.inv[(type_, hash_)] = data
-        self.send_inv(invs=[dict(type=type_, hash=hash_)])
-
 class ClientFactory(protocol.ReconnectingClientFactory):
-    protocol = ProtocolInv
+    protocol = Protocol
     
     maxDelay = 15
     
-    conn = None
-    waiters = None
-    
     def __init__(self, testnet=False):
-        #protocol.ReconnectingClientFactory.__init__(self)
         self.testnet = testnet
+        self.conn = util.Variable(None)
+        
         self.new_block = util.Event()
         self.new_tx = util.Event()
     
@@ -545,28 +521,11 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return p
     
     def gotConnection(self, conn):
+        self.conn.set(conn)
         self.conn = conn
-        if conn is not None:
-            if self.waiters is None:
-                self.waiters = []
-            
-            waiters = self.waiters
-            self.waiters = []
-            
-            for df in waiters:
-                df.callback(conn)
     
     def getProtocol(self):
-        df = defer.Deferred()
-        
-        if self.conn is not None:
-            df.callback(self.conn)
-        else:
-            if self.waiters is None:
-                self.waiters = []
-            self.waiters.append(df)
-        
-        return df
+        return self.conn.get_not_none()
 
 if __name__ == '__main__':
     factory = ClientFactory()

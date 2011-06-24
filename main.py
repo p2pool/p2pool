@@ -92,7 +92,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
         except:
             traceback.print_exc()
             continue
-        coinbase_data = block['txns'][0]['tx_ins'][0]['script']
+        coinbase_data = block['txs'][0]['tx_ins'][0]['script']
         try:
             coinbase = p2pool.coinbase_type.unpack(coinbase_data, ignore_extra=True)
         except bitcoin_p2p.EarlyEnd:
@@ -101,7 +101,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
             try:
                 if coinbase['identifier'] == net.IDENTIFIER:
                     payouts = {}
-                    for tx_out in block['txns'][0]['tx_outs']:
+                    for tx_out in block['txs'][0]['tx_outs']:
                         payouts[tx_out['script']] = payouts.get(tx_out['script'], 0) + tx_out['value']
                     subsidy = sum(payouts.itervalues())
                     if coinbase['subsidy'] == subsidy:
@@ -253,7 +253,7 @@ def main(args):
                 
                 if chain is current_work.value['current_chain']:
                     if share.hash == chain.highest.value:
-                        print 'Accepted share, passing to peers. Height: %i Hash: %x' % (share2.height, share.hash,)
+                        print 'Accepted share, passing to peers. Height: %i Hash: %x Script: %s' % (share2.height, share.hash, share2.shares[-1].encode('hex'))
                         share_share2(share2, peer)
                     else:
                         print 'Accepted share, not highest. Height: %i Hash: %x' % (share2.height, share.hash,)
@@ -370,17 +370,17 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
         def compute(state):
-            extra_txns = [tx for tx in tx_pool.itervalues() if tx.is_good()]
-            generate_txn, shares = p2pool.generate_transaction(
+            extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
+            generate_tx, shares = p2pool.generate_transaction(
                 last_p2pool_block_hash=state['last_p2pool_block_hash'],
                 previous_share2=state['highest_p2pool_share2'],
-                add_script=my_script,
-                subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txns),
+                new_script=my_script,
+                subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=random.randrange(2**64),
                 net=net,
             )
-            print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txns)/100000000
-            transactions = [generate_txn] + [tx.tx for tx in extra_txns]
+            print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
+            transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin_p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
@@ -393,7 +393,7 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
-            share = p2pool.Share(header=header, txns=transactions)
+            share = p2pool.Share(header=header, txs=transactions)
             print 'GOT SHARE! %x' % (share.hash,)
             try:
                 p2p_share(share)
@@ -465,7 +465,7 @@ def main(args):
                 for block_hash, block in itertools.islice(get_blocks(current_work.value['previous_block']), 10):
                     if block_hash == self.seen_at_block:
                         return True
-                    for tx in block['txns']:
+                    for tx in block['txs']:
                         mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                         if mentions & self.mentions:
                             return False
@@ -483,8 +483,8 @@ def main(args):
         # p2pool has to be able to access the entire blockchain
         # possibilities
         #     access bitcoin's data files
-        #     include a few of the parent txns
-        #     patch bitcoind to find the block that includes a given txn hash
+        #     include a few of the parent txs
+        #     patch bitcoind to find the block that includes a given tx hash
         
         print 'Started successfully!'
         print

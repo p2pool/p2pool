@@ -74,6 +74,14 @@ class Variable(object):
         
         self.value = value
         self.changed.happened(value)
+    
+    def get_not_none(self):
+        if self.value is not None:
+            return defer.succeed(self.value)
+        else:
+            df = defer.Deferred()
+            self.changed.watch_one_time(df.callback)
+            return df
 
 def sleep(t):
     d = defer.Deferred()
@@ -317,3 +325,12 @@ class DictWrapper(object):
             yield self.decode_key(key), self.decode_value(value)
     def items(self):
         return list(self.iteritems())
+
+def update_dict(d, **replace):
+    d = d.copy()
+    for k, v in replace.iteritems():
+        if v is None:
+            del d[k]
+        else:
+            d[k] = v
+    return d

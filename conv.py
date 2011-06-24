@@ -37,6 +37,8 @@ class BlockAttempt(object):
     
     def getwork(self, target_multiplier=1, _check=2):
         target = bits_to_target(self.bits) * target_multiplier
+        if target >= 2**256//2**32:
+            raise ValueError("target higher than standard maximum")
         
         previous_block2 = reverse_chunks('%064x' % self.previous_block, 8).decode('hex')
         merkle_root2 = reverse_chunks('%064x' % self.merkle_root, 8).decode('hex')
