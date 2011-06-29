@@ -2,7 +2,7 @@ To use p2pool, you must be running your own local bitcoind. p2pool connects to
 this bitcoin over both its p2p interface and its RPC interface. For standard
 configurations, using p2p should be as simple as:
 
-    python main.py <rpc_username> <rpc_password>
+    python run_p2pool.py <rpc_username> <rpc_password>
 
 Then run your miner program, connecting to 127.0.0.1 on port 9332 with any
 username and password.
@@ -14,6 +14,6 @@ router. Forward port 9333 to the host running p2pool.py.
 
 Use
 
-    python main.py --help
+    python run_p2pool.py --help
 
 for additional options.

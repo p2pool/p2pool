@@ -14,15 +14,22 @@ import traceback
 from twisted.internet import defer, reactor
 from twisted.web import server
 
-import bitcoin_p2p
-import conv
+import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 import db
 import expiring_dict
 import jsonrpc
 import p2p
-import p2pool
+import p2pool.data as p2pool
 import util
 import worker_interface
+
+try:
+    __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
+except:
+    __version__ = 'unknown'
+
+if hasattr(sys, "frozen"):
+    __file__ = sys.executable
 
 class Chain(object):
     def __init__(self, chain_id_data):
@@ -94,8 +101,8 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
             continue
         coinbase_data = block['txs'][0]['tx_ins'][0]['script']
         try:
-            coinbase = p2pool.coinbase_type.unpack(coinbase_data, ignore_extra=True)
-        except bitcoin_p2p.EarlyEnd:
+            coinbase = p2pool.coinbase_type.unpack(coinbase_data)
+        except bitcoin.data.EarlyEnd:
             pass
         else:
             try:
@@ -119,14 +126,23 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
 def getwork(bitcoind):
     while True:
         try:
+            # a block could arrive in between these two queries
             getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
-            getwork, height = conv.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
+            try:
+                getwork, height = bitcoin.getwork.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
+            finally:
+                # get rid of residual errors
+                getwork_df.addErrback(lambda fail: None)
+                height_df.addErrback(lambda fail: None)
         except:
             print
             print 'Error getting work from bitcoind:'
             traceback.print_exc()
             print
+            
+            
             yield util.sleep(1)
+            
             continue
         defer.returnValue((getwork, height))
 
@@ -136,7 +152,7 @@ def main(args):
     try:
         net = p2pool.Testnet if args.testnet else p2pool.Main
         
-        print name
+        print 'p2pool (version %s)' % (__version__,)
         print
         
         # connect to bitcoind over JSON-RPC and do initial getwork
@@ -152,12 +168,12 @@ def main(args):
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
         print "Testing bitcoind P2P connection to '%s:%s'..." % (args.bitcoind_address, args.bitcoind_p2p_port)
-        factory = bitcoin_p2p.ClientFactory(args.testnet)
+        factory = bitcoin.p2p.ClientFactory(args.testnet)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         
         while True:
             try:
-                res = yield (yield factory.getProtocol()).check_order(order=bitcoin_p2p.Protocol.null_order)
+                res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
                 if res['reply'] != 'success':
                     print
                     print 'Error getting payout script:'
@@ -246,10 +262,12 @@ def main(args):
             if res == 'good':
                 share2 = chain.share2s[share.hash]
                 
-                hash_data = bitcoin_p2p.HashType().pack(share.hash)
-                share1_data = p2pool.share1.pack(share.as_share1())
-                for share_db in share_dbs:
-                    share_db[hash_data] = share1_data
+                def save():
+                    hash_data = bitcoin.p2p.HashType().pack(share.hash)
+                    share1_data = p2pool.share1.pack(share.as_share1())
+                    for share_db in share_dbs:
+                        share_db[hash_data] = share1_data
+                reactor.callLater(1, save)
                 
                 if chain is current_work.value['current_chain']:
                     if share.hash == chain.highest.value:
@@ -376,12 +394,12 @@ def main(args):
                 previous_share2=state['highest_p2pool_share2'],
                 new_script=my_script,
                 subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
-                nonce=random.randrange(2**64),
+                nonce=struct.pack("<Q", random.randrange(2**64)),
                 net=net,
             )
             print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
-            merkle_root = bitcoin_p2p.merkle_hash(transactions)
+            merkle_root = bitcoin.p2p.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
             return ba.getwork(net.TARGET_MULTIPLIER)
@@ -426,10 +444,10 @@ def main(args):
         
         class Tx(object):
             def __init__(self, tx, seen_at_block):
-                self.hash = bitcoin_p2p.tx_hash(tx)
+                self.hash = bitcoin.data.tx_hash(tx)
                 self.tx = tx
                 self.seen_at_block = seen_at_block
-                self.mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                self.mentions = set([bitcoin.data.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                 #print
                 #print "%x %r" % (seen_at_block, tx)
                 #for mention in self.mentions:
@@ -466,58 +484,40 @@ def main(args):
                     if block_hash == self.seen_at_block:
                         return True
                     for tx in block['txs']:
-                        mentions = set([bitcoin_p2p.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                        mentions = set([bitcoin.data.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                         if mentions & self.mentions:
                             return False
                 return False
         
         def new_tx(tx):
-            seen_at_block = current_work.value['previous_block']
-            tx_pool[bitcoin_p2p.tx_hash(tx)] = Tx(tx, seen_at_block)
+            tx_pool[bitcoin.data.tx_hash(tx)] = Tx(tx, current_work.value['previous_block'])
         factory.new_tx.watch(new_tx)
-        # disabled for now - txs can rely on past txs that are not yet in the block chain
-        # bitcoin passes those txs along
-        # if a p2pool program was started in between the tx-not-yet-included and the tx-depending-on-that-one
-        # it would need to find the tx-not-yet-included
-        # in fact, it has no way to know if a tx is included...
-        # p2pool has to be able to access the entire blockchain
-        # possibilities
-        #     access bitcoin's data files
-        #     include a few of the parent txs
-        #     patch bitcoind to find the block that includes a given tx hash
+        
+        def new_block(block):
+            set_real_work()
+        factory.new_block.watch(new_block)
         
         print 'Started successfully!'
         print
-        
-        while True:
-            yield set_real_work()
-            yield util.sleep(.5)
     except:
         print
         print 'Fatal error:'
         traceback.print_exc()
         print
-    reactor.stop()
+        reactor.stop()
 
-if __name__ == '__main__':
-    try:
-        __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
-    except:
-        __version__ = 'unknown'
-    
-    name = 'p2pool (version %s)' % (__version__,)
-    
-    parser = argparse.ArgumentParser(description=name)
+def run():
+    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (__version__,))
     parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument('-t', '--testnet',
+    parser.add_argument('--testnet',
         help='use the testnet; make sure you change the ports too',
         action='store_true', default=False, dest='testnet')
-    parser.add_argument('-s', '--store-shares', metavar='FILENAME',
+    parser.add_argument('--store-shares', metavar='FILENAME',
         help='write shares to a database (not needed for normal usage)',
         type=str, action='append', default=[], dest='store_shares')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
-    p2pool_group.add_argument('-p', '--p2pool-port', metavar='PORT',
+    p2pool_group.add_argument('--p2pool-port', metavar='PORT',
         help='use TCP port PORT to listen for connections (default: 9333 normally, 19333 for testnet) (forward this port from your router!)',
         type=int, action='store', default=None, dest='p2pool_port')
     p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
@@ -551,9 +551,6 @@ if __name__ == '__main__':
         type=str, action='store', dest='bitcoind_rpc_password')
     
     args = parser.parse_args()
-    
-    if hasattr(sys, "frozen"):
-        __file__ = sys.executable
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = {False: 8333, True: 18333}[args.testnet]

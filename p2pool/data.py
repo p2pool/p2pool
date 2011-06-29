@@ -1,50 +1,49 @@
 from __future__ import division
 
-import bitcoin_p2p
-import conv
+from bitcoin import data as bitcoin_data
 
-chain_id_type = bitcoin_p2p.ComposedType([
-    ('last_p2pool_block_hash', bitcoin_p2p.HashType()),
-    ('bits', bitcoin_p2p.StructType('<I')),
+chain_id_type = bitcoin_data.ComposedType([
+    ('last_p2pool_block_hash', bitcoin_data.HashType()),
+    ('bits', bitcoin_data.StructType('<I')),
 ])
 
-share_data_type = bitcoin_p2p.ComposedType([
-    ('last_p2pool_block_hash', bitcoin_p2p.HashType()),
-    ('previous_p2pool_share_hash', bitcoin_p2p.HashType()),
-    ('nonce', bitcoin_p2p.StructType('<Q')),
+share_data_type = bitcoin_data.ComposedType([
+    ('last_p2pool_block_hash', bitcoin_data.HashType()),
+    ('previous_p2pool_share_hash', bitcoin_data.HashType()),
+    ('nonce', bitcoin_data.VarStrType()),
 ])
 
-coinbase_type = bitcoin_p2p.ComposedType([
-    ('identifier', bitcoin_p2p.StructType('<Q')),
+coinbase_type = bitcoin_data.ComposedType([
+    ('identifier', bitcoin_data.StructType('<Q')),
     ('share_data', share_data_type),
 ])
 
-merkle_branch_type = bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
-    ('side', bitcoin_p2p.StructType('<B')),
-    ('hash', bitcoin_p2p.HashType()),
+merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
+    ('side', bitcoin_data.StructType('<B')),
+    ('hash', bitcoin_data.HashType()),
 ]))
 
-gentx_info_type = bitcoin_p2p.ComposedType([
-    ('share_info', bitcoin_p2p.ComposedType([
+gentx_info_type = bitcoin_data.ComposedType([
+    ('share_info', bitcoin_data.ComposedType([
         ('share_data', share_data_type),
-        ('new_script', bitcoin_p2p.VarStrType()),
-        ('subsidy', bitcoin_p2p.StructType('<Q')),
+        ('new_script', bitcoin_data.VarStrType()),
+        ('subsidy', bitcoin_data.StructType('<Q')),
     ])),
     ('merkle_branch', merkle_branch_type),
 ])
 
-share1_type = bitcoin_p2p.ComposedType([
-    ('header', bitcoin_p2p.block_header_type),
+share1_type = bitcoin_data.ComposedType([
+    ('header', bitcoin_data.block_header_type),
     ('gentx_info', gentx_info_type),
 ])
 
-def calculate_merkle_branch(tx_list, index):
-    hash_list = [(bitcoin_p2p.doublesha(bitcoin_p2p.tx_type.pack(data)), i == index, []) for i, data in enumerate(tx_list)]
+def calculate_merkle_branch(txs, index):
+    hash_list = [(bitcoin_data.tx_hash(tx), i == index, []) for i, tx in enumerate(txs)]
     
     while len(hash_list) > 1:
         hash_list = [
             (
-                bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=left, right=right))),
+                bitcoin_data.doublesha(bitcoin_data.merkle_record_type.pack(dict(left=left, right=right))),
                 left_f or right_f,
                 (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
             )
@@ -53,17 +52,17 @@ def calculate_merkle_branch(tx_list, index):
         ]
     
     assert hash_list[0][1]
-    assert check_merkle_branch(tx_list[index], hash_list[0][2]) == hash_list[0][0]
+    assert check_merkle_branch(txs[index], hash_list[0][2]) == hash_list[0][0]
     
     return hash_list[0][2]
 
 def check_merkle_branch(tx, branch):
-    hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.tx_type.pack(tx))
+    hash_ = bitcoin_data.tx_hash(tx)
     for step in branch:
         if not step['side']:
-            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=step['hash'], right=hash_)))
+            hash_ = bitcoin_data.doublesha(bitcoin_data.merkle_record_type.pack(dict(left=step['hash'], right=hash_)))
         else:
-            hash_ = bitcoin_p2p.doublesha(bitcoin_p2p.merkle_record_type.pack(dict(left=hash_, right=step['hash'])))
+            hash_ = bitcoin_data.doublesha(bitcoin_data.merkle_record_type.pack(dict(left=hash_, right=step['hash'])))
     return hash_
 
 def txs_to_gentx_info(txs):
@@ -93,7 +92,7 @@ def gentx_info_to_gentx_shares_and_merkle_root(gentx_info, chain, net):
 class Share(object):
     def __init__(self, header, txs=None, gentx_info=None):
         if txs is not None:
-            if bitcoin_p2p.merkle_hash(txs) != header['merkle_root']:
+            if bitcoin_data.merkle_hash(txs) != header['merkle_root']:
                 raise ValueError("txs don't match header")
         
         if gentx_info is None:
@@ -107,7 +106,7 @@ class Share(object):
         self.header = header
         self.txs = txs
         self.gentx_info = gentx_info
-        self.hash = bitcoin_p2p.block_hash(header)
+        self.hash = bitcoin_data.block_hash(header)
         self.previous_share_hash = coinbase['previous_p2pool_share_hash'] if coinbase['previous_p2pool_share_hash'] != 2**256 - 1 else None
         self.chain_id_data = chain_id_type.pack(dict(last_p2pool_block_hash=coinbase['last_p2pool_block_hash'], bits=header['bits']))
     
@@ -123,7 +122,8 @@ class Share(object):
     def check(self, chain, height, previous_share2, net):
         if self.chain_id_data != chain.chain_id_data:
             raise ValueError('wrong chain')
-        if self.hash > net.TARGET_MULTIPLIER*conv.bits_to_target(self.header['bits']):
+        
+        if self.hash > net.TARGET_MULTIPLIER*bitcoin_data.bits_to_target(self.header['bits']):
             raise ValueError('not enough work!')
         
         gentx, shares, merkle_root = gentx_info_to_gentx_shares_and_merkle_root(self.gentx_info, chain, net)
@@ -138,8 +138,9 @@ class Share2(object):
     
     def __init__(self, share, shares, height):
         self.share = share
-        self.shares = map(intern, shares)
+        self.shares = shares
         self.height = height
+        
         self.shared = False
     
     def flag_shared(self):
@@ -157,9 +158,8 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, new_script, su
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy//64 # prevent fake previous p2pool blocks
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
-    dests = sorted(amounts.iterkeys())
-    dests.remove(new_script)
-    dests = dests + [new_script]
+    dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
+    assert dests[-1] == new_script
     
     return dict(
         version=1,
@@ -180,6 +180,42 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, new_script, su
     ), shares
 
 
+class Tracker(object):
+    def __init__(self):
+        self.shares = {} # hash -> share
+        self.reverse_shares = {} # previous_hash -> share_hash
+        self.heads = {} # hash -> (height, tail hash)
+        self.heads = set()
+    
+    def add_share(self, share):
+        if share.hash in self.shares:
+            return # XXX
+        
+        self.shares[share.hash] = share
+        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
+        
+        if self.reverse_shares.get(share.hash, set()):
+            pass # not a head
+        else:
+            self.heads.add(share.hash)
+            if share.previous_hash in self.heads:
+                self.heads.remove(share.previous_hash)
+
+if __name__ == '__main__':
+    class FakeShare(object):
+        def __init__(self, hash, previous_hash):
+            self.hash = hash
+            self.previous_hash = previous_hash
+    
+    t = Tracker()
+    
+    t.add_share(FakeShare(1, 2))
+    print t.heads
+    t.add_share(FakeShare(4, 0))
+    print t.heads
+    t.add_share(FakeShare(3, 4))
+    print t.heads
+
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 
 class Testnet(object):
@@ -187,7 +223,7 @@ class Testnet(object):
     ROOT_BLOCK = 0xd5070cd4f2987ad2191af71393731a2b143f094f7b84c9e6aa9a6a
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = 0x1ae3479e4eb6700a
-    PREFIX= 'd19778c812754854'.decode('hex')
+    PREFIX = 'd19778c812754854'.decode('hex')
     ADDRS_TABLE = 'addrs_testnet'
 
 class Main(object):

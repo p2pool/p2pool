@@ -6,9 +6,9 @@ import traceback
 
 from twisted.internet import defer, protocol, reactor
 
-import bitcoin_p2p
-import conv
-import p2pool
+from bitcoin import p2p as bitcoin_p2p
+from bitcoin import data as bitcoin_data
+from p2pool import data as p2pool_data
 import util
 
 # mode
@@ -26,65 +26,63 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     use_checksum = True
     
-    message_types = {
-        'version': bitcoin_p2p.ComposedType([
-            ('version', bitcoin_p2p.StructType('<I')),
-            ('services', bitcoin_p2p.StructType('<Q')),
-            ('addr_to', bitcoin_p2p.address),
-            ('addr_from', bitcoin_p2p.address),
-            ('nonce', bitcoin_p2p.StructType('<Q')),
-            ('sub_version', bitcoin_p2p.VarStrType()),
-            ('mode', bitcoin_p2p.StructType('<I')),
-            ('state', bitcoin_p2p.ComposedType([
-                ('chain_id', p2pool.chain_id_type),
-                ('highest', bitcoin_p2p.ComposedType([
-                    ('hash', bitcoin_p2p.HashType()),
-                    ('height', bitcoin_p2p.StructType('<Q')),
-                ])),
+    message_version = bitcoin_data.ComposedType([
+        ('version', bitcoin_data.StructType('<I')),
+        ('services', bitcoin_data.StructType('<Q')),
+        ('addr_to', bitcoin_data.address_type),
+        ('addr_from', bitcoin_data.address_type),
+        ('nonce', bitcoin_data.StructType('<Q')),
+        ('sub_version', bitcoin_data.VarStrType()),
+        ('mode', bitcoin_data.StructType('<I')),
+        ('state', bitcoin_data.ComposedType([
+            ('chain_id', p2pool_data.chain_id_type),
+            ('highest', bitcoin_data.ComposedType([
+                ('hash', bitcoin_data.HashType()),
+                ('height', bitcoin_data.StructType('<Q')),
             ])),
-        ]),
-        
-        'update_mode': bitcoin_p2p.ComposedType([
-            ('mode', bitcoin_p2p.StructType('<I')),
-        ]),
-        
-        'ping': bitcoin_p2p.ComposedType([]),
-        
-        'addrme': bitcoin_p2p.ComposedType([
-            ('port', bitcoin_p2p.StructType('<H')),
-        ]),
-        'addrs': bitcoin_p2p.ComposedType([
-            ('addrs', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
-                ('timestamp', bitcoin_p2p.StructType('<Q')),
-                ('address', bitcoin_p2p.address),
-            ]))),
-        ]),
-        'getaddrs': bitcoin_p2p.ComposedType([
-            ('count', bitcoin_p2p.StructType('<I')),
-        ]),
-        
-        'gettobest': bitcoin_p2p.ComposedType([
-            ('chain_id', p2pool.chain_id_type),
-            ('have', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
-        ]),
-        'getshares': bitcoin_p2p.ComposedType([
-            ('chain_id', p2pool.chain_id_type),
-            ('hashes', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
-        ]),
-        
-        'share0s': bitcoin_p2p.ComposedType([
-            ('chains', bitcoin_p2p.ListType(bitcoin_p2p.ComposedType([
-                ('chain_id', p2pool.chain_id_type),
-                ('hashes', bitcoin_p2p.ListType(bitcoin_p2p.HashType())),
-            ]))),
-        ]),
-        'share1s': bitcoin_p2p.ComposedType([
-            ('share1s', bitcoin_p2p.ListType(p2pool.share1)),
-        ]),
-        'share2s': bitcoin_p2p.ComposedType([
-            ('share2s', bitcoin_p2p.ListType(bitcoin_p2p.block)),
-        ]),
-    }
+        ])),
+    ])
+    
+    message_update_mode = bitcoin_data.ComposedType([
+        ('mode', bitcoin_data.StructType('<I')),
+    ])
+    
+    message_ping = bitcoin_data.ComposedType([])
+    
+    message_addrme = bitcoin_data.ComposedType([
+        ('port', bitcoin_data.StructType('<H')),
+    ])
+    message_addrs = bitcoin_data.ComposedType([
+        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
+            ('timestamp', bitcoin_data.StructType('<Q')),
+            ('address', bitcoin_data.address_type),
+        ]))),
+    ])
+    message_getaddrs = bitcoin_data.ComposedType([
+        ('count', bitcoin_data.StructType('<I')),
+    ])
+    
+    message_gettobest = bitcoin_data.ComposedType([
+        ('chain_id', p2pool_data.chain_id_type),
+        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
+    ])
+    message_getshares = bitcoin_data.ComposedType([
+        ('chain_id', p2pool_data.chain_id_type),
+        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
+    ])
+    
+    message_share0s = bitcoin_data.ComposedType([
+        ('chains', bitcoin_data.ListType(bitcoin_data.ComposedType([
+            ('chain_id', p2pool_data.chain_id_type),
+            ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
+        ]))),
+    ])
+    message_share1s = bitcoin_data.ComposedType([
+        ('share1s', bitcoin_data.ListType(p2pool_data.share1_type)),
+    ])
+    message_share2s = bitcoin_data.ComposedType([
+        ('share2s', bitcoin_data.ListType(bitcoin_data.block_type)),
+    ])
     
     other_version = None
     node_var_watch = None
@@ -116,7 +114,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             sub_version=self.sub_version,
             mode=self.node.mode_var.value,
             state=dict(
-                chain_id=p2pool.chain_id_type.unpack(chain.chain_id_data),
+                chain_id=p2pool_data.chain_id_type.unpack(chain.chain_id_data),
                 highest=dict(
                     hash=highest_share2.share.hash if highest_share2 is not None else 2**256-1,
                     height=highest_share2.height if highest_share2 is not None else 0,
@@ -217,41 +215,41 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ])
     
     def handle_gettobest(self, chain_id, have):
-        self.node.handle_get_to_best(p2pool.chain_id_type.pack(chain_id), have, self)
+        self.node.handle_get_to_best(p2pool_data.chain_id_type.pack(chain_id), have, self)
     
     def handle_getshares(self, chain_id, hashes):
-        self.node.handle_get_shares(p2pool.chain_id_type.pack(chain_id), hashes, self)
+        self.node.handle_get_shares(p2pool_data.chain_id_type.pack(chain_id), hashes, self)
     
     def handle_share0s(self, chains):
         for chain in chains:
             for hash_ in chain['hashes']:
-                self.node.handle_share_hash(p2pool.chain_id_type.pack(chain['chain_id']), hash_, self)
+                self.node.handle_share_hash(p2pool_data.chain_id_type.pack(chain['chain_id']), hash_, self)
     def handle_share1s(self, share1s):
         for share1 in share1s:
-            hash_ = bitcoin_p2p.block_hash(share1['header'])
-            if hash_ <= conv.bits_to_target(share1['header']['bits']):
+            hash_ = bitcoin_data.block_hash(share1['header'])
+            if hash_ <= bitcoin_data.bits_to_target(share1['header']['bits']):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool.Share(share1['header'], gentx=share1['gentx'])
+            share = p2pool_data.Share(share1['header'], gentx=share1['gentx'])
             self.node.handle_share(share, self)
     def handle_share2s(self, share2s):
         for share2 in share2s:
-            hash_ = bitcoin_p2p.block_hash(share2['header'])
-            if not hash_ <= conv.bits_to_target(share2['header']['bits']):
+            hash_ = bitcoin_data.block_hash(share2['header'])
+            if not hash_ <= bitcoin_data.bits_to_target(share2['header']['bits']):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool.Share(share2['header'], txs=share2['txs'])
+            share = p2pool_data.Share(share2['header'], txs=share2['txs'])
             self.node.handle_share(share, self)
     
     def send_share(self, share, full=False):
-        if share.hash <= conv.bits_to_target(share.header['bits']):
+        if share.hash <= bitcoin_data.bits_to_target(share.header['bits']):
             self.send_share2s(share2s=[share.as_block()])
         else:
             if self.mode == 0 and not full:
                 self.send_share0s(chains=[dict(
-                    chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
+                    chain_id=p2pool_data.chain_id_type.unpack(share.chain_id_data),
                     hashes=[share.hash],
                 )])
             elif self.mode == 1 or full:
@@ -296,14 +294,14 @@ class ClientFactory(protocol.ClientFactory):
     def clientConnectionLost(self, connector, reason):
         self.node.attempt_ended(connector)
 
-addrdb_key = bitcoin_p2p.ComposedType([
-    ('address', bitcoin_p2p.IPV6AddressType()),
-    ('port', bitcoin_p2p.StructType('>H')),
+addrdb_key = bitcoin_data.ComposedType([
+    ('address', bitcoin_data.IPV6AddressType()),
+    ('port', bitcoin_data.StructType('>H')),
 ])
-addrdb_value = bitcoin_p2p.ComposedType([
-    ('services', bitcoin_p2p.StructType('<Q')),
-    ('first_seen', bitcoin_p2p.StructType('<Q')),
-    ('last_seen', bitcoin_p2p.StructType('<Q')),
+addrdb_value = bitcoin_data.ComposedType([
+    ('services', bitcoin_data.StructType('<Q')),
+    ('first_seen', bitcoin_data.StructType('<Q')),
+    ('last_seen', bitcoin_data.StructType('<Q')),
 ])
 
 class AddrStore(util.DictWrapper):

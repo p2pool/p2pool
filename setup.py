@@ -13,5 +13,5 @@ setup(name='p2pool',
     author_email='forrest@forre.st',
     url='http://p2pool.forre.st/',
     
-    console=['main.py'],
+    console=['run_p2pool.py'],
 )

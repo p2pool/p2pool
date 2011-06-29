@@ -6,20 +6,18 @@ from __future__ import division
 
 import struct
 
-import sha256
+from . import data as bitcoin_data
+from . import sha256
 
-def bits_to_target(bits):
-    return (bits & 0x00ffffff) * 2 ** (8 * ((bits >> 24) - 3))
-
-def target_to_attempts(target):
-    return (2**257 + target + 1)//(2*target + 2)
-
-def reverse_chunks(s, l):
+def _reverse_chunks(s, l):
     return ''.join(reversed([s[x:x+l] for x in xrange(0, len(s), l)]))
 
 class BlockAttempt(object):
     def __init__(self, version, previous_block, merkle_root, timestamp, bits):
         self.version, self.previous_block, self.merkle_root, self.timestamp, self.bits = version, previous_block, merkle_root, timestamp, bits
+    
+    def __hash__(self):
+        return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.bits))
     
     def __repr__(self):
         return '<BlockAttempt %s>' % (' '.join('%s=%s' % (k, hex(v))) for k, v in self.__dict__.iteritems())
@@ -36,12 +34,12 @@ class BlockAttempt(object):
         return 'BlockAttempt(%s)' % (', '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
     
     def getwork(self, target_multiplier=1, _check=2):
-        target = bits_to_target(self.bits) * target_multiplier
+        target = bitcoin_data.bits_to_target(self.bits) * target_multiplier
         if target >= 2**256//2**32:
             raise ValueError("target higher than standard maximum")
         
-        previous_block2 = reverse_chunks('%064x' % self.previous_block, 8).decode('hex')
-        merkle_root2 = reverse_chunks('%064x' % self.merkle_root, 8).decode('hex')
+        previous_block2 = _reverse_chunks('%064x' % self.previous_block, 8).decode('hex')
+        merkle_root2 = _reverse_chunks('%064x' % self.merkle_root, 8).decode('hex')
         data = struct.pack('>I32s32sIII', self.version, previous_block2, merkle_root2, self.timestamp, self.bits, 0).encode('hex') + '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000'
         
         previous_block3 = ('%064x' % self.previous_block).decode('hex')[::-1]
@@ -52,7 +50,7 @@ class BlockAttempt(object):
             'data': data,
             'hash1': '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
             'target': ('%064x' % (target,)).decode('hex')[::-1].encode('hex'),
-            'midstate': reverse_chunks(sha256.process(data2[:64])[::-1], 4).encode('hex'),
+            'midstate': _reverse_chunks(sha256.process(data2[:64])[::-1], 4).encode('hex'),
         }
         
         if _check:
@@ -78,8 +76,8 @@ class BlockAttempt(object):
 
 def decode_data(data):
     version, previous_block, merkle_root, timestamp, bits, nonce = struct.unpack('>I32s32sIII', data[:160].decode('hex'))
-    previous_block = int(reverse_chunks(previous_block.encode('hex'), 8), 16)
-    merkle_root = int(reverse_chunks(merkle_root.encode('hex'), 8), 16)
+    previous_block = int(_reverse_chunks(previous_block.encode('hex'), 8), 16)
+    merkle_root = int(_reverse_chunks(merkle_root.encode('hex'), 8), 16)
     return dict(version=version, previous_block=previous_block, merkle_root=merkle_root, timestamp=timestamp, bits=bits, nonce=nonce)
 
 if __name__ == '__main__':
