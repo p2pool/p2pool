@@ -13,11 +13,11 @@ import traceback
 from twisted.internet import protocol, reactor
 
 from . import data as bitcoin_data
-import p2pool.util
+from p2pool.util import variable, datachunker, deferral
 
 class BaseProtocol(protocol.Protocol):
     def connectionMade(self):
-        self.dataReceived = p2pool.util.DataChunker(self.dataReceiver())
+        self.dataReceived = datachunker.DataChunker(self.dataReceiver())
     
     def dataReceiver(self):
         while True:
@@ -93,11 +93,8 @@ class BaseProtocol(protocol.Protocol):
         raise AttributeError(attr)
 
 class Protocol(BaseProtocol):
-    def __init__(self, testnet=False):
-        if testnet:
-            self._prefix = 'fabfb5da'.decode('hex')
-        else:
-            self._prefix = 'f9beb4d9'.decode('hex')
+    def __init__(self, net):
+        self._prefix = net.BITCOIN_P2P_PREFIX
     
     version = 0
     
@@ -206,10 +203,10 @@ class Protocol(BaseProtocol):
         self.version = self.version_after
         
         # connection ready
-        self.check_order = p2pool.util.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
-        self.submit_order = p2pool.util.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
-        self.get_block = p2pool.util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
-        self.get_block_header = p2pool.util.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
+        self.check_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
+        self.submit_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
+        self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
+        self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
         
         if hasattr(self.factory, 'resetDelay'):
             self.factory.resetDelay()
@@ -249,15 +246,15 @@ class ClientFactory(protocol.ReconnectingClientFactory):
     
     maxDelay = 15
     
-    def __init__(self, testnet=False):
-        self.testnet = testnet
-        self.conn = p2pool.util.Variable(None)
+    def __init__(self, net):
+        self.net = net
+        self.conn = variable.Variable(None)
         
-        self.new_block = p2pool.util.Event()
-        self.new_tx = p2pool.util.Event()
+        self.new_block = variable.Event()
+        self.new_tx = variable.Event()
     
     def buildProtocol(self, addr):
-        p = self.protocol(self.testnet)
+        p = self.protocol(self.net)
         p.factory = self
         return p
     

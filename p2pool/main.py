@@ -7,6 +7,7 @@ import itertools
 import os
 import random
 import sqlite3
+import struct
 import subprocess
 import sys
 import traceback
@@ -15,12 +16,9 @@ from twisted.internet import defer, reactor
 from twisted.web import server
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
-import db
-import expiring_dict
-import jsonrpc
-import p2p
+from util import db, expiring_dict, jsonrpc, variable, deferral
+import p2pool.p2p as p2p
 import p2pool.data as p2pool
-import util
 import worker_interface
 
 try:
@@ -37,7 +35,7 @@ class Chain(object):
         self.last_p2pool_block_hash = p2pool.chain_id_type.unpack(chain_id_data)['last_p2pool_block_hash']
         
         self.share2s = {} # hash -> share2
-        self.highest = util.Variable(None) # hash
+        self.highest = variable.Variable(None) # hash
         
         self.requesting = set()
         self.request_map = {}
@@ -122,36 +120,23 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
                 print
         block_hash = block['header']['previous_block']
 
+@deferral.retry('Error getting work from bitcoind:', 1)
 @defer.inlineCallbacks
 def getwork(bitcoind):
-    while True:
-        try:
-            # a block could arrive in between these two queries
-            getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
-            try:
-                getwork, height = bitcoin.getwork.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
-            finally:
-                # get rid of residual errors
-                getwork_df.addErrback(lambda fail: None)
-                height_df.addErrback(lambda fail: None)
-        except:
-            print
-            print 'Error getting work from bitcoind:'
-            traceback.print_exc()
-            print
-            
-            
-            yield util.sleep(1)
-            
-            continue
-        defer.returnValue((getwork, height))
+    # a block could arrive in between these two queries
+    getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
+    try:
+        getwork, height = bitcoin.getwork.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
+    finally:
+        # get rid of residual errors
+        getwork_df.addErrback(lambda fail: None)
+        height_df.addErrback(lambda fail: None)
+    defer.returnValue((getwork, height))
 
 
 @defer.inlineCallbacks
 def main(args):
     try:
-        net = p2pool.Testnet if args.testnet else p2pool.Main
-        
         print 'p2pool (version %s)' % (__version__,)
         print
         
@@ -168,7 +153,7 @@ def main(args):
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
         print "Testing bitcoind P2P connection to '%s:%s'..." % (args.bitcoind_address, args.bitcoind_p2p_port)
-        factory = bitcoin.p2p.ClientFactory(args.testnet)
+        factory = bitcoin.p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         
         while True:
@@ -188,7 +173,7 @@ def main(args):
                 print
             else:
                 break
-            yield util.sleep(1)
+            yield deferral.sleep(1)
         
         print '    ...success!'
         print '    Payout script:', my_script.encode('hex')
@@ -199,24 +184,24 @@ def main(args):
             block = yield (yield factory.getProtocol()).get_block(block_hash)
             print 'Got block %x' % (block_hash,)
             defer.returnValue(block)
-        get_block = util.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
+        get_block = deferral.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
         
-        get_raw_transaction = util.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
+        get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
         
         chains = expiring_dict.ExpiringDict(300)
         def get_chain(chain_id_data):
             return chains.setdefault(chain_id_data, Chain(chain_id_data))
         # information affecting work that should trigger a long-polling update
-        current_work = util.Variable(None)
+        current_work = variable.Variable(None)
         # information affecting work that should not trigger a long-polling update
-        current_work2 = util.Variable(None)
+        current_work2 = variable.Variable(None)
         
         share_dbs = [db.SQLiteDict(sqlite3.connect(filename, isolation_level=None), 'shares') for filename in args.store_shares]
         
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
-            last_p2pool_block_hash = (yield get_last_p2pool_block_hash(work.previous_block, get_block, net))
+            last_p2pool_block_hash = (yield get_last_p2pool_block_hash(work.previous_block, get_block, args.net))
             chain = get_chain(p2pool.chain_id_type.pack(dict(last_p2pool_block_hash=last_p2pool_block_hash, bits=work.bits)))
             current_work.set(dict(
                 version=work.version,
@@ -247,7 +232,7 @@ def main(args):
             share2.flag_shared()
         
         def p2p_share(share, peer=None):
-            if share.hash <= conv.bits_to_target(share.header['bits']):
+            if share.hash <= bitcoin.data.bits_to_target(share.header['bits']):
                 print
                 print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
                 #print share.__dict__
@@ -258,7 +243,7 @@ def main(args):
                     print 'No bitcoind connection! Erp!'
             
             chain = get_chain(share.chain_id_data)
-            res = chain.accept(share, net)
+            res = chain.accept(share, args.net)
             if res == 'good':
                 share2 = chain.share2s[share.hash]
                 
@@ -335,22 +320,19 @@ def main(args):
                 ip, port = x.split(':')
                 return ip, int(port)
             else:
-                return x, {False: 9333, True: 19333}[args.testnet]
+                return x, args.net.P2P_PORT
         
-        if args.testnet:
-            nodes = [('72.14.191.28', 19333)]
-        else:
-            nodes = [('72.14.191.28', 9333)]
+        nodes = [('72.14.191.28', args.net.P2P_PORT)]
         try:
-            nodes.append(((yield reactor.resolve('p2pool.forre.st')), {False: 9333, True: 19333}[args.testnet]))
+            nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:
             traceback.print_exc()
         
         p2p_node = p2p.Node(
             current_work=current_work,
             port=args.p2pool_port,
-            net=net,
-            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), net.ADDRS_TABLE),
+            net=args.net,
+            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), args.net.ADDRS_TABLE),
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
@@ -395,18 +377,18 @@ def main(args):
                 new_script=my_script,
                 subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=struct.pack("<Q", random.randrange(2**64)),
-                net=net,
+                net=args.net,
             )
             print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
-            merkle_root = bitcoin.p2p.merkle_hash(transactions)
+            merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
-            ba = conv.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
-            return ba.getwork(net.TARGET_MULTIPLIER)
+            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
+            return ba.getwork(args.net.TARGET_MULTIPLIER)
         
         def got_response(data):
             # match up with transactions
-            header = conv.decode_data(data)
+            header = bitcoin.getwork.decode_data(data)
             transactions = merkle_root_to_transactions.get(header['merkle_root'], None)
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
@@ -435,7 +417,7 @@ def main(args):
             while True:
                 try:
                     block = get_block.call_now(start_hash)
-                except util.NotNowError:
+                except deferral.NotNowError:
                     break
                 yield start_hash, block
                 start_hash = block['header']['previous_block']
@@ -511,7 +493,7 @@ def run():
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--testnet',
         help='use the testnet; make sure you change the ports too',
-        action='store_true', default=False, dest='testnet')
+        action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
     parser.add_argument('--store-shares', metavar='FILENAME',
         help='write shares to a database (not needed for normal usage)',
         type=str, action='append', default=[], dest='store_shares')
@@ -553,10 +535,10 @@ def run():
     args = parser.parse_args()
     
     if args.bitcoind_p2p_port is None:
-        args.bitcoind_p2p_port = {False: 8333, True: 18333}[args.testnet]
+        args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
     
     if args.p2pool_port is None:
-        args.p2pool_port = {False: 9333, True: 19333}[args.testnet]
+        args.p2pool_port = args.net.P2P_PORT
     
     reactor.callWhenRunning(main, args)
     reactor.run()

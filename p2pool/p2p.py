@@ -9,7 +9,7 @@ from twisted.internet import defer, protocol, reactor
 from bitcoin import p2p as bitcoin_p2p
 from bitcoin import data as bitcoin_data
 from p2pool import data as p2pool_data
-import util
+from util import deferral, variable, dicts
 
 # mode
 #     0: send hash first (high latency, low bandwidth)
@@ -135,19 +135,19 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def _think(self):
         while self.connected2:
             self.send_ping()
-            yield util.sleep(random.expovariate(1/100))
+            yield deferral.sleep(random.expovariate(1/100))
     
     @defer.inlineCallbacks
     def _think2(self):
         while self.connected2:
             self.send_addrme(port=self.node.port)
             #print 'sending addrme'
-            yield util.sleep(random.expovariate(1/100))
+            yield deferral.sleep(random.expovariate(1/100))
     
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, state):
         self.other_version = version
         self.other_services = services
-        self.other_mode_var = util.Variable(mode)
+        self.other_mode_var = variable.Variable(mode)
         
         if nonce == self.node.nonce:
             #print 'Detected connection to self, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
@@ -304,7 +304,7 @@ addrdb_value = bitcoin_data.ComposedType([
     ('last_seen', bitcoin_data.StructType('<Q')),
 ])
 
-class AddrStore(util.DictWrapper):
+class AddrStore(dicts.DictWrapper):
     def encode_key(self, (address, port)):
         return addrdb_key.pack(dict(address=address, port=port))
     def decode_key(self, encoded_key):
@@ -326,7 +326,7 @@ class Node(object):
         self.net = net
         self.addr_store = AddrStore(addr_store)
         self.preferred_addrs = preferred_addrs
-        self.mode_var = util.Variable(mode)
+        self.mode_var = variable.Variable(mode)
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts
         self.current_work = current_work
@@ -367,7 +367,7 @@ class Node(object):
             except:
                 traceback.print_exc()
             
-            yield util.sleep(random.expovariate(1/5))
+            yield deferral.sleep(random.expovariate(1/5))
     
     @defer.inlineCallbacks
     def _think2(self):
@@ -378,7 +378,7 @@ class Node(object):
             except:
                 traceback.print_exc()
             
-            yield util.sleep(random.expovariate(1/20))
+            yield deferral.sleep(random.expovariate(1/20))
     
     def stop(self):
         if not self.running:

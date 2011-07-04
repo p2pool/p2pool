@@ -1,12 +1,13 @@
 from __future__ import division
 
+import json
+import traceback
+
 from twisted.internet import defer
 
-import json
-import jsonrpc
-import util
+from util import jsonrpc, deferred_resource
 
-class LongPollingWorkerInterface(util.DeferredResource):
+class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, work, compute):
         self.work = work
         self.compute = compute
@@ -42,7 +43,10 @@ class WorkerInterface(jsonrpc.Server):
         self.putChild('', self)
     
     def rpc_getwork(self, data=None):
+      try:
         if data is not None:
             return self.response_callback(data)
         
         return self.compute(self.work.value)
+      except ValueError:
+        traceback.print_exc()

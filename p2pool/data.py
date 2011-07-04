@@ -2,14 +2,9 @@ from __future__ import division
 
 from bitcoin import data as bitcoin_data
 
-chain_id_type = bitcoin_data.ComposedType([
-    ('last_p2pool_block_hash', bitcoin_data.HashType()),
-    ('bits', bitcoin_data.StructType('<I')),
-])
-
 share_data_type = bitcoin_data.ComposedType([
-    ('last_p2pool_block_hash', bitcoin_data.HashType()),
     ('previous_p2pool_share_hash', bitcoin_data.HashType()),
+    ('bits2', bitcoin_data.FixedStrType(4)),
     ('nonce', bitcoin_data.VarStrType()),
 ])
 
@@ -77,7 +72,6 @@ def txs_to_gentx_info(txs):
 
 def share_info_to_gentx_and_shares(share_info, chain, net):
     return generate_transaction(
-        last_p2pool_block_hash=share_info['share_data']['last_p2pool_block_hash'],
         previous_share2=chain.share2s[share_info['share_data']['previous_p2pool_share_hash']],
         nonce=share_info['share_data']['nonce'],
         new_script=share_info['new_script'],
@@ -161,6 +155,9 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, new_script, su
     dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
+    pre_target = sum(bitcoin_data.target_to_average_attempts(share(x ago).target) for x in xrange(1000))/(share(1000 ago).timestamp - share(1 ago).timestamp)
+    bits2 = bitcoin_data.compress_target_to_bits(pre_target)
+    
     return dict(
         version=1,
         tx_ins=[dict(
@@ -172,6 +169,7 @@ def generate_transaction(last_p2pool_block_hash, previous_share2, new_script, su
                     last_p2pool_block_hash=last_p2pool_block_hash,
                     previous_p2pool_share_hash=previous_share2.share.hash if previous_share2 is not None else 2**256 - 1,
                     nonce=nonce,
+                    bits2=bits2,
                 ),
             )),
         )],
@@ -200,6 +198,25 @@ class Tracker(object):
             self.heads.add(share.hash)
             if share.previous_hash in self.heads:
                 self.heads.remove(share.previous_hash)
+    
+    def get_chain(self, start):
+        share_hash_to_get = start
+        while share_hash_to_get in self.shares:
+            share = self.shares[share_hash_to_get]
+            yield share
+            share_hash_to_get = share.previous_hash
+    
+    def best(self):
+        return max(self.heads, key=self.score_chain)
+    
+    def score_chain(self, start):
+        length = len(self.get_chain(start))
+        
+        score = 0
+        for share in itertools.islice(self.get_chain(start), 1000):
+            score += a
+        
+        return (min(length, 1000), score)
 
 if __name__ == '__main__':
     class FakeShare(object):
@@ -218,18 +235,20 @@ if __name__ == '__main__':
 
 # TARGET_MULTIPLIER needs to be less than the current difficulty to prevent miner clients from missing shares
 
-class Testnet(object):
+class Mainnet(bitcoin_data.Mainnet):
+    TARGET_MULTIPLIER = SPREAD = 600
+    ROOT_BLOCK = 0x6c9cb0589a44808d9a9361266a4ffb9fea2e2cf4d70bb2118b5
+    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
+    IDENTIFIER = 0x7452839666e1f8f8
+    PREFIX = '2d4224bf18c87b87'.decode('hex')
+    ADDRS_TABLE = 'addrs'
+    P2P_PORT = 9333
+
+class Testnet(bitcoin_data.Testnet):
     TARGET_MULTIPLIER = SPREAD = 30
     ROOT_BLOCK = 0xd5070cd4f2987ad2191af71393731a2b143f094f7b84c9e6aa9a6a
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = 0x1ae3479e4eb6700a
     PREFIX = 'd19778c812754854'.decode('hex')
     ADDRS_TABLE = 'addrs_testnet'
-
-class Main(object):
-    TARGET_MULTIPLIER = SPREAD = 600
-    ROOT_BLOCK = 0x11a22c6e314b1a3f44cbbf50246187a37756ea8af4d41c43a8d6
-    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
-    IDENTIFIER = 0x7452839666e1f8f8
-    PREFIX = '2d4224bf18c87b87'.decode('hex')
-    ADDRS_TABLE = 'addrs'
+    P2P_PORT = 19333

@@ -7,7 +7,7 @@ import traceback
 from twisted.internet import defer
 from twisted.web import client
 
-import util
+import deferred_resource
 
 class Error(Exception):
     def __init__(self, code, message, data=None):
@@ -62,7 +62,7 @@ class Proxy(object):
             return lambda *params: self.callRemote(attr[len('rpc_'):], *params)
         raise AttributeError('%r object has no attribute %r' % (self.__class__.__name__, attr))
 
-class Server(util.DeferredResource):
+class Server(deferred_resource.DeferredResource):
     extra_headers = None
     
     @defer.inlineCallbacks
@@ -111,11 +111,13 @@ class Server(util.DeferredResource):
             if id_ is None:
                 return
             
+            #print (df.result.type, df.result.value, df.result.tb)
+            #print df.result.__dict__
             try:
                 result = yield df
-            except Error, e:
-                raise e
-            except Exception, e:
+            #except Error, e:
+            #w    raise e
+            except Exception:
                 print 'Squelched JSON method error:'
                 traceback.print_exc()
                 raise Error(-32099, u'Unknown error')
