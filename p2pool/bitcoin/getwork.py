@@ -9,9 +9,6 @@ import struct
 from . import data as bitcoin_data
 from . import sha256
 
-def _reverse_chunks(s, l):
-    return ''.join(reversed([s[x:x+l] for x in xrange(0, len(s), l)]))
-
 def _swap(s, l):
     return ''.join(s[x:x+l][::-1] for x in xrange(0, len(s), l))
 
@@ -55,7 +52,7 @@ class BlockAttempt(object):
             'data': _swap(block_data, 4).encode('hex') + '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
             'hash1': '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
             'target': ('%064x' % (target2,)).decode('hex')[::-1].encode('hex'),
-            'midstate': _reverse_chunks(sha256.process(block_data[:64])[::-1], 4).encode('hex'),
+            'midstate': _swap(sha256.process(block_data[:64]), 4).encode('hex'),
         }
         
         if _check:
