@@ -26,64 +26,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     use_checksum = True
     
-    message_version = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.StructType('<I')),
-        ('services', bitcoin_data.StructType('<Q')),
-        ('addr_to', bitcoin_data.address_type),
-        ('addr_from', bitcoin_data.address_type),
-        ('nonce', bitcoin_data.StructType('<Q')),
-        ('sub_version', bitcoin_data.VarStrType()),
-        ('mode', bitcoin_data.StructType('<I')),
-        ('state', bitcoin_data.ComposedType([
-            ('chain_id', p2pool_data.chain_id_type),
-            ('highest', bitcoin_data.ComposedType([
-                ('hash', bitcoin_data.HashType()),
-                ('height', bitcoin_data.StructType('<Q')),
-            ])),
-        ])),
-    ])
-    
-    message_update_mode = bitcoin_data.ComposedType([
-        ('mode', bitcoin_data.StructType('<I')),
-    ])
-    
-    message_ping = bitcoin_data.ComposedType([])
-    
-    message_addrme = bitcoin_data.ComposedType([
-        ('port', bitcoin_data.StructType('<H')),
-    ])
-    message_addrs = bitcoin_data.ComposedType([
-        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('timestamp', bitcoin_data.StructType('<Q')),
-            ('address', bitcoin_data.address_type),
-        ]))),
-    ])
-    message_getaddrs = bitcoin_data.ComposedType([
-        ('count', bitcoin_data.StructType('<I')),
-    ])
-    
-    message_gettobest = bitcoin_data.ComposedType([
-        ('chain_id', p2pool_data.chain_id_type),
-        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    message_getshares = bitcoin_data.ComposedType([
-        ('chain_id', p2pool_data.chain_id_type),
-        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    
-    message_share0s = bitcoin_data.ComposedType([
-        ('chains', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('chain_id', p2pool_data.chain_id_type),
-            ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ]))),
-    ])
-    message_share1s = bitcoin_data.ComposedType([
-        ('share1s', bitcoin_data.ListType(p2pool_data.share1_type)),
-    ])
-    message_share2s = bitcoin_data.ComposedType([
-        ('share2s', bitcoin_data.ListType(bitcoin_data.block_type)),
-    ])
-    
     other_version = None
     node_var_watch = None
     connected2 = False
@@ -102,23 +44,20 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             services=0,
             addr_to=dict(
                 services=0,
-                address='::ffff:' + self.transport.getPeer().host,
+                address=self.transport.getPeer().host,
                 port=self.transport.getPeer().port,
             ),
             addr_from=dict(
                 services=0,
-                address='::ffff:' + self.transport.getHost().host,
+                address=self.transport.getHost().host,
                 port=self.transport.getHost().port,
             ),
             nonce=self.node.nonce,
             sub_version=self.sub_version,
             mode=self.node.mode_var.value,
-            state=dict(
-                chain_id=p2pool_data.chain_id_type.unpack(chain.chain_id_data),
-                highest=dict(
-                    hash=highest_share2.share.hash if highest_share2 is not None else 2**256-1,
-                    height=highest_share2.height if highest_share2 is not None else 0,
-                ),
+            highest=dict(
+                hash=highest_share2.share.hash if highest_share2 is not None else 2**256-1,
+                height=highest_share2.height if highest_share2 is not None else 0,
             ),
         )
         
@@ -144,6 +83,19 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             #print 'sending addrme'
             yield deferral.sleep(random.expovariate(1/100))
     
+    message_version = bitcoin_data.ComposedType([
+        ('version', bitcoin_data.StructType('<I')),
+        ('services', bitcoin_data.StructType('<Q')),
+        ('addr_to', bitcoin_data.address_type),
+        ('addr_from', bitcoin_data.address_type),
+        ('nonce', bitcoin_data.StructType('<Q')),
+        ('sub_version', bitcoin_data.VarStrType()),
+        ('mode', bitcoin_data.StructType('<I')),
+        ('highest', bitcoin_data.PossiblyNone(dict(hash=0, height=0), bitcoin_data.ComposedType([
+            ('hash', bitcoin_data.HashType()),
+            ('height', bitcoin_data.StructType('<Q')),
+        ]))),
+    ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, state):
         self.other_version = version
         self.other_services = services
@@ -154,7 +106,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.transport.loseConnection()
             return
         if nonce in self.node.peers:
-            print 'Detected duplicate connection, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
+            #print 'Detected duplicate connection, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
             self.transport.loseConnection()
             return
         
@@ -165,18 +117,23 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._think()
         self._think2()
         
-        if state['highest']['hash'] != 2**256 - 1:
-            self.handle_share0s(chains=[dict(
-                chain_id=state['chain_id'],
-                hashes=[state['highest']['hash']],
-            )])
+        if state['highest'] is not None:
+            self.handle_share0s(hashes=[state['highest']['hash']])
     
+    
+    message_update_mode = bitcoin_data.ComposedType([
+        ('mode', bitcoin_data.StructType('<I')),
+    ])
     def handle_set_mode(self, mode):
         self.other_mode_var.set(mode)
     
+    message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
         pass
     
+    message_addrme = bitcoin_data.ComposedType([
+        ('port', bitcoin_data.StructType('<H')),
+    ])
     def handle_addrme(self, port):
         host = self.transport.getPeer().host
         #print 'addrme from', host, port
@@ -184,23 +141,34 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             if random.random() < .8 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrme(port=port) # services...
         else:
-            self.node.got_addr(('::ffff:' + self.transport.getPeer().host, port), self.other_services, int(time.time()))
+            self.node.got_addr((self.transport.getPeer().host, port), self.other_services, int(time.time()))
             if random.random() < .8 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrs(addrs=[
                     dict(
                         address=dict(
                             services=self.other_services,
-                            address='::ffff:' + host,
+                            address=host,
                             port=port,
                         ),
                         timestamp=int(time.time()),
                     ),
                 ])
+    
+    message_addrs = bitcoin_data.ComposedType([
+        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
+            ('timestamp', bitcoin_data.StructType('<Q')),
+            ('address', bitcoin_data.address_type),
+        ]))),
+    ])
     def handle_addrs(self, addrs):
         for addr_record in addrs:
             self.node.got_addr((addr_record['address']['address'], addr_record['address']['port']), addr_record['address']['services'], min(int(time.time()), addr_record['timestamp']))
             if random.random() < .8 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrs(addrs=[addr_record])
+    
+    message_getaddrs = bitcoin_data.ComposedType([
+        ('count', bitcoin_data.StructType('<I')),
+    ])
     def handle_getaddrs(self, count):
         self.send_addrs(addrs=[
             dict(
@@ -214,18 +182,31 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
         ])
     
-    def handle_gettobest(self, chain_id, have):
-        self.node.handle_get_to_best(p2pool_data.chain_id_type.pack(chain_id), have, self)
+    message_gettobest = bitcoin_data.ComposedType([
+        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
+    ])
+    def handle_gettobest(self, have):
+        self.node.handle_get_to_best(have, self)
     
-    def handle_getshares(self, chain_id, hashes):
-        self.node.handle_get_shares(p2pool_data.chain_id_type.pack(chain_id), hashes, self)
+    message_getshares = bitcoin_data.ComposedType([
+        ('hash', bitcoin_data.HashType()),
+        ('parents', bitcoin_data.StructType('<I')),
+    ])
+    def handle_getshares(self, hashes):
+        self.node.handle_get_shares(hashes, self)
     
+    message_share0s = bitcoin_data.ComposedType([
+        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
+    ])
     def handle_share0s(self, chains):
-        for chain in chains:
-            for hash_ in chain['hashes']:
-                self.node.handle_share_hash(p2pool_data.chain_id_type.pack(chain['chain_id']), hash_, self)
-    def handle_share1s(self, share1s):
-        for share1 in share1s:
+        for hash_ in hashes:
+            self.node.handle_share_hash(hash_, self)
+    
+    message_share1as = bitcoin_data.ComposedType([
+        ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
+    ])
+    def handle_share1as(self, share1s):
+        for share1a in share1as:
             hash_ = bitcoin_data.block_hash(share1['header'])
             if hash_ <= bitcoin_data.bits_to_target(share1['header']['bits']):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
@@ -233,8 +214,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 return
             share = p2pool_data.Share(share1['header'], gentx=share1['gentx'])
             self.node.handle_share(share, self)
-    def handle_share2s(self, share2s):
-        for share2 in share2s:
+    
+    message_share1bs = bitcoin_data.ComposedType([
+        ('share1bs', bitcoin_data.ListType(p2pool_data.share1b_type)),
+    ])
+    def handle_share1bs(self, share2s):
+        for share1b in share1bs:
             hash_ = bitcoin_data.block_hash(share2['header'])
             if not hash_ <= bitcoin_data.bits_to_target(share2['header']['bits']):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
@@ -248,10 +233,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.send_share2s(share2s=[share.as_block()])
         else:
             if self.mode == 0 and not full:
-                self.send_share0s(chains=[dict(
-                    chain_id=p2pool_data.chain_id_type.unpack(share.chain_id_data),
-                    hashes=[share.hash],
-                )])
+                self.send_share0s(hashes=[share.hash])
             elif self.mode == 1 or full:
                 self.send_share1s(share1s=[dict(
                     header=share.header,
@@ -355,11 +337,7 @@ class Node(object):
                     if (random.randrange(2) and len(self.preferred_addrs)) or not len(self.addr_store):
                         host, port = random.choice(self.preferred_addrs)
                     else:
-                        host2, port = random.choice(self.addr_store.keys())
-                        prefix = '::ffff:'
-                        if not host2.startswith(prefix):
-                            raise ValueError('invalid address')
-                        host = host2[len(prefix):]
+                        host, port = random.choice(self.addr_store.keys())
                     
                     if (host, port) not in self.attempts:
                         #print 'Trying to connect to', host, port
@@ -434,21 +412,21 @@ class Node(object):
     def handle_share(self, share, peer):
         print 'handle_share', (share, peer)
     
-    def handle_share_hash(self, chain_id_data, hash, peer):
-        print 'handle_share_hash', (chain_id_data, hash, peer)
+    def handle_share_hash(self, hash_, peer):
+        print 'handle_share_hash', (hash_, peer)
     
-    def handle_get_to_best(self, chain_id_data, have, peer):
-        print 'handle_get_to_best', (chain_id_data, have, peer)
+    def handle_get_to_best(self, have, peer):
+        print 'handle_get_to_best', (have, peer)
     
-    def handle_get_shares(self, chain_id_data, hashes, peer):
-        print 'handle_get_shares', (chain_id_data, hashes, peer)
+    def handle_get_shares(self, hashes, peer):
+        print 'handle_get_shares', (hashes, peer)
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)
     for i in xrange(5):
         p2 = random.randrange(2**15, 2**16)
         print p, p2
-        n = Node(p2, True, {addrdb_key.pack(dict(address='::ffff:' + '127.0.0.1', port=p)): addrdb_value.pack(dict(services=0, first_seen=int(time.time())-10, last_seen=int(time.time())))})
+        n = Node(p2, True, {addrdb_key.pack(dict(address='127.0.0.1', port=p)): addrdb_value.pack(dict(services=0, first_seen=int(time.time())-10, last_seen=int(time.time())))})
         n.start()
         p = p2
     

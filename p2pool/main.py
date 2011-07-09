@@ -17,20 +17,17 @@ from twisted.web import server
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 from util import db, expiring_dict, jsonrpc, variable, deferral
-import p2pool.p2p as p2p
+from . import p2p, worker_interface
 import p2pool.data as p2pool
-import worker_interface
 
 try:
     __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
 except:
     __version__ = 'unknown'
 
-if hasattr(sys, "frozen"):
-    __file__ = sys.executable
-
 class Chain(object):
     def __init__(self, chain_id_data):
+        assert False
         self.chain_id_data = chain_id_data
         self.last_p2pool_block_hash = p2pool.chain_id_type.unpack(chain_id_data)['last_p2pool_block_hash']
         
@@ -188,9 +185,11 @@ def main(args):
         
         get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
         
+        tracker = p2pool.Tracker()
         chains = expiring_dict.ExpiringDict(300)
         def get_chain(chain_id_data):
             return chains.setdefault(chain_id_data, Chain(chain_id_data))
+        
         # information affecting work that should trigger a long-polling update
         current_work = variable.Variable(None)
         # information affecting work that should not trigger a long-polling update
@@ -201,26 +200,22 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
-            last_p2pool_block_hash = (yield get_last_p2pool_block_hash(work.previous_block, get_block, args.net))
-            chain = get_chain(p2pool.chain_id_type.pack(dict(last_p2pool_block_hash=last_p2pool_block_hash, bits=work.bits)))
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
-                bits=work.bits,
+                target=work.target,
+                
                 height=height + 1,
-                current_chain=chain,
-                highest_p2pool_share2=chain.get_highest_share2(),
-                last_p2pool_block_hash=last_p2pool_block_hash,
+                
+                highest_p2pool_share_hash=tracker.get_best_share_hash(),
             ))
             current_work2.set(dict(
                 timestamp=work.timestamp,
             ))
         
-        print 'Searching for last p2pool-generated block...'
+        print 'Initializing work...'
         yield set_real_work()
         print '    ...success!'
-        print '    Matched block %x' % (current_work.value['last_p2pool_block_hash'],)
-        print
         
         # setup p2p logic and join p2pool network
         
@@ -232,7 +227,7 @@ def main(args):
             share2.flag_shared()
         
         def p2p_share(share, peer=None):
-            if share.hash <= bitcoin.data.bits_to_target(share.header['bits']):
+            if share.hash <= share.header['target']:
                 print
                 print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
                 #print share.__dict__
@@ -242,8 +237,7 @@ def main(args):
                 else:
                     print 'No bitcoind connection! Erp!'
             
-            chain = get_chain(share.chain_id_data)
-            res = chain.accept(share, args.net)
+            res = tracker.add_share(share)
             if res == 'good':
                 share2 = chain.share2s[share.hash]
                 
@@ -276,7 +270,7 @@ def main(args):
                 raise ValueError('unknown result from chain.accept - %r' % (res,))
             
             w = dict(current_work.value)
-            w['highest_p2pool_share2'] = w['current_chain'].get_highest_share2()
+            w['highest_p2pool_share_hash'] = w['current_chain'].get_highest_share_hash()
             current_work.set(w)
         
         def p2p_share_hash(chain_id_data, hash, peer):
@@ -332,7 +326,7 @@ def main(args):
             current_work=current_work,
             port=args.p2pool_port,
             net=args.net,
-            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(__file__), 'addrs.dat'), isolation_level=None), args.net.ADDRS_TABLE),
+            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), args.net.ADDRS_TABLE),
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
@@ -371,20 +365,21 @@ def main(args):
         
         def compute(state):
             extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
-            generate_tx, shares = p2pool.generate_transaction(
-                last_p2pool_block_hash=state['last_p2pool_block_hash'],
-                previous_share2=state['highest_p2pool_share2'],
+            generate_tx = p2pool.generate_transaction(
+                tracker=tracker,
+                previous_share_hash=state['highest_p2pool_share_hash'],
                 new_script=my_script,
                 subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=struct.pack("<Q", random.randrange(2**64)),
+                block_target=state['target'],
                 net=args.net,
             )
-            print 'Generating, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
+            print 'Generating!' #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
-            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['bits'])
-            return ba.getwork(args.net.TARGET_MULTIPLIER)
+            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['target'])
+            return ba.getwork(p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'])
         
         def got_response(data):
             # match up with transactions
@@ -393,7 +388,7 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
-            share = p2pool.Share(header=header, txs=transactions)
+            share = p2pool.Share.from_block(dict(header=header, txs=transactions))
             print 'GOT SHARE! %x' % (share.hash,)
             try:
                 p2p_share(share)
@@ -426,10 +421,10 @@ def main(args):
         
         class Tx(object):
             def __init__(self, tx, seen_at_block):
-                self.hash = bitcoin.data.tx_hash(tx)
+                self.hash = bitcoin.data.tx_type.hash256(tx)
                 self.tx = tx
                 self.seen_at_block = seen_at_block
-                self.mentions = set([bitcoin.data.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                self.mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                 #print
                 #print "%x %r" % (seen_at_block, tx)
                 #for mention in self.mentions:
@@ -466,13 +461,16 @@ def main(args):
                     if block_hash == self.seen_at_block:
                         return True
                     for tx in block['txs']:
-                        mentions = set([bitcoin.data.tx_hash(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                        mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                         if mentions & self.mentions:
                             return False
                 return False
         
-        def new_tx(tx):
-            tx_pool[bitcoin.data.tx_hash(tx)] = Tx(tx, current_work.value['previous_block'])
+        @defer.inlineCallbacks
+        def new_tx(tx_hash):
+            assert isinstance(tx_hash, (int, long))
+            tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
+            tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
         factory.new_tx.watch(new_tx)
         
         def new_block(block):

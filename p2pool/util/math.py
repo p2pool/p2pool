@@ -15,3 +15,17 @@ def shuffled(x):
     x = list(x)
     random.shuffle(x)
     return x
+
+def shift_left(n, m):
+    # python: :(
+    if m < 0:
+        return n >> -m
+    return n << m
+
+def clip(x, (low, high)):
+    if x < low:
+        return low
+    elif x > high:
+        return high
+    else:
+        return x

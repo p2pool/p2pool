@@ -102,6 +102,31 @@ class Protocol(BaseProtocol):
     def use_checksum(self):
         return self.version >= 209
     
+    
+    null_order = '\0'*60
+    
+    def connectionMade(self):
+        BaseProtocol.connectionMade(self)
+        
+        self.send_version(
+            version=32200,
+            services=1,
+            time=int(time.time()),
+            addr_to=dict(
+                services=1,
+                address=self.transport.getPeer().host,
+                port=self.transport.getPeer().port,
+            ),
+            addr_from=dict(
+                services=1,
+                address=self.transport.getHost().host,
+                port=self.transport.getHost().port,
+            ),
+            nonce=random.randrange(2**64),
+            sub_version_num='',
+            start_height=0,
+        )
+    
     message_version = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('services', bitcoin_data.StructType('<Q')),
@@ -112,19 +137,42 @@ class Protocol(BaseProtocol):
         ('sub_version_num', bitcoin_data.VarStrType()),
         ('start_height', bitcoin_data.StructType('<I')),
     ])
+    def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
+        #print 'VERSION', locals()
+        self.version_after = version
+        self.send_verack()
+    
     message_verack = bitcoin_data.ComposedType([])
-    message_addr = bitcoin_data.ComposedType([
-        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('timestamp', bitcoin_data.StructType('<I')),
-            ('address', bitcoin_data.address_type),
-        ]))),
-    ])
+    def handle_verack(self):
+        self.version = self.version_after
+        
+        # connection ready
+        self.check_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
+        self.submit_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
+        self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
+        self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getheaders(version=1, have=[], last=hash))
+        self.get_tx = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='tx', hash=hash)]))
+        
+        if hasattr(self.factory, 'resetDelay'):
+            self.factory.resetDelay()
+        if hasattr(self.factory, 'gotConnection'):
+            self.factory.gotConnection(self)
+    
     message_inv = bitcoin_data.ComposedType([
         ('invs', bitcoin_data.ListType(bitcoin_data.ComposedType([
             ('type', bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'tx': 1, 'block': 2})),
             ('hash', bitcoin_data.HashType()),
         ]))),
     ])
+    def handle_inv(self, invs):
+        for inv in invs:
+            if inv['type'] == 'tx':
+                self.factory.new_tx.happened(inv['hash'])
+            elif inv['type'] == 'block':
+                self.factory.new_block.happened(inv['hash'])
+            else:
+                print "Unknown inv type", item
+    
     message_getdata = bitcoin_data.ComposedType([
         ('requests', bitcoin_data.ListType(bitcoin_data.ComposedType([
             ('type', bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'tx': 1, 'block': 2})),
@@ -141,15 +189,6 @@ class Protocol(BaseProtocol):
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
         ('last', bitcoin_data.HashType()),
     ])
-    message_tx = bitcoin_data.ComposedType([
-        ('tx', bitcoin_data.tx_type),
-    ])
-    message_block = bitcoin_data.ComposedType([
-        ('block', bitcoin_data.block_type),
-    ])
-    message_headers = bitcoin_data.ComposedType([
-        ('headers', bitcoin_data.ListType(bitcoin_data.block_header_type)),
-    ])
     message_getaddr = bitcoin_data.ComposedType([])
     message_checkorder = bitcoin_data.ComposedType([
         ('id', bitcoin_data.HashType()),
@@ -159,83 +198,55 @@ class Protocol(BaseProtocol):
         ('id', bitcoin_data.HashType()),
         ('order', bitcoin_data.FixedStrType(60)), # XXX
     ])
+
+    message_addr = bitcoin_data.ComposedType([
+        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
+            ('timestamp', bitcoin_data.StructType('<I')),
+            ('address', bitcoin_data.address_type),
+        ]))),
+    ])
+    def handle_addr(self, addrs):
+        for addr in addrs:
+            pass
+    
+    message_tx = bitcoin_data.ComposedType([
+        ('tx', bitcoin_data.tx_type),
+    ])
+    def handle_tx(self, tx):
+        self.get_block.got_response(bitcoin_data.tx_type.hash256(tx), tx)
+    
+    message_block = bitcoin_data.ComposedType([
+        ('block', bitcoin_data.block_type),
+    ])
+    def handle_block(self, block):
+        self.get_block.got_response(bitcoin_data.block_header_type.hash256(block['header']), block)
+    
+    message_headers = bitcoin_data.ComposedType([
+        ('headers', bitcoin_data.ListType(bitcoin_data.block_header_type)),
+    ])
+    def handle_headers(self, headers):
+        for header in headers:
+            self.get_block_header.got_response(bitcoin_data.block_hash(header), header)
+    
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
         ('script', bitcoin_data.VarStrType()),
     ])
+    def handle_reply(self, hash, reply, script):
+        self.check_order.got_response(hash, dict(reply=reply, script=script))
+        self.submit_order.got_response(hash, dict(reply=reply, script=script))
+
     message_ping = bitcoin_data.ComposedType([])
+    def handle_ping(self):
+        pass
+
     message_alert = bitcoin_data.ComposedType([
         ('message', bitcoin_data.VarStrType()),
         ('signature', bitcoin_data.VarStrType()),
     ])
-    
-    null_order = '\0'*60
-    
-    def connectionMade(self):
-        BaseProtocol.connectionMade(self)
-        
-        self.send_version(
-            version=32200,
-            services=1,
-            time=int(time.time()),
-            addr_to=dict(
-                services=1,
-                address='::ffff:' + self.transport.getPeer().host,
-                port=self.transport.getPeer().port,
-            ),
-            addr_from=dict(
-                services=1,
-                address='::ffff:' + self.transport.getHost().host,
-                port=self.transport.getHost().port,
-            ),
-            nonce=random.randrange(2**64),
-            sub_version_num='',
-            start_height=0,
-        )
-    
-    def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
-        #print 'VERSION', locals()
-        self.version_after = version
-        self.send_verack()
-    
-    def handle_verack(self):
-        self.version = self.version_after
-        
-        # connection ready
-        self.check_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
-        self.submit_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
-        self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
-        self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
-        
-        if hasattr(self.factory, 'resetDelay'):
-            self.factory.resetDelay()
-        if hasattr(self.factory, 'gotConnection'):
-            self.factory.gotConnection(self)
-    
-    def handle_inv(self, invs):
-        for inv in invs:
-            #print 'INV', item['type'], hex(item['hash'])
-            self.send_getdata(requests=[inv])
-    
-    def handle_addr(self, addrs):
-        for addr in addrs:
-            pass#print 'ADDR', addr
-    
-    def handle_reply(self, hash, reply, script):
-        self.check_order.got_response(hash, dict(reply=reply, script=script))
-        self.submit_order.got_response(hash, dict(reply=reply, script=script))
-    
-    def handle_tx(self, tx):
-        #print 'TX', hex(merkle_hash([tx])), tx
-        self.factory.new_tx.happened(tx)
-    
-    def handle_block(self, block):
-        self.get_block.got_response(bitcoin_data.block_hash(block['header']), block)
-        self.factory.new_block.happened(block)
-    
-    def handle_ping(self):
-        pass
+    def handle_alert(self, message, signature):
+        print "ALERT:", (message, signature)
     
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
@@ -267,5 +278,11 @@ class ClientFactory(protocol.ReconnectingClientFactory):
 if __name__ == '__main__':
     factory = ClientFactory()
     reactor.connectTCP('127.0.0.1', 8333, factory)
+
+    @repr
+    @apply
+    @defer.inlineCallbacks
+    def think():
+        (yield factory.getProtocol())
     
     reactor.run()
