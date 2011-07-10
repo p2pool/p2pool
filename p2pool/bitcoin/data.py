@@ -74,6 +74,7 @@ class Type(object):
         return HashType().unpack(hashlib.sha256(hashlib.sha256(self.pack(obj)).digest()).digest())
 
 class VarIntType(Type):
+    # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
     def read(self, file):
         data = file.read(1)
         if len(data) != 1:
@@ -253,6 +254,9 @@ class ChecksummedType(Type):
         file.write(hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4])
 
 class FloatingIntegerType(Type):
+    # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
+    # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
+    
     def read(self, file):
         data = FixedStrType(4).read(file)
         target = self._bits_to_target(data)
@@ -365,6 +369,8 @@ def merkle_hash(tx_list):
 def target_to_average_attempts(target):
     return 2**256//(target + 1)
 
+# human addresses
+
 human_address_type = ChecksummedType(ComposedType([
     ('version', StructType("<B")),
     ('pubkey_hash', ShortHashType()),
@@ -383,6 +389,8 @@ def address_to_pubkey_hash(address, net):
     if x['version'] != net.BITCOIN_ADDRESS_VERSION:
         raise ValueError('address not for this net!')
     return x['pubkey_hash']
+
+# network definitions
 
 class Mainnet(object):
     BITCOIN_P2P_PREFIX = 'f9beb4d9'.decode('hex')

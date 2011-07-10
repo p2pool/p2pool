@@ -37,7 +37,7 @@ share_data_type = bitcoin_data.ComposedType([
 
 
 coinbase_type = bitcoin_data.ComposedType([
-    ('identifier', bitcoin_data.StructType('<Q')),
+    ('identifier', bitcoin_data.FixedStrType(8)),
     ('share_data', share_data_type),
 ])
 
@@ -107,9 +107,22 @@ def share_info_to_gentx(share_info, chain, net):
     )
 
 class Share(object):
+    @classmethod
+    def from_block(cls, block):
+        return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
+    
+    @classmethod
+    def from_share1a(cls, share1a):
+        return cls(**share1a)
+    
+    @classmethod
+    def from_share1b(cls, share1b):
+        return cls(**share1b)
+    
     def __init__(self, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
+        
         self.header = header
         self.share_info = share_info
         self.merkle_branch = merkle_branch
@@ -124,18 +137,9 @@ class Share(object):
         self.target2 = self.share_data['target2']
         
         self.hash = bitcoin_data.block_header_type.hash256(header)
-    
-    @classmethod
-    def from_block(cls, block):
-        return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
-    
-    @classmethod
-    def from_share1a(cls, share1a):
-        return cls(**share1a)
-    
-    @classmethod
-    def from_share1b(cls, share1b):
-        return cls(**share1b)
+        
+        if self.hash > self.target2:
+            raise ValueError('not enough work!')
     
     def as_block(self):
         if self.txs is None:
@@ -143,30 +147,30 @@ class Share(object):
         
         return dict(header=self.header, txs=self.txs)
     
-    def as_share1(self):
-        return dict(header=self.header, gentx_info=self.gentx_info)
+    def as_share1a(self):
+        return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
     
-    def check(self, chain, height, previous_share2, net):
-        if self.chain_id_data != chain.chain_id_data:
-            raise ValueError('wrong chain')
+    def as_share1b(self):
+        return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
+    
+    def check(self, tracker, net):
+        gentx = share_info_to_gentx(self.share_info, tracker, net)
         
-        if self.hash > net.TARGET_MULTIPLIER*bitcoin_data.bits_to_target(self.header['bits']):
-            raise ValueError('not enough work!')
+        if self.merkle_branch is not None:
+            if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
+                raise ValueError("gentx doesn't match header via merkle_branch")
         
-        gentx, shares, merkle_root = gentx_info_to_gentx_shares_and_merkle_root(self.gentx_info, chain, net)
+        if self.other_txs is not None:
+            if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
+                raise ValueError("gentx doesn't match header via other_txs")
         
-        if merkle_root != self.header['merkle_root']:
-            raise ValueError("gentx doesn't match header")
-        
-        return Share2(self, shares, height)
+        return Share2(self)
 
 class Share2(object):
     '''Share with associated data'''
     
-    def __init__(self, share, shares, height):
+    def __init__(self, share):
         self.share = share
-        self.shares = shares
-        self.height = height
         
         self.shared = False
     
@@ -214,7 +218,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
     dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
-    assert dests[-1] == new_script, dests
+    assert dests[-1] == new_script
     
     previous_shares = [] # XXX
     
@@ -242,8 +246,10 @@ class Tracker(object):
     def __init__(self):
         self.shares = {} # hash -> share
         self.reverse_shares = {} # previous_share_hash -> share_hash
-        self.heads = {} # hash -> (height, tail hash)
-        self.heads = set()
+        
+        self.heads = {} # head hash -> tail_hash
+        self.tails = {} # tail hash -> set of head hashes
+        self.heights = {} # share hash -> height, to_share_hash
     
     def add_share(self, share):
         if share.hash in self.shares:
@@ -252,12 +258,38 @@ class Tracker(object):
         self.shares[share.hash] = share
         self.reverse_shares.setdefault(share.previous_share_hash, set()).add(share.hash)
         
-        if self.reverse_shares.get(share.hash, set()):
-            pass # not a head
+        if share.hash in self.tails:
+            heads = self.tails.pop(share.hash)
         else:
-            self.heads.add(share.hash)
-            if share.previous_share_hash in self.heads:
-                self.heads.remove(share.previous_share_hash)
+            heads = set([share.hash])
+        
+        if share.previous_share_hash in self.heads:
+            tail = self.heads.pop(share.previous_share_hash)
+        else:
+            tail = share.previous_share_hash
+        
+        self.tails.setdefault(tail, set()).update(heads)
+        if share.previous_share_hash in self.tails[tail]:
+            self.tails[tail].remove(share.previous_share_hash)
+        
+        for head in heads:
+            self.heads[head] = tail
+    
+    def get_height_and_last(self, share_hash):
+        height = 0
+        updates = []
+        while True:
+            if share_hash is None or share_hash not in self.shares:
+                break
+            updates.append((share_hash, height))
+            if share_hash in self.heights:
+                height_inc, share_hash = self.heights[share_hash]
+            else:
+                height_inc, share_hash = 1, self.shares[share_hash].previous_share_hash
+            height += height_inc
+        for update_hash, height_then in updates:
+            self.heights[update_hash] = height - height_then, share_hash
+        return height, share_hash
     
     def get_chain(self, start):
         share_hash_to_get = start
@@ -266,9 +298,8 @@ class Tracker(object):
             yield share
             share_hash_to_get = share.previous_share_hash
     
+    '''
     def get_best_share_hash(self):
-        if not self.heads:
-            return None
         return max(self.heads, key=self.score_chain)
     
     def score_chain(self, start):
@@ -279,37 +310,7 @@ class Tracker(object):
             score += a
         
         return (min(length, 1000), score)
-
-class OkayTracker(Tracker):
-    def __init__(self):
-        Tracker.__init__(self)
-        self.okay_cache = set()
-    def is_okay(self, start):
-        '''
-        Returns:
-            {'result': 'okay', verified_height: ...} # if share has an okay parent or if share has CHAIN_LENGTH children and CHAIN_LENTH parents that it verified with
-            {'result': 'needs_parent', 'parent_hash': ...} # if share doesn't have CHAIN_LENGTH parents
-            {'result': 'needs_share_shares', 'share_hash': ...} # if share has CHAIN_LENGTH children and needs its shares to 
-            {'result': 'not_okay'} # if the share has a not okay parent or if the share has an okay parent and failed validation
-        '''
-        
-        length = len
-        to_end_rev = []
-        for share in itertools.islice(self.get_chain(start), self.net.CHAIN_LENGTH):
-            if share in self.okay_cache:
-                return validate(share, to_end_rev[::-1])
-            to_end_rev.append(share)
-        # picking up last share from for loop, ew
-        self.okay_cache.add(share)
-        return validate(share, to_end_rev[::-1])
-class Chain(object):
-    def __init__(self):
-        pass
-
-def get_chain_descriptor(tracker, start):
-    for item in tracker.get_chain(self.net.CHAIN_LENGTH):
-        a
-    pass
+    '''
 
 if __name__ == '__main__':
     class FakeShare(object):
@@ -320,30 +321,84 @@ if __name__ == '__main__':
     t = Tracker()
     
     t.add_share(FakeShare(1, 2))
-    print t.heads
+    print t.heads, t.tails
     t.add_share(FakeShare(4, 0))
-    print t.heads
+    print t.heads, t.tails
     t.add_share(FakeShare(3, 4))
-    print t.heads
+    print t.heads, t.tails
+    t.add_share(FakeShare(5, 0))
+    print t.heads, t.tails
+    t.add_share(FakeShare(0, 1))
+    print t.heads, t.tails
+    
+    for share_hash in t.shares:
+        print share_hash, t.get_height_and_last(share_hash)
+
+class OkayTracker(Tracker):
+    def __init__(self):
+        Tracker.__init__(self)
+        self.okay_cache = {} # hash -> height
+    
+    def is_okay(self, start, _height_after=0):
+        '''
+        Returns:
+            {'result': 'okay', verified_height: ...} # if share has an okay parent or if share has CHAIN_LENGTH children and CHAIN_LENTH parents that it verified with
+            {'result': 'needs_share', 'share_hash': ...} # if share doesn't have CHAIN_LENGTH parents
+            #{'result': 'needs_share_shares', 'share_hash': ...} # if share has CHAIN_LENGTH children and needs its shares to 
+            {'result': 'not_okay'} # if the share has a not okay parent or if the share has an okay parent and failed validation
+        '''
+        
+        if start in self.okay_cache:
+            return dict(result='okay', verified_height=self.okay_cache['start'])
+        
+        share = self.shares[start]
+        if start not in self.shares:
+            return dict(result='needs_share', share_hash=start)
+        
+        length = len
+        to_end_rev = []
+        for share in itertools.islice(self.get_chain(start), self.net.CHAIN_LENGTH):
+            if share in self.okay_cache:
+                return validate(share, to_end_rev[::-1])
+            to_end_rev.append(share)
+        # picking up last share from for loop, ew
+        self.okay_cache.add(share)
+        return validate(share, to_end_rev[::-1])
+    
+    def accept_share(self, share):
+        self.add_share(share)
+        
+        for head in self.heads:
+            height, last = self.get_height(head)
+            if last is None or height >= 2*self.net.CHAIN_LENGTH:
+                a
+                a
+class Chain(object):
+    def __init__(self):
+        pass
+
+def get_chain_descriptor(tracker, start):
+    for item in tracker.get_chain(self.net.CHAIN_LENGTH):
+        a
+    pass
+
 
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
-    CHAIN_LENGTH = 1000 # shares
-    SPREAD = 10 # blocks
-    ROOT_BLOCK = 0x6c9cb0589a44808d9a9361266a4ffb9fea2e2cf4d70bb2118b5
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    SPREAD = 3 # blocks
     SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
-    IDENTIFIER = 0x7452839666e1f8f8
+    IDENTIFIER = '7452839666e1f8f8'.decode('hex')
     PREFIX = '2d4224bf18c87b87'.decode('hex')
     ADDRS_TABLE = 'addrs'
     P2P_PORT = 9333
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 5 # seconds
-    CHAIN_LENGTH = 1000 # shares
-    SPREAD = 10 # blocks
-    ROOT_BLOCK = 0xd5070cd4f2987ad2191af71393731a2b143f094f7b84c9e6aa9a6a
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    SPREAD = 3 # blocks
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
-    IDENTIFIER = 0x1ae3479e4eb6700a
+    IDENTIFIER = '1ae3479e4eb6700a'.decode('hex')
     PREFIX = 'd19778c812754854'.decode('hex')
     ADDRS_TABLE = 'addrs_testnet'
     P2P_PORT = 19333
