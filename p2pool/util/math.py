@@ -29,3 +29,9 @@ def clip(x, (low, high)):
         return high
     else:
         return x
+
+def nth(i, n=0):
+    i = iter(i)
+    for _ in xrange(n):
+        i.next()
+    return i.next()

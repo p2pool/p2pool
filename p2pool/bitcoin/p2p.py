@@ -35,6 +35,13 @@ class BaseProtocol(protocol.Protocol):
             
             payload = yield length
             
+            if self.compress:
+                try:
+                    payload = zlib.decompress(payload)
+                except:
+                    print 'FAILURE DECOMPRESSING'
+                    continue
+            
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
                     print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
@@ -69,20 +76,21 @@ class BaseProtocol(protocol.Protocol):
                 traceback.print_exc()
                 continue
     
-    def sendPacket(self, command, payload2={}):
+    def sendPacket(self, command, payload2):
+        if len(command) >= 12:
+            raise ValueError('command too long')
         type_ = getattr(self, "message_" + command, None)
         if type_ is None:
             raise ValueError('invalid command')
         payload = type_.pack(payload2)
-        if len(command) >= 12:
-            raise ValueError('command too long')
         if self.use_checksum:
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
         else:
             checksum = ''
+        if self.compress:
+            payload = zlib.compress(payload)
         data = self._prefix + struct.pack('<12sI', command, len(payload)) + checksum + payload
         self.transport.write(data)
-        #print 'SEND', command, payload2
     
     def __getattr__(self, attr):
         prefix = 'send_'
@@ -98,6 +106,7 @@ class Protocol(BaseProtocol):
     
     version = 0
     
+    compress = False
     @property
     def use_checksum(self):
         return self.version >= 209

@@ -25,6 +25,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._prefix = self.node.net.PREFIX
     
     use_checksum = True
+    compress = True
     
     other_version = None
     node_var_watch = None

@@ -203,7 +203,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         share = dict(target=target2)
     
     dest_weights = {}
-    for share in itertools.chain([fake_share], itertools.islice(tracker.get_chain(previous_share_hash), net.CHAIN_LENGTH)):
+    for i, share in enumerate(itertools.chain([fake_share], itertools.islice(tracker.get_chain(previous_share_hash), net.CHAIN_LENGTH))):
         weight = bitcoin_data.target_to_average_attempts(share.share['target'])
         weight = max(weight, attempts_to_block - total_weight)
         
@@ -212,6 +212,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         
         if total_weight == attempts_to_block:
             break
+    assert total_weight == attempts_to_block or i == net.CHAIN_LENGTH + 1
     
     amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200 # prevent fake previous p2pool blocks
@@ -243,13 +244,15 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
 
 
 class Tracker(object):
-    def __init__(self):
+    def __init__(self, net):
+        self.net = net
+        
         self.shares = {} # hash -> share
         self.reverse_shares = {} # previous_share_hash -> share_hash
         
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
-        self.heights = {} # share hash -> height, to_share_hash
+        self.heights = {} # share_hash -> height_to, other_share_hash
     
     def add_share(self, share):
         if share.hash in self.shares:
@@ -335,8 +338,9 @@ if __name__ == '__main__':
         print share_hash, t.get_height_and_last(share_hash)
 
 class OkayTracker(Tracker):
-    def __init__(self):
-        Tracker.__init__(self)
+    def __init__(self, net):
+        Tracker.__init__(self, net)
+    """
         self.okay_cache = {} # hash -> height
     
     def is_okay(self, start, _height_after=0):
@@ -364,15 +368,32 @@ class OkayTracker(Tracker):
         # picking up last share from for loop, ew
         self.okay_cache.add(share)
         return validate(share, to_end_rev[::-1])
-    
-    def accept_share(self, share):
-        self.add_share(share)
-        
+    """
+    def think(self):
+        desired = set()
         for head in self.heads:
             height, last = self.get_height(head)
-            if last is None or height >= 2*self.net.CHAIN_LENGTH:
+            if last is not None and height < 2*self.net.CHAIN_LENGTH:
+                desired.add(last)
+                continue
+            first_to_verify = math.nth(self.get_chain(head), self.net.CHAIN_LENGTH - 1)
+            to_verify = []
+            for share_hash in self.get_chain(head):
+                if share_hash not in self.verified:
+                    to_verify.append(share_hash)
+            for share_hash in reversed(to_verify):
+                try:
+                    share.check(self, self.net)
+                except:
+                    print
+                    print "Share check failed:"
+                    traceback.print_exc()
+                    print
+                    break
+            else:
                 a
-                a
+        return desired
+
 class Chain(object):
     def __init__(self):
         pass
