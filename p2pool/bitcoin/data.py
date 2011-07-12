@@ -5,7 +5,7 @@ import hashlib
 import warnings
 
 from . import base58
-from p2pool.util import bases, expiring_dict, math
+from p2pool.util import bases, math
 
 class EarlyEnd(Exception):
     pass
@@ -65,7 +65,7 @@ class Type(object):
         data = self._pack(obj)
         
         assert self._unpack(data) == obj
-                
+        
         return data
     
     
@@ -74,7 +74,7 @@ class Type(object):
     
     def unpack_base58(self, base58_data):
         return self.unpack(base58.base58_decode(base58_data))
-        
+    
     
     def hash160(self, obj):
         return ShortHashType().unpack(hashlib.new('ripemd160', hashlib.sha256(self.pack(obj)).digest()).digest())
@@ -278,7 +278,7 @@ class FloatingIntegerType(Type):
     
     def truncate_to(self, x):
         return self._bits_to_target(self._target_to_bits(x, _check=False))
-        
+    
     def _bits_to_target(self, bits2):
         target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
         assert target == self._bits_to_target1(struct.pack("<I", bits2))
@@ -289,7 +289,7 @@ class FloatingIntegerType(Type):
         bits = bits[::-1]
         length = ord(bits[0])
         return bases.string_to_natural((bits[1:] + "\0"*length)[:length])
-
+    
     def _target_to_bits(self, target, _check=True):
         n = bases.natural_to_string(target)
         if n and ord(n[0]) >= 128:

@@ -200,7 +200,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     previous_share2 = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
     #previous_share2 = chain.shares
     #previous_shares
-    #shares = 
+    #shares =
     #shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [new_script, new_script]
     
     lookbehind = 120
@@ -307,7 +307,7 @@ class OkayTracker(bitcoin_data.Tracker):
         Returns:
             {'result': 'okay', verified_height: ...} # if share has an okay parent or if share has CHAIN_LENGTH children and CHAIN_LENTH parents that it verified with
             {'result': 'needs_share', 'share_hash': ...} # if share doesn't have CHAIN_LENGTH parents
-            #{'result': 'needs_share_shares', 'share_hash': ...} # if share has CHAIN_LENGTH children and needs its shares to 
+            #{'result': 'needs_share_shares', 'share_hash': ...} # if share has CHAIN_LENGTH children and needs its shares to
             {'result': 'not_okay'} # if the share has a not okay parent or if the share has an okay parent and failed validation
         '''
         

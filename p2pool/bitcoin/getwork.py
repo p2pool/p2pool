@@ -4,8 +4,6 @@ Representation of a getwork request/reply
 
 from __future__ import division
 
-import struct
-
 from . import data as bitcoin_data
 from . import sha256
 

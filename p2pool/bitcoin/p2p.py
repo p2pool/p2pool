@@ -209,7 +209,7 @@ class Protocol(BaseProtocol):
         ('id', bitcoin_data.HashType()),
         ('order', bitcoin_data.FixedStrType(60)), # XXX
     ])
-
+    
     message_addr = bitcoin_data.ComposedType([
         ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
             ('timestamp', bitcoin_data.StructType('<I')),
@@ -251,11 +251,11 @@ class Protocol(BaseProtocol):
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))
         self.submit_order.got_response(hash, dict(reply=reply, script=script))
-
+    
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
         pass
-
+    
     message_alert = bitcoin_data.ComposedType([
         ('message', bitcoin_data.VarStrType()),
         ('signature', bitcoin_data.VarStrType()),
