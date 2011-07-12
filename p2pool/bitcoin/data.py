@@ -32,11 +32,10 @@ class Type(object):
     #    return self.__dict__ == other.__dict__
     
     def _unpack(self, data):
-        f = StringIO.StringIO(data)
-        
         obj, (data2, pos) = self.read((data, 0))
         
         assert data2 is data
+        
         if pos != len(data):
             raise LateEnd('underread ' + repr((self, data)))
         
@@ -53,16 +52,17 @@ class Type(object):
         return obj
     
     def _pack(self, obj):
-        f = StringIO.StringIO()
+        f = []
         
         self.write(f, obj)
         
-        data = f.getvalue()
+        data = ''.join(f)
         
         return data
     
     def pack(self, obj):
         data = self._pack(obj)
+        
         assert self._unpack(data) == obj
                 
         return data
@@ -101,13 +101,13 @@ class VarIntType(Type):
     
     def write(self, file, item):
         if item < 0xfd:
-            file.write(struct.pack('<B', item))
+            file.append(struct.pack('<B', item))
         elif item <= 0xffff:
-            file.write(struct.pack('<BH', 0xfd, item))
+            file.append(struct.pack('<BH', 0xfd, item))
         elif item <= 0xffffffff:
-            file.write(struct.pack('<BI', 0xfe, item))
+            file.append(struct.pack('<BI', 0xfe, item))
         elif item <= 0xffffffffffffffff:
-            file.write(struct.pack('<BQ', 0xff, item))
+            file.append(struct.pack('<BQ', 0xff, item))
         else:
             raise ValueError('int too large for varint')
 
@@ -120,7 +120,7 @@ class VarStrType(Type):
     
     def write(self, file, item):
         self._inner_size.write(file, len(item))
-        file.write(item)
+        file.append(item)
 
 class FixedStrType(Type):
     def __init__(self, length):
@@ -132,7 +132,7 @@ class FixedStrType(Type):
     def write(self, file, item):
         if len(item) != self.length:
             raise ValueError('incorrect length!')
-        file.write(item)
+        file.append(item)
 
 class EnumType(Type):
     def __init__(self, inner, values):
@@ -162,7 +162,7 @@ class HashType(Type):
             raise ValueError("invalid hash value")
         if item != 0 and item < 2**160:
             warnings.warn("very low hash value - maybe you meant to use ShortHashType? %x" % (item,))
-        file.write(('%064x' % (item,)).decode('hex')[::-1])
+        file.append(('%064x' % (item,)).decode('hex')[::-1])
 
 class ShortHashType(Type):
     def read(self, file):
@@ -172,7 +172,7 @@ class ShortHashType(Type):
     def write(self, file, item):
         if item >= 2**160:
             raise ValueError("invalid hash value")
-        file.write(('%040x' % (item,)).decode('hex')[::-1])
+        file.append(('%040x' % (item,)).decode('hex')[::-1])
 
 class ListType(Type):
     _inner_size = VarIntType()
@@ -217,7 +217,7 @@ class StructType(Type):
         if struct.unpack(self.desc, data)[0] != item:
             # special test because struct doesn't error on some overflows
             raise ValueError("item didn't survive pack cycle (%r)" % (item,))
-        file.write(data)
+        file.append(data)
 
 class IPV6AddressType(Type):
     def read(self, file):
@@ -232,7 +232,7 @@ class IPV6AddressType(Type):
             raise ValueError("invalid address: %r" % (bits,))
         data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
         assert len(data) == 16, len(data)
-        file.write(data)
+        file.append(data)
 
 class ComposedType(Type):
     def __init__(self, fields):
@@ -263,8 +263,8 @@ class ChecksummedType(Type):
     
     def write(self, file, item):
         data = self.inner.pack(item)
-        file.write(data)
-        file.write(hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4])
+        file.append(data)
+        file.append(hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4])
 
 class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
