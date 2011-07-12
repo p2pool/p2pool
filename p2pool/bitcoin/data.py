@@ -1,7 +1,6 @@
 from __future__ import division
 
 import struct
-import cStringIO as StringIO
 import hashlib
 import warnings
 
@@ -37,9 +36,20 @@ class Type(object):
         assert data2 is data
         
         if pos != len(data):
-            raise LateEnd('underread ' + repr((self, data)))
+            raise LateEnd()
         
         return obj
+    
+    def _pack(self, obj):
+        f = self.write(None, obj)
+        
+        res = []
+        while f is not None:
+            res.append(f[1])
+            f = f[0]
+        res.reverse()
+        return ''.join(res)
+    
     
     def unpack(self, data):
         obj = self._unpack(data)
@@ -50,15 +60,6 @@ class Type(object):
                 assert self._unpack(data2) == obj
         
         return obj
-    
-    def _pack(self, obj):
-        f = []
-        
-        self.write(f, obj)
-        
-        data = ''.join(f)
-        
-        return data
     
     def pack(self, obj):
         data = self._pack(obj)
@@ -101,15 +102,16 @@ class VarIntType(Type):
     
     def write(self, file, item):
         if item < 0xfd:
-            file.append(struct.pack('<B', item))
+            file = file, struct.pack('<B', item)
         elif item <= 0xffff:
-            file.append(struct.pack('<BH', 0xfd, item))
+            file = file, struct.pack('<BH', 0xfd, item)
         elif item <= 0xffffffff:
-            file.append(struct.pack('<BI', 0xfe, item))
+            file = file, struct.pack('<BI', 0xfe, item)
         elif item <= 0xffffffffffffffff:
-            file.append(struct.pack('<BQ', 0xff, item))
+            file = file, struct.pack('<BQ', 0xff, item)
         else:
             raise ValueError('int too large for varint')
+        return file
 
 class VarStrType(Type):
     _inner_size = VarIntType()
@@ -119,8 +121,8 @@ class VarStrType(Type):
         return read(file, length)
     
     def write(self, file, item):
-        self._inner_size.write(file, len(item))
-        file.append(item)
+        file = self._inner_size.write(file, len(item))
+        return file, item
 
 class FixedStrType(Type):
     def __init__(self, length):
@@ -132,7 +134,7 @@ class FixedStrType(Type):
     def write(self, file, item):
         if len(item) != self.length:
             raise ValueError('incorrect length!')
-        file.append(item)
+        return file, item
 
 class EnumType(Type):
     def __init__(self, inner, values):
@@ -150,7 +152,7 @@ class EnumType(Type):
         return self.keys[data], file
     
     def write(self, file, item):
-        self.inner.write(file, self.values[item])
+        return self.inner.write(file, self.values[item])
 
 class HashType(Type):
     def read(self, file):
@@ -162,7 +164,7 @@ class HashType(Type):
             raise ValueError("invalid hash value")
         if item != 0 and item < 2**160:
             warnings.warn("very low hash value - maybe you meant to use ShortHashType? %x" % (item,))
-        file.append(('%064x' % (item,)).decode('hex')[::-1])
+        return file, ('%064x' % (item,)).decode('hex')[::-1]
 
 class ShortHashType(Type):
     def read(self, file):
@@ -172,7 +174,7 @@ class ShortHashType(Type):
     def write(self, file, item):
         if item >= 2**160:
             raise ValueError("invalid hash value")
-        file.append(('%040x' % (item,)).decode('hex')[::-1])
+        return file, ('%040x' % (item,)).decode('hex')[::-1]
 
 class ListType(Type):
     _inner_size = VarIntType()
@@ -189,9 +191,10 @@ class ListType(Type):
         return res, file
     
     def write(self, file, item):
-        self._inner_size.write(file, len(item))
+        file = self._inner_size.write(file, len(item))
         for subitem in item:
-            self.type.write(file, subitem)
+            file = self.type.write(file, subitem)
+        return file
 
 class FastLittleEndianUnsignedInteger(Type):
     def read(self, file):
@@ -200,7 +203,7 @@ class FastLittleEndianUnsignedInteger(Type):
         return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24), file
     
     def write(self, file, item):
-        StructType("<I").write(file, item)
+        return StructType("<I").write(file, item)
 
 class StructType(Type):
     def __init__(self, desc):
@@ -217,7 +220,7 @@ class StructType(Type):
         if struct.unpack(self.desc, data)[0] != item:
             # special test because struct doesn't error on some overflows
             raise ValueError("item didn't survive pack cycle (%r)" % (item,))
-        file.append(data)
+        return file, data
 
 class IPV6AddressType(Type):
     def read(self, file):
@@ -232,7 +235,7 @@ class IPV6AddressType(Type):
             raise ValueError("invalid address: %r" % (bits,))
         data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
         assert len(data) == 16, len(data)
-        file.append(data)
+        return file, data
 
 class ComposedType(Type):
     def __init__(self, fields):
@@ -246,7 +249,8 @@ class ComposedType(Type):
     
     def write(self, file, item):
         for key, type_ in self.fields:
-            type_.write(file, item[key])
+            file = type_.write(file, item[key])
+        return file
 
 class ChecksummedType(Type):
     def __init__(self, inner):
@@ -263,8 +267,8 @@ class ChecksummedType(Type):
     
     def write(self, file, item):
         data = self.inner.pack(item)
-        file.append(data)
-        file.append(hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4])
+        file = file, data
+        return file, hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
 
 class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
@@ -281,7 +285,7 @@ class FloatingIntegerType(Type):
         return target, file
     
     def write(self, file, item):
-        self._inner.write(file, self._target_to_bits(item))
+        return self._inner.write(file, self._target_to_bits(item))
     
     def truncate_to(self, x):
         return self._bits_to_target(self._target_to_bits(x, _check=False))
@@ -320,7 +324,7 @@ class PossiblyNone(Type):
     def write(self, file, item):
         if item == self.none_value:
             raise ValueError("none_value used")
-        self.inner.write(file, self.none_value if item is None else item)
+        return self.inner.write(file, self.none_value if item is None else item)
 
 address_type = ComposedType([
     ('services', StructType('<Q')),
