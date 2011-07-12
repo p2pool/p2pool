@@ -10,7 +10,7 @@ import struct
 import time
 import traceback
 
-from twisted.internet import protocol, reactor
+from twisted.internet import defer, protocol, reactor
 
 from . import data as bitcoin_data
 from p2pool.util import variable, datachunker, deferral
@@ -230,7 +230,9 @@ class Protocol(BaseProtocol):
         ('block', bitcoin_data.block_type),
     ])
     def handle_block(self, block):
-        self.get_block.got_response(bitcoin_data.block_header_type.hash256(block['header']), block)
+        block_hash = bitcoin_data.block_header_type.hash256(block['header'])
+        self.get_block.got_response(block_hash, block)
+        self.get_block_header.got_response(block_hash, block['header'])
     
     message_headers = bitcoin_data.ComposedType([
         ('headers', bitcoin_data.ListType(bitcoin_data.block_type)),
@@ -238,8 +240,8 @@ class Protocol(BaseProtocol):
     def handle_headers(self, headers):
         for header in headers:
             header = header['header']
-            print header
             self.get_block_header.got_response(bitcoin_data.block_header_type.hash256(header), header)
+        self.factory.new_headers.happened([header['header'] for header in headers])
     
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
@@ -276,6 +278,7 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         
         self.new_block = variable.Event()
         self.new_tx = variable.Event()
+        self.new_headers = variable.Event()
     
     def buildProtocol(self, addr):
         p = self.protocol(self.net)
@@ -288,14 +291,112 @@ class ClientFactory(protocol.ReconnectingClientFactory):
     def getProtocol(self):
         return self.conn.get_not_none()
 
-if __name__ == '__main__':
-    factory = ClientFactory()
-    reactor.connectTCP('127.0.0.1', 8333, factory)
+class HeaderWrapper(object):
+    def __init__(self, header):
+        self.hash = bitcoin_data.block_header_type.hash256(header)
+        self.previous_hash = header['previous_block']
 
+class HeightTracker(object):
+    '''Point this at a factory and let it take care of getting block heights'''
+    # XXX think keeps object alive
+    
+    def __init__(self, factory):
+        self.factory = factory
+        self.tracker = bitcoin_data.Tracker()
+        self.most_recent = None
+        
+        self.factory.new_headers.watch(self.heard_headers)
+        
+        self.think()
+    
+    @defer.inlineCallbacks
+    def think(self):
+        last = None
+        yield self.factory.getProtocol()
+        while True:
+            highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
+            it = self.tracker.get_chain_known(highest_head)
+            have = []
+            step = 1
+            try:
+                cur = it.next()
+            except StopIteration:
+                cur = None
+            while True:
+                if cur is None:
+                    break
+                have.append(cur.hash)
+                for i in xrange(step): # XXX inefficient
+                    try:
+                        cur = it.next()
+                    except StopIteration:
+                        break
+                else:
+                    if len(have) > 10:
+                        step *= 2
+                    continue
+                break
+            chain = list(self.tracker.get_chain_known(highest_head))
+            if chain:
+                have.append(chain[-1].hash)
+            if not have:
+                have.append(0)
+            if have == last:
+                yield deferral.sleep(1)
+                last = None
+                continue
+            
+            last = have
+            good_tails = [x for x in self.tracker.tails if x is not None]
+            self.request(have, random.choice(good_tails) if good_tails else None)
+            for tail in self.tracker.tails:
+                if tail is None:
+                    continue
+                self.request([], tail)
+            try:
+                yield self.factory.new_headers.get_deferred(timeout=1)
+            except defer.TimeoutError:
+                pass
+    
+    def heard_headers(self, headers):
+        header2s = map(HeaderWrapper, headers)
+        for header2 in header2s:
+            self.tracker.add(header2)
+        if header2s:
+            if self.tracker.get_height_and_last(header2s[-1].hash)[1] is None:
+                self.most_recent = header2s[-1].hash
+                if random.random() < .6:
+                    self.request([header2s[-1].hash], None)
+        print len(self.tracker.shares)
+    
+    def request(self, have, last):
+        #print "REQ", ('[' + ', '.join(map(hex, have)) + ']', hex(last) if last is not None else None)
+        if self.factory.conn.value is not None:
+            self.factory.conn.value.send_getheaders(version=1, have=have, last=last)
+    
+    #@defer.inlineCallbacks
+    #XXX should defer
+    def getHeight(self, block_hash):
+        height, last = self.tracker.get_height_and_last(block_hash)
+        if last is not None:
+            self.request([], last)
+            #raise ValueError(last)
+        return height, last
+
+if __name__ == '__main__':
+    factory = ClientFactory(bitcoin_data.Mainnet)
+    reactor.connectTCP('127.0.0.1', 8333, factory)
+    h = HeightTracker(factory)
+    
     @repr
     @apply
     @defer.inlineCallbacks
     def think():
-        (yield factory.getProtocol())
+        while True:
+            yield deferral.sleep(1)
+            try:
+                print h.getHeight(0xa285c3cb2a90ac7194cca034512748289e2526d9d7ae6ee7523)
+            except Exception, e:
+                traceback.print_exc()
     
     reactor.run()

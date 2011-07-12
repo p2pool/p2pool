@@ -1,6 +1,7 @@
 import itertools
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
+from twisted.python import failure
 
 class Event(object):
     def __init__(self):
@@ -31,9 +32,16 @@ class Event(object):
         for func in one_time_observers.itervalues():
             func(event)
     
-    def get_deferred(self):
+    def get_deferred(self, timeout=None):
         df = defer.Deferred()
-        self.watch_one_time(df.callback)
+        id1 = self.watch_one_time(df.callback)
+        if timeout is not None:
+            def do_timeout():
+                df.errback(failure.Failure(defer.TimeoutError()))
+                self.unwatch_one_time(id1)
+                self.unwatch_one_time(x)
+            delay = reactor.callLater(timeout, do_timeout)
+            x = self.watch_one_time(lambda value: delay.cancel())
         return df
 
 class Variable(object):

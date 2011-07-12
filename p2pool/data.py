@@ -11,17 +11,17 @@ class CompressedList(bitcoin_data.Type):
         self.inner = inner
     
     def read(self, file):
-        values = bitcoin_data.ListType(self.inner).read(file)
+        values, file = bitcoin_data.ListType(self.inner).read(file)
         if values != sorted(set(values)):
             raise ValueError("invalid values")
-        references = bitcoin_data.ListType(bitcoin_data.VarIntType()).read(file)
-        return [values[reference] for reference in references]
+        references, file = bitcoin_data.ListType(bitcoin_data.VarIntType()).read(file)
+        return [values[reference] for reference in references], file
     
     def write(self, file, item):
         values = sorted(set(item))
         values_map = dict((value, i) for i, value in enumerate(values))
-        bitcoin_data.ListType(self.inner).write(file, values)
-        bitcoin_data.ListType(bitcoin_data.VarIntType()).write(file, [values_map[subitem] for subitem in item])
+        file = bitcoin_data.ListType(self.inner).write(file, values)
+        return bitcoin_data.ListType(bitcoin_data.VarIntType()).write(file, [values_map[subitem] for subitem in item])
 
 
 merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
@@ -140,7 +140,7 @@ class Share(object):
         self.new_script = self.share_info['new_script']
         self.subsidy = self.share_info['subsidy']
         
-        self.previous_share_hash = self.share_data['previous_share_hash']
+        self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
         self.previous_shares_hash = self.share_data['previous_shares_hash']
         self.target2 = self.share_data['target2']
         
@@ -270,94 +270,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     )
 
 
-class Tracker(object):
-    def __init__(self):        
-        self.shares = {} # hash -> share
-        self.reverse_shares = {} # previous_share_hash -> set of share_hashes
-        
-        self.heads = {} # head hash -> tail_hash
-        self.tails = {} # tail hash -> set of head hashes
-        self.heights = {} # share_hash -> height_to, other_share_hash
-    
-    def add_share(self, share):
-        if share.hash in self.shares:
-            return # XXX raise exception?
-        
-        self.shares[share.hash] = share
-        self.reverse_shares.setdefault(share.previous_share_hash, set()).add(share.hash)
-        
-        if share.hash in self.tails:
-            heads = self.tails.pop(share.hash)
-        else:
-            heads = set([share.hash])
-        
-        if share.previous_share_hash in self.heads:
-            tail = self.heads.pop(share.previous_share_hash)
-        else:
-            tail = share.previous_share_hash
-        
-        self.tails.setdefault(tail, set()).update(heads)
-        if share.previous_share_hash in self.tails[tail]:
-            self.tails[tail].remove(share.previous_share_hash)
-        
-        for head in heads:
-            self.heads[head] = tail
-    
-    def get_height_and_last(self, share_hash):
-        orig = share_hash
-        height = 0
-        updates = []
-        while True:
-            if share_hash is None or share_hash not in self.shares:
-                break
-            updates.append((share_hash, height))
-            if share_hash in self.heights:
-                height_inc, share_hash = self.heights[share_hash]
-            else:
-                height_inc, share_hash = 1, self.shares[share_hash].previous_share_hash
-            height += height_inc
-        for update_hash, height_then in updates:
-            self.heights[update_hash] = height - height_then, share_hash
-        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
-        return height, share_hash
-    
-    def get_height_and_last2(self, share_hash):
-        height = 0
-        while True:
-            if share_hash not in self.shares:
-                break
-            share_hash = self.shares[share_hash].previous_share_hash
-            height += 1
-        return height, share_hash
-    
-    def get_chain_known(self, share_hash):
-        while True:
-            if share_hash not in self.shares:
-                break
-            yield share_hash
-            share_hash = self.shares[share_hash].previous_share_hash
-    
-    def get_chain_to_root(self, start):
-        share_hash_to_get = start
-        while share_hash_to_get is not None:
-            share = self.shares[share_hash_to_get]
-            yield share
-            share_hash_to_get = share.previous_share_hash
-    
-    
-    def get_best_share_hash(self):
-        return None
-        return max(self.heads, key=self.score_chain)
-    '''
-    def score_chain(self, start):
-        length = len(self.get_chain(start))
-        
-        score = 0
-        for share in itertools.islice(self.get_chain(start), self.net.CHAIN_LENGTH):
-            score += a
-        
-        return (min(length, 1000), score)
-    '''
+
 
 if __name__ == '__main__':
     class FakeShare(object):
@@ -381,11 +294,11 @@ if __name__ == '__main__':
     for share_hash in t.shares:
         print share_hash, t.get_height_and_last(share_hash)
 
-class OkayTracker(Tracker):
+class OkayTracker(bitcoin_data.Tracker):
     def __init__(self, net):
-        Tracker.__init__(self)
+        bitcoin_data.Tracker.__init__(self)
         self.net = net
-        self.verified = Tracker()
+        self.verified = bitcoin_data.Tracker()
     """
         self.okay_cache = {} # hash -> height
     
@@ -423,12 +336,14 @@ class OkayTracker(Tracker):
         # if no successful verification because of lack of parents, request parent
         for head in self.heads:
             head_height, last = self.get_height_and_last(head)
-            if head_height < a and last is not None:
+            if head_height < self.net.CHAIN_LENGTH and last is not None:
                 # request more
+                pass
             
             for share in itertools.islice(self.get_chain_known(head), None if last is None else head_height - self.net.CHAIN_LENGTH): # XXX change length for None
-                in share in self.verified.shares:
+                if share.hash in self.verified.shares:
                     break
+                print share
                 try:
                     share.check(self, self.net)
                 except:
@@ -437,20 +352,22 @@ class OkayTracker(Tracker):
                     traceback.print_exc()
                     print
                 else:
-                    self.verified.add_share(share_hash)
+                    self.verified.add(share)
                     break
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in self.verified.heads:
             head_height, last = self.verified.get_height_and_last(head)
-            a
+            if head_height < self.net.CHAIN_LENGTH and last is not None:
+                desired.add(last)
         
         # decide best verified head
         def score(share_hash):
             share = self.verified.shares[share_hash]
             head_height, last = self.verified.get_height_and_last(share)
-            return (min(head_height, net.CHAIN_LENGTH), RECENTNESS)
-        best = max(self.verified.heads, key=score)
+            RECENTNESS = 0
+            return (min(head_height, self.net.CHAIN_LENGTH), RECENTNESS)
+        best = max(self.verified.heads, key=score) if self.verified.heads else None
         
         return best, desired
 

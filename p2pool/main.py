@@ -198,6 +198,8 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
+            best, desired = tracker.think()
+            # XXX desired?
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -205,7 +207,7 @@ def main(args):
                 
                 height=height + 1,
                 
-                best_share_hash=tracker.get_best_share_hash(),
+                best_share_hash=best,
             ))
             current_work2.set(dict(
                 timestamp=work.timestamp,
@@ -236,7 +238,7 @@ def main(args):
             
             print "Received share %x" % (share.hash,)
             
-            tracker.add_share(share)
+            tracker.add(share)
             best, desired = tracker.think()
             for peer2, share_hash in desired:
                 peer2.get_shares([share_hash])
@@ -340,9 +342,7 @@ def main(args):
         # send share when the chain changes to their chain
         def work_changed(new_work):
             #print 'Work changed:', new_work
-            for share_hash in tracker.get_chain_known(new_work['best_share_hash']):
-                if share_hash is None: continue
-                share = tracker.shares[share_hash]
+            for share in tracker.get_chain_known(new_work['best_share_hash']):
                 if share.shared:
                     break
                 share_share(share)

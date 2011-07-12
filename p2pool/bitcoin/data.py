@@ -391,6 +391,100 @@ def address_to_pubkey_hash(address, net):
         raise ValueError('address not for this net!')
     return x['pubkey_hash']
 
+# linked list tracker
+
+class Tracker(object):
+    def __init__(self):
+        self.shares = {} # hash -> share
+        self.reverse_shares = {} # previous_hash -> set of share_hashes
+        
+        self.heads = {} # head hash -> tail_hash
+        self.tails = {} # tail hash -> set of head hashes
+        self.heights = {} # share_hash -> height_to, other_share_hash
+    
+    def add(self, share):
+        if share.hash in self.shares:
+            return # XXX raise exception?
+        
+        self.shares[share.hash] = share
+        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
+        
+        if share.hash in self.tails:
+            heads = self.tails.pop(share.hash)
+        else:
+            heads = set([share.hash])
+        
+        if share.previous_hash in self.heads:
+            tail = self.heads.pop(share.previous_hash)
+        else:
+            tail = share.previous_hash
+        
+        self.tails.setdefault(tail, set()).update(heads)
+        if share.previous_hash in self.tails[tail]:
+            self.tails[tail].remove(share.previous_hash)
+        
+        for head in heads:
+            self.heads[head] = tail
+    
+    def get_height_and_last(self, share_hash):
+        orig = share_hash
+        height = 0
+        updates = []
+        while True:
+            if share_hash is None or share_hash not in self.shares:
+                break
+            updates.append((share_hash, height))
+            if share_hash in self.heights:
+                height_inc, share_hash = self.heights[share_hash]
+            else:
+                height_inc, share_hash = 1, self.shares[share_hash].previous_hash
+            height += height_inc
+        for update_hash, height_then in updates:
+            self.heights[update_hash] = height - height_then, share_hash
+        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
+        return height, share_hash
+    
+    def get_height_and_last2(self, share_hash):
+        height = 0
+        while True:
+            if share_hash not in self.shares:
+                break
+            share_hash = self.shares[share_hash].previous_hash
+            height += 1
+        return height, share_hash
+    
+    def get_chain_known(self, start_hash):
+        '''
+        Chain starting with item of hash I{start_hash} of items that this Tracker contains
+        '''
+        item_hash_to_get = start_hash
+        while True:
+            if item_hash_to_get not in self.shares:
+                break
+            share = self.shares[item_hash_to_get]
+            assert not isinstance(share, long)
+            yield share
+            item_hash_to_get = share.previous_hash
+    
+    def get_chain_to_root(self, start_hash, root=None):
+        '''
+        Chain of hashes starting with share_hash of shares to the root (doesn't include root)
+        Raises an error if one is missing
+        '''
+        share_hash_to_get = start_hash
+        while share_hash_to_get != root:
+            share = self.shares[share_hash_to_get]
+            yield share
+            share_hash_to_get = share.previous_hash
+    
+    def get_best_hash(self):
+        '''
+        Returns hash of item with the most items in its chain
+        '''
+        if not self.heads:
+            return None
+        return max(self.heads, key=self.get_height_and_last)
+
 # network definitions
 
 class Mainnet(object):
