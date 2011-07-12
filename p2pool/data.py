@@ -271,9 +271,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
 
 
 class Tracker(object):
-    def __init__(self, net):
-        self.net = net
-        
+    def __init__(self):        
         self.shares = {} # hash -> share
         self.reverse_shares = {} # previous_share_hash -> set of share_hashes
         
@@ -385,8 +383,9 @@ if __name__ == '__main__':
 
 class OkayTracker(Tracker):
     def __init__(self, net):
-        Tracker.__init__(self, net)
-        self.verified = set()
+        Tracker.__init__(self)
+        self.net = net
+        self.verified = Tracker()
     """
         self.okay_cache = {} # hash -> height
     
@@ -418,25 +417,18 @@ class OkayTracker(Tracker):
     """
     def think(self):
         desired = set()
-        best = None
-        best_score = 0
+        
+        # for each overall head, attempt verification
+        # if it fails, attempt on parent, and repeat
+        # if no successful verification because of lack of parents, request parent
         for head in self.heads:
-            height, last = self.get_height_and_last(head)
-            #if height > 1:#, self.shares[head]
-            if last is not None and height < 2*self.net.CHAIN_LENGTH:
-                desired.add((random.choice(self.reverse_shares[last]).peers, last)) # XXX
-                continue
-            #first_to_verify = math.nth(self.get_chain(head), self.net.CHAIN_LENGTH - 1)
-            to_verify = []
-            last_good_hash = None
-            for share_hash in self.get_chain_known(head):
-                if share_hash in self.verified:
-                    last_good = share_hash
+            head_height, last = self.get_height_and_last(head)
+            if head_height < a and last is not None:
+                # request more
+            
+            for share in itertools.islice(self.get_chain_known(head), None if last is None else head_height - self.net.CHAIN_LENGTH): # XXX change length for None
+                in share in self.verified.shares:
                     break
-                to_verify.append(share_hash)
-            # recheck for 2*chain_length
-            for share_hash in reversed(to_verify):
-                share = self.shares[share_hash]
                 try:
                     share.check(self, self.net)
                 except:
@@ -444,30 +436,23 @@ class OkayTracker(Tracker):
                     print "Share check failed:"
                     traceback.print_exc()
                     print
+                else:
+                    self.verified.add_share(share_hash)
                     break
-                self.verified.add(share_hash)
-                last_good_hash = share_hash
-            
-            new_height, last = self.get_height_and_last(last_good_hash)
-            
-            print head, height, last, new_height
-            score = new_height
-            
-            if score > best_score:
-                best = head
-                best_score = score
         
-        print "BEST", best
+        # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
+        for head in self.verified.heads:
+            head_height, last = self.verified.get_height_and_last(head)
+            a
+        
+        # decide best verified head
+        def score(share_hash):
+            share = self.verified.shares[share_hash]
+            head_height, last = self.verified.get_height_and_last(share)
+            return (min(head_height, net.CHAIN_LENGTH), RECENTNESS)
+        best = max(self.verified.heads, key=score)
+        
         return best, desired
-
-class Chain(object):
-    def __init__(self):
-        pass
-
-def get_chain_descriptor(tracker, start):
-    for item in tracker.get_chain(self.net.CHAIN_LENGTH):
-        a
-    pass
 
 
 class Mainnet(bitcoin_data.Mainnet):

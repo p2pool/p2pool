@@ -1,7 +1,7 @@
 from __future__ import division
 
 import struct
-import StringIO
+import cStringIO as StringIO
 import hashlib
 import warnings
 
@@ -38,9 +38,10 @@ class Type(object):
     def unpack(self, data):
         obj = self._unpack(data)
         
-        data2 = self._pack(obj)
-        if data2 != data:
-            assert self._unpack(data2) == obj
+        if __debug__:
+            data2 = self._pack(obj)
+            if data2 != data:
+                assert self._unpack(data2) == obj
         
         return obj
     
@@ -79,11 +80,17 @@ class VarIntType(Type):
         data = file.read(1)
         if len(data) != 1:
             raise EarlyEnd()
-        first, = struct.unpack('<B', data)
-        if first == 0xff: desc = '<Q'
-        elif first == 0xfe: desc = '<I'
-        elif first == 0xfd: desc = '<H'
-        else: return first
+        first = ord(data)
+        if first < 0xfd:
+            return first
+        elif first == 0xfd:
+            desc = '<H'
+        elif first == 0xfe:
+            desc = '<I'
+        elif first == 0xff:
+            desc = '<Q'
+        else:
+            raise AssertionError()
         length = struct.calcsize(desc)
         data = file.read(length)
         if len(data) != length:
@@ -103,15 +110,17 @@ class VarIntType(Type):
             raise ValueError('int too large for varint')
 
 class VarStrType(Type):
+    _inner_size = VarIntType()
+    
     def read(self, file):
-        length = VarIntType().read(file)
+        length = self._inner_size.read(file)
         res = file.read(length)
         if len(res) != length:
             raise EarlyEnd('var str not long enough %r' % ((length, len(res), res),))
         return res
     
     def write(self, file, item):
-        VarIntType().write(file, len(item))
+        self._inner_size.write(file, len(item))
         file.write(item)
 
 class FixedStrType(Type):
@@ -154,10 +163,10 @@ class HashType(Type):
         return int(data[::-1].encode('hex'), 16)
     
     def write(self, file, item):
-        if item >= 2**256:
+        if not 0 <= item < 2**256:
             raise ValueError("invalid hash value")
         if item != 0 and item < 2**160:
-            warnings.warn("very low hash value - maybe you meant to use ShortHashType?")
+            warnings.warn("very low hash value - maybe you meant to use ShortHashType? %x" % (item,))
         file.write(('%064x' % (item,)).decode('hex')[::-1])
 
 class ShortHashType(Type):
@@ -173,17 +182,27 @@ class ShortHashType(Type):
         file.write(('%040x' % (item,)).decode('hex')[::-1])
 
 class ListType(Type):
+    _inner_size = VarIntType()
+    
     def __init__(self, type):
         self.type = type
     
     def read(self, file):
-        length = VarIntType().read(file)
+        length = self._inner_size.read(file)
         return [self.type.read(file) for i in xrange(length)]
     
     def write(self, file, item):
-        VarIntType().write(file, len(item))
+        self._inner_size.write(file, len(item))
         for subitem in item:
             self.type.write(file, subitem)
+
+class FastLittleEndianUnsignedInteger(Type):
+    def read(self, file):
+        data = map(ord, file.read(4))
+        return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+    
+    def write(self, file, item):
+        StructType("<I").write(file, item)
 
 class StructType(Type):
     def __init__(self, desc):
@@ -256,47 +275,42 @@ class ChecksummedType(Type):
 class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
     # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
+    _inner = StructType("<I")
+    _inner = FastLittleEndianUnsignedInteger()
     
     def read(self, file):
-        data = FixedStrType(4).read(file)
-        target = self._bits_to_target(data)
-        if self._target_to_bits(target) != data:
-            raise ValueError("bits in non-canonical form")
+        bits = self._inner.read(file)
+        target = self._bits_to_target(bits)
+        if __debug__:
+            if self._target_to_bits(target) != bits:
+                raise ValueError("bits in non-canonical form")
         return target
     
     def write(self, file, item):
-        FixedStrType(4).write(file, self._target_to_bits(item))
+        self._inner.write(file, self._target_to_bits(item))
     
     def truncate_to(self, x):
         return self._bits_to_target(self._target_to_bits(x, _check=False))
         
-    def _bits_to_target(self, bits, _check=True):
-        assert len(bits) == 4, repr(bits)
-        target1 = self._bits_to_target1(bits)
-        target2 = self._bits_to_target2(bits)
-        if target1 != target2:
-            raise ValueError()
-        if _check:
-            if self._target_to_bits(target1, _check=False) != bits:
-                raise ValueError()
-        return target1
+    def _bits_to_target(self, bits2):
+        target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
+        assert target == self._bits_to_target1(struct.pack("<I", bits2))
+        assert self._target_to_bits(target, _check=False) == bits2
+        return target
     
     def _bits_to_target1(self, bits):
         bits = bits[::-1]
         length = ord(bits[0])
         return bases.string_to_natural((bits[1:] + "\0"*length)[:length])
 
-    def _bits_to_target2(self, bits):
-        bits = struct.unpack("<I", bits)[0]
-        return math.shift_left(bits & 0x00ffffff, 8 * ((bits >> 24) - 3))
-
     def _target_to_bits(self, target, _check=True):
         n = bases.natural_to_string(target)
         if n and ord(n[0]) >= 128:
             n = "\x00" + n
-        bits = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
+        bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
+        bits = struct.unpack("<I", bits2)[0]
         if _check:
-            if self._bits_to_target(bits, _check=False) != target:
+            if self._bits_to_target(bits) != target:
                 raise ValueError(repr((target, self._bits_to_target(bits, _check=False))))
         return bits
 

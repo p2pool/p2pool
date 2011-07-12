@@ -155,7 +155,9 @@ class Protocol(BaseProtocol):
     def handle_verack(self):
         self.version = self.version_after
         
-        # connection ready
+        self.ready()
+    
+    def ready(self):
         self.check_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
         self.submit_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
         self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
@@ -191,12 +193,12 @@ class Protocol(BaseProtocol):
     message_getblocks = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.HashType()),
+        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
     ])
     message_getheaders = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.HashType()),
+        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
     ])
     message_getaddr = bitcoin_data.ComposedType([])
     message_checkorder = bitcoin_data.ComposedType([
@@ -231,16 +233,18 @@ class Protocol(BaseProtocol):
         self.get_block.got_response(bitcoin_data.block_header_type.hash256(block['header']), block)
     
     message_headers = bitcoin_data.ComposedType([
-        ('headers', bitcoin_data.ListType(bitcoin_data.block_header_type)),
+        ('headers', bitcoin_data.ListType(bitcoin_data.block_type)),
     ])
     def handle_headers(self, headers):
         for header in headers:
-            self.get_block_header.got_response(bitcoin_data.block_hash(header), header)
+            header = header['header']
+            print header
+            self.get_block_header.got_response(bitcoin_data.block_header_type.hash256(header), header)
     
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
-        ('script', bitcoin_data.VarStrType()),
+        ('script', bitcoin_data.PossiblyNone("", bitcoin_data.VarStrType())),
     ])
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))

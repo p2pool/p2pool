@@ -18,9 +18,9 @@ def shuffled(x):
 
 def shift_left(n, m):
     # python: :(
-    if m < 0:
-        return n >> -m
-    return n << m
+    if m >= 0:
+        return n << m
+    return n >> -m
 
 def clip(x, (low, high)):
     if x < low:
