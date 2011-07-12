@@ -121,8 +121,7 @@ class VarStrType(Type):
         return read(file, length)
     
     def write(self, file, item):
-        file = self._inner_size.write(file, len(item))
-        return file, item
+        return self._inner_size.write(file, len(item)), item
 
 class FixedStrType(Type):
     def __init__(self, length):
@@ -133,7 +132,7 @@ class FixedStrType(Type):
     
     def write(self, file, item):
         if len(item) != self.length:
-            raise ValueError('incorrect length!')
+            raise ValueError('incorrect length item!')
         return file, item
 
 class EnumType(Type):
@@ -172,7 +171,7 @@ class ShortHashType(Type):
         return int(data[::-1].encode('hex'), 16), file
     
     def write(self, file, item):
-        if item >= 2**160:
+        if not 0 <= item < 2**160:
             raise ValueError("invalid hash value")
         return file, ('%040x' % (item,)).decode('hex')[::-1]
 
@@ -195,15 +194,6 @@ class ListType(Type):
         for subitem in item:
             file = self.type.write(file, subitem)
         return file
-
-class FastLittleEndianUnsignedInteger(Type):
-    def read(self, file):
-        data, file = read(file, 4)
-        data = map(ord, data)
-        return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24), file
-    
-    def write(self, file, item):
-        return StructType("<I").write(file, item)
 
 class StructType(Type):
     def __init__(self, desc):
@@ -274,7 +264,6 @@ class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
     # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
     _inner = StructType("<I")
-    _inner = FastLittleEndianUnsignedInteger()
     
     def read(self, file):
         bits, file = self._inner.read(file)
