@@ -477,9 +477,12 @@ def main(args):
         
         @defer.inlineCallbacks
         def new_tx(tx_hash):
-            assert isinstance(tx_hash, (int, long))
-            tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
-            tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
+            try:
+                assert isinstance(tx_hash, (int, long))
+                tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
+                tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
+            except:
+                traceback.print_exc()
         factory.new_tx.watch(new_tx)
         
         def new_block(block):

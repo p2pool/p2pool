@@ -224,7 +224,7 @@ class Protocol(BaseProtocol):
         ('tx', bitcoin_data.tx_type),
     ])
     def handle_tx(self, tx):
-        self.get_block.got_response(bitcoin_data.tx_type.hash256(tx), tx)
+        self.get_tx.got_response(bitcoin_data.tx_type.hash256(tx), tx)
     
     message_block = bitcoin_data.ComposedType([
         ('block', bitcoin_data.block_type),

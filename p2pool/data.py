@@ -215,7 +215,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         attempts_per_second = attempts//time
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**16 - 1))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**32 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
         print attempts_per_second//1000, "KHASH"
         print "TARGET", 2**256//target2, 2**256/pre_target
