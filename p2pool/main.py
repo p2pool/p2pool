@@ -185,7 +185,7 @@ def main(args):
         
         get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
         
-        tracker = p2pool.Tracker()
+        tracker = p2pool.OkayTracker(args.net)
         chains = expiring_dict.ExpiringDict(300)
         def get_chain(chain_id_data):
             return chains.setdefault(chain_id_data, Chain(chain_id_data))
@@ -194,8 +194,6 @@ def main(args):
         current_work = variable.Variable(None)
         # information affecting work that should not trigger a long-polling update
         current_work2 = variable.Variable(None)
-        
-        share_dbs = [db.SQLiteDict(sqlite3.connect(filename, isolation_level=None), 'shares') for filename in args.store_shares]
         
         @defer.inlineCallbacks
         def set_real_work():
@@ -207,7 +205,7 @@ def main(args):
                 
                 height=height + 1,
                 
-                highest_p2pool_share_hash=tracker.get_best_share_hash(),
+                best_share_hash=tracker.get_best_share_hash(),
             ))
             current_work2.set(dict(
                 timestamp=work.timestamp,
@@ -219,34 +217,36 @@ def main(args):
         
         # setup p2p logic and join p2pool network
         
-        def share_share2(share2, ignore_peer=None):
+        def share_share(share, ignore_peer=None):
             for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
-                peer.send_share(share2.share)
-            share2.flag_shared()
+                peer.send_share(share.share)
+            share.flag_shared()
         
         def p2p_share(share, peer=None):
             if share.hash <= share.header['target']:
                 print
                 print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
-                #print share.__dict__
                 print
                 if factory.conn is not None:
                     factory.conn.send_block(block=share.as_block())
                 else:
                     print 'No bitcoind connection! Erp!'
             
-            res = tracker.add_share(share)
+            print "Received share %x" % (share.hash,)
+            
+            tracker.add_share(share)
+            best, desired = tracker.think()
+            for peer2, share_hash in desired:
+                peer2.get_shares([share_hash])
+            
+            w = dict(current_work.value)
+            w['best_share_hash'] = best
+            current_work.set(w)
+            '''
             if res == 'good':
                 share2 = chain.share2s[share.hash]
-                
-                def save():
-                    hash_data = bitcoin.p2p.HashType().pack(share.hash)
-                    share1_data = p2pool.share1.pack(share.as_share1())
-                    for share_db in share_dbs:
-                        share_db[hash_data] = share1_data
-                reactor.callLater(1, save)
                 
                 if chain is current_work.value['current_chain']:
                     if share.hash == chain.highest.value:
@@ -270,8 +270,9 @@ def main(args):
                 raise ValueError('unknown result from chain.accept - %r' % (res,))
             
             w = dict(current_work.value)
-            w['highest_p2pool_share_hash'] = w['current_chain'].get_highest_share_hash()
+            w['best_share_hash'] = w['current_chain'].get_highest_share_hash()
             current_work.set(w)
+            '''
         
         def p2p_share_hash(chain_id_data, hash, peer):
             chain = get_chain(chain_id_data)
@@ -301,11 +302,10 @@ def main(args):
                     continue
                 peer.send_share(chain.share2s[share_hash].share, full=True) # doesn't have to be full ... but does that still guarantee ordering?
         
-        def p2p_get_shares(chain_id_data, hashes, peer):
-            chain = get_chain(chain_id_data)
-            for hash_ in hashes:
-                if hash_ in chain.share2s:
-                    peer.send_share(chain.share2s[hash_].share, full=True)
+        def p2p_get_shares(share_hashes, peer):
+            for share_hash in share_hashes:
+                if share_hash in tracker.shares:
+                    peer.send_share(chain.shares[share_hash], full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
@@ -340,6 +340,13 @@ def main(args):
         # send share when the chain changes to their chain
         def work_changed(new_work):
             #print 'Work changed:', new_work
+            for share_hash in tracker.get_chain_known(new_work['best_share_hash']):
+                if share_hash is None: continue
+                share = tracker.shares[share_hash]
+                if share.shared:
+                    break
+                share_share(share)
+            return
             chain = new_work['current_chain']
             if chain.highest.value is not None:
                 for share_hash in chain.get_down(chain.highest.value):
@@ -347,6 +354,7 @@ def main(args):
                     if not share2.shared:
                         print 'Sharing share of switched to chain. Hash:', share2.share.hash
                         share_share2(share2)
+            # XXX ???
             for hash, peers in chain.request_map.iteritems():
                 if hash not in chain.share2s:
                     random.choice(peers).send_getshares(hashes=[hash])
@@ -367,7 +375,7 @@ def main(args):
             extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
-                previous_share_hash=state['highest_p2pool_share_hash'],
+                previous_share_hash=state['best_share_hash'],
                 new_script=my_script,
                 subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=struct.pack("<Q", random.randrange(2**64)),
@@ -379,6 +387,7 @@ def main(args):
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['target'])
+            print "SENT", 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
             return ba.getwork(p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'])
         
         def got_response(data):
@@ -479,6 +488,10 @@ def main(args):
         
         print 'Started successfully!'
         print
+        
+        while True:
+            yield deferral.sleep(1)
+            set_real_work()
     except:
         print
         print 'Fatal error:'
@@ -492,9 +505,6 @@ def run():
     parser.add_argument('--testnet',
         help='use the testnet; make sure you change the ports too',
         action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
-    parser.add_argument('--store-shares', metavar='FILENAME',
-        help='write shares to a database (not needed for normal usage)',
-        type=str, action='append', default=[], dest='store_shares')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',

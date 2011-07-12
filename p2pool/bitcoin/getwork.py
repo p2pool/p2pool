@@ -21,7 +21,7 @@ class BlockAttempt(object):
         return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.target))
     
     def __repr__(self):
-        return '<BlockAttempt %s>' % (' '.join('%s=%s' % (k, hex(v))) for k, v in self.__dict__.iteritems())
+        return '<BlockAttempt %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
     
     def __eq__(self, other):
         if not isinstance(other, BlockAttempt):
@@ -36,8 +36,8 @@ class BlockAttempt(object):
     
     def getwork(self, target=None, _check=3):
         target2 = self.target if target is None else target
-        if target2 >= 2**256//2**32:
-            raise ValueError("target higher than standard maximum")
+        #if target2 >= 2**256//2**32:
+        #    raise ValueError("target higher than standard maximum")
         
         block_data = bitcoin_data.block_header_type.pack(dict(
             version=self.version,

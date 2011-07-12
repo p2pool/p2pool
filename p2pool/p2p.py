@@ -6,10 +6,10 @@ import traceback
 
 from twisted.internet import defer, protocol, reactor
 
-from bitcoin import p2p as bitcoin_p2p
-from bitcoin import data as bitcoin_data
+from p2pool.bitcoin import p2p as bitcoin_p2p
+from p2pool.bitcoin import data as bitcoin_data
 from p2pool import data as p2pool_data
-from util import deferral, variable, dicts
+from p2pool.util import deferral, variable, dicts
 
 # mode
 #     0: send hash first (high latency, low bandwidth)
@@ -213,7 +213,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool_data.Share(share1['header'], gentx=share1['gentx'])
+            share = p2pool_data.Share.from_share1a(share1a)
+            share.peer = self # XXX
             self.node.handle_share(share, self)
     
     message_share1bs = bitcoin_data.ComposedType([
@@ -226,7 +227,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
-            share = p2pool_data.Share(share2['header'], txs=share2['txs'])
+            share = p2pool_data.Share.from_share1b(share1b)
+            share.peer = self # XXX
             self.node.handle_share(share, self)
     
     def send_share(self, share, full=False):

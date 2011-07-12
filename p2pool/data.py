@@ -1,8 +1,10 @@
 from __future__ import division
 
 import itertools
+import traceback
 
-from bitcoin import data as bitcoin_data
+from p2pool.util import math
+from p2pool.bitcoin import data as bitcoin_data
 
 class CompressedList(bitcoin_data.Type):
     def __init__(self, inner):
@@ -97,16 +99,20 @@ def gentx_to_share_info(gentx):
         new_script=gentx['tx_outs'][-1]['script'],
     )
 
-def share_info_to_gentx(share_info, chain, net):
+def share_info_to_gentx(share_info, block_target, tracker, net):
     return generate_transaction(
-        previous_share2=chain.share2s[share_info['share_data']['previous_share_hash']],
-        nonce=share_info['share_data']['nonce'],
+        tracker=tracker,
+        previous_share_hash=share_info['share_data']['previous_share_hash'],
         new_script=share_info['new_script'],
         subsidy=share_info['subsidy'],
+        nonce=share_info['share_data']['nonce'],
+        block_target=block_target,
         net=net,
     )
 
 class Share(object):
+    peer = None
+    
     @classmethod
     def from_block(cls, block):
         return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
@@ -128,6 +134,8 @@ class Share(object):
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
         
+        self.timestamp = self.header['timestamp']
+        
         self.share_data = self.share_info['share_data']
         self.new_script = self.share_info['new_script']
         self.subsidy = self.share_info['subsidy']
@@ -139,7 +147,12 @@ class Share(object):
         self.hash = bitcoin_data.block_header_type.hash256(header)
         
         if self.hash > self.target2:
+            print "hash", hex(self.hash)
+            print "targ", hex(self.target2)
             raise ValueError('not enough work!')
+        
+        
+        self.shared = False
     
     def as_block(self):
         if self.txs is None:
@@ -154,7 +167,7 @@ class Share(object):
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def check(self, tracker, net):
-        gentx = share_info_to_gentx(self.share_info, tracker, net)
+        gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
         if self.merkle_branch is not None:
             if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
@@ -165,6 +178,12 @@ class Share(object):
                 raise ValueError("gentx doesn't match header via other_txs")
         
         return Share2(self)
+    
+    def flag_shared(self):
+        self.shared = True
+    
+    def __repr__(self):
+        return '<Share %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
 
 class Share2(object):
     '''Share with associated data'''
@@ -184,18 +203,27 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     #shares = 
     #shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [new_script, new_script]
     
-    chain = list(itertools.islice(tracker.get_chain(previous_share_hash), net.CHAIN_LENGTH))
-    if len(chain) < 100:
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**32 - 1)
+    lookbehind = 120
+    chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), lookbehind))
+    if len(chain) < lookbehind:
+        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**16 - 1)
     else:
-        attempts_per_second = sum(bitcoin_data.target_to_average_attempts(share.target) for share in itertools.islice(chain, 0, max(0, len(chain) - 1)))//(chain[0].timestamp - chain[-1].timestamp)
-        pre_target = 2**256*net.SHARE_PERIOD//attempts_per_second
-        pre_target2 = math.clip(pre_target, (previous_share2.target*9//10, previous_share2.target*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**32 - 1))
+        attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain)
+        time = chain[0].timestamp - chain[-1].timestamp
+        if time == 0:
+            time = 1
+        attempts_per_second = attempts//time
+        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
+        pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**16 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
+        print attempts_per_second//1000, "KHASH"
+        print "TARGET", 2**256//target2, 2**256/pre_target
+        print "ATT", bitcoin_data.target_to_average_attempts(target2)//1000
     
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
+    max_weight = net.SPREAD * attempts_to_block
     total_weight = 0
     
     class fake_share(object):
@@ -203,19 +231,18 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         share = dict(target=target2)
     
     dest_weights = {}
-    for i, share in enumerate(itertools.chain([fake_share], itertools.islice(tracker.get_chain(previous_share_hash), net.CHAIN_LENGTH))):
+    for i, share in enumerate(itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH))):
         weight = bitcoin_data.target_to_average_attempts(share.share['target'])
-        weight = max(weight, attempts_to_block - total_weight)
+        weight = max(weight, max_weight - total_weight)
         
         dest_weights[share.script] = dest_weights.get(share.script, 0) + weight
         total_weight += weight
         
-        if total_weight == attempts_to_block:
+        if total_weight == max_weight:
             break
-    assert total_weight == attempts_to_block or i == net.CHAIN_LENGTH + 1
     
     amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200 # prevent fake previous p2pool blocks
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
     dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
@@ -248,7 +275,7 @@ class Tracker(object):
         self.net = net
         
         self.shares = {} # hash -> share
-        self.reverse_shares = {} # previous_share_hash -> share_hash
+        self.reverse_shares = {} # previous_share_hash -> set of share_hashes
         
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
@@ -279,6 +306,7 @@ class Tracker(object):
             self.heads[head] = tail
     
     def get_height_and_last(self, share_hash):
+        orig = share_hash
         height = 0
         updates = []
         while True:
@@ -292,19 +320,37 @@ class Tracker(object):
             height += height_inc
         for update_hash, height_then in updates:
             self.heights[update_hash] = height - height_then, share_hash
+        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
         return height, share_hash
     
-    def get_chain(self, start):
+    def get_height_and_last2(self, share_hash):
+        height = 0
+        while True:
+            if share_hash not in self.shares:
+                break
+            share_hash = self.shares[share_hash].previous_share_hash
+            height += 1
+        return height, share_hash
+    
+    def get_chain_known(self, share_hash):
+        while True:
+            if share_hash not in self.shares:
+                break
+            yield share_hash
+            share_hash = self.shares[share_hash].previous_share_hash
+    
+    def get_chain_to_root(self, start):
         share_hash_to_get = start
-        while share_hash_to_get in self.shares:
+        while share_hash_to_get is not None:
             share = self.shares[share_hash_to_get]
             yield share
             share_hash_to_get = share.previous_share_hash
     
-    '''
-    def get_best_share_hash(self):
-        return max(self.heads, key=self.score_chain)
     
+    def get_best_share_hash(self):
+        return None
+        return max(self.heads, key=self.score_chain)
+    '''
     def score_chain(self, start):
         length = len(self.get_chain(start))
         
@@ -340,6 +386,7 @@ if __name__ == '__main__':
 class OkayTracker(Tracker):
     def __init__(self, net):
         Tracker.__init__(self, net)
+        self.verified = set()
     """
         self.okay_cache = {} # hash -> height
     
@@ -371,17 +418,25 @@ class OkayTracker(Tracker):
     """
     def think(self):
         desired = set()
+        best = None
+        best_score = 0
         for head in self.heads:
-            height, last = self.get_height(head)
+            height, last = self.get_height_and_last(head)
+            #if height > 1:#, self.shares[head]
             if last is not None and height < 2*self.net.CHAIN_LENGTH:
-                desired.add(last)
+                desired.add((random.choice(self.reverse_shares[last]).peers, last)) # XXX
                 continue
-            first_to_verify = math.nth(self.get_chain(head), self.net.CHAIN_LENGTH - 1)
+            #first_to_verify = math.nth(self.get_chain(head), self.net.CHAIN_LENGTH - 1)
             to_verify = []
-            for share_hash in self.get_chain(head):
-                if share_hash not in self.verified:
-                    to_verify.append(share_hash)
+            last_good_hash = None
+            for share_hash in self.get_chain_known(head):
+                if share_hash in self.verified:
+                    last_good = share_hash
+                    break
+                to_verify.append(share_hash)
+            # recheck for 2*chain_length
             for share_hash in reversed(to_verify):
+                share = self.shares[share_hash]
                 try:
                     share.check(self, self.net)
                 except:
@@ -390,9 +445,20 @@ class OkayTracker(Tracker):
                     traceback.print_exc()
                     print
                     break
-            else:
-                a
-        return desired
+                self.verified.add(share_hash)
+                last_good_hash = share_hash
+            
+            new_height, last = self.get_height_and_last(last_good_hash)
+            
+            print head, height, last, new_height
+            score = new_height
+            
+            if score > best_score:
+                best = head
+                best_score = score
+        
+        print "BEST", best
+        return best, desired
 
 class Chain(object):
     def __init__(self):
