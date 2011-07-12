@@ -14,6 +14,12 @@ class EarlyEnd(Exception):
 class LateEnd(Exception):
     pass
 
+def read((data, pos), length):
+    data2 = data[pos:pos + length]
+    if len(data2) != length:
+        raise EarlyEnd()
+    return data2, (data, pos + length)
+
 class Type(object):
     # the same data can have only one unpacked representation, but multiple packed binary representations
     
@@ -28,9 +34,10 @@ class Type(object):
     def _unpack(self, data):
         f = StringIO.StringIO(data)
         
-        obj = self.read(f)
+        obj, (data2, pos) = self.read((data, 0))
         
-        if f.tell() != len(data):
+        assert data2 is data
+        if pos != len(data):
             raise LateEnd('underread ' + repr((self, data)))
         
         return obj
@@ -77,25 +84,20 @@ class Type(object):
 class VarIntType(Type):
     # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
     def read(self, file):
-        data = file.read(1)
-        if len(data) != 1:
-            raise EarlyEnd()
+        data, file = read(file, 1)
         first = ord(data)
         if first < 0xfd:
-            return first
+            return first, file
         elif first == 0xfd:
-            desc = '<H'
+            desc, length = '<H', 2
         elif first == 0xfe:
-            desc = '<I'
+            desc, length = '<I', 4
         elif first == 0xff:
-            desc = '<Q'
+            desc, length = '<Q', 8
         else:
             raise AssertionError()
-        length = struct.calcsize(desc)
-        data = file.read(length)
-        if len(data) != length:
-            raise EarlyEnd()
-        return struct.unpack(desc, data)[0]
+        data, file = read(file, length)
+        return struct.unpack(desc, data)[0], file
     
     def write(self, file, item):
         if item < 0xfd:
@@ -113,11 +115,8 @@ class VarStrType(Type):
     _inner_size = VarIntType()
     
     def read(self, file):
-        length = self._inner_size.read(file)
-        res = file.read(length)
-        if len(res) != length:
-            raise EarlyEnd('var str not long enough %r' % ((length, len(res), res),))
-        return res
+        length, file = self._inner_size.read(file)
+        return read(file, length)
     
     def write(self, file, item):
         self._inner_size.write(file, len(item))
@@ -128,10 +127,7 @@ class FixedStrType(Type):
         self.length = length
     
     def read(self, file):
-        res = file.read(self.length)
-        if len(res) != self.length:
-            raise EarlyEnd('early EOF!')
-        return res
+        return read(file, self.length)
     
     def write(self, file, item):
         if len(item) != self.length:
@@ -150,17 +146,16 @@ class EnumType(Type):
             self.keys[v] = k
     
     def read(self, file):
-        return self.keys[self.inner.read(file)]
+        data, file = self.inner.read(file)
+        return self.keys[data], file
     
     def write(self, file, item):
         self.inner.write(file, self.values[item])
 
 class HashType(Type):
     def read(self, file):
-        data = file.read(256//8)
-        if len(data) != 256//8:
-            raise EarlyEnd('incorrect length!')
-        return int(data[::-1].encode('hex'), 16)
+        data, file = read(file, 256//8)
+        return int(data[::-1].encode('hex'), 16), file
     
     def write(self, file, item):
         if not 0 <= item < 2**256:
@@ -171,10 +166,8 @@ class HashType(Type):
 
 class ShortHashType(Type):
     def read(self, file):
-        data = file.read(160//8)
-        if len(data) != 160//8:
-            raise EarlyEnd('incorrect length!')
-        return int(data[::-1].encode('hex'), 16)
+        data, file = read(file, 160//8)
+        return int(data[::-1].encode('hex'), 16), file
     
     def write(self, file, item):
         if item >= 2**160:
@@ -188,8 +181,12 @@ class ListType(Type):
         self.type = type
     
     def read(self, file):
-        length = self._inner_size.read(file)
-        return [self.type.read(file) for i in xrange(length)]
+        length, file = self._inner_size.read(file)
+        res = []
+        for i in xrange(length):
+            item, file = self.type.read(file)
+            res.append(item)
+        return res, file
     
     def write(self, file, item):
         self._inner_size.write(file, len(item))
@@ -198,8 +195,9 @@ class ListType(Type):
 
 class FastLittleEndianUnsignedInteger(Type):
     def read(self, file):
-        data = map(ord, file.read(4))
-        return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24)
+        data, file = read(file, 4)
+        data = map(ord, data)
+        return data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24), file
     
     def write(self, file, item):
         StructType("<I").write(file, item)
@@ -210,11 +208,9 @@ class StructType(Type):
         self.length = struct.calcsize(self.desc)
     
     def read(self, file):
-        data = file.read(self.length)
-        if len(data) != self.length:
-            raise EarlyEnd()
+        data, file = read(file, self.length)
         res, = struct.unpack(self.desc, data)
-        return res
+        return res, file
     
     def write(self, file, item):
         data = struct.pack(self.desc, item)
@@ -225,12 +221,10 @@ class StructType(Type):
 
 class IPV6AddressType(Type):
     def read(self, file):
-        data = file.read(16)
-        if len(data) != 16:
-            raise EarlyEnd()
+        data, file = read(file, 16)
         if data[:12] != '00000000000000000000ffff'.decode('hex'):
             raise ValueError("ipv6 addresses not supported yet")
-        return '.'.join(str(ord(x)) for x in data[12:])
+        return '.'.join(str(ord(x)) for x in data[12:]), file
     
     def write(self, file, item):
         bits = map(int, item.split('.'))
@@ -247,8 +241,8 @@ class ComposedType(Type):
     def read(self, file):
         item = {}
         for key, type_ in self.fields:
-            item[key] = type_.read(file)
-        return item
+            item[key], file = type_.read(file)
+        return item, file
     
     def write(self, file, item):
         for key, type_ in self.fields:
@@ -259,13 +253,13 @@ class ChecksummedType(Type):
         self.inner = inner
     
     def read(self, file):
-        obj = self.inner.read(file)
+        obj, file = self.inner.read(file)
         data = self.inner.pack(obj)
         
         if file.read(4) != hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]:
             raise ValueError("invalid checksum")
         
-        return obj
+        return obj, file
     
     def write(self, file, item):
         data = self.inner.pack(item)
@@ -279,12 +273,12 @@ class FloatingIntegerType(Type):
     _inner = FastLittleEndianUnsignedInteger()
     
     def read(self, file):
-        bits = self._inner.read(file)
+        bits, file = self._inner.read(file)
         target = self._bits_to_target(bits)
         if __debug__:
             if self._target_to_bits(target) != bits:
                 raise ValueError("bits in non-canonical form")
-        return target
+        return target, file
     
     def write(self, file, item):
         self._inner.write(file, self._target_to_bits(item))
@@ -320,8 +314,8 @@ class PossiblyNone(Type):
         self.inner = inner
     
     def read(self, file):
-        value = self.inner.read(file)
-        return None if value == self.none_value else value
+        value, file = self.inner.read(file)
+        return None if value == self.none_value else value, file
     
     def write(self, file, item):
         if item == self.none_value:
