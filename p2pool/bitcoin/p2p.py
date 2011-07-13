@@ -9,6 +9,7 @@ import random
 import struct
 import time
 import traceback
+import zlib
 
 from twisted.internet import defer, protocol, reactor
 

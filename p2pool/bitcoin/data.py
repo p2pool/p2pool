@@ -160,7 +160,7 @@ class HashType(Type):
     
     def write(self, file, item):
         if not 0 <= item < 2**256:
-            raise ValueError("invalid hash value")
+            raise ValueError("invalid hash value - %r" % (item,))
         if item != 0 and item < 2**160:
             warnings.warn("very low hash value - maybe you meant to use ShortHashType? %x" % (item,))
         return file, ('%064x' % (item,)).decode('hex')[::-1]
@@ -172,7 +172,7 @@ class ShortHashType(Type):
     
     def write(self, file, item):
         if not 0 <= item < 2**160:
-            raise ValueError("invalid hash value")
+            raise ValueError("invalid hash value - %r" % (item,))
         return file, ('%040x' % (item,)).decode('hex')[::-1]
 
 class ListType(Type):

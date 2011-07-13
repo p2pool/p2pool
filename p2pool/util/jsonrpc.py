@@ -2,9 +2,9 @@ from __future__ import division
 
 import base64
 import json
-import traceback
 
 from twisted.internet import defer
+from twisted.python import log
 from twisted.web import client
 
 import deferred_resource
@@ -106,21 +106,16 @@ class Server(deferred_resource.DeferredResource):
                 raise Error(-32601, u'Method not found')
             method_meth = getattr(self, method_name)
             
-            df = defer.maybeDeferred(method_meth, *params)
+            
+            try:
+                result = yield method_meth(*params)
+            except Exception:
+                print 'Squelched JSON method error:'
+                log.err()
+                raise Error(-32099, u'Unknown error')
             
             if id_ is None:
                 return
-            
-            #print (df.result.type, df.result.value, df.result.tb)
-            #print df.result.__dict__
-            try:
-                result = yield df
-            #except Error, e:
-            #w    raise e
-            except Exception:
-                print 'Squelched JSON method error:'
-                traceback.print_exc()
-                raise Error(-32099, u'Unknown error')
             
             request.write(json.dumps({
                 'jsonrpc': '2.0',

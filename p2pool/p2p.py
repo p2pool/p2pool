@@ -38,8 +38,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
         
-        chain = self.node.current_work.value['current_chain']
-        highest_share2 = chain.get_highest_share2()
         self.send_version(
             version=self.version,
             services=0,
@@ -56,10 +54,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             nonce=self.node.nonce,
             sub_version=self.sub_version,
             mode=self.node.mode_var.value,
-            highest=dict(
-                hash=highest_share2.share.hash if highest_share2 is not None else 2**256-1,
-                height=highest_share2.height if highest_share2 is not None else 0,
-            ),
+            best_share_hash=self.node.current_work.value['best_share_hash'],
         )
         
         self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
@@ -92,12 +87,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('nonce', bitcoin_data.StructType('<Q')),
         ('sub_version', bitcoin_data.VarStrType()),
         ('mode', bitcoin_data.StructType('<I')),
-        ('highest', bitcoin_data.PossiblyNone(dict(hash=0, height=0), bitcoin_data.ComposedType([
-            ('hash', bitcoin_data.HashType()),
-            ('height', bitcoin_data.StructType('<Q')),
-        ]))),
+        ('best_share_hash', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
     ])
-    def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, state):
+    def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version
         self.other_services = services
         self.other_mode_var = variable.Variable(mode)
@@ -118,8 +110,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._think()
         self._think2()
         
-        if state['highest'] is not None:
-            self.handle_share0s(hashes=[state['highest']['hash']])
+        if best_share_hash is not None:
+            self.handle_share0s(hashes=[best_share_hash])
     
     
     message_update_mode = bitcoin_data.ComposedType([
@@ -190,8 +182,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.node.handle_get_to_best(have, self)
     
     message_getshares = bitcoin_data.ComposedType([
-        ('hash', bitcoin_data.HashType()),
-        ('parents', bitcoin_data.StructType('<I')),
+        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
     ])
     def handle_getshares(self, hashes):
         self.node.handle_get_shares(hashes, self)
@@ -199,17 +190,17 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     message_share0s = bitcoin_data.ComposedType([
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
     ])
-    def handle_share0s(self, chains):
+    def handle_share0s(self, hashes):
         for hash_ in hashes:
             self.node.handle_share_hash(hash_, self)
     
     message_share1as = bitcoin_data.ComposedType([
         ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
     ])
-    def handle_share1as(self, share1s):
+    def handle_share1as(self, share1as):
         for share1a in share1as:
-            hash_ = bitcoin_data.block_hash(share1['header'])
-            if hash_ <= bitcoin_data.bits_to_target(share1['header']['bits']):
+            hash_ = bitcoin_data.block_header_type.hash256(share1a['header'])
+            if hash_ <= share1a['header']['target']:
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
@@ -222,8 +213,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     ])
     def handle_share1bs(self, share2s):
         for share1b in share1bs:
-            hash_ = bitcoin_data.block_hash(share2['header'])
-            if not hash_ <= bitcoin_data.bits_to_target(share2['header']['bits']):
+            hash_ = bitcoin_data.block_header_type.hash256(share1b['header'])
+            if not hash_ <= share1b['header']['target']:
                 print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
                 self.transport.loseConnection()
                 return
@@ -232,16 +223,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.node.handle_share(share, self)
     
     def send_share(self, share, full=False):
-        if share.hash <= bitcoin_data.bits_to_target(share.header['bits']):
-            self.send_share2s(share2s=[share.as_block()])
+        if share.hash <= share.header['target']:
+            self.send_share1bs(share2s=[share.as_share1b()])
         else:
             if self.mode == 0 and not full:
                 self.send_share0s(hashes=[share.hash])
             elif self.mode == 1 or full:
-                self.send_share1s(share1s=[dict(
-                    header=share.header,
-                    gentx=share.gentx,
-                )])
+                self.send_share1as(share1as=[share.as_share1a()])
             else:
                 raise ValueError(self.mode)
     

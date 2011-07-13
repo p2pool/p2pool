@@ -3,6 +3,8 @@ from __future__ import division
 def median(x, use_float=True):
     # there exist better algorithms...
     y = sorted(x)
+    if not y:
+        raise ValueError("empty sequence!")
     left = (len(y) - 1)//2
     right = len(y)//2
     sum = y[left] + y[right]

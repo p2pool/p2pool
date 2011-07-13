@@ -16,7 +16,7 @@ from twisted.internet import defer, reactor
 from twisted.web import server
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
-from util import db, expiring_dict, jsonrpc, variable, deferral
+from util import db, expiring_dict, jsonrpc, variable, deferral, math
 from . import p2p, worker_interface
 import p2pool.data as p2pool
 
@@ -223,7 +223,7 @@ def main(args):
             for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
-                peer.send_share(share.share)
+                peer.send_share(share)
             share.flag_shared()
         
         def p2p_share(share, peer=None):
@@ -241,7 +241,8 @@ def main(args):
             tracker.add(share)
             best, desired = tracker.think()
             for peer2, share_hash in desired:
-                peer2.get_shares([share_hash])
+                print "Requesting parent share %x" % (share_hash,)
+                peer2.send_getshares(hashes=[share_hash])
             
             w = dict(current_work.value)
             w['best_share_hash'] = best
@@ -276,17 +277,12 @@ def main(args):
             current_work.set(w)
             '''
         
-        def p2p_share_hash(chain_id_data, hash, peer):
-            chain = get_chain(chain_id_data)
-            if chain is current_work.value['current_chain']:
-                if hash not in chain.share2s:
-                    print "Got share hash, requesting! Hash: %x" % (hash,)
-                    peer.send_getshares(chain_id=p2pool.chain_id_type.unpack(chain_id_data), hashes=[hash])
-                else:
-                    print "Got share hash, already have, ignoring. Hash: %x" % (hash,)
+        def p2p_share_hash(share_hash, peer):
+            if share_hash in tracker.shares:
+                print "Got share hash, already have, ignoring. Hash: %x" % (share_hash,)
             else:
-                print "Got share hash to non-current chain, storing. Hash: %x" % (hash,)
-                chain.request_map.setdefault(hash, []).append(peer)
+                print "Got share hash, requesting! Hash: %x" % (share_hash,)
+                peer.send_getshares(hashes=[share_hash])
         
         def p2p_get_to_best(chain_id_data, have, peer):
             chain = get_chain(chain_id_data)
@@ -307,7 +303,7 @@ def main(args):
         def p2p_get_shares(share_hashes, peer):
             for share_hash in share_hashes:
                 if share_hash in tracker.shares:
-                    peer.send_share(chain.shares[share_hash], full=True)
+                    peer.send_share(tracker.shares[share_hash], full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
@@ -386,8 +382,15 @@ def main(args):
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
-            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['timestamp'], state['target'])
-            print "SENT", 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
+            
+            timestamp = current_work2.value['timestamp']
+            if state['best_share_hash'] is not None:
+                timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
+                if timestamp2 > timestamp:
+                    print "Toff", timestamp2 - timestamp
+                    timestamp = timestamp2
+            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'])
+            #print "SENT", 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
             return ba.getwork(p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'])
         
         def got_response(data):
