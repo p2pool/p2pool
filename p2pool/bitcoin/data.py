@@ -403,6 +403,7 @@ class Tracker(object):
         self.heights = {} # share_hash -> height_to, other_share_hash
     
     def add(self, share):
+        assert not isinstance(share, (int, long, type(None)))
         if share.hash in self.shares:
             return # XXX raise exception?
         
@@ -427,6 +428,7 @@ class Tracker(object):
             self.heads[head] = tail
     
     def get_height_and_last(self, share_hash):
+        assert isinstance(share_hash, (int, long, type(None)))
         orig = share_hash
         height = 0
         updates = []
@@ -445,6 +447,7 @@ class Tracker(object):
         return height, share_hash
     
     def get_height_and_last2(self, share_hash):
+        assert isinstance(share_hash, (int, long, type(None)))
         height = 0
         while True:
             if share_hash not in self.shares:
@@ -454,6 +457,7 @@ class Tracker(object):
         return height, share_hash
     
     def get_chain_known(self, start_hash):
+        assert isinstance(start_hash, (int, long, type(None)))
         '''
         Chain starting with item of hash I{start_hash} of items that this Tracker contains
         '''
@@ -467,6 +471,8 @@ class Tracker(object):
             item_hash_to_get = share.previous_hash
     
     def get_chain_to_root(self, start_hash, root=None):
+        assert isinstance(start_hash, (int, long, type(None)))
+        assert isinstance(root, (int, long, type(None)))
         '''
         Chain of hashes starting with share_hash of shares to the root (doesn't include root)
         Raises an error if one is missing
@@ -484,6 +490,9 @@ class Tracker(object):
         if not self.heads:
             return None
         return max(self.heads, key=self.get_height_and_last)
+    
+    def get_highest_height(self):
+        return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
 
 # network definitions
 

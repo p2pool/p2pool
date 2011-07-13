@@ -296,7 +296,10 @@ def main(args):
             else:
                 return x, args.net.P2P_PORT
         
-        nodes = [('72.14.191.28', args.net.P2P_PORT)]
+        nodes = [
+            ('72.14.191.28', args.net.P2P_PORT),
+            ('62.204.197.159', args.net.P2P_PORT),
+        ]
         try:
             nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:

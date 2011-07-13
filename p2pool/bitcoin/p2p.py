@@ -390,6 +390,9 @@ class HeightTracker(object):
         if last is not None:
             self.request([], last)
         return height
+    
+    def get_highest_height(self):
+        return self.tracker.get_highest_height()
 
 if __name__ == '__main__':
     factory = ClientFactory(bitcoin_data.Mainnet)

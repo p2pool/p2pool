@@ -231,9 +231,9 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         if time == 0:
             time = 1
         attempts_per_second = attempts//time
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_sec4nd) - 1
+        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**25 - 1))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**24 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
         print attempts_per_second//1000, "KHASH"
         #print "TARGET", 2**256//target2, 2**256/pre_target
@@ -380,21 +380,38 @@ class OkayTracker(bitcoin_data.Tracker):
                 if self.attempt_verify(share):
                     break
         
+        last = object
+        
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in self.verified.heads:
-            head_height, last = self.verified.get_height_and_last(head)
-            last_height, last_last = self.get_height_and_last(last)
-            for share in itertools.islice(self.get_chain_known(last), max(0, min(self.net.CHAIN_LENGTH - head_height, last_height - 1 - self.net.CHAIN_LENGTH))):
+            head_height, last_hash = self.verified.get_height_and_last(head)
+            last_height, last_last_hash = self.get_height_and_last(last_hash)
+            # XXX review boundary conditions
+            want = self.net.CHAIN_LENGTH - head_height
+            can = max(last_height - 1 - self.net.CHAIN_LENGTH, 0) if last_last_hash is not None else last_height
+            if want > can:
+                get = can
+            else:
+                get = want
+            #print "Z", head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
+            for share in itertools.islice(self.get_chain_known(last_hash), get):
                 if not self.attempt_verify(share):
                     break
-            if head_height < self.net.CHAIN_LENGTH and last_last is not None:
-                desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last]))].peer, last_last))
+            if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
+                desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
         
         # decide best verified head
         def score(share_hash):
-            share = self.verified.shares[share_hash]
-            head_height, last = self.verified.get_height_and_last(share)
-            score2 = sum(ht.get_min_height(share.header['previous_block']) for share in itertools.islice(self.verified.get_chain_known(share_hash), self.net.CHAIN_LENGTH))
+            head_height, last = self.verified.get_height_and_last(share_hash)
+            score2 = 0
+            attempts = 0
+            max_height = 0
+            for share in itertools.islice(self.verified.get_chain_known(share_hash), self.net.CHAIN_LENGTH):
+                max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
+                attempts += bitcoin_data.target_to_average_attempts(share.target2)
+                this_score = attempts//(ht.get_highest_height() - max_height + 1)
+                if this_score > score2:
+                    score2 = this_score
             res = (min(head_height, self.net.CHAIN_LENGTH), score2)
             print res
             return res
