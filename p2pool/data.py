@@ -113,6 +113,7 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
 
 class Share(object):
     peer = None
+    gentx = None
     
     @classmethod
     def from_block(cls, block):
@@ -162,10 +163,10 @@ class Share(object):
         self.shared = False
     
     def as_block(self):
-        if self.txs is None:
+        if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        return dict(header=self.header, txs=self.txs)
+        return dict(header=self.header, txs=[self.gentx] + self.other_txs)
     
     def as_share1a(self):
         return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
@@ -191,6 +192,8 @@ class Share(object):
         if self.other_txs is not None:
             if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
                 raise ValueError("gentx doesn't match header via other_txs")
+        
+        self.gentx = gentx
         
         return Share2(self)
     
@@ -221,16 +224,16 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     lookbehind = 200
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), lookbehind))
     if len(chain) < lookbehind:
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**16 - 1)
+        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**24 - 1)
     else:
         attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
         time = chain[0].timestamp - chain[-1].timestamp
         if time == 0:
             time = 1
         attempts_per_second = attempts//time
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
+        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_sec4nd) - 1
         pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**16 - 1))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**25 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
         print attempts_per_second//1000, "KHASH"
         #print "TARGET", 2**256//target2, 2**256/pre_target
@@ -242,15 +245,17 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     total_weight = 0
     
     class fake_share(object):
-        script = new_script
-        share = dict(target=target2)
+        pass
+    fake_share.new_script = new_script
+    fake_share.target2 = target2
     
     dest_weights = {}
     for i, share in enumerate(itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH))):
-        weight = bitcoin_data.target_to_average_attempts(share.share['target'])
-        weight = max(weight, max_weight - total_weight)
+        weight = bitcoin_data.target_to_average_attempts(share.target2)
+        if weight > max_weight - total_weight:
+            weight = max_weight - total_weight
         
-        dest_weights[share.script] = dest_weights.get(share.script, 0) + weight
+        dest_weights[share.new_script] = dest_weights.get(share.new_script, 0) + weight
         total_weight += weight
         
         if total_weight == max_weight:
@@ -357,7 +362,7 @@ class OkayTracker(bitcoin_data.Tracker):
         else:
             self.verified.add(share)
             return True
-    def think(self):
+    def think(self, ht):
         desired = set()
         
         # for each overall head, attempt verification
@@ -389,8 +394,10 @@ class OkayTracker(bitcoin_data.Tracker):
         def score(share_hash):
             share = self.verified.shares[share_hash]
             head_height, last = self.verified.get_height_and_last(share)
-            RECENTNESS = 0
-            return (min(head_height, self.net.CHAIN_LENGTH), RECENTNESS)
+            score2 = sum(ht.get_min_height(share.header['previous_block']) for share in itertools.islice(self.verified.get_chain_known(share_hash), self.net.CHAIN_LENGTH))
+            res = (min(head_height, self.net.CHAIN_LENGTH), score2)
+            print res
+            return res
         best = max(self.verified.heads, key=score) if self.verified.heads else None
         
         return best, desired

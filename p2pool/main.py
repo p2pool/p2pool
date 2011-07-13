@@ -130,6 +130,26 @@ def getwork(bitcoind):
         height_df.addErrback(lambda fail: None)
     defer.returnValue((getwork, height))
 
+@defer.inlineCallbacks
+def get_payout_script(factory):
+        while True:
+            try:
+                res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
+                if res['reply'] != 'success':
+                    print
+                    print 'Error getting payout script:'
+                    print res
+                    print
+                    continue
+                my_script = res['script']
+            except Exception:
+                print
+                print 'Error getting payout script:'
+                traceback.print_exc()
+                print
+            else:
+                defer.returnValue(my_script)
+            yield deferral.sleep(1)
 
 @defer.inlineCallbacks
 def main(args):
@@ -141,9 +161,7 @@ def main(args):
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print "Testing bitcoind RPC connection to '%s' with authorization '%s:%s'..." % (url, args.bitcoind_rpc_username, args.bitcoind_rpc_password)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
-        
         work, height = yield getwork(bitcoind)
-        
         print '    ...success!'
         print '    Current block hash: %x height: %i' % (work.previous_block, height)
         print
@@ -152,26 +170,7 @@ def main(args):
         print "Testing bitcoind P2P connection to '%s:%s'..." % (args.bitcoind_address, args.bitcoind_p2p_port)
         factory = bitcoin.p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
-        
-        while True:
-            try:
-                res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
-                if res['reply'] != 'success':
-                    print
-                    print 'Error getting payout script:'
-                    print res
-                    print
-                    continue
-                my_script = res['script']
-            except:
-                print
-                print 'Error getting payout script:'
-                traceback.print_exc()
-                print
-            else:
-                break
-            yield deferral.sleep(1)
-        
+        my_script = yield get_payout_script(factory)
         print '    ...success!'
         print '    Payout script:', my_script.encode('hex')
         print
@@ -184,6 +183,8 @@ def main(args):
         get_block = deferral.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
         
         get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
+        
+        ht = bitcoin.p2p.HeightTracker(factory)
         
         tracker = p2pool.OkayTracker(args.net)
         chains = expiring_dict.ExpiringDict(300)
@@ -198,7 +199,7 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
-            best, desired = tracker.think()
+            best, desired = tracker.think(ht)
             # XXX desired?
             current_work.set(dict(
                 version=work.version,
@@ -227,55 +228,36 @@ def main(args):
             share.flag_shared()
         
         def p2p_share(share, peer=None):
-            if share.hash <= share.header['target']:
-                print
-                print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
-                print
-                if factory.conn is not None:
-                    factory.conn.send_block(block=share.as_block())
-                else:
-                    print 'No bitcoind connection! Erp!'
+            if share.hash in tracker.shares:
+                print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
+                return
             
-            print "Received share %x" % (share.hash,)
+            #print "Received share %x" % (share.hash,)
             
             tracker.add(share)
-            best, desired = tracker.think()
+            best, desired = tracker.think(ht)
             for peer2, share_hash in desired:
                 print "Requesting parent share %x" % (share_hash,)
                 peer2.send_getshares(hashes=[share_hash])
             
+            if share.gentx is not None:
+                if share.hash <= share.header['target']:
+                    print
+                    print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
+                    print
+                    if factory.conn.value is not None:
+                        factory.conn.value.send_block(block=share.as_block())
+                    else:
+                        print 'No bitcoind connection! Erp!'
+            
             w = dict(current_work.value)
             w['best_share_hash'] = best
             current_work.set(w)
-            '''
-            if res == 'good':
-                share2 = chain.share2s[share.hash]
-                
-                if chain is current_work.value['current_chain']:
-                    if share.hash == chain.highest.value:
-                        print 'Accepted share, passing to peers. Height: %i Hash: %x Script: %s' % (share2.height, share.hash, share2.shares[-1].encode('hex'))
-                        share_share2(share2, peer)
-                    else:
-                        print 'Accepted share, not highest. Height: %i Hash: %x' % (share2.height, share.hash,)
-                else:
-                    print 'Accepted share to non-current chain. Height: %i Hash: %x' % (share2.height, share.hash,)
-            elif res == 'dup':
-                print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
-            elif res == 'orphan':
-                print 'Got share referencing unknown share, requesting past shares from peer. Hash: %x' % (share.hash,)
-                if peer is None:
-                    raise ValueError()
-                peer.send_gettobest(
-                    chain_id=p2pool.chain_id_type.unpack(share.chain_id_data),
-                    have=random.sample(chain.share2s.keys(), min(8, len(chain.share2s))) + [chain.share2s[chain.highest.value].share.hash] if chain.highest.value is not None else [],
-                )
-            else:
-                raise ValueError('unknown result from chain.accept - %r' % (res,))
             
-            w = dict(current_work.value)
-            w['best_share_hash'] = w['current_chain'].get_highest_share_hash()
-            current_work.set(w)
-            '''
+            if best == share.hash:
+                print 'Accepted share, new highest, will pass to peers! Hash: %x' % (share.hash,)
+            else:
+                print 'Accepted share, not highest. Hash: %x' % (share.hash,)
         
         def p2p_share_hash(share_hash, peer):
             if share_hash in tracker.shares:
@@ -341,19 +323,7 @@ def main(args):
             for share in tracker.get_chain_known(new_work['best_share_hash']):
                 if share.shared:
                     break
-                share_share(share)
-            return
-            chain = new_work['current_chain']
-            if chain.highest.value is not None:
-                for share_hash in chain.get_down(chain.highest.value):
-                    share2 = chain.share2s[share_hash]
-                    if not share2.shared:
-                        print 'Sharing share of switched to chain. Hash:', share2.share.hash
-                        share_share2(share2)
-            # XXX ???
-            for hash, peers in chain.request_map.iteritems():
-                if hash not in chain.share2s:
-                    random.choice(peers).send_getshares(hashes=[hash])
+                share_share(share, share.peer)
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
@@ -378,7 +348,9 @@ def main(args):
                 block_target=state['target'],
                 net=args.net,
             )
-            print 'Generating!' #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
+            print 'Generating!', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']//1000000
+            print "Target: %x" % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
+            #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
@@ -400,7 +372,17 @@ def main(args):
             if transactions is None:
                 print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
                 return False
-            share = p2pool.Share.from_block(dict(header=header, txs=transactions))
+            block = dict(header=header, txs=transactions)
+            hash_ = bitcoin.data.block_header_type.hash256(block['header'])
+            if hash_ <= block['header']['target']:
+                print
+                print 'GOT BLOCK! Passing to bitcoind! %x' % (hash_,)
+                print
+                if factory.conn.value is not None:
+                    factory.conn.value.send_block(block=block)
+                else:
+                    print 'No bitcoind connection! Erp!'
+            share = p2pool.Share.from_block(block)
             print 'GOT SHARE! %x' % (share.hash,)
             try:
                 p2p_share(share)

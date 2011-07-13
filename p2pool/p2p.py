@@ -211,7 +211,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     message_share1bs = bitcoin_data.ComposedType([
         ('share1bs', bitcoin_data.ListType(p2pool_data.share1b_type)),
     ])
-    def handle_share1bs(self, share2s):
+    def handle_share1bs(self, share1bs):
         for share1b in share1bs:
             hash_ = bitcoin_data.block_header_type.hash256(share1b['header'])
             if not hash_ <= share1b['header']['target']:
@@ -224,7 +224,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def send_share(self, share, full=False):
         if share.hash <= share.header['target']:
-            self.send_share1bs(share2s=[share.as_share1b()])
+            self.send_share1bs(share1bs=[share.as_share1b()])
         else:
             if self.mode == 0 and not full:
                 self.send_share0s(hashes=[share.hash])

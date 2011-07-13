@@ -68,7 +68,7 @@ class BaseProtocol(protocol.Protocol):
                 print 'NO HANDLER FOR', command
                 continue
             
-            #print 'RECV', command, payload2
+            #print 'RECV', command, repr(payload2)[:500]
             
             try:
                 handler(**payload2)
@@ -83,6 +83,7 @@ class BaseProtocol(protocol.Protocol):
         type_ = getattr(self, "message_" + command, None)
         if type_ is None:
             raise ValueError('invalid command')
+        #print 'SEND', command, repr(payload2)[:500]
         payload = type_.pack(payload2)
         if self.use_checksum:
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
@@ -355,7 +356,7 @@ class HeightTracker(object):
                     continue
                 self.request([], tail)
             try:
-                yield self.factory.new_headers.get_deferred(timeout=1)
+                yield self.factory.new_headers.get_deferred(timeout=5)
             except defer.TimeoutError:
                 pass
     
@@ -381,8 +382,14 @@ class HeightTracker(object):
         height, last = self.tracker.get_height_and_last(block_hash)
         if last is not None:
             self.request([], last)
-            #raise ValueError(last)
-        return height, last
+            raise ValueError()
+        return height
+    
+    def get_min_height(self, block_hash):
+        height, last = self.tracker.get_height_and_last(block_hash)
+        if last is not None:
+            self.request([], last)
+        return height
 
 if __name__ == '__main__':
     factory = ClientFactory(bitcoin_data.Mainnet)
