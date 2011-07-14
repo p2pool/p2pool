@@ -49,7 +49,7 @@ class BaseProtocol(protocol.Protocol):
                     print 'INVALID HASH'
                     continue
             
-            type_ = getattr(self, "message_" + command, None)
+            type_ = getattr(self, 'message_' + command, None)
             if type_ is None:
                 print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
                 print 'NO TYPE FOR', repr(command)
@@ -80,7 +80,7 @@ class BaseProtocol(protocol.Protocol):
     def sendPacket(self, command, payload2):
         if len(command) >= 12:
             raise ValueError('command too long')
-        type_ = getattr(self, "message_" + command, None)
+        type_ = getattr(self, 'message_' + command, None)
         if type_ is None:
             raise ValueError('invalid command')
         #print 'SEND', command, repr(payload2)[:500]
@@ -184,7 +184,7 @@ class Protocol(BaseProtocol):
             elif inv['type'] == 'block':
                 self.factory.new_block.happened(inv['hash'])
             else:
-                print "Unknown inv type", item
+                print 'Unknown inv type', item
     
     message_getdata = bitcoin_data.ComposedType([
         ('requests', bitcoin_data.ListType(bitcoin_data.ComposedType([
@@ -248,7 +248,7 @@ class Protocol(BaseProtocol):
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
-        ('script', bitcoin_data.PossiblyNone("", bitcoin_data.VarStrType())),
+        ('script', bitcoin_data.PossiblyNone('', bitcoin_data.VarStrType())),
     ])
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))
@@ -263,7 +263,7 @@ class Protocol(BaseProtocol):
         ('signature', bitcoin_data.VarStrType()),
     ])
     def handle_alert(self, message, signature):
-        print "ALERT:", (message, signature)
+        print 'ALERT:', (message, signature)
     
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
@@ -372,7 +372,7 @@ class HeightTracker(object):
         print len(self.tracker.shares)
     
     def request(self, have, last):
-        #print "REQ", ('[' + ', '.join(map(hex, have)) + ']', hex(last) if last is not None else None)
+        #print 'REQ', ('[' + ', '.join(map(hex, have)) + ']', hex(last) if last is not None else None)
         if self.factory.conn.value is not None:
             self.factory.conn.value.send_getheaders(version=1, have=have, last=last)
     

@@ -160,9 +160,9 @@ class HashType(Type):
     
     def write(self, file, item):
         if not 0 <= item < 2**256:
-            raise ValueError("invalid hash value - %r" % (item,))
+            raise ValueError('invalid hash value - %r' % (item,))
         if item != 0 and item < 2**160:
-            warnings.warn("very low hash value - maybe you meant to use ShortHashType? %x" % (item,))
+            warnings.warn('very low hash value - maybe you meant to use ShortHashType? %x' % (item,))
         return file, ('%064x' % (item,)).decode('hex')[::-1]
 
 class ShortHashType(Type):
@@ -172,7 +172,7 @@ class ShortHashType(Type):
     
     def write(self, file, item):
         if not 0 <= item < 2**160:
-            raise ValueError("invalid hash value - %r" % (item,))
+            raise ValueError('invalid hash value - %r' % (item,))
         return file, ('%040x' % (item,)).decode('hex')[::-1]
 
 class ListType(Type):
@@ -209,20 +209,20 @@ class StructType(Type):
         data = struct.pack(self.desc, item)
         if struct.unpack(self.desc, data)[0] != item:
             # special test because struct doesn't error on some overflows
-            raise ValueError("item didn't survive pack cycle (%r)" % (item,))
+            raise ValueError('''item didn't survive pack cycle (%r)''' % (item,))
         return file, data
 
 class IPV6AddressType(Type):
     def read(self, file):
         data, file = read(file, 16)
         if data[:12] != '00000000000000000000ffff'.decode('hex'):
-            raise ValueError("ipv6 addresses not supported yet")
+            raise ValueError('ipv6 addresses not supported yet')
         return '.'.join(str(ord(x)) for x in data[12:]), file
     
     def write(self, file, item):
         bits = map(int, item.split('.'))
         if len(bits) != 4:
-            raise ValueError("invalid address: %r" % (bits,))
+            raise ValueError('invalid address: %r' % (bits,))
         data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
         assert len(data) == 16, len(data)
         return file, data
@@ -251,7 +251,7 @@ class ChecksummedType(Type):
         data = self.inner.pack(obj)
         
         if file.read(4) != hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]:
-            raise ValueError("invalid checksum")
+            raise ValueError('invalid checksum')
         
         return obj, file
     
@@ -263,14 +263,14 @@ class ChecksummedType(Type):
 class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
     # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
-    _inner = StructType("<I")
+    _inner = StructType('<I')
     
     def read(self, file):
         bits, file = self._inner.read(file)
         target = self._bits_to_target(bits)
         if __debug__:
             if self._target_to_bits(target) != bits:
-                raise ValueError("bits in non-canonical form")
+                raise ValueError('bits in non-canonical form')
         return target, file
     
     def write(self, file, item):
@@ -281,21 +281,21 @@ class FloatingIntegerType(Type):
     
     def _bits_to_target(self, bits2):
         target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
-        assert target == self._bits_to_target1(struct.pack("<I", bits2))
+        assert target == self._bits_to_target1(struct.pack('<I', bits2))
         assert self._target_to_bits(target, _check=False) == bits2
         return target
     
     def _bits_to_target1(self, bits):
         bits = bits[::-1]
         length = ord(bits[0])
-        return bases.string_to_natural((bits[1:] + "\0"*length)[:length])
+        return bases.string_to_natural((bits[1:] + '\0'*length)[:length])
     
     def _target_to_bits(self, target, _check=True):
         n = bases.natural_to_string(target)
         if n and ord(n[0]) >= 128:
-            n = "\x00" + n
+            n = '\x00' + n
         bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
-        bits = struct.unpack("<I", bits2)[0]
+        bits = struct.unpack('<I', bits2)[0]
         if _check:
             if self._bits_to_target(bits) != target:
                 raise ValueError(repr((target, self._bits_to_target(bits, _check=False))))
@@ -312,7 +312,7 @@ class PossiblyNone(Type):
     
     def write(self, file, item):
         if item == self.none_value:
-            raise ValueError("none_value used")
+            raise ValueError('none_value used')
         return self.inner.write(file, self.none_value if item is None else item)
 
 address_type = ComposedType([
@@ -373,7 +373,7 @@ def target_to_average_attempts(target):
 # human addresses
 
 human_address_type = ChecksummedType(ComposedType([
-    ('version', StructType("<B")),
+    ('version', StructType('<B')),
     ('pubkey_hash', ShortHashType()),
 ]))
 
@@ -497,7 +497,7 @@ class Tracker(object):
     
     def get_nth_parent_hash(self, item_hash, n):
         if n < 0:
-            raise ValueError("n must be >= 0")
+            raise ValueError('n must be >= 0')
         
         updates = {}
         while n:

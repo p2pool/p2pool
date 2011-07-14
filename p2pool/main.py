@@ -93,7 +93,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
             block = yield get_block(block_hash)
         except:
             print
-            print "Error getting block while searching block chain:"
+            print 'Error getting block while searching block chain:'
             log.err()
             print
             continue
@@ -135,24 +135,24 @@ def getwork(bitcoind):
 
 @defer.inlineCallbacks
 def get_payout_script(factory):
-        while True:
-            try:
-                res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
-                if res['reply'] != 'success':
-                    print
-                    print 'Error getting payout script:'
-                    print res
-                    print
-                    continue
-                my_script = res['script']
-            except Exception:
+    while True:
+        try:
+            res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
+            if res['reply'] != 'success':
                 print
                 print 'Error getting payout script:'
-                log.err()
+                print res
                 print
-            else:
-                defer.returnValue(my_script)
-            yield deferral.sleep(1)
+                continue
+            my_script = res['script']
+        except Exception:
+            print
+            print 'Error getting payout script:'
+            log.err()
+            print
+        else:
+            defer.returnValue(my_script)
+        yield deferral.sleep(1)
 
 @defer.inlineCallbacks
 def main(args):
@@ -162,7 +162,7 @@ def main(args):
         
         # connect to bitcoind over JSON-RPC and do initial getwork
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
-        print "Testing bitcoind RPC connection to '%s' with authorization '%s:%s'..." % (url, args.bitcoind_rpc_username, args.bitcoind_rpc_password)
+        print '''Testing bitcoind RPC connection to '%s' with authorization '%s:%s'...''' % (url, args.bitcoind_rpc_username, args.bitcoind_rpc_password)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         work, height = yield getwork(bitcoind)
         print '    ...success!'
@@ -170,7 +170,7 @@ def main(args):
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
-        print "Testing bitcoind P2P connection to '%s:%s'..." % (args.bitcoind_address, args.bitcoind_p2p_port)
+        print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
         factory = bitcoin.p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         my_script = yield get_payout_script(factory)
@@ -235,12 +235,12 @@ def main(args):
                 print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
                 return
             
-            #print "Received share %x" % (share.hash,)
+            #print 'Received share %x' % (share.hash,)
             
             tracker.add(share)
             best, desired = tracker.think(ht)
             for peer2, share_hash in desired:
-                print "Requesting parent share %x" % (share_hash,)
+                print 'Requesting parent share %x' % (share_hash,)
                 peer2.send_getshares(hashes=[share_hash])
             
             if share.gentx is not None:
@@ -264,9 +264,9 @@ def main(args):
         
         def p2p_share_hash(share_hash, peer):
             if share_hash in tracker.shares:
-                print "Got share hash, already have, ignoring. Hash: %x" % (share_hash,)
+                print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
             else:
-                print "Got share hash, requesting! Hash: %x" % (share_hash,)
+                print 'Got share hash, requesting! Hash: %x' % (share_hash,)
                 peer.send_getshares(hashes=[share_hash])
         
         def p2p_get_to_best(chain_id_data, have, peer):
@@ -307,7 +307,7 @@ def main(args):
             nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:
             print
-            print "Error resolving bootstrap node IP:"
+            print 'Error resolving bootstrap node IP:'
             log.err()
             print
         
@@ -349,17 +349,18 @@ def main(args):
         def compute(state):
             extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             # XXX limit to merkle_branch and block max size - 1000000 byte
+            # and sigops
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
                 new_script=my_script,
                 subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
-                nonce=struct.pack("<Q", random.randrange(2**64)),
+                nonce=struct.pack('<Q', random.randrange(2**64)),
                 block_target=state['target'],
                 net=args.net,
             )
             print 'Generating!', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']//1000000
-            print "Target: %x" % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
+            print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
@@ -369,10 +370,10 @@ def main(args):
             if state['best_share_hash'] is not None:
                 timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
                 if timestamp2 > timestamp:
-                    print "Toff", timestamp2 - timestamp
+                    print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
             ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'])
-            #print "SENT", 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
+            #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
             return ba.getwork(p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'])
         
         def got_response(data):
@@ -380,7 +381,7 @@ def main(args):
             header = bitcoin.getwork.decode_data(data)
             transactions = merkle_root_to_transactions.get(header['merkle_root'], None)
             if transactions is None:
-                print "Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool"
+                print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                 return False
             block = dict(header=header, txs=transactions)
             hash_ = bitcoin.data.block_header_type.hash256(block['header'])
@@ -430,9 +431,9 @@ def main(args):
                 self.seen_at_block = seen_at_block
                 self.mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
                 #print
-                #print "%x %r" % (seen_at_block, tx)
+                #print '%x %r' % (seen_at_block, tx)
                 #for mention in self.mentions:
-                #    print "%x" % mention
+                #    print '%x' % mention
                 #print
                 self.parents_all_in_blocks = False
                 self.value_in = 0
@@ -457,7 +458,7 @@ def main(args):
                 if not self.parents_all_in_blocks:
                     return False
                 x = self.is_good2()
-                #print "is_good:", x
+                #print 'is_good:', x
                 return x
             
             def is_good2(self):
@@ -478,7 +479,7 @@ def main(args):
                 tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
             except:
                 print
-                print "Error handling tx:"
+                print 'Error handling tx:'
                 log.err()
                 print
         factory.new_tx.watch(new_tx)

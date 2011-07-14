@@ -15,7 +15,7 @@ def natural_to_string(n, alphabet=None, min_width=0):
 def string_to_natural(s, alphabet=None):
     if alphabet is None:
         s = s.encode('hex')
-        return int("0"+s, 16)
+        return int('0'+s, 16)
     assert len(set(alphabet)) == len(alphabet)
     if not s or (s != alphabet[0] and s.startswith(alphabet[0])):
         raise ValueError()

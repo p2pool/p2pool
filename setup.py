@@ -3,7 +3,7 @@ from distutils.core import setup
 try:
     import py2exe
 except ImportError:
-    print "missing py2exe"
+    print 'missing py2exe'
 
 
 setup(name='p2pool',

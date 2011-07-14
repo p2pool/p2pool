@@ -158,7 +158,7 @@ class DeferredCacher(object):
             def eb(fail):
                 self.waiting.pop(key).callback(None)
                 print
-                print "Error when requesting noncached value:"
+                print 'Error when requesting noncached value:'
                 fail.printTraceback()
                 print
             self.func(key).addCallback(cb).addErrback(eb)

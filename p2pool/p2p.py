@@ -370,7 +370,7 @@ class Node(object):
     def attempt_ended(self, connector):
         host, port = connector.getDestination().host, connector.getDestination().port
         if (host, port) not in self.attempts:
-            raise ValueError("don't have attempt")
+            raise ValueError('''don't have attempt''')
         if connector is not self.attempts[host, port]:
             raise ValueError('wrong connector')
         del self.attempts[host, port]
@@ -385,7 +385,7 @@ class Node(object):
     
     def lost_conn(self, conn):
         if conn.nonce not in self.peers:
-            raise ValueError("don't have peer")
+            raise ValueError('''don't have peer''')
         if conn is not self.peers[conn.nonce]:
             raise ValueError('wrong conn')
         del self.peers[conn.nonce]

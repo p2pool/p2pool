@@ -15,7 +15,7 @@ class CompressedList(bitcoin_data.Type):
     def read(self, file):
         values, file = bitcoin_data.ListType(self.inner).read(file)
         if values != sorted(set(values)):
-            raise ValueError("invalid values")
+            raise ValueError('invalid values')
         references, file = bitcoin_data.ListType(bitcoin_data.VarIntType()).read(file)
         return [values[reference] for reference in references], file
     
@@ -166,8 +166,8 @@ class Share(object):
         self.hash = bitcoin_data.block_header_type.hash256(header)
         
         if self.hash > self.target2:
-            print "hash", hex(self.hash)
-            print "targ", hex(self.target2)
+            print 'hash', hex(self.hash)
+            print 'targ', hex(self.target2)
             raise ValueError('not enough work!')
         
         
@@ -198,11 +198,11 @@ class Share(object):
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
         if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
-            raise ValueError("gentx doesn't match header via merkle_branch")
+            raise ValueError('''gentx doesn't match header via merkle_branch''')
         
         if self.other_txs is not None:
             if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
-                raise ValueError("gentx doesn't match header via other_txs")
+                raise ValueError('''gentx doesn't match header via other_txs''')
         
         self.gentx = gentx
         
@@ -246,9 +246,9 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
         pre_target3 = math.clip(pre_target2, (0, 2**256//2**24 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
-        print attempts_per_second//1000, "KHASH"
-        #print "TARGET", 2**256//target2, 2**256/pre_target
-        #print "ATT", bitcoin_data.target_to_average_attempts(target2)//1000
+        print attempts_per_second//1000, 'KHASH'
+        #print 'TARGET', 2**256//target2, 2**256/pre_target
+        #print 'ATT', bitcoin_data.target_to_average_attempts(target2)//1000
     
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
@@ -307,35 +307,9 @@ class OkayTracker(bitcoin_data.Tracker):
         bitcoin_data.Tracker.__init__(self)
         self.net = net
         self.verified = bitcoin_data.Tracker()
-    """
+        
         self.okay_cache = {} # hash -> height
     
-    def is_okay(self, start, _height_after=0):
-        '''
-        Returns:
-            {'result': 'okay', verified_height: ...} # if share has an okay parent or if share has CHAIN_LENGTH children and CHAIN_LENTH parents that it verified with
-            {'result': 'needs_share', 'share_hash': ...} # if share doesn't have CHAIN_LENGTH parents
-            #{'result': 'needs_share_shares', 'share_hash': ...} # if share has CHAIN_LENGTH children and needs its shares to
-            {'result': 'not_okay'} # if the share has a not okay parent or if the share has an okay parent and failed validation
-        '''
-        
-        if start in self.okay_cache:
-            return dict(result='okay', verified_height=self.okay_cache['start'])
-        
-        share = self.shares[start]
-        if start not in self.shares:
-            return dict(result='needs_share', share_hash=start)
-        
-        length = len
-        to_end_rev = []
-        for share in itertools.islice(self.get_chain(start), self.net.CHAIN_LENGTH):
-            if share in self.okay_cache:
-                return validate(share, to_end_rev[::-1])
-            to_end_rev.append(share)
-        # picking up last share from for loop, ew
-        self.okay_cache.add(share)
-        return validate(share, to_end_rev[::-1])
-    """
     def attempt_verify(self, share):
         height, last = self.get_height_and_last(share.hash)
         if height < self.net.CHAIN_LENGTH and last is not None:
@@ -346,7 +320,7 @@ class OkayTracker(bitcoin_data.Tracker):
             share.check(self, self.net)
         except:
             print
-            print "Share check failed:"
+            print 'Share check failed:'
             log.err()
             print
             return False
@@ -382,7 +356,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 get = can
             else:
                 get = want
-            #print "Z", head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
+            #print 'Z', head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
             for share in itertools.islice(self.get_chain_known(last_hash), get):
                 if not self.attempt_verify(share):
                     break
