@@ -348,6 +348,7 @@ def main(args):
         
         def compute(state):
             extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
+            # XXX limit to merkle_branch and block max size - 1000000 byte
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],

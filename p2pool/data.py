@@ -138,6 +138,9 @@ class Share(object):
                     raise ValueError('invalid merkle_branch and other_txs')
             merkle_branch = new_merkle_branch
         
+        if len(merkle_branch) > 16:
+            raise ValueError('merkle_branch too long!')
+        
         self.header = header
         self.share_info = share_info
         self.merkle_branch = merkle_branch
@@ -149,9 +152,16 @@ class Share(object):
         self.new_script = self.share_info['new_script']
         self.subsidy = self.share_info['subsidy']
         
+        if len(self.new_script) > 100:
+            raise ValueError('new_script too long!')
+        
         self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
         self.previous_shares_hash = self.share_data['previous_shares_hash']
         self.target2 = self.share_data['target2']
+        self.nonce = self.share_data['nonce']
+        
+        if len(self.nonce) > 20:
+            raise ValueError('nonce too long!')
         
         self.hash = bitcoin_data.block_header_type.hash256(header)
         
