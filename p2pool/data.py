@@ -346,7 +346,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
-        for head in self.verified.heads:
+        for head in list(self.verified.heads):
             head_height, last_hash = self.verified.get_height_and_last(head)
             last_height, last_last_hash = self.get_height_and_last(last_hash)
             # XXX review boundary conditions
