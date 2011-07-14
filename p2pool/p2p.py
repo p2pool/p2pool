@@ -2,9 +2,9 @@ from __future__ import division
 
 import random
 import time
-import traceback
 
 from twisted.internet import defer, protocol, reactor
+from twisted.python import log
 
 from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
@@ -334,7 +334,7 @@ class Node(object):
                         #print 'Trying to connect to', host, port
                         reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
             except:
-                traceback.print_exc()
+                log.err()
             
             yield deferral.sleep(random.expovariate(1/5))
     
@@ -345,7 +345,7 @@ class Node(object):
                 if len(self.addr_store) < self.preferred_addrs and self.peers:
                     random.choice(self.peers.values()).send_getaddrs(count=8)
             except:
-                traceback.print_exc()
+                log.err()
             
             yield deferral.sleep(random.expovariate(1/20))
     

@@ -10,10 +10,10 @@ import sqlite3
 import struct
 import subprocess
 import sys
-import traceback
 
 from twisted.internet import defer, reactor
 from twisted.web import server
+from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
@@ -92,7 +92,10 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
         try:
             block = yield get_block(block_hash)
         except:
-            traceback.print_exc()
+            print
+            print "Error getting block while searching block chain:"
+            log.err()
+            print
             continue
         coinbase_data = block['txs'][0]['tx_ins'][0]['script']
         try:
@@ -113,7 +116,7 @@ def get_last_p2pool_block_hash(current_block_hash, get_block, net):
                 print
                 print 'Error matching block:'
                 print 'block:', block
-                traceback.print_exc()
+                log.err()
                 print
         block_hash = block['header']['previous_block']
 
@@ -145,7 +148,7 @@ def get_payout_script(factory):
             except Exception:
                 print
                 print 'Error getting payout script:'
-                traceback.print_exc()
+                log.err()
                 print
             else:
                 defer.returnValue(my_script)
@@ -303,7 +306,10 @@ def main(args):
         try:
             nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:
-            traceback.print_exc()
+            print
+            print "Error resolving bootstrap node IP:"
+            log.err()
+            print
         
         p2p_node = p2p.Node(
             current_work=current_work,
@@ -392,7 +398,7 @@ def main(args):
             except:
                 print
                 print 'Error processing data received from worker:'
-                traceback.print_exc()
+                log.err()
                 print
                 return False
             else:
@@ -470,7 +476,10 @@ def main(args):
                 tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
                 tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
             except:
-                traceback.print_exc()
+                print
+                print "Error handling tx:"
+                log.err()
+                print
         factory.new_tx.watch(new_tx)
         
         def new_block(block):
@@ -486,7 +495,7 @@ def main(args):
     except:
         print
         print 'Fatal error:'
-        traceback.print_exc()
+        log.err()
         print
         reactor.stop()
 

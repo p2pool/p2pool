@@ -2,7 +2,8 @@ from __future__ import division
 
 import itertools
 import random
-import traceback
+
+from twisted.python import log
 
 from p2pool.util import math
 from p2pool.bitcoin import data as bitcoin_data
@@ -180,14 +181,14 @@ class Share(object):
             if self.header['timestamp'] <= math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(self.previous_share_hash), 11)), use_float=False):
                 raise ValueError('share from too far in the past!')
         
+        # XXX use adjusted time
         if self.header['timestamp'] > time.time() + 2*60*60:
             raise ValueError('share from too far in the future!')
         
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
-        if self.merkle_branch is not None:
-            if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
-                raise ValueError("gentx doesn't match header via merkle_branch")
+        if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
+            raise ValueError("gentx doesn't match header via merkle_branch")
         
         if self.other_txs is not None:
             if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
@@ -291,29 +292,6 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
 
 
 
-
-if __name__ == '__main__':
-    class FakeShare(object):
-        def __init__(self, hash, previous_share_hash):
-            self.hash = hash
-            self.previous_share_hash = previous_share_hash
-    
-    t = Tracker()
-    
-    t.add_share(FakeShare(1, 2))
-    print t.heads, t.tails
-    t.add_share(FakeShare(4, 0))
-    print t.heads, t.tails
-    t.add_share(FakeShare(3, 4))
-    print t.heads, t.tails
-    t.add_share(FakeShare(5, 0))
-    print t.heads, t.tails
-    t.add_share(FakeShare(0, 1))
-    print t.heads, t.tails
-    
-    for share_hash in t.shares:
-        print share_hash, t.get_height_and_last(share_hash)
-
 class OkayTracker(bitcoin_data.Tracker):
     def __init__(self, net):
         bitcoin_data.Tracker.__init__(self)
@@ -349,6 +327,9 @@ class OkayTracker(bitcoin_data.Tracker):
         return validate(share, to_end_rev[::-1])
     """
     def attempt_verify(self, share):
+        height, last = self.get_height_and_last(share.hash)
+        if height < self.net.CHAIN_LENGTH and last is not None:
+            raise AssertionError()
         if share.hash in self.verified.shares:
             return True
         try:
@@ -356,31 +337,29 @@ class OkayTracker(bitcoin_data.Tracker):
         except:
             print
             print "Share check failed:"
-            traceback.print_exc()
+            log.err()
             print
             return False
         else:
             self.verified.add(share)
             return True
+    
     def think(self, ht):
         desired = set()
         
+        # O(len(self.heads))
+        #   make 'unverified heads' set?
         # for each overall head, attempt verification
         # if it fails, attempt on parent, and repeat
         # if no successful verification because of lack of parents, request parent
         for head in self.heads:
             head_height, last = self.get_height_and_last(head)
-            if head_height < self.net.CHAIN_LENGTH and last is not None:
-                # request more
-                print 1, hex(last)
-                desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
-                continue
             
             for share in itertools.islice(self.get_chain_known(head), None if last is None else head_height - self.net.CHAIN_LENGTH):
                 if self.attempt_verify(share):
                     break
-        
-        last = object
+            else:
+                desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in self.verified.heads:
@@ -406,7 +385,9 @@ class OkayTracker(bitcoin_data.Tracker):
             score2 = 0
             attempts = 0
             max_height = 0
-            for share in itertools.islice(self.verified.get_chain_known(share_hash), self.net.CHAIN_LENGTH):
+            # XXX should only look past a certain share, not at recent ones
+            share2_hash = self.verified.get_nth_parent(share_hash, self.net.CHAIN_LENGTH//2)
+            for share in itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH):
                 max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
                 attempts += bitcoin_data.target_to_average_attempts(share.target2)
                 this_score = attempts//(ht.get_highest_height() - max_height + 1)

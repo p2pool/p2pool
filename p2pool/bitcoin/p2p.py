@@ -8,10 +8,10 @@ import hashlib
 import random
 import struct
 import time
-import traceback
 import zlib
 
 from twisted.internet import defer, protocol, reactor
+from twisted.python import log
 
 from . import data as bitcoin_data
 from p2pool.util import variable, datachunker, deferral
@@ -59,7 +59,7 @@ class BaseProtocol(protocol.Protocol):
                 payload2 = type_.unpack(payload)
             except:
                 print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                traceback.print_exc()
+                log.err()
                 continue
             
             handler = getattr(self, 'handle_' + command, None)
@@ -74,7 +74,7 @@ class BaseProtocol(protocol.Protocol):
                 handler(**payload2)
             except:
                 print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                traceback.print_exc()
+                log.err()
                 continue
     
     def sendPacket(self, command, payload2):
@@ -408,6 +408,6 @@ if __name__ == '__main__':
             try:
                 print h.getHeight(0xa285c3cb2a90ac7194cca034512748289e2526d9d7ae6ee7523)
             except Exception, e:
-                traceback.print_exc()
+                log.err()
     
     reactor.run()

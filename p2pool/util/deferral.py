@@ -1,10 +1,9 @@
 from __future__ import division
 
 import random
-import traceback
 
 from twisted.internet import defer, reactor
-from twisted.python import failure
+from twisted.python import failure, log
 
 def sleep(t):
     d = defer.Deferred()
@@ -28,7 +27,7 @@ def retry(message, delay):
                 except:
                     print
                     print message
-                    traceback.print_exc()
+                    log.err()
                     print
                     
                     yield sleep(delay)
@@ -158,6 +157,9 @@ class DeferredCacher(object):
                 self.waiting.pop(key).callback(None)
             def eb(fail):
                 self.waiting.pop(key).callback(None)
+                print
+                print "Error when requesting noncached value:"
                 fail.printTraceback()
+                print
             self.func(key).addCallback(cb).addErrback(eb)
             raise NotNowError()

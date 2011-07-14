@@ -401,6 +401,7 @@ class Tracker(object):
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
         self.heights = {} # share_hash -> height_to, other_share_hash
+        self.skips = {} # share_hash -> skip list
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
@@ -493,6 +494,70 @@ class Tracker(object):
     
     def get_highest_height(self):
         return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
+    
+    def get_nth_parent_hash(self, item_hash, n):
+        if n < 0:
+            raise ValueError("n must be >= 0")
+        
+        updates = {}
+        while n:
+            if item_hash not in self.skips:
+                self.skips[item_hash] = math.geometric(.5), [(1, self.shares[item_hash].previous_hash)]
+            skip_length, skip = self.skips[item_hash]
+            
+            for i in xrange(skip_length):
+                if i in updates:
+                    n_then, that_hash = updates.pop(i)
+                    x, y = self.skips[that_hash]
+                    assert len(y) == i
+                    y.append((n_then - n, item_hash))
+            
+            for i in xrange(len(skip), skip_length):
+                updates[i] = n, item_hash
+            
+            for i, (dist, then_hash) in enumerate(reversed(skip)):
+                if dist <= n:
+                    break
+            else:
+                raise AssertionError()
+            
+            n -= dist
+            item_hash = then_hash
+        
+        return item_hash
+    
+    def get_nth_parent2(self, item_hash, n):
+        x = item_hash
+        for i in xrange(n):
+            x = self.shares[item_hash].previous_hash
+        return x
+
+if __name__ == '__main__':
+    class FakeShare(object):
+        def __init__(self, hash, previous_hash):
+            self.hash = hash
+            self.previous_hash = previous_hash
+    
+    t = Tracker()
+    
+    for i in xrange(10000):
+        t.add(FakeShare(i, i - 1 if i > 0 else None))
+    
+    #for share_hash in sorted(t.shares):
+    #    print share_hash, t.get_height_and_last(share_hash)
+    
+    print t.get_nth_parent_hash(9000, 5000)
+    print t.get_nth_parent_hash(9001, 412)
+    #print t.get_nth_parent_hash(90, 51)
+    
+    for share_hash in sorted(t.shares):
+        print str(share_hash).rjust(4),
+        x = t.skips.get(share_hash, None)
+        if x is not None:
+            print str(x[0]).rjust(4),
+            for a in x[1]:
+                print str(a).rjust(10),
+        print
 
 # network definitions
 

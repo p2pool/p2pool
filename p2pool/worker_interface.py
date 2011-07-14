@@ -1,7 +1,6 @@
 from __future__ import division
 
 import json
-import traceback
 
 from twisted.internet import defer
 
