@@ -444,7 +444,7 @@ class Tracker(object):
             height += height_inc
         for update_hash, height_then in updates:
             self.heights[update_hash] = height - height_then, share_hash
-        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
+        #assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
         return height, share_hash
     
     def get_height_and_last2(self, share_hash):

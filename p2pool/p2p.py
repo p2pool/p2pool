@@ -183,9 +183,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     message_getshares = bitcoin_data.ComposedType([
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
+        ('parents', bitcoin_data.VarIntType()),
     ])
-    def handle_getshares(self, hashes):
-        self.node.handle_get_shares(hashes, self)
+    def handle_getshares(self, hashes, parents):
+        self.node.handle_get_shares(hashes, parents, self)
     
     message_share0s = bitcoin_data.ComposedType([
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
@@ -409,8 +410,8 @@ class Node(object):
     def handle_get_to_best(self, have, peer):
         print 'handle_get_to_best', (have, peer)
     
-    def handle_get_shares(self, hashes, peer):
-        print 'handle_get_shares', (hashes, peer)
+    def handle_get_shares(self, hashes, parents, peer):
+        print 'handle_get_shares', (hashes, parents, peer)
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)

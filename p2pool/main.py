@@ -203,7 +203,9 @@ def main(args):
         def set_real_work():
             work, height = yield getwork(bitcoind)
             best, desired = tracker.think(ht)
-            # XXX desired?
+            for peer2, share_hash in desired:
+                print 'Requesting parent share %x' % (share_hash,)
+                peer2.send_getshares(hashes=[share_hash], parents=2000)
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -239,9 +241,9 @@ def main(args):
             
             tracker.add(share)
             best, desired = tracker.think(ht)
-            for peer2, share_hash in desired:
-                print 'Requesting parent share %x' % (share_hash,)
-                peer2.send_getshares(hashes=[share_hash])
+            #for peer2, share_hash in desired:
+            #    print 'Requesting parent share %x' % (share_hash,)
+            #    peer2.send_getshares(hashes=[share_hash], parents=2000)
             
             if share.gentx is not None:
                 if share.hash <= share.header['target']:
@@ -267,9 +269,10 @@ def main(args):
                 print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
             else:
                 print 'Got share hash, requesting! Hash: %x' % (share_hash,)
-                peer.send_getshares(hashes=[share_hash])
+                peer.send_getshares(hashes=[share_hash], parents=0)
         
         def p2p_get_to_best(chain_id_data, have, peer):
+            # XXX
             chain = get_chain(chain_id_data)
             if chain.highest.value is None:
                 return
@@ -285,10 +288,11 @@ def main(args):
                     continue
                 peer.send_share(chain.share2s[share_hash].share, full=True) # doesn't have to be full ... but does that still guarantee ordering?
         
-        def p2p_get_shares(share_hashes, peer):
+        def p2p_get_shares(share_hashes, parents, peer):
+            parents = min(parents, 100//len(share_hashes))
             for share_hash in share_hashes:
-                if share_hash in tracker.shares:
-                    peer.send_share(tracker.shares[share_hash], full=True)
+                for share in itertools.islice(tracker.get_chain_known(share_hash), parents + 1):
+                    peer.send_share(share, full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         

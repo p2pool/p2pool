@@ -235,7 +235,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     lookbehind = 200
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), lookbehind))
     if len(chain) < lookbehind:
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**24 - 1)
+        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
         attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
         time = chain[0].timestamp - chain[-1].timestamp
@@ -244,7 +244,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         attempts_per_second = attempts//time
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**24 - 1))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**20 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
         print attempts_per_second//1000, 'KHASH'
         #print 'TARGET', 2**256//target2, 2**256/pre_target
@@ -339,7 +339,7 @@ class OkayTracker(bitcoin_data.Tracker):
         for head in self.heads:
             head_height, last = self.get_height_and_last(head)
             
-            for share in itertools.islice(self.get_chain_known(head), None if last is None else head_height - self.net.CHAIN_LENGTH):
+            for share in itertools.islice(self.get_chain_known(head), None if last is None else max(0, head_height - self.net.CHAIN_LENGTH)):
                 if self.attempt_verify(share):
                     break
             else:
@@ -370,11 +370,12 @@ class OkayTracker(bitcoin_data.Tracker):
             attempts = 0
             max_height = 0
             # XXX should only look past a certain share, not at recent ones
-            share2_hash = self.verified.get_nth_parent(share_hash, self.net.CHAIN_LENGTH//2)
+            share2_hash = self.verified.get_nth_parent_hash(share_hash, self.net.CHAIN_LENGTH//2) if last is not None else share_hash
             for share in itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH):
                 max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
                 attempts += bitcoin_data.target_to_average_attempts(share.target2)
                 this_score = attempts//(ht.get_highest_height() - max_height + 1)
+                #this_score = -(ht.get_highest_height() - max_height + 1)//attempts
                 if this_score > score2:
                     score2 = this_score
             res = (min(head_height, self.net.CHAIN_LENGTH), score2)
@@ -397,7 +398,7 @@ class Mainnet(bitcoin_data.Mainnet):
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 5 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
+    CHAIN_LENGTH = 60*60//5 # shares
     SPREAD = 3 # blocks
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '1ae3479e4eb6700a'.decode('hex')
