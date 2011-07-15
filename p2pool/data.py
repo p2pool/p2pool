@@ -356,7 +356,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         return best, desired
     
-    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
+    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(15, get_touches=False))
     def score(self, share_hash, ht):
         head_height, last = self.verified.get_height_and_last(share_hash)
         score2 = 0

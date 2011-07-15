@@ -1,5 +1,6 @@
 from __future__ import division
 
+import random
 import time
 
 from twisted.internet import reactor
@@ -121,13 +122,14 @@ class ExpiringDict(object):
             node.delete()
         
         new_value = old_value if value is self._nothing else value
-        self.d[key] = self.expiry_deque.append((time.time(), key)), new_value
+        self.d[key] = self.expiry_deque.append((time.time() + random.expovariate(1/self.expiry_time), key)), new_value
         return new_value
     
     def expire(self):
+        t = time.time()
         for node in self.expiry_deque:
             timestamp, key = node.contents
-            if timestamp + self.expiry_time > time.time():
+            if timestamp > t:
                 break
             del self.d[key]
             node.delete()

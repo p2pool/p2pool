@@ -111,7 +111,6 @@ class BaseProtocol(protocol.Protocol):
             raise ValueError('compressed payload too long')
         data = self._prefix + struct.pack('<12sI', command, len(compressed_payload)) + checksum + compressed_payload
         self.transport.write(data)
-        print "SEND", command, len(compressed_payload)
     
     def __getattr__(self, attr):
         prefix = 'send_'
