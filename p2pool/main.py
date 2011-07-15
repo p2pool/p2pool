@@ -246,7 +246,7 @@ def main(args):
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
-        def compute(state):
+        def compute(state, all_targets):
             extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             # XXX limit to merkle_branch and block max size - 1000000 byte
             # and sigops
@@ -274,7 +274,10 @@ def main(args):
                     timestamp = timestamp2
             ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'])
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
-            return ba.getwork(p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'])
+            target = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
+            if not all_targets:
+                target = min(2**256//2**32 - 1, target)
+            return ba.getwork(target)
         
         def got_response(data):
             try:

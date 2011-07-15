@@ -15,7 +15,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def render_GET(self, request):
         request.setHeader('X-Long-Polling', '/long-polling')
         
-        res = self.compute((yield self.work.changed.get_deferred()))
+        res = self.compute((yield self.work.changed.get_deferred()), 'x-all-targets' in map(str.lower, request.received_headers))
         
         request.write(json.dumps({
             'jsonrpc': '2.0',
@@ -41,8 +41,9 @@ class WorkerInterface(jsonrpc.Server):
             LongPollingWorkerInterface(self.work, self.compute))
         self.putChild('', self)
     
-    def rpc_getwork(self, data=None):
+    def rpc_getwork(self, headers, data=None):
         if data is not None:
             return self.response_callback(data)
         
-        return self.compute(self.work.value)
+        return self.compute(self.work.value, 'x-all-targets' in map(str.lower, headers))
+    rpc_getwork.takes_headers = True
