@@ -7,6 +7,7 @@ from twisted.python import log
 
 from p2pool.util import math
 from p2pool.bitcoin import data as bitcoin_data
+from p2pool.util import memoize, expiring_dict
 
 class CompressedList(bitcoin_data.Type):
     def __init__(self, inner):
@@ -350,12 +351,9 @@ class OkayTracker(bitcoin_data.Tracker):
             head_height, last_hash = self.verified.get_height_and_last(head)
             last_height, last_last_hash = self.get_height_and_last(last_hash)
             # XXX review boundary conditions
-            want = self.net.CHAIN_LENGTH - head_height
+            want = max(self.net.CHAIN_LENGTH - head_height, 0)
             can = max(last_height - 1 - self.net.CHAIN_LENGTH, 0) if last_last_hash is not None else last_height
-            if want > can:
-                get = can
-            else:
-                get = want
+            get = min(want, can)
             #print 'Z', head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
             for share in itertools.islice(self.get_chain_known(last_hash), get):
                 if not self.attempt_verify(share):
@@ -364,26 +362,29 @@ class OkayTracker(bitcoin_data.Tracker):
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
         
         # decide best verified head
-        def score(share_hash):
-            head_height, last = self.verified.get_height_and_last(share_hash)
-            score2 = 0
-            attempts = 0
-            max_height = 0
-            # XXX should only look past a certain share, not at recent ones
-            share2_hash = self.verified.get_nth_parent_hash(share_hash, self.net.CHAIN_LENGTH//2) if last is not None else share_hash
-            for share in itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH):
-                max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
-                attempts += bitcoin_data.target_to_average_attempts(share.target2)
-                this_score = attempts//(ht.get_highest_height() - max_height + 1)
-                #this_score = -(ht.get_highest_height() - max_height + 1)//attempts
-                if this_score > score2:
-                    score2 = this_score
-            res = (min(head_height, self.net.CHAIN_LENGTH), score2)
-            print res
-            return res
-        best = max(self.verified.heads, key=score) if self.verified.heads else None
+        best = max(self.verified.heads, key=lambda h: self.score(h, ht)) if self.verified.heads else None
         
         return best, desired
+    
+    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
+    def score(self, share_hash, ht):
+        head_height, last = self.verified.get_height_and_last(share_hash)
+        score2 = 0
+        attempts = 0
+        max_height = 0
+        # XXX should only look past a certain share, not at recent ones
+        share2_hash = self.verified.get_nth_parent_hash(share_hash, min(self.net.CHAIN_LENGTH//2, head_height//2)) if last is not None else share_hash
+        # XXX this must go in the opposite direction for max_height to make sense
+        for share in reversed(list(itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH))):
+            max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
+            attempts += bitcoin_data.target_to_average_attempts(share.target2)
+            this_score = attempts//(ht.get_highest_height() - max_height + 1)
+            #this_score = -(ht.get_highest_height() - max_height + 1)//attempts
+            if this_score > score2:
+                score2 = this_score
+        res = (min(head_height, self.net.CHAIN_LENGTH), score2)
+        print res
+        return res
 
 
 class Mainnet(bitcoin_data.Mainnet):

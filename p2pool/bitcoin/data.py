@@ -250,15 +250,15 @@ class ChecksummedType(Type):
         obj, file = self.inner.read(file)
         data = self.inner.pack(obj)
         
-        if file.read(4) != hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]:
+        checksum, file = read(file, 4)
+        if checksum != hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]:
             raise ValueError('invalid checksum')
         
         return obj, file
     
     def write(self, file, item):
         data = self.inner.pack(item)
-        file = file, data
-        return file, hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
+        return (file, data), hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
 
 class FloatingIntegerType(Type):
     # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
@@ -390,6 +390,14 @@ def address_to_pubkey_hash(address, net):
     if x['version'] != net.BITCOIN_ADDRESS_VERSION:
         raise ValueError('address not for this net!')
     return x['pubkey_hash']
+
+# transactions
+
+def pubkey_to_script2(pubkey):
+    return ('\x41' + pubkey_type.pack(pubkey)) + '\xac'
+
+def pubkey_hash_to_script2(pubkey_hash):
+    return '\x76\xa9' + ('\x14' + ShortHashType().pack(pubkey_hash)) + '\x88\xac'
 
 # linked list tracker
 

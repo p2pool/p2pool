@@ -10,7 +10,7 @@ import struct
 import time
 import zlib
 
-from twisted.internet import defer, protocol, reactor
+from twisted.internet import defer, protocol, reactor, task
 from twisted.python import log
 
 from . import data as bitcoin_data
@@ -29,19 +29,34 @@ class BaseProtocol(protocol.Protocol):
             command = (yield 12).rstrip('\0')
             length, = struct.unpack('<I', (yield 4))
             
+            if length > self.max_net_payload_length:
+                print "length too long"
+                continue
+            
             if self.use_checksum:
                 checksum = yield 4
             else:
                 checksum = None
             
-            payload = yield length
+            compressed_payload = yield length
             
             if self.compress:
                 try:
-                    payload = zlib.decompress(payload)
+                    d = zlib.decompressobj()
+                    payload = d.decompress(compressed_payload, self.max_payload_length)
+                    if d.unconsumed_tail:
+                        print "compressed payload expanded too much"
+                        continue
+                    assert not len(payload) > self.max_payload_length
                 except:
                     print 'FAILURE DECOMPRESSING'
+                    log.err()
                     continue
+            else:
+                if len(compressed_payload) > self.max_payload_length:
+                    print "compressed payload expanded too much"
+                    continue
+                payload = compressed_payload
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
@@ -85,13 +100,16 @@ class BaseProtocol(protocol.Protocol):
             raise ValueError('invalid command')
         #print 'SEND', command, repr(payload2)[:500]
         payload = type_.pack(payload2)
+        if len(payload) > self.max_payload_length:
+            raise ValueError('payload too long')
         if self.use_checksum:
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
         else:
             checksum = ''
-        if self.compress:
-            payload = zlib.compress(payload)
-        data = self._prefix + struct.pack('<12sI', command, len(payload)) + checksum + payload
+        compressed_payload = zlib.compress(payload) if self.compress else payload
+        if len(compressed_payload) > self.max_net_payload_length:
+            raise ValueError('compressed payload too long')
+        data = self._prefix + struct.pack('<12sI', command, len(compressed_payload)) + checksum + compressed_payload
         self.transport.write(data)
     
     def __getattr__(self, attr):
@@ -107,6 +125,8 @@ class Protocol(BaseProtocol):
         self._prefix = net.BITCOIN_P2P_PREFIX
     
     version = 0
+    
+    max_payload_length = max_net_payload_length = 1000000
     
     compress = False
     @property
@@ -300,84 +320,66 @@ class HeaderWrapper(object):
 
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
-    # XXX think keeps object alive
     
     def __init__(self, factory):
         self.factory = factory
         self.tracker = bitcoin_data.Tracker()
         self.most_recent = None
         
-        self.factory.new_headers.watch(self.heard_headers)
+        self._watch1 = self.factory.new_headers.watch(self.heard_headers)
+        self._watch2 = self.factory.new_block.watch(self.heard_block)
+        
+        self.requested = set()
+        self._clear_task = task.LoopingCall(self.requested.clear)
+        self._clear_task.start(60)
         
         self.think()
     
-    @defer.inlineCallbacks
     def think(self):
-        last = None
-        yield self.factory.getProtocol()
-        while True:
-            highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
-            it = self.tracker.get_chain_known(highest_head)
-            have = []
-            step = 1
-            try:
-                cur = it.next()
-            except StopIteration:
-                cur = None
-            while True:
-                if cur is None:
-                    break
-                have.append(cur.hash)
-                for i in xrange(step): # XXX inefficient
-                    try:
-                        cur = it.next()
-                    except StopIteration:
-                        break
-                else:
-                    if len(have) > 10:
-                        step *= 2
-                    continue
+        highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
+        height, last = self.tracker.get_height_and_last(highest_head)
+        cur = highest_head
+        cur_height = height
+        have = []
+        step = 1
+        while cur is not None:
+            have.append(cur)
+            if step > cur_height:
                 break
-            chain = list(self.tracker.get_chain_known(highest_head))
-            if chain:
-                have.append(chain[-1].hash)
-            if not have:
-                have.append(0)
-            if have == last:
-                yield deferral.sleep(1)
-                last = None
+            cur = self.tracker.get_nth_parent_hash(cur, step)
+            cur_height -= step
+            if len(have) > 10:
+                step *= 2
+        if height:
+            have.append(self.tracker.get_nth_parent_hash(highest_head, height - 1))
+        if not have:
+            have.append(0)
+        self.request(have, None)
+        
+        for tail in self.tracker.tails:
+            if tail is None:
                 continue
-            
-            last = have
-            good_tails = [x for x in self.tracker.tails if x is not None]
-            self.request(have, random.choice(good_tails) if good_tails else None)
-            for tail in self.tracker.tails:
-                if tail is None:
-                    continue
-                self.request([], tail)
-            try:
-                yield self.factory.new_headers.get_deferred(timeout=5)
-            except defer.TimeoutError:
-                pass
+            self.request([], tail)
+        for head in self.tracker.heads:
+            self.request([head], None)
     
     def heard_headers(self, headers):
-        header2s = map(HeaderWrapper, headers)
         for header2 in header2s:
-            self.tracker.add(header2)
-        if header2s:
-            if self.tracker.get_height_and_last(header2s[-1].hash)[1] is None:
-                self.most_recent = header2s[-1].hash
-                if random.random() < .6:
-                    self.request([header2s[-1].hash], None)
-        print len(self.tracker.shares)
+            self.tracker.add(HeaderWrapper(header2))
+        self.think()
     
+    def heard_block(self, block_hash):
+        self.request([], block_hash)
+    
+    @defer.inlineCallbacks
     def request(self, have, last):
-        #print 'REQ', ('[' + ', '.join(map(hex, have)) + ']', hex(last) if last is not None else None)
-        if self.factory.conn.value is not None:
-            self.factory.conn.value.send_getheaders(version=1, have=have, last=last)
+        if (tuple(have), last) in self.requested:
+            return
+        self.requested.add((tuple(have), last))
+        (yield self.factory.getProtocol()).send_getheaders(version=1, have=have, last=last)
     
     #@defer.inlineCallbacks
-    #XXX should defer
+    #XXX should defer?
     def getHeight(self, block_hash):
         height, last = self.tracker.get_height_and_last(block_hash)
         if last is not None:
@@ -393,6 +395,11 @@ class HeightTracker(object):
     
     def get_highest_height(self):
         return self.tracker.get_highest_height()
+    
+    def stop(self):
+        self.factory.new_headers.unwatch(self._watch1)
+        self.factory.new_block.unwatch(self._watch2)
+        self._clear_task.stop()
 
 if __name__ == '__main__':
     factory = ClientFactory(bitcoin_data.Mainnet)
@@ -405,9 +412,6 @@ if __name__ == '__main__':
     def think():
         while True:
             yield deferral.sleep(1)
-            try:
-                print h.getHeight(0xa285c3cb2a90ac7194cca034512748289e2526d9d7ae6ee7523)
-            except Exception, e:
-                log.err()
+            print h.get_min_height(0xa285c3cb2a90ac7194cca034512748289e2526d9d7ae6ee7523)
     
     reactor.run()

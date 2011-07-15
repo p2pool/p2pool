@@ -24,6 +24,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         self._prefix = self.node.net.PREFIX
     
+    max_payload_length = 1000000
+    max_net_payload_length = 2000000
     use_checksum = True
     compress = True
     
