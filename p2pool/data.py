@@ -35,7 +35,6 @@ merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
 
 share_data_type = bitcoin_data.ComposedType([
     ('previous_share_hash', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
-    ('previous_shares_hash', bitcoin_data.HashType()),
     ('target2', bitcoin_data.FloatingIntegerType()),
     ('nonce', bitcoin_data.VarStrType()),
 ])
@@ -54,7 +53,7 @@ share_info_type = bitcoin_data.ComposedType([
 
 
 share1a_type = bitcoin_data.ComposedType([
-    ('header', bitcoin_data.block_header_type), # merkle_header not completely needed
+    ('header', bitcoin_data.block_header_type),
     ('share_info', share_info_type),
     ('merkle_branch', merkle_branch_type),
 ])
@@ -157,7 +156,6 @@ class Share(object):
             raise ValueError('new_script too long!')
         
         self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
-        self.previous_shares_hash = self.share_data['previous_shares_hash']
         self.target2 = self.share_data['target2']
         self.nonce = self.share_data['nonce']
         
@@ -228,14 +226,9 @@ class Share2(object):
 
 def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
     previous_share2 = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-    #previous_share2 = chain.shares
-    #previous_shares
-    #shares =
-    #shares = (previous_share2.shares if previous_share2 is not None else [net.SCRIPT]*net.SPREAD)[1:-1] + [new_script, new_script]
     
-    lookbehind = 200
-    chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), lookbehind))
-    if len(chain) < lookbehind:
+    chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
+    if len(chain) < net.TARGET_LOOKBEHIND:
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
         attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
@@ -280,8 +273,6 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
-    previous_shares = [] # XXX
-    
     return dict(
         version=1,
         tx_ins=[dict(
@@ -291,7 +282,6 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
                 identifier=net.IDENTIFIER,
                 share_data=dict(
                     previous_share_hash=previous_share_hash,
-                    previous_shares_hash=shares_type.hash256(previous_shares),
                     nonce=nonce,
                     target2=target2,
                 ),
@@ -390,6 +380,7 @@ class OkayTracker(bitcoin_data.Tracker):
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
     IDENTIFIER = '7452839666e1f8f8'.decode('hex')
@@ -398,8 +389,9 @@ class Mainnet(bitcoin_data.Mainnet):
     P2P_PORT = 9333
 
 class Testnet(bitcoin_data.Testnet):
-    SHARE_PERIOD = 5 # seconds
-    CHAIN_LENGTH = 60*60//5 # shares
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '1ae3479e4eb6700a'.decode('hex')

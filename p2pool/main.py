@@ -138,7 +138,7 @@ def main(args):
             for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
-                peer.send_share(share)
+                peer.send_shares([share])
             share.flag_shared()
         
         def p2p_share(share, peer=None):
@@ -181,13 +181,15 @@ def main(args):
                 peer.send_getshares(hashes=[share_hash], parents=0, stops=[])
         
         def p2p_get_shares(share_hashes, parents, stops, peer):
-            parents = min(parents, 100//len(share_hashes))
+            parents = min(parents, 1000//len(share_hashes))
             stops = set(stops)
+            shares = []
             for share_hash in share_hashes:
                 for share in itertools.islice(tracker.get_chain_known(share_hash), parents + 1):
                     if share.hash in stops:
                         break
-                    peer.send_share(share, full=True)
+                    shares.append(share)
+            peer.send_shares(shares, full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         

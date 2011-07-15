@@ -27,7 +27,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     max_payload_length = 1000000
     max_net_payload_length = 2000000
     use_checksum = True
-    compress = True
+    compress = False
     
     other_version = None
     node_var_watch = None
@@ -220,16 +220,25 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             share.peer = self # XXX
             self.node.handle_share(share, self)
     
-    def send_share(self, share, full=False):
-        if share.hash <= share.header['target']:
-            self.send_share1bs(share1bs=[share.as_share1b()])
-        else:
-            if self.mode == 0 and not full:
-                self.send_share0s(hashes=[share.hash])
-            elif self.mode == 1 or full:
-                self.send_share1as(share1as=[share.as_share1a()])
+    def send_shares(self, shares, full=False):
+        share1bs = []
+        share0s = []
+        share1as = []
+        # XXX doesn't need to send full block when it's not urgent
+        # eg. when getting history
+        for share in shares:
+            if share.hash <= share.header['target']:
+                share1bs.append(share.as_share1b())
             else:
-                raise ValueError(self.mode)
+                if self.mode == 0 and not full:
+                    share0s.append(share.hash)
+                elif self.mode == 1 or full:
+                    share1as.append(share.as_share1a())
+                else:
+                    raise ValueError(self.mode)
+        if share1bs: self.send_share1bs(share1bs=share1bs)
+        if share0s: self.send_share0s(share0s=share0s)
+        if share1as: self.send_share1as(share1as=share1as)
     
     def connectionLost(self, reason):
         if self.node_var_watch is not None:
