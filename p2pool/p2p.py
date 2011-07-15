@@ -177,18 +177,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
         ])
     
-    message_gettobest = bitcoin_data.ComposedType([
-        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    def handle_gettobest(self, have):
-        self.node.handle_get_to_best(have, self)
-    
     message_getshares = bitcoin_data.ComposedType([
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
         ('parents', bitcoin_data.VarIntType()),
+        ('stops', bitcoin_data.ListType(bitcoin_data.HashType())),
     ])
-    def handle_getshares(self, hashes, parents):
-        self.node.handle_get_shares(hashes, parents, self)
+    def handle_getshares(self, hashes, parents, stops):
+        self.node.handle_get_shares(hashes, parents, stops, self)
     
     message_share0s = bitcoin_data.ComposedType([
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
@@ -409,11 +404,8 @@ class Node(object):
     def handle_share_hash(self, hash_, peer):
         print 'handle_share_hash', (hash_, peer)
     
-    def handle_get_to_best(self, have, peer):
-        print 'handle_get_to_best', (have, peer)
-    
-    def handle_get_shares(self, hashes, parents, peer):
-        print 'handle_get_shares', (hashes, parents, peer)
+    def handle_get_shares(self, hashes, parents, stops, peer):
+        print 'handle_get_shares', (hashes, parents, stops, peer)
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)

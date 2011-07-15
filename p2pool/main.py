@@ -108,7 +108,13 @@ def main(args):
             best, desired = tracker.think(ht)
             for peer2, share_hash in desired:
                 print 'Requesting parent share %x' % (share_hash,)
-                peer2.send_getshares(hashes=[share_hash], parents=2000, stops=list(set(tracker.heads) | set())
+                peer2.send_getshares(
+                    hashes=[share_hash],
+                    parents=2000,
+                    stops=list(set(tracker.heads) | set(
+                        tracker.get_nth_parent_hash(head, min(max(0, tracker.get_height_and_last(head)[0] - 1), 10)) for head in tracker.heads
+                    )),
+                )
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -174,27 +180,13 @@ def main(args):
                 print 'Got share hash, requesting! Hash: %x' % (share_hash,)
                 peer.send_getshares(hashes=[share_hash], parents=0, stops=[])
         
-        def p2p_get_to_best(chain_id_data, have, peer):
-            # XXX
-            chain = get_chain(chain_id_data)
-            if chain.highest.value is None:
-                return
-            
-            chain_hashes = chain.get_down(chain.highest.value)
-            
-            have2 = set()
-            for hash_ in have:
-                have2 |= set(chain.get_down(hash_))
-            
-            for share_hash in reversed(chain_hashes):
-                if share_hash in have2:
-                    continue
-                peer.send_share(chain.share2s[share_hash].share, full=True) # doesn't have to be full ... but does that still guarantee ordering?
-        
-        def p2p_get_shares(share_hashes, parents, peer):
+        def p2p_get_shares(share_hashes, parents, stops, peer):
             parents = min(parents, 100//len(share_hashes))
+            stops = set(stops)
             for share_hash in share_hashes:
                 for share in itertools.islice(tracker.get_chain_known(share_hash), parents + 1):
+                    if share.hash in stops:
+                        break
                     peer.send_share(share, full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
@@ -228,7 +220,6 @@ def main(args):
         )
         p2p_node.handle_share = p2p_share
         p2p_node.handle_share_hash = p2p_share_hash
-        p2p_node.handle_get_to_best = p2p_get_to_best
         p2p_node.handle_get_shares = p2p_get_shares
         
         p2p_node.start()

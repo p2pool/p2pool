@@ -364,8 +364,8 @@ class HeightTracker(object):
             self.request([head], None)
     
     def heard_headers(self, headers):
-        for header2 in header2s:
-            self.tracker.add(HeaderWrapper(header2))
+        for header in headers:
+            self.tracker.add(HeaderWrapper(header))
         self.think()
     
     def heard_block(self, block_hash):
