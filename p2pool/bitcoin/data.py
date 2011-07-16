@@ -410,6 +410,9 @@ class Tracker(object):
         self.tails = {} # tail hash -> set of head hashes
         self.heights = {} # share_hash -> height_to, other_share_hash
         self.skips = {} # share_hash -> skip list
+        
+        self.id_generator = itertools.count()
+        self.tails_by_id = {}
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
@@ -427,7 +430,10 @@ class Tracker(object):
         if share.previous_hash in self.heads:
             tail = self.heads.pop(share.previous_hash)
         else:
+            #dist, tail = self.get_height_and_last(share.previous_hash) # XXX this should be moved out of the critical area even though it shouldn't matter
             tail = share.previous_hash
+            while tail in self.shares:
+                tail = self.shares[tail].previous_hash
         
         self.tails.setdefault(tail, set()).update(heads)
         if share.previous_hash in self.tails[tail]:
@@ -435,6 +441,92 @@ class Tracker(object):
         
         for head in heads:
             self.heads[head] = tail
+    
+    def test(self):
+        t = Tracker()
+        for s in self.shares.itervalues():
+            t.add(s)
+        
+        assert self.shares == t.shares, (self.shares, t.shares)
+        assert self.reverse_shares == t.reverse_shares, (self.reverse_shares, t.reverse_shares)
+        assert self.heads == t.heads, (self.heads, t.heads)
+        assert self.tails == t.tails, (self.tails, t.tails)
+    
+    def remove(self, share_hash):
+        assert isinstance(share_hash, (int, long, type(None)))
+        if share_hash not in self.shares:
+            raise KeyError()
+        share = self.shares[share_hash]
+        del share_hash
+        
+        if share.hash in self.heads and share.previous_hash in self.tails:
+            tail = self.heads.pop(share.hash)
+            self.tails[tail].remove(share.hash)
+            if not self.tails[share.previous_hash]:
+                self.tails.pop(share.previous_hash)
+        elif share.hash in self.heads:
+            tail = self.heads.pop(share.hash)
+            self.tails[tail].remove(share.hash)
+            if self.reverse_shares[share.previous_hash] != set([share.hash]):
+                pass # has sibling
+            else:
+                self.tails[tail].add(share.previous_hash)
+                self.heads[share.previous_hash] = tail
+        elif share.previous_hash in self.tails:
+            raise NotImplementedError() # will break other things..
+            heads = self.tails[share.previous_hash]
+            if len(self.reverse_shares[share.previous_hash]) > 1:
+                raise NotImplementedError()
+            else:
+                del self.tails[share.previous_hash]
+                for head in heads:
+                    self.heads[head] = share.hash
+                self.tails[share.hash] = set(heads)
+        else:
+            raise NotImplementedError()
+        
+        '''
+        height, tail = self.get_height_and_last(share.hash)
+        
+        if share.hash in self.heads:
+            my_heads = set([share.hash])
+        elif share.previous_hash in self.tails:
+            my_heads = self.tails[share.previous_hash]
+        else:
+            some_heads = self.tails[tail]
+            some_heads_heights = dict((that_head, self.get_height_and_last(that_head)[0]) for that_head in some_heads)
+            my_heads = set(that_head for that_head in some_heads
+                if some_heads_heights[that_head] > height and
+                self.get_nth_parent_hash(that_head, some_heads_heights[that_head] - height) == share.hash)
+        
+        if share.previous_hash != tail:
+            self.heads[share.previous_hash] = tail
+        
+        for head in my_heads:
+            if head != share.hash:
+                self.heads[head] = share.hash
+            else:
+                self.heads.pop(head)
+        
+        if share.hash in self.heads:
+            self.heads.pop(share.hash)
+        
+        
+        self.tails[tail].difference_update(my_heads)
+        if share.previous_hash != tail:
+            self.tails[tail].add(share.previous_hash)
+        if not self.tails[tail]:
+            self.tails.pop(tail)
+        if my_heads != set([share.hash]):
+            self.tails[share.hash] = set(my_heads) - set([share.hash])
+        '''
+        
+        self.shares.pop(share.hash)
+        self.reverse_shares[share.previous_hash].remove(share.hash)
+        if not self.reverse_shares[share.previous_hash]:
+            self.reverse_shares.pop(share.previous_hash)
+        
+        assert self.test() is None
     
     def get_height_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
@@ -452,7 +544,7 @@ class Tracker(object):
             height += height_inc
         for update_hash, height_then in updates:
             self.heights[update_hash] = height - height_then, share_hash
-        #assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
+        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
         return height, share_hash
     
     def get_height_and_last2(self, share_hash):
@@ -548,11 +640,41 @@ if __name__ == '__main__':
     
     t = Tracker()
     
-    for i in xrange(10000):
+    for i in xrange(100):
         t.add(FakeShare(i, i - 1 if i > 0 else None))
     
-    #for share_hash in sorted(t.shares):
-    #    print share_hash, t.get_height_and_last(share_hash)
+    t.remove(99)
+    
+    print "HEADS", t.heads
+    print "TAILS", t.tails
+    
+    import random
+    
+    while True:
+        print
+        print '-'*30
+        print
+        t = Tracker()
+        for i in xrange(random.randrange(100)):
+            x = random.choice(list(t.shares) + [None])
+            print i, '->', x
+            t.add(FakeShare(i, x))
+        while t.shares:
+            x = random.choice(list(t.shares))
+            print "DEL", x, t.__dict__
+            try:
+                t.remove(x)
+            except NotImplementedError:
+                print "aborted; not implemented"
+        import time
+        time.sleep(.1)
+        print "HEADS", t.heads
+        print "TAILS", t.tails
+    
+    #for share_hash, share in sorted(t.shares.iteritems()):
+    #    print share_hash, share.previous_hash, t.heads.get(share_hash), t.tails.get(share_hash)
+    
+    import sys;sys.exit()
     
     print t.get_nth_parent_hash(9000, 5000)
     print t.get_nth_parent_hash(9001, 412)
