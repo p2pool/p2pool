@@ -2,6 +2,7 @@ from __future__ import division
 
 import itertools
 import random
+import time
 
 from twisted.python import log
 
@@ -170,6 +171,7 @@ class Share(object):
             raise ValueError('not enough work!')
         
         
+        self.time_seen = time.time()
         self.shared = False
     
     def as_block(self):
@@ -352,11 +354,24 @@ class OkayTracker(bitcoin_data.Tracker):
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
         
         # decide best verified head
-        best = max(self.verified.heads, key=lambda h: self.score(h, ht)) if self.verified.heads else None
+        scores = sorted(self.verified.heads, key=lambda h: self.score(h, ht))
+        
+        print "---"
+        for a in scores:
+            print time.time()
+            print '%x'%a, self.score(a, ht)
+        print "---"
+        
+        for share_hash in scores[:-5]:
+            if tracker.shares[share_hash].time_seen > time.time() - 30:
+                continue
+            tracker.remove(share_hash)
+        
+        best = scores[-1] if scores else None
         
         return best, desired
     
-    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(15, get_touches=False))
+    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
     def score(self, share_hash, ht):
         head_height, last = self.verified.get_height_and_last(share_hash)
         score2 = 0
@@ -372,8 +387,8 @@ class OkayTracker(bitcoin_data.Tracker):
             #this_score = -(ht.get_highest_height() - max_height + 1)//attempts
             if this_score > score2:
                 score2 = this_score
-        res = (min(head_height, self.net.CHAIN_LENGTH), score2)
-        print res
+        res = (min(head_height, self.net.CHAIN_LENGTH), score2, -self.verified.shares[share_hash].time_seen)
+        #print res
         return res
 
 

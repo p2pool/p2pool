@@ -25,7 +25,7 @@ try:
 except:
     __version__ = 'unknown'
 
-@deferral.retry('Error getting work from bitcoind:', 1)
+@deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
 def getwork(bitcoind):
     # a block could arrive in between these two queries

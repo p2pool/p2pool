@@ -2,6 +2,7 @@ from __future__ import division
 
 import struct
 import hashlib
+import itertools
 import warnings
 
 from . import base58
@@ -404,6 +405,7 @@ def pubkey_hash_to_script2(pubkey_hash):
 class Tracker(object):
     def __init__(self):
         self.shares = {} # hash -> share
+        self.ids = {} # hash -> (id, height)
         self.reverse_shares = {} # previous_hash -> set of share_hashes
         
         self.heads = {} # head hash -> tail_hash
@@ -418,6 +420,19 @@ class Tracker(object):
         assert not isinstance(share, (int, long, type(None)))
         if share.hash in self.shares:
             return # XXX raise exception?
+        
+        '''
+        parent_id = self.ids.get(share.previous_hash, None)
+        children_ids = set(self.ids.get(share2_hash) for share2_hash in self.reverse_shares.get(share.hash, set()))
+        infos = set()
+        if parent_id is not None:
+            infos.add((parent_id[0], parent_id[1] + 1))
+        for child_id in children_ids:
+            infos.add((child_id[0], child_id[1] - 1))
+        if not infos:
+            infos.add((self.id_generator.next(), 0))
+        chosen = min(infos)
+        '''
         
         self.shares[share.hash] = share
         self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
@@ -544,7 +559,7 @@ class Tracker(object):
             height += height_inc
         for update_hash, height_then in updates:
             self.heights[update_hash] = height - height_then, share_hash
-        assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
+        #assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
         return height, share_hash
     
     def get_height_and_last2(self, share_hash):
@@ -631,6 +646,11 @@ class Tracker(object):
         for i in xrange(n):
             x = self.shares[item_hash].previous_hash
         return x
+    
+    def distance_up_to_branch(self, item_hash, max_dist=None):
+        while True:
+            if a:
+                pass
 
 if __name__ == '__main__':
     class FakeShare(object):
