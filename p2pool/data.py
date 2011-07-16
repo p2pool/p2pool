@@ -366,6 +366,7 @@ class OkayTracker(bitcoin_data.Tracker):
             if self.shares[share_hash].time_seen > time.time() - 30:
                 continue
             self.remove(share_hash)
+            self.verified.remove(share_hash)
         
         best = scores[-1] if scores else None
         
