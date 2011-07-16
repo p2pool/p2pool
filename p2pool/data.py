@@ -363,9 +363,9 @@ class OkayTracker(bitcoin_data.Tracker):
         print "---"
         
         for share_hash in scores[:-5]:
-            if tracker.shares[share_hash].time_seen > time.time() - 30:
+            if self.shares[share_hash].time_seen > time.time() - 30:
                 continue
-            tracker.remove(share_hash)
+            self.remove(share_hash)
         
         best = scores[-1] if scores else None
         
