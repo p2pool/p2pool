@@ -102,11 +102,17 @@ def main(args):
         # information affecting work that should not trigger a long-polling update
         current_work2 = variable.Variable(None)
         
+        requested = set()
+        
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
             best, desired = tracker.think(ht)
             for peer2, share_hash in desired:
+                if peer2 is None:
+                    continue
+                if (peer2.nonce, share_hash) in requested:
+                    continue
                 print 'Requesting parent share %x' % (share_hash,)
                 peer2.send_getshares(
                     hashes=[share_hash],
@@ -115,6 +121,7 @@ def main(args):
                         tracker.get_nth_parent_hash(head, min(max(0, tracker.get_height_and_last(head)[0] - 1), 10)) for head in tracker.heads
                     )),
                 )
+                requested.add((peer2.nonce, share_hash))
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -396,7 +403,7 @@ def main(args):
         
         while True:
             yield deferral.sleep(1)
-            set_real_work()
+            yield set_real_work()
     except:
         print
         print 'Fatal error:'

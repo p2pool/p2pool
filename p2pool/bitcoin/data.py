@@ -6,7 +6,7 @@ import itertools
 import warnings
 
 from . import base58
-from p2pool.util import bases, math
+from p2pool.util import bases, math, skiplist
 
 class EarlyEnd(Exception):
     pass
@@ -415,6 +415,8 @@ class Tracker(object):
         
         self.id_generator = itertools.count()
         self.tails_by_id = {}
+        
+        self.get_nth_parent = skiplist.DistanceSkipList(self)
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
@@ -646,17 +648,12 @@ class Tracker(object):
         for i in xrange(n):
             x = self.shares[item_hash].previous_hash
         return x
-    
-    def distance_up_to_branch(self, item_hash, max_dist=None):
-        while True:
-            if a:
-                pass
+
+class FakeShare(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 if __name__ == '__main__':
-    class FakeShare(object):
-        def __init__(self, hash, previous_hash):
-            self.hash = hash
-            self.previous_hash = previous_hash
     
     t = Tracker()
     

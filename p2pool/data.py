@@ -6,9 +6,8 @@ import time
 
 from twisted.python import log
 
-from p2pool.util import math
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import memoize, expiring_dict
+from p2pool.util import memoize, expiring_dict, math, skiplist
 
 class CompressedList(bitcoin_data.Type):
     def __init__(self, inner):
@@ -249,15 +248,16 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
-    total_weight = 0
     
+    '''
     class fake_share(object):
         pass
     fake_share.new_script = new_script
     fake_share.target2 = target2
     
     dest_weights = {}
-    for i, share in enumerate(itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH))):
+    total_weight = 0
+    for share in itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH)):
         weight = bitcoin_data.target_to_average_attempts(share.target2)
         if weight > max_weight - total_weight:
             weight = max_weight - total_weight
@@ -267,6 +267,12 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         
         if total_weight == max_weight:
             break
+    '''
+    
+    this_weight = min(bitcoin_data.target_to_average_attempts(target2), max_weight)
+    dest_weights = math.add_dicts([{new_script: this_weight}, tracker.get_cumulative_weights(previous_share_hash, min(tracker.get_height_and_last(previous_share_hash)[0], net.CHAIN_LENGTH), max(0, max_weight - this_weight))[0]])
+    total_weight = sum(dest_weights.itervalues())
+    #assert dest_weights == dest_weights2
     
     amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
@@ -301,7 +307,7 @@ class OkayTracker(bitcoin_data.Tracker):
         self.net = net
         self.verified = bitcoin_data.Tracker()
         
-        self.okay_cache = {} # hash -> height
+        self.get_cumulative_weights = skiplist.WeightsSkipList(self)
     
     def attempt_verify(self, share):
         height, last = self.get_height_and_last(share.hash)
