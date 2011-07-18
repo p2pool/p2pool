@@ -5,7 +5,7 @@ import json
 
 from twisted.internet import defer
 from twisted.python import log
-from twisted.web import client
+from twisted.web import client, error
 
 import deferred_resource
 
@@ -17,7 +17,7 @@ class Error(Exception):
             raise TypeError('message must be a unicode')
         self._code, self._message, self._data = code, message, data
     def __str__(self):
-        return '%i %s %r' % (self._code, self._message, self._data)
+        return '%i %s' % (self._code, self._message) + (' %r' % (self._data, ) if self._data is not None else '')
     def _to_obj(self):
         return {
             'code': self._code,
@@ -39,22 +39,27 @@ class Proxy(object):
         }
         if self._auth is not None:
             headers['Authorization'] = 'Basic ' + base64.b64encode(':'.join(self._auth))
-        resp = json.loads((yield client.getPage(
-            url=self._url,
-            method='POST',
-            headers=headers,
-            postdata=json.dumps({
-                'jsonrpc': '2.0',
-                'method': method,
-                'params': params,
-                'id': id_,
-            }),
-        )))
+        try:
+            data = yield client.getPage(
+                url=self._url,
+                method='POST',
+                headers=headers,
+                postdata=json.dumps({
+                    'jsonrpc': '2.0',
+                    'method': method,
+                    'params': params,
+                    'id': id_,
+                }),
+            )
+        except error.Error, e:
+            resp = json.loads(e.response)
+        else:
+            resp = json.loads(data)
         
         if resp['id'] != id_:
             raise ValueError('invalid id')
         if 'error' in resp and resp['error'] is not None:
-            raise Error(resp['error'])
+            raise Error(**resp['error'])
         defer.returnValue(resp['result'])
     
     def __getattr__(self, attr):
