@@ -10,23 +10,6 @@ from p2pool.bitcoin import data as bitcoin_data
 from p2pool.bitcoin import script
 from p2pool.util import memoize, expiring_dict, math, skiplist
 
-class CompressedList(bitcoin_data.Type):
-    def __init__(self, inner):
-        self.inner = inner
-    
-    def read(self, file):
-        values, file = bitcoin_data.ListType(self.inner).read(file)
-        if values != sorted(set(values)):
-            raise ValueError('invalid values')
-        references, file = bitcoin_data.ListType(bitcoin_data.VarIntType()).read(file)
-        return [values[reference] for reference in references], file
-    
-    def write(self, file, item):
-        values = sorted(set(item))
-        values_map = dict((value, i) for i, value in enumerate(values))
-        file = bitcoin_data.ListType(self.inner).write(file, values)
-        return bitcoin_data.ListType(bitcoin_data.VarIntType()).write(file, [values_map[subitem] for subitem in item])
-
 
 merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
     ('side', bitcoin_data.StructType('<B')), # enum?
@@ -64,8 +47,6 @@ share1b_type = bitcoin_data.ComposedType([
     ('share_info', share_info_type),
     ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
 ])
-
-shares_type = CompressedList(bitcoin_data.VarStrType())
 
 def calculate_merkle_branch(txs, index):
     hash_list = [(bitcoin_data.tx_type.hash256(tx), i == index, []) for i, tx in enumerate(txs)]
@@ -220,17 +201,6 @@ class Share(object):
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
 
-class Share2(object):
-    '''Share with associated data'''
-    
-    def __init__(self, share):
-        self.share = share
-        
-        self.shared = False
-    
-    def flag_shared(self):
-        self.shared = True
-
 def get_pool_attempts_per_second(tracker, previous_share_hash, net):
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
     attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
@@ -244,7 +214,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         print "start generate_transaction"
     height, last = tracker.get_height_and_last(previous_share_hash)
     if height < net.TARGET_LOOKBEHIND:
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
+        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**32 - 1)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
@@ -277,9 +247,9 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     '''
     
     this_weight = min(bitcoin_data.target_to_average_attempts(target2), max_weight)
-    dest_weights = math.add_dicts([{new_script: this_weight}, tracker.get_cumulative_weights(previous_share_hash, min(tracker.get_height_and_last(previous_share_hash)[0], net.CHAIN_LENGTH), max(0, max_weight - this_weight))[0]])
+    other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
+    dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     total_weight = sum(dest_weights.itervalues())
-    #assert dest_weights == dest_weights2
     
     amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
@@ -435,8 +405,8 @@ class Mainnet(bitcoin_data.Mainnet):
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
-    IDENTIFIER = '7452839666e1f8f8'.decode('hex')
-    PREFIX = '2d4224bf18c87b87'.decode('hex')
+    IDENTIFIER = 'fc70035c7a81bc6f'.decode('hex')
+    PREFIX = '2472ef181efcd37b'.decode('hex')
     ADDRS_TABLE = 'addrs'
     P2P_PORT = 9333
 
@@ -446,7 +416,7 @@ class Testnet(bitcoin_data.Testnet):
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
-    IDENTIFIER = '1ae3479e4eb6700a'.decode('hex')
-    PREFIX = 'd19778c812754854'.decode('hex')
+    IDENTIFIER = '5fc2be5d4f0d6bfb'.decode('hex')
+    PREFIX = '3f6057a15076f441'.decode('hex')
     ADDRS_TABLE = 'addrs_testnet'
     P2P_PORT = 19333
