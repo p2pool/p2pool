@@ -237,7 +237,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 else:
                     raise ValueError(self.mode)
         if share1bs: self.send_share1bs(share1bs=share1bs)
-        if share0s: self.send_share0s(share0s=share0s)
+        if share0s: self.send_share0s(hashes=share0s)
         if share1as: self.send_share1as(share1as=share1as)
     
     def connectionLost(self, reason):
