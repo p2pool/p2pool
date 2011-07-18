@@ -185,14 +185,13 @@ class Share(object):
     def as_share1b(self):
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
-    def check(self, tracker, net):
+    def check(self, tracker, now, net):
         import time
         if self.previous_share_hash is not None:
             if self.header['timestamp'] <= math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(self.previous_share_hash), 11)), use_float=False):
                 raise ValueError('share from too far in the past!')
         
-        # XXX use adjusted time
-        if self.header['timestamp'] > time.time() + 2*60*60:
+        if self.header['timestamp'] > now + 2*60*60:
             raise ValueError('share from too far in the future!')
         
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
@@ -225,20 +224,19 @@ class Share2(object):
     def flag_shared(self):
         self.shared = True
 
-def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
-    previous_share2 = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-    
+def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):    
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
     if len(chain) < net.TARGET_LOOKBEHIND:
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
+        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
         time = chain[0].timestamp - chain[-1].timestamp
         if time == 0:
             time = 1
         attempts_per_second = attempts//time
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
-        pre_target2 = math.clip(pre_target, (previous_share2.target2*9//10, previous_share2.target2*11//10))
+        pre_target2 = math.clip(pre_target, (previous_share.target2*9//10, previous_share.target2*11//10))
         pre_target3 = math.clip(pre_target2, (0, 2**256//2**20 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
         print attempts_per_second//1000, 'KHASH'
@@ -309,14 +307,14 @@ class OkayTracker(bitcoin_data.Tracker):
         
         self.get_cumulative_weights = skiplist.WeightsSkipList(self)
     
-    def attempt_verify(self, share):
+    def attempt_verify(self, share, now):
+        if share.hash in self.verified.shares:
+            return True
         height, last = self.get_height_and_last(share.hash)
         if height < self.net.CHAIN_LENGTH and last is not None:
             raise AssertionError()
-        if share.hash in self.verified.shares:
-            return True
         try:
-            share.check(self, self.net)
+            share.check(self, now, self.net)
         except:
             print
             print 'Share check failed:'
@@ -327,7 +325,7 @@ class OkayTracker(bitcoin_data.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, ht):
+    def think(self, ht, now):
         desired = set()
         
         # O(len(self.heads))
@@ -339,7 +337,7 @@ class OkayTracker(bitcoin_data.Tracker):
             head_height, last = self.get_height_and_last(head)
             
             for share in itertools.islice(self.get_chain_known(head), None if last is None else max(0, head_height - self.net.CHAIN_LENGTH)):
-                if self.attempt_verify(share):
+                if self.attempt_verify(share, now):
                     break
             else:
                 desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
@@ -354,7 +352,7 @@ class OkayTracker(bitcoin_data.Tracker):
             get = min(want, can)
             #print 'Z', head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
             for share in itertools.islice(self.get_chain_known(last_hash), get):
-                if not self.attempt_verify(share):
+                if not self.attempt_verify(share, now):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))

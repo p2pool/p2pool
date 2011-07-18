@@ -107,7 +107,10 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
-            best, desired = tracker.think(ht)
+            current_work2.set(dict(
+                time=work.timestamp,
+            ))
+            best, desired = tracker.think(ht, current_work2.value['time'])
             for peer2, share_hash in desired:
                 if peer2 is None:
                     continue
@@ -126,13 +129,8 @@ def main(args):
                 version=work.version,
                 previous_block=work.previous_block,
                 target=work.target,
-                
-                height=height + 1,
-                
+                height=height,
                 best_share_hash=best,
-            ))
-            current_work2.set(dict(
-                timestamp=work.timestamp,
             ))
         
         print 'Initializing work...'
@@ -156,7 +154,7 @@ def main(args):
             #print 'Received share %x' % (share.hash,)
             
             tracker.add(share)
-            best, desired = tracker.think(ht)
+            best, desired = tracker.think(ht, current_work2.value['time'])
             #for peer2, share_hash in desired:
             #    print 'Requesting parent share %x' % (share_hash,)
             #    peer2.send_getshares(hashes=[share_hash], parents=2000)
@@ -261,7 +259,7 @@ def main(args):
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
                 new_script=my_script,
-                subsidy=(50*100000000 >> state['height']//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
+                subsidy=(50*100000000 >> (state['height'] + 1)//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=struct.pack('<Q', random.randrange(2**64)),
                 block_target=state['target'],
                 net=args.net,
@@ -273,7 +271,7 @@ def main(args):
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             
-            timestamp = current_work2.value['timestamp']
+            timestamp = current_work2.value['time']
             if state['best_share_hash'] is not None:
                 timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
                 if timestamp2 > timestamp:
