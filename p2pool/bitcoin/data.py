@@ -20,6 +20,9 @@ def read((data, pos), length):
         raise EarlyEnd()
     return data2, (data, pos + length)
 
+def size((data, pos)):
+    return len(data) - pos
+
 class Type(object):
     # the same data can have only one unpacked representation, but multiple packed binary representations
     
@@ -370,6 +373,11 @@ def merkle_hash(tx_list):
 
 def target_to_average_attempts(target):
     return 2**256//(target + 1)
+
+# tx
+
+def tx_get_sigop_count(tx):
+    return sum(script.get_sigop_count(txin['script']) for txin in tx['tx_ins']) + sum(script.get_sigop_count(txout['script']) for txout in tx['tx_outs'])
 
 # human addresses
 

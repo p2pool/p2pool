@@ -252,9 +252,18 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
         def compute(state, all_targets):
-            extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
-            # XXX limit to merkle_branch and block max size - 1000000 byte
-            # and sigops
+            pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
+            pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
+            extra_txs = []
+            size = 0
+            for tx in pre_extra_txs:
+                this_size = bitcoin_data.tx_type.pack(tx)
+                if size + this_size > 500000:
+                    break
+                extra_txs.append(tx)
+                size += this_size
+            # XXX check sigops!
+            # XXX assuming generate_tx is smallish here..
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
@@ -265,7 +274,7 @@ def main(args):
                 net=args.net,
             )
             print 'Generating!', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']//1000000
-            print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
+            #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
@@ -410,6 +419,9 @@ def main(args):
         reactor.stop()
 
 def run():
+    if __debug__:
+        defer.setDebugging(True)
+    
     parser = argparse.ArgumentParser(description='p2pool (version %s)' % (__version__,))
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--testnet',

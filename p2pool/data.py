@@ -7,6 +7,7 @@ import time
 from twisted.python import log
 
 from p2pool.bitcoin import data as bitcoin_data
+from p2pool.bitcoin import script
 from p2pool.util import memoize, expiring_dict, math, skiplist
 
 class CompressedList(bitcoin_data.Type):
@@ -169,6 +170,8 @@ class Share(object):
             print 'targ', hex(self.target2)
             raise ValueError('not enough work!')
         
+        if script.get_sigop_count(self.new_script) > 1:
+            raise ValueError('too many sigops!')
         
         self.time_seen = time.time()
         self.shared = False
@@ -202,6 +205,9 @@ class Share(object):
         if self.other_txs is not None:
             if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
                 raise ValueError('''gentx doesn't match header via other_txs''')
+            
+            if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
+                raise ValueError('''block size too large''')
         
         self.gentx = gentx
         
@@ -276,7 +282,10 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
-    dests = sorted(amounts.iterkeys(), key=lambda script: (script == new_script, script))
+    pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
+    pre_dests = pre_dests[-4000:] # block length limit, unlikely to ever be hit
+    
+    dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
     return dict(
@@ -333,15 +342,22 @@ class OkayTracker(bitcoin_data.Tracker):
         # for each overall head, attempt verification
         # if it fails, attempt on parent, and repeat
         # if no successful verification because of lack of parents, request parent
-        for head in self.heads:
+        bads = set()
+        for head in set(self.heads) - set(self.verified.heads):
             head_height, last = self.get_height_and_last(head)
             
             for share in itertools.islice(self.get_chain_known(head), None if last is None else max(0, head_height - self.net.CHAIN_LENGTH)):
                 if self.attempt_verify(share, now):
                     break
+                if share.hash in self.heads:
+                    bads.add(share.hash)
             else:
                 if last is not None:
                     desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
+        for bad in bads:
+            assert bad not in self.verified.shares
+            assert bad in self.heads
+            self.remove(bad)
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in list(self.verified.heads):
