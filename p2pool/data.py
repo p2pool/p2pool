@@ -239,6 +239,8 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net):
     return attempts//time
 
 def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
+    if __debug__:
+        print "start generate_transaction"
     height, last = tracker.get_height_and_last(previous_share_hash)
     if height < net.TARGET_LOOKBEHIND:
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
@@ -247,10 +249,8 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target2 = math.clip(pre_target, (previous_share.target2*9//10, previous_share.target2*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**20 - 1))
+        pre_target3 = math.clip(pre_target2, (0, 2**256//2**32 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
-        if __debug__:
-            print 'generate_transaction. pool rate:', attempts_per_second//1000, 'KHASH'
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
@@ -280,15 +280,23 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     total_weight = sum(dest_weights.itervalues())
     #assert dest_weights == dest_weights2
     
-    amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
+    amounts = dict((script, subsidy*(198*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
+    amounts[net_script] = amounts.get(new_script, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    if sum(amounts.itervalues()) != subsidy:
+        raise ValueError()
+    if any(x < 0 for x in amounts.itervalues()):
+        raise ValueError()
     
     pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
     pre_dests = pre_dests[-4000:] # block length limit, unlikely to ever be hit
     
     dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
+    
+    if __debug__:
+        print "end generate_transaction"
     
     return dict(
         version=1,
@@ -337,6 +345,9 @@ class OkayTracker(bitcoin_data.Tracker):
             return True
     
     def think(self, ht, now):
+        if __debug__:
+            print "start think"
+        
         desired = set()
         
         # O(len(self.heads))
@@ -390,6 +401,9 @@ class OkayTracker(bitcoin_data.Tracker):
             self.verified.remove(share_hash)
         
         best = scores[-1] if scores else None
+        
+        if __debug__:
+            print "end think"
         
         return best, desired
     

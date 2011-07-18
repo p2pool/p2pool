@@ -420,11 +420,10 @@ def main(args):
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                     if height > 5:
-                        start = time.time()
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
-                        print time.time() - start
-                        print 'Pool rate: %i mhash/s Contribution greater than: %.02f%% %i mhash/s' % (
+                        print 'Pool rate: %i mhash/s %i shares Contribution: %.02f%% >%i mhash/s' % (
                             att_s//1000000,
+                            height,
                             weights.get(my_script, 0)/total_weight*100,
                             weights.get(my_script, 0)/total_weight*att_s//1000000,
                         )
