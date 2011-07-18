@@ -280,9 +280,9 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     total_weight = sum(dest_weights.itervalues())
     #assert dest_weights == dest_weights2
     
-    amounts = dict((script, subsidy*(198*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[new_script] = amounts.get(new_script, 0) + subsidy*1//200
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
+    amounts = dict((script, subsidy*(395*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+    amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*3//400
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
@@ -359,7 +359,7 @@ class OkayTracker(bitcoin_data.Tracker):
         for head in set(self.heads) - set(self.verified.heads):
             head_height, last = self.get_height_and_last(head)
             
-            for share in itertools.islice(self.get_chain_known(head), None if last is None else max(0, head_height - self.net.CHAIN_LENGTH)):
+            for share in itertools.islice(self.get_chain_known(head), None if last is None else min(5, max(0, head_height - self.net.CHAIN_LENGTH))):
                 if self.attempt_verify(share, now):
                     break
                 if share.hash in self.heads:
