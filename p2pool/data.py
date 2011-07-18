@@ -340,7 +340,8 @@ class OkayTracker(bitcoin_data.Tracker):
                 if self.attempt_verify(share, now):
                     break
             else:
-                desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
+                if last is not None:
+                    desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in list(self.verified.heads):
