@@ -281,7 +281,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     #assert dest_weights == dest_weights2
     
     amounts = dict((script, subsidy*(198*weight)//(200*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[net_script] = amounts.get(new_script, 0) + subsidy*1//200
+    amounts[new_script] = amounts.get(new_script, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*1//200
     amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     if sum(amounts.itervalues()) != subsidy:
