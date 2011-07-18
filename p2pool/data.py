@@ -230,25 +230,27 @@ class Share2(object):
     def flag_shared(self):
         self.shared = True
 
-def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):    
+def get_pool_attempts_per_second(tracker, previous_share_hash, net):
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
-    if len(chain) < net.TARGET_LOOKBEHIND:
+    attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
+    time = chain[0].timestamp - chain[-1].timestamp
+    if time == 0:
+        time = 1
+    return attempts//time
+
+def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
+    height, last = tracker.get_height_and_last(previous_share_hash)
+    if height < net.TARGET_LOOKBEHIND:
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
-        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-        attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
-        time = chain[0].timestamp - chain[-1].timestamp
-        if time == 0:
-            time = 1
-        attempts_per_second = attempts//time
+        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
+        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target2 = math.clip(pre_target, (previous_share.target2*9//10, previous_share.target2*11//10))
         pre_target3 = math.clip(pre_target2, (0, 2**256//2**20 - 1))
         target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
-        print attempts_per_second//1000, 'KHASH'
-        #print 'TARGET', 2**256//target2, 2**256/pre_target
-        #print 'ATT', bitcoin_data.target_to_average_attempts(target2)//1000
-    
+        if __debug__:
+            print 'generate_transaction. pool rate:', attempts_per_second//1000, 'KHASH'
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
@@ -377,11 +379,9 @@ class OkayTracker(bitcoin_data.Tracker):
         # decide best verified head
         scores = sorted(self.verified.heads, key=lambda h: self.score(h, ht))
         
-        print "---"
-        for a in scores:
-            print time.time()
-            print '%x'%a, self.score(a, ht)
-        print "---"
+        if __debug__:
+            for a in scores:
+                print '   ', '%x'%a, self.score(a, ht)
         
         for share_hash in scores[:-5]:
             if self.shares[share_hash].time_seen > time.time() - 30:

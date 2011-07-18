@@ -273,7 +273,7 @@ def main(args):
                 block_target=state['target'],
                 net=args.net,
             )
-            print 'Generating!', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']//1000000
+            print 'Generating!'
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
@@ -410,7 +410,21 @@ def main(args):
         
         while True:
             yield deferral.sleep(1)
-            yield set_real_work()
+            try:
+                yield set_real_work()
+            except:
+                log.err()
+            try:
+                if current_work.value['best_share_hash'] is not None:
+                    height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+                    if height > 5:
+                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
+                        print 'Pool rate: %i mhash/s Contribution: %.02f%%' % (
+                            p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)//1000000,
+                            weights.get(my_script, 0)/total_weight,
+                        )
+            except:
+                log.err()
     except:
         print
         print 'Fatal error:'
