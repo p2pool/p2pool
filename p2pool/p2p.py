@@ -227,7 +227,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         # XXX doesn't need to send full block when it's not urgent
         # eg. when getting history
         for share in shares:
-            if share.hash <= share.header['target']:
+            if share.bitcoin_hash <= share.header['target']:
                 share1bs.append(share.as_share1b())
             else:
                 if self.mode == 0 and not full:

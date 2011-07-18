@@ -161,9 +161,9 @@ def main(args):
             #    peer2.send_getshares(hashes=[share_hash], parents=2000)
             
             if share.gentx is not None:
-                if share.hash <= share.header['target']:
+                if share.bitcoin_hash <= share.header['target']:
                     print
-                    print 'GOT BLOCK! Passing to bitcoind! %x' % (share.hash,)
+                    print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash, share.bitcoin_hash,)
                     print
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=share.as_block())
