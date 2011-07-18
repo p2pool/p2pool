@@ -10,6 +10,7 @@ import sqlite3
 import struct
 import subprocess
 import sys
+import time
 
 from twisted.internet import defer, reactor
 from twisted.web import server
@@ -417,11 +418,15 @@ def main(args):
             try:
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+                    att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                     if height > 5:
+                        start = time.time()
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
-                        print 'Pool rate: %i mhash/s Contribution: %.02f%%' % (
-                            p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)//1000000,
+                        print time.time() - start
+                        print 'Pool rate: %i mhash/s Contribution greater than: %.02f%% %i mhash/s' % (
+                            att_s//1000000,
                             weights.get(my_script, 0)/total_weight*100,
+                            weights.get(my_script, 0)/total_weight*att_s//1000000,
                         )
             except:
                 log.err()
