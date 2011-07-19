@@ -361,10 +361,10 @@ class OkayTracker(bitcoin_data.Tracker):
         # decide best tree
         best_tail = max(self.verified.tails, key=lambda h: self.score(max(self.verified.tails[h], key=self.verified.get_height), ht)) if self.verified.tails else None
         # decide best verified head
-        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (self.verified.get_work(h), ht.get_min_height(self.verified.shares[h].previous_block)))
+        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (self.verified.get_work(h), ht.get_min_height(self.verified.shares[h].previous_block), -self.verified.shares[h].time_seen))
         
         
-        #tif __debug__:
+        #if __debug__:
             #print len(self.verified.tails.get(best_tail, []))
             #for a in scores:
             #    print '   ', '%x'%a, self.score(a, ht)
@@ -379,7 +379,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(best_share.highest_block_on_arrival):
+            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block):
                 if __debug__:
                     print "stale detected!"
                 best = best_share.previous_hash
