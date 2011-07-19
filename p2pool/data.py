@@ -19,7 +19,7 @@ merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
 
 share_data_type = bitcoin_data.ComposedType([
     ('previous_share_hash', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
-    ('target2', bitcoin_data.FloatingIntegerType()),
+    ('target', bitcoin_data.FloatingIntegerType()),
     ('nonce', bitcoin_data.VarStrType()),
 ])
 
@@ -96,6 +96,7 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
 
 class Share(object):
     peer = None
+    highest_block_on_arrival = None
     gentx = None
     
     @classmethod
@@ -124,6 +125,7 @@ class Share(object):
             raise ValueError('merkle_branch too long!')
         
         self.header = header
+        self.previous_block = header['previous_block']
         self.share_info = share_info
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
@@ -138,7 +140,7 @@ class Share(object):
             raise ValueError('new_script too long!')
         
         self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
-        self.target2 = self.share_data['target2']
+        self.target = self.share_data['target']
         self.nonce = self.share_data['nonce']
         
         if len(self.nonce) > 20:
@@ -147,9 +149,9 @@ class Share(object):
         self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
         self.hash = share1a_type.hash256(self.as_share1a())
         
-        if self.bitcoin_hash > self.target2:
+        if self.bitcoin_hash > self.target:
             print 'hash', hex(self.bitcoin_hash)
-            print 'targ', hex(self.target2)
+            print 'targ', hex(self.target)
             raise ValueError('not enough work!')
         
         if script.get_sigop_count(self.new_script) > 1:
@@ -192,8 +194,6 @@ class Share(object):
                 raise ValueError('''block size too large''')
         
         self.gentx = gentx
-        
-        return Share2(self)
     
     def flag_shared(self):
         self.shared = True
@@ -203,7 +203,7 @@ class Share(object):
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, net):
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
-    attempts = sum(bitcoin_data.target_to_average_attempts(share.target2) for share in chain[:-1])
+    attempts = sum(bitcoin_data.target_to_average_attempts(share.target) for share in chain[:-1])
     time = chain[0].timestamp - chain[-1].timestamp
     if time == 0:
         time = 1
@@ -214,14 +214,14 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         print "start generate_transaction"
     height, last = tracker.get_height_and_last(previous_share_hash)
     if height < net.TARGET_LOOKBEHIND:
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**32 - 1)
+        target = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-        pre_target2 = math.clip(pre_target, (previous_share.target2*9//10, previous_share.target2*11//10))
+        pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, 2**256//2**32 - 1))
-        target2 = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
+        target = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
@@ -230,12 +230,12 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     class fake_share(object):
         pass
     fake_share.new_script = new_script
-    fake_share.target2 = target2
+    fake_share.target = target
     
     dest_weights = {}
     total_weight = 0
     for share in itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH)):
-        weight = bitcoin_data.target_to_average_attempts(share.target2)
+        weight = bitcoin_data.target_to_average_attempts(share.target)
         if weight > max_weight - total_weight:
             weight = max_weight - total_weight
         
@@ -246,7 +246,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
             break
     '''
     
-    this_weight = min(bitcoin_data.target_to_average_attempts(target2), max_weight)
+    this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     total_weight = sum(dest_weights.itervalues())
@@ -279,7 +279,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
                 share_data=dict(
                     previous_share_hash=previous_share_hash,
                     nonce=nonce,
-                    target2=target2,
+                    target=target,
                 ),
             )),
         )],
@@ -315,7 +315,7 @@ class OkayTracker(bitcoin_data.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, ht, now):
+    def think(self, ht, previous_block, now):
         if __debug__:
             print "start think"
         
@@ -358,12 +358,16 @@ class OkayTracker(bitcoin_data.Tracker):
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
         
+        # decide best tree
+        best_tail = max(self.verified.tails, key=lambda h: self.score(max(self.verified.tails[h], key=self.verified.get_height), ht)) if self.verified.tails else None
         # decide best verified head
-        scores = sorted(self.verified.heads, key=lambda h: self.score(h, ht))
+        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (self.verified.get_work(h), ht.get_min_height(self.verified.shares[h].previous_block)))
         
-        if __debug__:
-            for a in scores:
-                print '   ', '%x'%a, self.score(a, ht)
+        
+        #tif __debug__:
+            #print len(self.verified.tails.get(best_tail, []))
+            #for a in scores:
+            #    print '   ', '%x'%a, self.score(a, ht)
         
         for share_hash in scores[:-5]:
             if self.shares[share_hash].time_seen > time.time() - 30:
@@ -372,6 +376,13 @@ class OkayTracker(bitcoin_data.Tracker):
             self.verified.remove(share_hash)
         
         best = scores[-1] if scores else None
+        
+        if best is not None:
+            best_share = self.verified.shares[best]
+            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(best_share.highest_block_on_arrival):
+                if __debug__:
+                    print "stale detected!"
+                best = best_share.previous_hash
         
         if __debug__:
             print "end think"
@@ -389,14 +400,11 @@ class OkayTracker(bitcoin_data.Tracker):
         # XXX this must go in the opposite direction for max_height to make sense
         for share in reversed(list(itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH))):
             max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
-            attempts += bitcoin_data.target_to_average_attempts(share.target2)
+            attempts += bitcoin_data.target_to_average_attempts(share.target)
             this_score = attempts//(ht.get_highest_height() - max_height + 1)
-            #this_score = -(ht.get_highest_height() - max_height + 1)//attempts
             if this_score > score2:
                 score2 = this_score
-        res = (min(head_height, self.net.CHAIN_LENGTH), score2, -self.verified.shares[share_hash].time_seen)
-        #print res
-        return res
+        return min(head_height, self.net.CHAIN_LENGTH), score2
 
 
 class Mainnet(bitcoin_data.Mainnet):

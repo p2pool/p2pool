@@ -204,6 +204,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 return
             share = p2pool_data.Share.from_share1a(share1a)
             share.peer = self # XXX
+            share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
             self.node.handle_share(share, self)
     
     message_share1bs = bitcoin_data.ComposedType([
@@ -218,6 +219,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 return
             share = p2pool_data.Share.from_share1b(share1b)
             share.peer = self # XXX
+            share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
             self.node.handle_share(share, self)
     
     def send_shares(self, shares, full=False):

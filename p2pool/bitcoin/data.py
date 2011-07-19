@@ -418,13 +418,13 @@ class Tracker(object):
         
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
+        
         self.heights = {} # share_hash -> height_to, other_share_hash
-        self.skips = {} # share_hash -> skip list
         
-        self.id_generator = itertools.count()
-        self.tails_by_id = {}
+        #self.id_generator = itertools.count()
+        #self.tails_by_id = {}
         
-        self.get_nth_parent = skiplist.DistanceSkipList(self)
+        self.get_nth_parent_hash = skiplist.DistanceSkipList(self)
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
@@ -553,34 +553,37 @@ class Tracker(object):
         
         assert self.test() is None
     
+    def get_height(self, share_hash):
+        height, work, last = self.get_height_work_and_last(share_hash)
+        return height
+    
+    def get_work(self, share_hash):
+        height, work, last = self.get_height_work_and_last(share_hash)
+        return work
+    
     def get_height_and_last(self, share_hash):
+        height, work, last = self.get_height_work_and_last(share_hash)
+        return height, last
+    
+    def get_height_work_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
         orig = share_hash
         height = 0
+        work = 0
         updates = []
         while True:
             if share_hash is None or share_hash not in self.shares:
                 break
-            updates.append((share_hash, height))
+            updates.append((share_hash, height, work))
             if share_hash in self.heights:
-                height_inc, share_hash = self.heights[share_hash]
+                height_inc, share_hash, work_inc = self.heights[share_hash]
             else:
-                height_inc, share_hash = 1, self.shares[share_hash].previous_hash
+                height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, target_to_average_attempts(self.shares[share_hash].target)
             height += height_inc
-        for update_hash, height_then in updates:
-            self.heights[update_hash] = height - height_then, share_hash
-        #assert (height, share_hash) == self.get_height_and_last2(orig), ((height, share_hash), self.get_height_and_last2(orig))
-        return height, share_hash
-    
-    def get_height_and_last2(self, share_hash):
-        assert isinstance(share_hash, (int, long, type(None)))
-        height = 0
-        while True:
-            if share_hash not in self.shares:
-                break
-            share_hash = self.shares[share_hash].previous_hash
-            height += 1
-        return height, share_hash
+            work += work_inc
+        for update_hash, height_then, work_then in updates:
+            self.heights[update_hash] = height - height_then, share_hash, work - work_then
+        return height, work, share_hash
     
     def get_chain_known(self, start_hash):
         assert isinstance(start_hash, (int, long, type(None)))
@@ -619,43 +622,6 @@ class Tracker(object):
     
     def get_highest_height(self):
         return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
-    
-    def get_nth_parent_hash(self, item_hash, n):
-        if n < 0:
-            raise ValueError('n must be >= 0')
-        
-        updates = {}
-        while n:
-            if item_hash not in self.skips:
-                self.skips[item_hash] = math.geometric(.5), [(1, self.shares[item_hash].previous_hash)]
-            skip_length, skip = self.skips[item_hash]
-            
-            for i in xrange(skip_length):
-                if i in updates:
-                    n_then, that_hash = updates.pop(i)
-                    x, y = self.skips[that_hash]
-                    assert len(y) == i
-                    y.append((n_then - n, item_hash))
-            
-            for i in xrange(len(skip), skip_length):
-                updates[i] = n, item_hash
-            
-            for i, (dist, then_hash) in enumerate(reversed(skip)):
-                if dist <= n:
-                    break
-            else:
-                raise AssertionError()
-            
-            n -= dist
-            item_hash = then_hash
-        
-        return item_hash
-    
-    def get_nth_parent2(self, item_hash, n):
-        x = item_hash
-        for i in xrange(n):
-            x = self.shares[item_hash].previous_hash
-        return x
 
 class FakeShare(object):
     def __init__(self, **kwargs):
@@ -665,17 +631,17 @@ if __name__ == '__main__':
     
     t = Tracker()
     
-    for i in xrange(100):
-        t.add(FakeShare(i, i - 1 if i > 0 else None))
+    for i in xrange(10000):
+        t.add(FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None))
     
-    t.remove(99)
+    #t.remove(99)
     
     print "HEADS", t.heads
     print "TAILS", t.tails
     
     import random
     
-    while True:
+    while False:
         print
         print '-'*30
         print
@@ -699,7 +665,7 @@ if __name__ == '__main__':
     #for share_hash, share in sorted(t.shares.iteritems()):
     #    print share_hash, share.previous_hash, t.heads.get(share_hash), t.tails.get(share_hash)
     
-    import sys;sys.exit()
+    #import sys;sys.exit()
     
     print t.get_nth_parent_hash(9000, 5000)
     print t.get_nth_parent_hash(9001, 412)

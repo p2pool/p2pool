@@ -108,10 +108,7 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work():
             work, height = yield getwork(bitcoind)
-            current_work2.set(dict(
-                time=work.timestamp,
-            ))
-            best, desired = tracker.think(ht, current_work2.value['time'])
+            best, desired = tracker.think(ht, work.previous_block, work.timestamp)
             for peer2, share_hash in desired:
                 if peer2 is None:
                     continue
@@ -132,6 +129,9 @@ def main(args):
                 target=work.target,
                 height=height,
                 best_share_hash=best,
+            ))
+            current_work2.set(dict(
+                time=work.timestamp,
             ))
         
         print 'Initializing work...'
@@ -155,7 +155,7 @@ def main(args):
             #print 'Received share %x' % (share.hash,)
             
             tracker.add(share)
-            best, desired = tracker.think(ht, current_work2.value['time'])
+            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
             #for peer2, share_hash in desired:
             #    print 'Requesting parent share %x' % (share_hash,)
             #    peer2.send_getshares(hashes=[share_hash], parents=2000)
@@ -275,7 +275,7 @@ def main(args):
                 net=args.net,
             )
             print 'Generating!'
-            #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2'],)
+            #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
             merkle_root = bitcoin.data.merkle_hash(transactions)
@@ -288,8 +288,8 @@ def main(args):
                     print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
             ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'])
-            #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
-            target = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target2']
+            #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
+            target = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             if not all_targets:
                 target = min(2**256//2**32 - 1, target)
             return ba.getwork(target)

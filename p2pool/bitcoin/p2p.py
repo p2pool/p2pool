@@ -317,6 +317,7 @@ class HeaderWrapper(object):
     def __init__(self, header):
         self.hash = bitcoin_data.block_header_type.hash256(header)
         self.previous_hash = header['previous_block']
+        self.target = header['target']
 
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''

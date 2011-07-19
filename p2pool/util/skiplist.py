@@ -135,7 +135,7 @@ class WeightsSkipList(SkipList):
         if element is None:
             return (2**256, {}, 0) # XXX
         share = self.tracker.shares[element]
-        att = bitcoin_data.target_to_average_attempts(share.target2)
+        att = bitcoin_data.target_to_average_attempts(share.target)
         return 1, {share.new_script: att}, att
     
     def combine_deltas(self, (share_count1, weights1, total_weight1), (share_count2, weights2, total_weight2)):
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     t = data.Tracker()
     d = WeightsSkipList(t)
     for i in xrange(2000):
-        t.add(data.FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None, new_script=i, target2=random.randrange(2**249, 2**250)))
+        t.add(data.FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None, new_script=i, target=random.randrange(2**249, 2**250)))
     for i in xrange(2000):
         #a = random.randrange(2000)
         a = 1999
