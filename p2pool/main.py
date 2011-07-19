@@ -68,9 +68,9 @@ def main(args):
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with authorization '%s:%s'...''' % (url, args.bitcoind_rpc_username, args.bitcoind_rpc_password)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
-        work, height = yield getwork(bitcoind)
+        temp_work, temp_height = yield getwork(bitcoind)
         print '    ...success!'
-        print '    Current block hash: %x height: %i' % (work.previous_block, height)
+        print '    Current block hash: %x height: %i' % (temp_work.previous_block, temp_height)
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
@@ -127,7 +127,7 @@ def main(args):
             ))
         
         def set_real_work2():
-            best, desired = tracker.think(ht, work.previous_block, work.timestamp)
+            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['timestamp'])
             
             t = dict(current_work.value)
             t['best_share_hash'] = best
