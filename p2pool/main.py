@@ -162,44 +162,50 @@ def main(args):
                 peer.send_shares([share])
             share.flag_shared()
         
-        def p2p_share(share, peer=None):
-            if share.hash in tracker.shares:
-                print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
-                return
+        def p2p_shares(shares, peer=None):
+            for share in shares:
+                if share.hash in tracker.shares:
+                    print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
+                    return
+                
+                #print 'Received share %x' % (share.hash,)
+                
+                tracker.add(share)
+                #for peer2, share_hash in desired:
+                #    print 'Requesting parent share %x' % (share_hash,)
+                #    peer2.send_getshares(hashes=[share_hash], parents=2000)
+                
+                if share.gentx is not None:
+                    if share.bitcoin_hash <= share.header['target']:
+                        print
+                        print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash, share.bitcoin_hash,)
+                        print
+                        if factory.conn.value is not None:
+                            factory.conn.value.send_block(block=share.as_block())
+                        else:
+                            print 'No bitcoind connection! Erp!'
             
-            #print 'Received share %x' % (share.hash,)
-            
-            tracker.add(share)
             best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
-            #for peer2, share_hash in desired:
-            #    print 'Requesting parent share %x' % (share_hash,)
-            #    peer2.send_getshares(hashes=[share_hash], parents=2000)
             
-            if share.gentx is not None:
-                if share.bitcoin_hash <= share.header['target']:
-                    print
-                    print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash, share.bitcoin_hash,)
-                    print
-                    if factory.conn.value is not None:
-                        factory.conn.value.send_block(block=share.as_block())
-                    else:
-                        print 'No bitcoind connection! Erp!'
+            if best == share.hash:
+                print 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash,)
+            else:
+                print 'Accepted share, not best. Hash: %x' % (share.hash,)
             
             w = dict(current_work.value)
             w['best_share_hash'] = best
             current_work.set(w)
-            
-            if best == share.hash:
-                print 'Accepted share, new highest, will pass to peers! Hash: %x' % (share.hash,)
-            else:
-                print 'Accepted share, not highest. Hash: %x' % (share.hash,)
         
-        def p2p_share_hash(share_hash, peer):
-            if share_hash in tracker.shares:
-                print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
-            else:
-                print 'Got share hash, requesting! Hash: %x' % (share_hash,)
-                peer.send_getshares(hashes=[share_hash], parents=0, stops=[])
+        def p2p_share_hashes(share_hashes, peer):
+            get_hashes = []
+            for share_hash in share_hashes:
+                if share_hash in tracker.shares:
+                    print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
+                else:
+                    print 'Got share hash, requesting! Hash: %x' % (share_hash,)
+                    get_hashes.append(share_hash)
+            if get_hashes:
+                peer.send_getshares(hashes=get_hashes, parents=0, stops=[])
         
         def p2p_get_shares(share_hashes, parents, stops, peer):
             parents = min(parents, 1000//len(share_hashes))
@@ -241,8 +247,8 @@ def main(args):
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
         )
-        p2p_node.handle_share = p2p_share
-        p2p_node.handle_share_hash = p2p_share_hash
+        p2p_node.handle_shares = p2p_shares
+        p2p_node.handle_share_hashes = p2p_share_hashes
         p2p_node.handle_get_shares = p2p_get_shares
         
         p2p_node.start()
@@ -329,7 +335,7 @@ def main(args):
                         print 'No bitcoind connection! Erp!'
                 share = p2pool.Share.from_block(block)
                 print 'GOT SHARE! %x' % (share.hash,)
-                p2p_share(share)
+                p2p_shares([share])
             except:
                 print
                 print 'Error processing data received from worker:'

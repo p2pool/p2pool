@@ -59,7 +59,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             best_share_hash=self.node.current_work.value['best_share_hash'],
         )
         
-        self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_set_mode(mode=new_mode))
+        self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_setmode(mode=new_mode))
         
         reactor.callLater(10, self._connect_timeout)
     
@@ -116,10 +116,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.handle_share0s(hashes=[best_share_hash])
     
     
-    message_update_mode = bitcoin_data.ComposedType([
+    message_setmode = bitcoin_data.ComposedType([
         ('mode', bitcoin_data.StructType('<I')),
     ])
-    def handle_set_mode(self, mode):
+    def handle_setmode(self, mode):
         self.other_mode_var.set(mode)
     
     message_ping = bitcoin_data.ComposedType([])
@@ -189,13 +189,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
     ])
     def handle_share0s(self, hashes):
-        for hash_ in hashes:
-            self.node.handle_share_hash(hash_, self)
+        self.node.handle_share_hashes(hashes, self)
     
     message_share1as = bitcoin_data.ComposedType([
         ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
     ])
     def handle_share1as(self, share1as):
+        shares = []
         for share1a in share1as:
             hash_ = bitcoin_data.block_header_type.hash256(share1a['header'])
             if hash_ <= share1a['header']['target']:
@@ -205,12 +205,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             share = p2pool_data.Share.from_share1a(share1a)
             share.peer = self # XXX
             share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
-            self.node.handle_share(share, self)
+            shares.append(share)
+        self.node.handle_shares(shares, self)
     
     message_share1bs = bitcoin_data.ComposedType([
         ('share1bs', bitcoin_data.ListType(p2pool_data.share1b_type)),
     ])
     def handle_share1bs(self, share1bs):
+        shares = []
         for share1b in share1bs:
             hash_ = bitcoin_data.block_header_type.hash256(share1b['header'])
             if not hash_ <= share1b['header']['target']:
@@ -220,7 +222,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             share = p2pool_data.Share.from_share1b(share1b)
             share.peer = self # XXX
             share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
-            self.node.handle_share(share, self)
+            shares.append(share)
+        self.node.handle_shares(shares, self)
     
     def send_shares(self, shares, full=False):
         share1bs = []
@@ -409,11 +412,11 @@ class Node(object):
         else:
             self.addr_store[host, port] = services, timestamp, timestamp
     
-    def handle_share(self, share, peer):
-        print 'handle_share', (share, peer)
+    def handle_shares(self, shares, peer):
+        print 'handle_shares', (shares, peer)
     
-    def handle_share_hash(self, hash_, peer):
-        print 'handle_share_hash', (hash_, peer)
+    def handle_share_hashes(self, hashes, peer):
+        print 'handle_share_hashes', (hashes, peer)
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         print 'handle_get_shares', (hashes, parents, stops, peer)
