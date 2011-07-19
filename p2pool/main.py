@@ -270,7 +270,7 @@ def main(args):
             extra_txs = []
             size = 0
             for tx in pre_extra_txs:
-                this_size = bitcoin_data.tx_type.pack(tx)
+                this_size = len(bitcoin.data.tx_type.pack(tx.tx))
                 if size + this_size > 500000:
                     break
                 extra_txs.append(tx)
@@ -396,7 +396,7 @@ def main(args):
                     if block_hash == self.seen_at_block:
                         return True
                     for tx in block['txs']:
-                        mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins']])
+                        mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins'] if tx_in['previous_output'] is not None])
                         if mentions & self.mentions:
                             return False
                 return False
@@ -405,7 +405,9 @@ def main(args):
         def new_tx(tx_hash):
             try:
                 assert isinstance(tx_hash, (int, long))
+                #print "REQUESTING", tx_hash
                 tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
+                #print "GOT", tx
                 tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
             except:
                 print
