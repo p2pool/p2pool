@@ -52,7 +52,10 @@ class Proxy(object):
                 }),
             )
         except error.Error, e:
-            resp = json.loads(e.response)
+            try:
+                resp = json.loads(e.response)
+            except:
+                raise e
         else:
             resp = json.loads(data)
         
