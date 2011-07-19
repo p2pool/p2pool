@@ -379,7 +379,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block):
+            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.peer is not None:
                 if __debug__:
                     print "stale detected!"
                 best = best_share.previous_hash
