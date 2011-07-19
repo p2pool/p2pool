@@ -36,7 +36,7 @@ class Proxy(object):
         id_ = 0
         
         headers = {
-            'Content-Type': 'text/json',
+            'Content-Type': 'application/json',
         }
         if self._auth is not None:
             headers['Authorization'] = 'Basic ' + base64.b64encode(':'.join(self._auth))
@@ -78,6 +78,7 @@ class Server(deferred_resource.DeferredResource):
     @defer.inlineCallbacks
     def render_POST(self, request):
         # missing batching, 1.0 notifications
+        request.setHeader('Content-Type', 'application/json')
         data = request.content.read()
         
         if self.extra_headers is not None:

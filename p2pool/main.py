@@ -345,7 +345,13 @@ def main(args):
             else:
                 return True
         
-        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response)))
+        def get_rate():
+            if current_work.value['best_share_hash'] is not None:
+                height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+                att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
+                return att_s
+        
+        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate)))
         
         print '    ...success!'
         print

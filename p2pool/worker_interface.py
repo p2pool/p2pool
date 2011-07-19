@@ -17,6 +17,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
         
         res = self.compute((yield self.work.changed.get_deferred()), 'x-all-targets' in map(str.lower, request.received_headers))
         
+        request.setHeader('Content-Type', 'application/json')
         request.write(json.dumps({
             'jsonrpc': '2.0',
             'id': 0,
@@ -25,20 +26,31 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
         }))
     render_POST = render_GET
 
+class RateInterface(deferred_resource.DeferredResource):
+    def __init__(self, get_rate):
+        self.get_rate = get_rate
+    
+    def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        request.write(json.dumps(self.get_rate()))
+
 class WorkerInterface(jsonrpc.Server):
     extra_headers = {
         'X-Long-Polling': '/long-polling',
     }
     
-    def __init__(self, work, compute, response_callback):
+    def __init__(self, work, compute, response_callback, get_rate):
         jsonrpc.Server.__init__(self)
         
         self.work = work
         self.compute = compute
         self.response_callback = response_callback
+        self.get_rate = get_rate
         
         self.putChild('long-polling',
             LongPollingWorkerInterface(self.work, self.compute))
+        self.putChild('rate',
+            RateInterface(get_rate))
         self.putChild('', self)
     
     def rpc_getwork(self, headers, data=None):
