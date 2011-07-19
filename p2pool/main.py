@@ -166,9 +166,9 @@ def main(args):
             for share in shares:
                 if share.hash in tracker.shares:
                     print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
-                    return
+                    continue
                 
-                #print 'Received share %x' % (share.hash,)
+                #print 'Received share %x from %r' % (share.hash, share.peer.transport.getPeer() if share.peer is not None else None)
                 
                 tracker.add(share)
                 #for peer2, share_hash in desired:
