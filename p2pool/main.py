@@ -21,10 +21,13 @@ from util import db, expiring_dict, jsonrpc, variable, deferral, math
 from . import p2p, worker_interface
 import p2pool.data as p2pool
 
+prev = os.getcwd()
+os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 try:
-    __version__ = subprocess.Popen(['svnversion', os.path.dirname(sys.argv[0])], stdout=subprocess.PIPE).stdout.read().strip()
+    __version__ = subprocess.Popen(['git', 'describe', '--always'], stdout=subprocess.PIPE).stdout.read().strip()
 except:
     __version__ = 'unknown'
+os.chdir(prev)
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
