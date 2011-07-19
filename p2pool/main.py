@@ -56,7 +56,7 @@ def get_payout_script(factory):
 @deferral.retry('Error creating payout script:', 10)
 @defer.inlineCallbacks
 def get_payout_script2(bitcoind, net):
-    defer.returnValue(bitcoin.data.pubkey_hash_to_script2(bitcoin.data.address_to_pubkey_hash((yield bitcoind.rpc_getnewaddress()), net)))
+    defer.returnValue(bitcoin.data.pubkey_hash_to_script2(bitcoin.data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net)))
 
 @defer.inlineCallbacks
 def main(args):
@@ -78,9 +78,12 @@ def main(args):
         factory = bitcoin.p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         my_script = yield get_payout_script(factory)
-        if my_script is None:
-            print 'IP transaction denied ... falling back to sending to address. Enable IP transactions on your bitcoind!'
-            my_script = yield get_payout_script2(bitcoind, args.net)
+        if args.pubkey_hash is None:
+            if my_script is None:
+                print 'IP transaction denied ... falling back to sending to address.'
+                my_script = yield get_payout_script2(bitcoind, args.net)
+        else:
+            my_script = bitcoin.data.pubkey_hash_to_script2(args.pubkey_hash)
         print '    ...success!'
         print '    Payout script:', my_script.encode('hex')
         print
@@ -479,6 +482,9 @@ def run():
     parser.add_argument('--testnet',
         help='use the testnet',
         action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
+    parser.add_argument('-a', '--address',
+        help='generate to this address (defaults to requesting one from bitcoind)',
+        type=str, action='store', default=None, dest='address')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
@@ -521,6 +527,14 @@ def run():
     
     if args.p2pool_port is None:
         args.p2pool_port = args.net.P2P_PORT
+    
+    if args.address is not None:
+        try:
+            args.pubkey_hash = bitcoin.data.address_to_pubkey_hash(args.address, args.net)
+        except Exception, e:
+            raise ValueError("error parsing address: " + repr(e))
+    else:
+        args.pubkey_hash = None
     
     reactor.callWhenRunning(main, args)
     reactor.run()
