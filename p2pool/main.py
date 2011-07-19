@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, task
 from twisted.web import server
 from twisted.python import log
 
@@ -107,11 +107,29 @@ def main(args):
         current_work2 = variable.Variable(None)
         
         requested = set()
+        task.LoopingCall(requested.clear).start(60)
         
         @defer.inlineCallbacks
-        def set_real_work():
+        def set_real_work1():
             work, height = yield getwork(bitcoind)
+            current_work.set(dict(
+                version=work.version,
+                previous_block=work.previous_block,
+                target=work.target,
+                height=height,
+                best_share_hash=current_work.value['best_share_hash'] if current_work.value is not None else None,
+            ))
+            current_work2.set(dict(
+                time=work.timestamp,
+            ))
+        
+        def set_real_work2():
             best, desired = tracker.think(ht, work.previous_block, work.timestamp)
+            
+            t = dict(current_work.value)
+            t['best_share_hash'] = best
+            current_work.set(t)
+            
             for peer2, share_hash in desired:
                 if peer2 is None:
                     continue
@@ -126,19 +144,10 @@ def main(args):
                     )),
                 )
                 requested.add((peer2.nonce, share_hash))
-            current_work.set(dict(
-                version=work.version,
-                previous_block=work.previous_block,
-                target=work.target,
-                height=height,
-                best_share_hash=best,
-            ))
-            current_work2.set(dict(
-                time=work.timestamp,
-            ))
         
         print 'Initializing work...'
-        yield set_real_work()
+        yield set_real_work1()
+        yield set_real_work2()
         print '    ...success!'
         
         # setup p2p logic and join p2pool network
@@ -405,19 +414,39 @@ def main(args):
                 print
         factory.new_tx.watch(new_tx)
         
+        @defer.inlineCallbacks
         def new_block(block):
-            set_real_work()
+            yield set_real_work1()
+            set_real_work2()
         factory.new_block.watch(new_block)
         
         print 'Started successfully!'
         print
         
+        @defer.inlineCallbacks
+        def work1_thread():
+            while True:
+                yield deferral.sleep(random.expovariate(1/1))
+                try:
+                    yield set_real_work1()
+                except:
+                    log.err()
+        
+        
+        @defer.inlineCallbacks
+        def work2_thread():
+            while True:
+                yield deferral.sleep(random.expovariate(1/1))
+                try:
+                    yield set_real_work2()
+                except:
+                    log.err()
+        
+        work1_thread()
+        work2_thread()
+        
         while True:
-            yield deferral.sleep(1)
-            try:
-                yield set_real_work()
-            except:
-                log.err()
+            yield deferral.sleep(random.expovariate(1/1))
             try:
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
