@@ -127,7 +127,7 @@ def main(args):
             ))
         
         def set_real_work2():
-            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['timestamp'])
+            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
             
             t = dict(current_work.value)
             t['best_share_hash'] = best
