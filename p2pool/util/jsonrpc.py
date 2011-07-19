@@ -26,9 +26,10 @@ class Error(Exception):
         }
 
 class Proxy(object):
-    def __init__(self, url, auth=None):
+    def __init__(self, url, auth=None, timeout=5):
         self._url = url
         self._auth = auth
+        self._timeout = timeout
     
     @defer.inlineCallbacks
     def callRemote(self, method, *params):
@@ -50,6 +51,7 @@ class Proxy(object):
                     'params': params,
                     'id': id_,
                 }),
+                timeout=self._timeout,
             )
         except error.Error, e:
             try:
