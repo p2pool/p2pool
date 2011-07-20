@@ -17,17 +17,10 @@ from twisted.web import server
 from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
-from util import db, expiring_dict, jsonrpc, variable, deferral, math
+from util import db, expiring_dict, jsonrpc, variable, deferral, math, skiplist
 from . import p2p, worker_interface
 import p2pool.data as p2pool
-
-prev = os.getcwd()
-os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
-try:
-    __version__ = subprocess.Popen(['git', 'describe', '--always'], stdout=subprocess.PIPE).stdout.read().strip()
-except:
-    __version__ = 'unknown'
-os.chdir(prev)
+import p2pool as p2pool_init
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
@@ -61,7 +54,7 @@ def get_payout_script2(bitcoind, net):
 @defer.inlineCallbacks
 def main(args):
     try:
-        print 'p2pool (version %s)' % (__version__,)
+        print 'p2pool (version %s)' % (p2pool_init.__version__,)
         print
         
         # connect to bitcoind over JSON-RPC and do initial getwork
@@ -489,8 +482,8 @@ def run():
     if __debug__:
         defer.setDebugging(True)
     
-    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (__version__,))
-    parser.add_argument('--version', action='version', version=__version__)
+    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,))
+    parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--testnet',
         help='use the testnet',
         action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
