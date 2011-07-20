@@ -158,7 +158,7 @@ def main(args):
         def p2p_shares(shares, peer=None):
             for share in shares:
                 if share.hash in tracker.shares:
-                    print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
+                    #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
                     continue
                 
                 #print 'Received share %x from %r' % (share.hash, share.peer.transport.getPeer() if share.peer is not None else None)
@@ -178,22 +178,25 @@ def main(args):
                         else:
                             print 'No bitcoind connection! Erp!'
             
-            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
-            
-            if best == share.hash:
-                print 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash,)
-            else:
-                print 'Accepted share, not best. Hash: %x' % (share.hash,)
-            
-            w = dict(current_work.value)
-            w['best_share_hash'] = best
-            current_work.set(w)
+            if shares:
+                share = shares[0]
+                
+                best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
+                
+                if best == share.hash:
+                    print ('MINE> ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash,)
+                else:
+                    print ('MINE> ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash,)
+                
+                w = dict(current_work.value)
+                w['best_share_hash'] = best
+                current_work.set(w)
         
         def p2p_share_hashes(share_hashes, peer):
             get_hashes = []
             for share_hash in share_hashes:
                 if share_hash in tracker.shares:
-                    print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
+                    pass # print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
                 else:
                     print 'Got share hash, requesting! Hash: %x' % (share_hash,)
                     get_hashes.append(share_hash)
@@ -331,7 +334,7 @@ def main(args):
                         print 'No bitcoind connection! Erp!'
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x' % (share.hash,)
+                #print 'GOT SHARE! %x' % (share.hash,), "DEAD ON ARRIVAL" if share.previous_hash != current_work['best_share_hash'] else ""
                 p2p_shares([share])
             except:
                 print
