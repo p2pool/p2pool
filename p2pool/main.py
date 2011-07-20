@@ -265,6 +265,7 @@ def main(args):
         # setup worker logic
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
+        run_identifier = struct.pack('<Q', random.randrange(2**64))
         
         def compute(state, all_targets):
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
@@ -284,7 +285,7 @@ def main(args):
                 previous_share_hash=state['best_share_hash'],
                 new_script=my_script,
                 subsidy=(50*100000000 >> (state['height'] + 1)//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
-                nonce=struct.pack('<Q', random.randrange(2**64)),
+                nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
                 block_target=state['target'],
                 net=args.net,
             )
@@ -308,6 +309,8 @@ def main(args):
                 target = min(2**256//2**32 - 1, target)
             return ba.getwork(target)
         
+        my_shares = set()
+        
         def got_response(data):
             try:
                 # match up with transactions
@@ -327,6 +330,7 @@ def main(args):
                     else:
                         print 'No bitcoind connection! Erp!'
                 share = p2pool.Share.from_block(block)
+                my_shares.add(share.hash)
                 print 'GOT SHARE! %x' % (share.hash,)
                 p2p_shares([share])
             except:
@@ -455,20 +459,29 @@ def main(args):
         work1_thread()
         work2_thread()
         
+        counter = skiplist.CountsSkipList(tracker, my_script, run_identifier)
+        
         while True:
             yield deferral.sleep(random.expovariate(1/1))
             try:
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-                    att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                     if height > 5:
+                        print "narg"
+                        att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
-                        print 'Pool rate: %i mhash/s %i shares Contribution: %.02f%% >%i mhash/s' % (
+                        count = counter(current_work.value['best_share_hash'], height, 2**100)
+                        print 'Pool: %i mhash/s in %i shares Recent: %.02f%% >%i mhash/s Known: %i shares (so %i stales)' % (
                             att_s//1000000,
                             height,
                             weights.get(my_script, 0)/total_weight*100,
                             weights.get(my_script, 0)/total_weight*att_s//1000000,
+                            count,
+                            len(my_shares) - count,
                         )
+                        #weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 100), 2**100)
+                        #for k, v in weights.iteritems():
+                        #    print k.encode('hex'), v/total_weight
             except:
                 log.err()
     except:
