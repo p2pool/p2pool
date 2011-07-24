@@ -158,7 +158,7 @@ def main(args):
         def p2p_shares(shares, peer=None):
             for share in shares:
                 if share.hash in tracker.shares:
-                    #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
+                    print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
                     continue
                 
                 #print 'Received share %x from %r' % (share.hash, share.peer.transport.getPeer() if share.peer is not None else None)
@@ -470,7 +470,6 @@ def main(args):
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     if height > 5:
-                        print "narg"
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
                         count = counter(current_work.value['best_share_hash'], height, 2**100)
