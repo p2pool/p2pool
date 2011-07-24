@@ -159,7 +159,7 @@ class Share(object):
         self.time_seen = time.time()
         self.shared = False
     
-    def as_block(self, tracke, net):
+    def as_block(self, tracker, net):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
