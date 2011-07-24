@@ -131,7 +131,7 @@ def main(args):
                     continue
                 if (peer2.nonce, share_hash) in requested:
                     continue
-                print 'Requesting parent share %x' % (share_hash,)
+                print 'Requesting parent share %x' % (share_hash % 2**32,)
                 peer2.send_getshares(
                     hashes=[share_hash],
                     parents=2000,
@@ -158,23 +158,22 @@ def main(args):
         def p2p_shares(shares, peer=None):
             for share in shares:
                 if share.hash in tracker.shares:
-                    print 'Got duplicate share, ignoring. Hash: %x' % (share.hash,)
+                    #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
                     continue
                 
-                #print 'Received share %x from %r' % (share.hash, share.peer.transport.getPeer() if share.peer is not None else None)
+                #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.transport.getPeer() if share.peer is not None else None)
                 
                 tracker.add(share)
                 #for peer2, share_hash in desired:
                 #    print 'Requesting parent share %x' % (share_hash,)
                 #    peer2.send_getshares(hashes=[share_hash], parents=2000)
                 
-                if share.gentx is not None:
-                    if share.bitcoin_hash <= share.header['target']:
+                if share.bitcoin_hash <= share.header['target']:
                         print
-                        print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash, share.bitcoin_hash,)
+                        print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
                         print
                         if factory.conn.value is not None:
-                            factory.conn.value.send_block(block=share.as_block())
+                            factory.conn.value.send_block(block=share.as_block(tracker, net))
                         else:
                             print 'No bitcoind connection! Erp!'
             
@@ -184,9 +183,9 @@ def main(args):
                 best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
                 
                 if best == share.hash:
-                    print ('MINE> ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash,)
+                    print ('MINE: ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash % 2**32,)
                 else:
-                    print ('MINE> ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash,)
+                    print ('MINE: ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash % 2**32,)
                 
                 w = dict(current_work.value)
                 w['best_share_hash'] = best
@@ -196,9 +195,9 @@ def main(args):
             get_hashes = []
             for share_hash in share_hashes:
                 if share_hash in tracker.shares:
-                    pass # print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash,)
+                    pass # print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash % 2**32,)
                 else:
-                    print 'Got share hash, requesting! Hash: %x' % (share_hash,)
+                    print 'Got share hash, requesting! Hash: %x' % (share_hash % 2**32,)
                     get_hashes.append(share_hash)
             if get_hashes:
                 peer.send_getshares(hashes=get_hashes, parents=0, stops=[])
@@ -271,6 +270,8 @@ def main(args):
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
         def compute(state, all_targets):
+            start = time.time()
+            start = time.time()
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -310,9 +311,13 @@ def main(args):
             target = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             if not all_targets:
                 target = min(2**256//2**32 - 1, target)
+            print "TOOK", time.time() - start
+            times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
+            print "TOOK", time.time() - start
             return ba.getwork(target)
         
         my_shares = set()
+        times = {}
         
         def got_response(data):
             try:
@@ -332,9 +337,13 @@ def main(args):
                         factory.conn.value.send_block(block=block)
                     else:
                         print 'No bitcoind connection! Erp!'
+                target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
+                if hash_ > target:
+                    print 'Received invalid share from worker - %x/%x' % (hash_, target)
+                    return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                #print 'GOT SHARE! %x' % (share.hash,), "DEAD ON ARRIVAL" if share.previous_hash != current_work['best_share_hash'] else ""
+                print 'GOT SHARE! %x %x' % (share.hash, 0 if share.previous_hash is None else share.previous_hash), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce]
                 p2p_shares([share])
             except:
                 print

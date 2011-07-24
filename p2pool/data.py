@@ -97,7 +97,6 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
 class Share(object):
     peer = None
     highest_block_on_arrival = None
-    gentx = None
     
     @classmethod
     def from_block(cls, block):
@@ -160,11 +159,13 @@ class Share(object):
         self.time_seen = time.time()
         self.shared = False
     
-    def as_block(self):
+    def as_block(self, tracke, net):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        return dict(header=self.header, txs=[self.gentx] + self.other_txs)
+        gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
+        
+        return dict(header=self.header, txs=[gentx] + self.other_txs)
     
     def as_share1a(self):
         return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
@@ -202,6 +203,7 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, net):
+    # XXX could be optimized to use nth_parent and cumulative_weights
     chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
     attempts = sum(bitcoin_data.target_to_average_attempts(share.target) for share in chain[:-1])
     time = chain[0].timestamp - chain[-1].timestamp
@@ -220,7 +222,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
-        pre_target3 = math.clip(pre_target2, (0, 2**256//2**32 - 1))
+        pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
         target = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
@@ -375,6 +377,11 @@ class OkayTracker(bitcoin_data.Tracker):
             self.remove(share_hash)
             self.verified.remove(share_hash)
         
+        #for tail, heads in list(self.tails.iteritems()):
+        #    if min(self.get_height(head) for head in heads) > 2*net.CHAIN_LENGTH + 10:
+        #        self.remove(tail)
+        #        self.verified.remove(tail)
+        
         best = scores[-1] if scores else None
         
         if best is not None:
@@ -417,6 +424,7 @@ class Mainnet(bitcoin_data.Mainnet):
     PREFIX = '2472ef181efcd37b'.decode('hex')
     ADDRS_TABLE = 'addrs'
     P2P_PORT = 9333
+    MAX_TARGET = 2**256//2**32 - 1
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -424,7 +432,8 @@ class Testnet(bitcoin_data.Testnet):
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
-    IDENTIFIER = '5fc2be5d4f0d6bfb'.decode('hex')
-    PREFIX = '3f6057a15076f441'.decode('hex')
+    IDENTIFIER = '5fc2be2d4f0d6bfb'.decode('hex')
+    PREFIX = '3f6057a15036f441'.decode('hex')
     ADDRS_TABLE = 'addrs_testnet'
     P2P_PORT = 19333
+    MAX_TARGET = 2**256//2**20 - 1
