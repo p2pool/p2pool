@@ -421,8 +421,8 @@ class Tracker(object):
         
         self.heights = {} # share_hash -> height_to, other_share_hash
         
-        #self.id_generator = itertools.count()
-        #self.tails_by_id = {}
+        self.id_generator = itertools.count()
+        self.tails_by_id = {}
         
         self.get_nth_parent_hash = skiplist.DistanceSkipList(self)
     
@@ -431,7 +431,6 @@ class Tracker(object):
         if share.hash in self.shares:
             return # XXX raise exception?
         
-        '''
         parent_id = self.ids.get(share.previous_hash, None)
         children_ids = set(self.ids.get(share2_hash) for share2_hash in self.reverse_shares.get(share.hash, set()))
         infos = set()
@@ -442,7 +441,7 @@ class Tracker(object):
         if not infos:
             infos.add((self.id_generator.next(), 0))
         chosen = min(infos)
-        '''
+        self.ids[share.hash] = chosen
         
         self.shares[share.hash] = share
         self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
