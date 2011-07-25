@@ -1,11 +1,9 @@
 from __future__ import division
 
 import json
-import random
 
 from twisted.internet import defer
 
-from p2pool.bitcoin import getwork
 from p2pool.util import jsonrpc, deferred_resource
 
 
@@ -53,7 +51,7 @@ class WorkerInterface(jsonrpc.Server):
     
     def rpc_getwork(self, request, data=None):
         request.setHeader('X-Long-Polling', '/long-polling')
-
+        
         if data is not None:
             return self.response_callback(data)
         

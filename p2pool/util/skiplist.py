@@ -52,7 +52,7 @@ class SkipList(Base):
             # XXX could be better by combining updates
             for x in updates:
                 updates[x] = updates[x][0], self.combine_deltas(updates[x][1], delta) if updates[x][1] is not None else delta
-            
+        
         
         return item_hash
 

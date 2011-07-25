@@ -8,7 +8,6 @@ import os
 import random
 import sqlite3
 import struct
-import subprocess
 import sys
 import time
 
@@ -174,13 +173,13 @@ def main(args):
                 #    peer2.send_getshares(hashes=[share_hash], parents=2000)
                 
                 if share.bitcoin_hash <= share.header['target']:
-                        print
-                        print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
-                        print
-                        if factory.conn.value is not None:
-                            factory.conn.value.send_block(block=share.as_block(tracker, args.net))
-                        else:
-                            print 'No bitcoind connection! Erp!'
+                    print
+                    print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
+                    print
+                    if factory.conn.value is not None:
+                        factory.conn.value.send_block(block=share.as_block(tracker, args.net))
+                    else:
+                        print 'No bitcoind connection! Erp!'
             
             if some_new:
                 share = shares[0]
