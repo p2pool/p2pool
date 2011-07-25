@@ -9,3 +9,5 @@ try:
 except:
     __version__ = 'unknown'
 os.chdir(prev)
+
+DEBUG = False

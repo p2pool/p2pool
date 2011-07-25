@@ -156,6 +156,9 @@ def main(args):
             share.flag_shared()
         
         def p2p_shares(shares, peer=None):
+            if len(shares) > 5:
+                print "Processing %i shares..." % (len(shares),)
+            
             for share in shares:
                 if share.hash in tracker.shares:
                     #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
@@ -190,6 +193,9 @@ def main(args):
                 w = dict(current_work.value)
                 w['best_share_hash'] = best
                 current_work.set(w)
+            
+            if len(shares) > 5:
+                print "... done processing %i shares." % (len(shares),)
         
         def p2p_share_hashes(share_hashes, peer):
             get_hashes = []
@@ -271,7 +277,6 @@ def main(args):
         
         def compute(state, all_targets):
             start = time.time()
-            start = time.time()
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -341,7 +346,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x %x' % (share.hash, 0 if share.previous_hash is None else share.previous_hash), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce]
+                print 'GOT SHARE! %x %x' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce]
                 p2p_shares([share])
             except:
                 print
@@ -501,14 +506,14 @@ def main(args):
         reactor.stop()
 
 def run():
-    if __debug__:
-        defer.setDebugging(True)
-    
     parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,))
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--testnet',
         help='use the testnet',
         action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
+    parser.add_argument('--debug',
+        help='debugging mode',
+        action='store_const', const=True, default=False, dest='debug')
     parser.add_argument('-a', '--address',
         help='generate to this address (defaults to requesting one from bitcoind)',
         type=str, action='store', default=None, dest='address')
@@ -548,6 +553,9 @@ def run():
         type=str, action='store', dest='bitcoind_rpc_password')
     
     args = parser.parse_args()
+    
+    if args.debug:
+        p2pool_init.DEBUG = True
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT

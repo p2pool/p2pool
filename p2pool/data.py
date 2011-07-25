@@ -212,8 +212,6 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net):
     return attempts//time
 
 def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
-    if __debug__:
-        print "start generate_transaction"
     height, last = tracker.get_height_and_last(previous_share_hash)
     if height < net.TARGET_LOOKBEHIND:
         target = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
@@ -268,9 +266,6 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
-    if __debug__:
-        print "end generate_transaction"
-    
     return dict(
         version=1,
         tx_ins=[dict(
@@ -318,9 +313,6 @@ class OkayTracker(bitcoin_data.Tracker):
             return True
     
     def think(self, ht, previous_block, now):
-        if __debug__:
-            print "start think"
-        
         desired = set()
         
         # O(len(self.heads))
@@ -387,12 +379,8 @@ class OkayTracker(bitcoin_data.Tracker):
         if best is not None:
             best_share = self.verified.shares[best]
             if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
-                if __debug__:
-                    print "stale detected!"
+                print "Stale detected!"
                 best = best_share.previous_hash
-        
-        if __debug__:
-            print "end think"
         
         return best, desired
     

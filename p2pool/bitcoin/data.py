@@ -6,7 +6,8 @@ import itertools
 import warnings
 
 from . import base58
-from p2pool.util import bases, math, skiplist
+from p2pool.util import bases, math, skiplist, intern2
+import p2pool
 
 class EarlyEnd(Exception):
     pass
@@ -58,17 +59,20 @@ class Type(object):
     def unpack(self, data):
         obj = self._unpack(data)
         
-        if __debug__:
+        if p2pool.DEBUG:
             data2 = self._pack(obj)
             if data2 != data:
-                assert self._unpack(data2) == obj
+                if self._unpack(data2) != obj:
+                    raise AssertionError()
         
         return obj
     
     def pack(self, obj):
         data = self._pack(obj)
         
-        assert self._unpack(data) == obj
+        if p2pool.DEBUG:
+            if self._unpack(data) != obj:
+                raise AssertionError()
         
         return data
     
@@ -272,9 +276,10 @@ class FloatingIntegerType(Type):
     def read(self, file):
         bits, file = self._inner.read(file)
         target = self._bits_to_target(bits)
-        if __debug__:
+        if p2pool.DEBUG:
             if self._target_to_bits(target) != bits:
                 raise ValueError('bits in non-canonical form')
+        target = intern2.intern2(target)
         return target, file
     
     def write(self, file, item):
@@ -285,8 +290,9 @@ class FloatingIntegerType(Type):
     
     def _bits_to_target(self, bits2):
         target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
-        assert target == self._bits_to_target1(struct.pack('<I', bits2))
-        assert self._target_to_bits(target, _check=False) == bits2
+        if p2pool.DEBUG:
+            assert target == self._bits_to_target1(struct.pack('<I', bits2))
+            assert self._target_to_bits(target, _check=False) == bits2
         return target
     
     def _bits_to_target1(self, bits):
@@ -550,7 +556,7 @@ class Tracker(object):
         if not self.reverse_shares[share.previous_hash]:
             self.reverse_shares.pop(share.previous_hash)
         
-        assert self.test() is None
+        #assert self.test() is None
     
     def get_height(self, share_hash):
         height, work, last = self.get_height_work_and_last(share_hash)
