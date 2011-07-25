@@ -173,7 +173,7 @@ def main(args):
                 #    print 'Requesting parent share %x' % (share_hash,)
                 #    peer2.send_getshares(hashes=[share_hash], parents=2000)
                 
-                if share.bitcoin_hash <= share.header['target'] or p2pool_init.DEBUG:
+                if share.bitcoin_hash <= share.header['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
                         print
@@ -332,7 +332,7 @@ def main(args):
                     return False
                 block = dict(header=header, txs=transactions)
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
-                if hash_ <= block['header']['target']:
+                if hash_ <= block['header']['target'] or p2pool_init.DEBUG:
                     print
                     print 'GOT BLOCK! Passing to bitcoind! %x' % (hash_,)
                     print
