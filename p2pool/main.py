@@ -59,7 +59,7 @@ def main(args):
         
         # connect to bitcoind over JSON-RPC and do initial getwork
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
-        print '''Testing bitcoind RPC connection to '%s' with authorization '%s:%s'...''' % (url, args.bitcoind_rpc_username, args.bitcoind_rpc_password)
+        print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         temp_work, temp_height = yield getwork(bitcoind)
         print '    ...success!'
