@@ -11,15 +11,13 @@ def _swap(s, l):
     return ''.join(s[x:x+l][::-1] for x in xrange(0, len(s), l))
 
 class BlockAttempt(object):
-    def __init__(self, version, previous_block, merkle_root, timestamp, target):
-        assert version == 1
-        self.version, self.previous_block, self.merkle_root, self.timestamp, self.target = version, previous_block, merkle_root, timestamp, target
+    def __init__(self, version, previous_block, merkle_root, timestamp, target, target2=None):
+        if target2 is None:
+            target2 = target
+        self.version, self.previous_block, self.merkle_root, self.timestamp, self.target, self.target2 = version, previous_block, merkle_root, timestamp, target, target2
     
     def __hash__(self):
-        return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.target))
-    
-    def __repr__(self):
-        return '<BlockAttempt %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
+        return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.target, self.target2))
     
     def __eq__(self, other):
         if not isinstance(other, BlockAttempt):
@@ -32,11 +30,7 @@ class BlockAttempt(object):
     def __repr__(self):
         return 'BlockAttempt(%s)' % (', '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
     
-    def getwork(self, target=None, _check=3):
-        target2 = self.target if target is None else target
-        #if target2 >= 2**256//2**32:
-        #    raise ValueError('target higher than standard maximum')
-        
+    def getwork(self, _check=3):
         block_data = bitcoin_data.block_header_type.pack(dict(
             version=self.version,
             previous_block=self.previous_block,
@@ -49,26 +43,27 @@ class BlockAttempt(object):
         getwork = {
             'data': _swap(block_data, 4).encode('hex') + '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
             'hash1': '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
-            'target': ('%064x' % (target2,)).decode('hex')[::-1].encode('hex'),
+            'target': ('%064x' % (self.target2,)).decode('hex')[::-1].encode('hex'),
             'midstate': _swap(sha256.process(block_data[:64]), 4).encode('hex'),
         }
         
         if _check:
-            self2 = self.__class__.from_getwork(getwork, _check=_check - 1, _check_target=target)
+            self2 = self.__class__.from_getwork(getwork, _check=_check - 1)
             if self2 != self:
                 raise ValueError('failed check - input invalid or implementation error')
         
         return getwork
     
     @classmethod
-    def from_getwork(cls, getwork, _check=3, _check_target=None):
+    def from_getwork(cls, getwork, _check=3):
         attrs = decode_data(getwork['data'])
         attrs.pop('nonce')
+        attrs['target2'] = int(getwork['target'].decode('hex')[::-1].encode('hex'), 16)
         
         ba = cls(**attrs)
         
         if _check:
-            getwork2 = ba.getwork(_check_target, _check=_check - 1)
+            getwork2 = ba.getwork(_check=_check - 1)
             if getwork2 != getwork:
                 raise ValueError('failed check - input invalid or implementation error')
         
@@ -97,8 +92,24 @@ if __name__ == '__main__':
         1305759879,
         0x44b9f20000000000000000000000000000000000000000000000,
     )
-    ba.getwork(2**192*5, 100)
-    ba.getwork(1, 100)
-    ba.getwork(10, 100)
+    ba.getwork(100)
+    ba = BlockAttempt(
+        1,
+        0x148135e10208db85abb62754341a392eab1f186aab077a831cf7,
+        0x534ea08be1ab529f484369344b6d5423ef5a0767db9b3ebb4e182bbb67962520,
+        1305759879,
+        0x44b9f20000000000000000000000000000000000000000000000,
+        432*2**230,
+    )
+    ba.getwork(100)
+    ba = BlockAttempt(
+        1,
+        0x148135e10208db85abb62754341a392eab1f186aab077a831cf7,
+        0x534ea08be1ab529f484369344b6d5423ef5a0767db9b3ebb4e182bbb67962520,
+        1305759879,
+        0x44b9f20000000000000000000000000000000000000000000000,
+        7*2**240,
+    )
+    ba.getwork(100)
     ba.getwork()
     ba.getwork(_check=100)

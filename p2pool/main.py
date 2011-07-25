@@ -293,7 +293,7 @@ def main(args):
                 block_target=state['target'],
                 net=args.net,
             )
-            print 'Generating!'
+            print 'Generating! Difficulty: %.06f' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
@@ -306,15 +306,13 @@ def main(args):
                 if timestamp2 > timestamp:
                     print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
-            ba = bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'])
-            #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
-            target = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
+            target2 = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             if not all_targets:
-                target = min(2**256//2**32 - 1, target)
+                target2 = min(2**256//2**32 - 1, target2)
             print "TOOK", time.time() - start
             times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
-            print "TOOK", time.time() - start
-            return ba.getwork(target)
+            #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
+            return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
         
         my_shares = set()
         times = {}
