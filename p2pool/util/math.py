@@ -54,3 +54,19 @@ def add_dicts(dicts):
         for k, v in d.iteritems():
             res[k] = res.get(k, 0) + v
     return dict((k, v) for k, v in res.iteritems() if v)
+
+def format(x):
+    prefixes = "kMGTPEZY"
+    count = 0
+    while x >= 10000 and count < len(prefixes) - 2:
+        x = x//1000
+        count += 1
+    s = "" if count == 0 else prefixes[count - 1]
+    return "%i" % (x,) + s
+
+if __name__ == "__main__":
+    import random
+    a = 1
+    while True:
+        print a, format(a) + "H/s"
+        a = a * random.randrange(2, 5)
