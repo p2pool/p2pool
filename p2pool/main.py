@@ -306,7 +306,7 @@ def main(args):
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             
-            timestamp = time.time() - current_work2.value['clock_offset']
+            timestamp = int(time.time() - current_work2.value['clock_offset'])
             if state['best_share_hash'] is not None:
                 timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
                 if timestamp2 > timestamp:
