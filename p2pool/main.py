@@ -159,10 +159,12 @@ def main(args):
             if len(shares) > 5:
                 print "Processing %i shares..." % (len(shares),)
             
+            some_new = False
             for share in shares:
                 if share.hash in tracker.shares:
                     #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
                     continue
+                some_new = True
                 
                 #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.transport.getPeer() if share.peer is not None else None)
                 
@@ -171,16 +173,16 @@ def main(args):
                 #    print 'Requesting parent share %x' % (share_hash,)
                 #    peer2.send_getshares(hashes=[share_hash], parents=2000)
                 
-                if share.bitcoin_hash <= share.header['target']:
+                if share.bitcoin_hash <= share.header['target'] or p2pool_init.DEBUG:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
                         print
                         if factory.conn.value is not None:
-                            factory.conn.value.send_block(block=share.as_block(tracker, net))
+                            factory.conn.value.send_block(block=share.as_block(tracker, args.net))
                         else:
                             print 'No bitcoind connection! Erp!'
             
-            if shares:
+            if some_new:
                 share = shares[0]
                 
                 best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
@@ -276,7 +278,6 @@ def main(args):
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
         def compute(state, all_targets):
-            start = time.time()
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -314,7 +315,6 @@ def main(args):
             target2 = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             if not all_targets:
                 target2 = min(2**256//2**32 - 1, target2)
-            print "TOOK", time.time() - start
             times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
