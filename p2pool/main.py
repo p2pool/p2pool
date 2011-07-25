@@ -116,11 +116,11 @@ def main(args):
                 best_share_hash=current_work.value['best_share_hash'] if current_work.value is not None else None,
             ))
             current_work2.set(dict(
-                time=work.timestamp,
+                clock_offset=time.time() - work.timestamp,
             ))
         
         def set_real_work2():
-            best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
+            best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
             
             t = dict(current_work.value)
             t['best_share_hash'] = best
@@ -185,7 +185,7 @@ def main(args):
             if some_new:
                 share = shares[0]
                 
-                best, desired = tracker.think(ht, current_work.value['previous_block'], current_work2.value['time'])
+                best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
                 
                 if best == share.hash:
                     print ('MINE: ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash % 2**32,)
@@ -306,7 +306,7 @@ def main(args):
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             
-            timestamp = current_work2.value['time']
+            timestamp = time.time() - current_work2.value['clock_offset']
             if state['best_share_hash'] is not None:
                 timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
                 if timestamp2 > timestamp:
