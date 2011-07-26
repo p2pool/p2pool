@@ -455,7 +455,6 @@ def main(args):
         # disable for now, for testing impact on stales
         #factory.new_tx.watch(new_tx)
         
-        @defer.inlineCallbacks
         def new_block(block):
             work_updated.happened()
         factory.new_block.watch(new_block)
