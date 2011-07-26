@@ -79,7 +79,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         while self.connected2:
             self.send_addrme(port=self.node.port)
             #print 'sending addrme'
-            yield deferral.sleep(random.expovariate(1/100))
+            yield deferral.sleep(random.expovariate(1/(100*len(self.node.peers))))
     
     message_version = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
