@@ -145,6 +145,8 @@ def main(args):
         yield set_real_work2()
         print '    ...success!'
         
+        start_time = time.time() - current_work2.value['clock_offset']
+        
         # setup p2p logic and join p2pool network
         
         def share_share(share, ignore_peer=None):
