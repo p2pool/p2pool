@@ -101,6 +101,7 @@ def main(args):
         # information affecting work that should not trigger a long-polling update
         current_work2 = variable.Variable(None)
         
+        work_updated = variable.Event()
         tracker_updated = variable.Event()
         
         requested = set()
@@ -109,6 +110,7 @@ def main(args):
         @defer.inlineCallbacks
         def set_real_work1():
             work, height = yield getwork(bitcoind)
+            # XXX call tracker_updated
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -353,8 +355,10 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x %x' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce]
+                print 'GOT SHARE! %x prev %x' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce], "s since getwork"
                 p2p_shares([share])
+                if share.previous_hash != current_work.value['best_share_hash']:
+                    return False
             except:
                 print
                 print 'Error processing data received from worker:'
@@ -448,12 +452,12 @@ def main(args):
                 print 'Error handling tx:'
                 log.err()
                 print
-        factory.new_tx.watch(new_tx)
+        # disable for now, for testing impact on stales
+        #factory.new_tx.watch(new_tx)
         
         @defer.inlineCallbacks
         def new_block(block):
-            yield set_real_work1()
-            yield set_real_work2()
+            work_updated.happened()
         factory.new_block.watch(new_block)
         
         print 'Started successfully!'
@@ -462,7 +466,10 @@ def main(args):
         @defer.inlineCallbacks
         def work1_thread():
             while True:
-                yield deferral.sleep(random.expovariate(1/1))
+                try:
+                    yield work_updated.get_deferred(random.expovariate(1/1))
+                except defer.TimeoutError:
+                    pass
                 try:
                     yield set_real_work1()
                 except:
