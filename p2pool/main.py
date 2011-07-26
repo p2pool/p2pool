@@ -101,6 +101,8 @@ def main(args):
         # information affecting work that should not trigger a long-polling update
         current_work2 = variable.Variable(None)
         
+        tracker_updated = variable.Event()
+        
         requested = set()
         task.LoopingCall(requested.clear).start(60)
         
@@ -118,12 +120,30 @@ def main(args):
                 clock_offset=time.time() - work.timestamp,
             ))
         
+        @defer.inlineCallbacks
         def set_real_work2():
-            best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
+            best, desired = yield tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
             
             t = dict(current_work.value)
             t['best_share_hash'] = best
             current_work.set(t)
+            
+            
+            
+            #if some_new:
+            #    share = shares[0]
+            #    
+            #    # instead, trigger main thread to call set_work
+            #    best, desired = yield tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
+            #    
+            #    if best == share.hash:
+            #        print ('MINE: ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash % 2**32,)
+            #    else:
+            #        print ('MINE: ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash % 2**32,)
+            #    
+            #    w = dict(current_work.value)
+            #    w['best_share_hash'] = best
+            #    current_work.set(w)
             
             for peer2, share_hash in desired:
                 if peer2 is None:
@@ -160,12 +180,10 @@ def main(args):
             if len(shares) > 5:
                 print "Processing %i shares..." % (len(shares),)
             
-            some_new = False
             for share in shares:
                 if share.hash in tracker.shares:
                     #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
                     continue
-                some_new = True
                 
                 #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.transport.getPeer() if share.peer is not None else None)
                 
@@ -183,19 +201,7 @@ def main(args):
                     else:
                         print 'No bitcoind connection! Erp!'
             
-            if some_new:
-                share = shares[0]
-                
-                best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
-                
-                if best == share.hash:
-                    print ('MINE: ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash % 2**32,)
-                else:
-                    print ('MINE: ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash % 2**32,)
-                
-                w = dict(current_work.value)
-                w['best_share_hash'] = best
-                current_work.set(w)
+            tracker_updated.happened()
             
             if len(shares) > 5:
                 print "... done processing %i shares." % (len(shares),)
@@ -447,7 +453,7 @@ def main(args):
         @defer.inlineCallbacks
         def new_block(block):
             yield set_real_work1()
-            set_real_work2()
+            yield set_real_work2()
         factory.new_block.watch(new_block)
         
         print 'Started successfully!'
@@ -466,7 +472,10 @@ def main(args):
         @defer.inlineCallbacks
         def work2_thread():
             while True:
-                yield deferral.sleep(random.expovariate(1/1))
+                try:
+                    yield tracker_updated.get_deferred(random.expovariate(1/1))
+                except defer.TimeoutError:
+                    pass
                 try:
                     yield set_real_work2()
                 except:
