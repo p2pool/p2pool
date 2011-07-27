@@ -7,12 +7,12 @@ from twisted.internet import defer
 
 from p2pool.util import jsonrpc, deferred_resource, variable
 
-def get_id(request):
-    x = request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
-    print x
-    return x
+# TODO: branch on User-Agent to remove overhead of workarounds
 
-last_cache_invalidation = {}
+def get_id(request):
+    return request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
+
+last_cache_invalidation = {} # XXX remove global
 
 def merge(gw1, gw2):
     if gw1['hash1'] != gw2['hash1']:
@@ -25,7 +25,6 @@ def merge(gw1, gw2):
         hash1=gw1['hash1'],
         target=gw1['target'],
     )
-    
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, work, compute):
@@ -34,8 +33,8 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     
     @defer.inlineCallbacks
     def render_GET(self, request):
-        id = random.randrange(10000)
-        print "LONG POLL", id
+        #id = random.randrange(10000)
+        #print "LONG POLL", id
         
         request_id = get_id(request)
         
@@ -53,7 +52,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
-            print "longpoll faked"
+            #print "longpoll faked"
             res = self.compute(work, request.getHeader('X-All-Targets') is not None)
             newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
         else:
@@ -71,7 +70,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             'error': None,
         }))
         
-        print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
+        #print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
     render_POST = render_GET
 
 class RateInterface(deferred_resource.DeferredResource):
@@ -115,7 +114,7 @@ class WorkerInterface(jsonrpc.Server):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
-            print "longpoll faked"
+            #print "longpoll faked"
             res = self.compute(work, request.getHeader('X-All-Targets') is not None)
             newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
         else:
