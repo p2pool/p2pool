@@ -182,10 +182,12 @@ def main(args):
             if len(shares) > 5:
                 print "Processing %i shares..." % (len(shares),)
             
+            some_new = False
             for share in shares:
                 if share.hash in tracker.shares:
                     #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
                     continue
+                some_new = True
                 
                 #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.transport.getPeer() if share.peer is not None else None)
                 
@@ -203,7 +205,8 @@ def main(args):
                     else:
                         print 'No bitcoind connection! Erp!'
             
-            tracker_updated.happened()
+            if some_new:
+                tracker_updated.happened()
             
             if len(shares) > 5:
                 print "... done processing %i shares." % (len(shares),)
@@ -465,27 +468,23 @@ def main(args):
         @defer.inlineCallbacks
         def work1_thread():
             while True:
-                try:
-                    yield work_updated.get_deferred(random.expovariate(1/1))
-                except defer.TimeoutError:
-                    pass
+                flag = work_updated.get_deferred()
                 try:
                     yield set_real_work1()
                 except:
                     log.err()
+                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
         
         
         @defer.inlineCallbacks
         def work2_thread():
             while True:
-                try:
-                    yield tracker_updated.get_deferred(random.expovariate(1/1))
-                except defer.TimeoutError:
-                    pass
+                flag = tracker_updated.get_deferred()
                 try:
                     yield set_real_work2()
                 except:
                     log.err()
+                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
         
         work1_thread()
         work2_thread()
