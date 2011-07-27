@@ -572,6 +572,18 @@ def run():
     
     if args.debug:
         p2pool_init.DEBUG = True
+        class TimestampingPipe(object):
+            def __init__(self, inner_file):
+                self.inner_file = inner_file
+                self.buf = ""
+            def write(self, data):
+                buf = self.buf + data
+                lines = buf.split('\n')
+                for line in lines[:-1]:
+                    self.inner_file.write("%s %s\n" % (time.strftime("%H:%M:%S"), line))
+                self.buf = lines[-1]
+        sys.stdout = TimestampingPipe(sys.stdout)
+        sys.stderr = TimestampingPipe(sys.stderr)
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
