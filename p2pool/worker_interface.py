@@ -5,12 +5,27 @@ import random
 
 from twisted.internet import defer
 
-from p2pool.util import jsonrpc, deferred_resource
+from p2pool.util import jsonrpc, deferred_resource, variable
 
 def get_id(request):
-    return request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
+    x = request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
+    print x
+    return x
 
 last_cache_invalidation = {}
+
+def merge(gw1, gw2):
+    if gw1['hash1'] != gw2['hash1']:
+        raise ValueError()
+    if gw1['target'] != gw2['target']:
+        raise ValueError()
+    return dict(
+        data=gw1['data'],
+        midstate=gw2['midstate'],
+        hash1=gw1['hash1'],
+        target=gw1['target'],
+    )
+    
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, work, compute):
@@ -24,35 +39,35 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
         
         request_id = get_id(request)
         
-        work = self.work.value
-        thought_work = last_cache_invalidation.get(request_id, None)
+        if request_id not in last_cache_invalidation:
+            last_cache_invalidation[request_id] = variable.Variable((None, None))
         
-        #if thought_work is not None and work != thought_work and work['previous_block'] == thought_work['previous_block']:
-        #    # clients won't believe the update
-        #    work = work.copy()
-        #    work['previous_block'] = random.randrange(2**256)
+        while True:
+            work = self.work.value
+            thought_work = last_cache_invalidation[request_id].value
+            if work != thought_work[-1]:
+                break
+            yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
         
-        if work == thought_work:
-            work = yield self.work.changed.get_deferred()
-        else:
-            print "shortcut worked!"
-        
-        thought_work = last_cache_invalidation.get(request_id, None)
-        if thought_work is not None and work != thought_work and work['previous_block'] == thought_work['previous_block']:
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work):
             # clients won't believe the update
-            work = work.copy()
-            work['previous_block'] = random.randrange(2**256)
+            newwork = work.copy()
+            newwork['previous_block'] = random.randrange(2**256)
+            print "longpoll faked"
+            res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+            newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+        else:
+            newwork = work
+            newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        res = self.compute(work, request.getHeader('X-All-Targets') is not None)
-        
-        last_cache_invalidation[request_id] = work
+        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
         
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('Content-Type', 'application/json')
         request.write(json.dumps({
             'jsonrpc': '2.0',
             'id': 0,
-            'result': res.getwork(),
+            'result': merge(newres.getwork(), res.getwork()),
             'error': None,
         }))
         
@@ -90,17 +105,24 @@ class WorkerInterface(jsonrpc.Server):
         
         request_id = get_id(request)
         
+        if request_id not in last_cache_invalidation:
+            last_cache_invalidation[request_id] = variable.Variable((None, None))
+        
         work = self.work.value
-        thought_work = last_cache_invalidation.get(request_id, None)
+        thought_work = last_cache_invalidation[request_id].value
         
-        if thought_work is not None and work != thought_work and work['previous_block'] == thought_work['previous_block']:
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work):
             # clients won't believe the update
-            work = work.copy()
-            work['previous_block'] = random.randrange(2**256)
+            newwork = work.copy()
+            newwork['previous_block'] = random.randrange(2**256)
+            print "longpoll faked"
+            res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+            newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+        else:
+            newwork = work
+            newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
         
-        last_cache_invalidation[request_id] = work
-        
-        return res.getwork()
+        return merge(newres.getwork(), res.getwork())
     rpc_getwork.takes_request = True
