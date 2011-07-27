@@ -9,6 +9,15 @@ from p2pool.util import jsonrpc, deferred_resource, variable
 
 # TODO: branch on User-Agent to remove overhead of workarounds
 
+def get_memory(user_agent):
+    user_agent2 = '' if user_agent is None else user_agent.lower()
+    if 'diablominer' in user_agent2: return 0
+    if 'cgminer' in user_agent2: return 1
+    if 'poclbm' in user_agent2: return 1
+    if 'phoenix' in user_agent2: return 2
+    print "Unknown miner User-Agent:", user_agent
+    return 0
+
 def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
 
@@ -37,6 +46,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
         #print "LONG POLL", id
         
         request_id = get_id(request)
+        memory = get_memory(request.getHeader('User-Agent'))
         
         if request_id not in last_cache_invalidation:
             last_cache_invalidation[request_id] = variable.Variable((None, None))
@@ -48,7 +58,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 break
             yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
         
-        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work if x is not None):
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):] if x is not None):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
@@ -103,6 +113,7 @@ class WorkerInterface(jsonrpc.Server):
             return self.response_callback(data)
         
         request_id = get_id(request)
+        memory = get_memory(request.getHeader('User-Agent'))
         
         if request_id not in last_cache_invalidation:
             last_cache_invalidation[request_id] = variable.Variable((None, None))
@@ -110,7 +121,7 @@ class WorkerInterface(jsonrpc.Server):
         work = self.work.value
         thought_work = last_cache_invalidation[request_id].value
         
-        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work if x is not None):
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):] if x is not None):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
