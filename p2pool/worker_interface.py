@@ -69,7 +69,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             newwork = work
             newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
+        reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
         
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('Content-Type', 'application/json')
@@ -132,7 +132,7 @@ class WorkerInterface(jsonrpc.Server):
             newwork = work
             newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
+        reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
         
         return merge(newres.getwork(), res.getwork())
     rpc_getwork.takes_request = True
