@@ -68,6 +68,11 @@ class BlockAttempt(object):
                 raise ValueError('failed check - input invalid or implementation error')
         
         return ba
+    
+    def update(self, **kwargs):
+        d = self.__dict__.copy()
+        d.update(kwargs)
+        return self.__class__(**d)
 
 def decode_data(data):
     return bitcoin_data.block_header_type.unpack(_swap(data.decode('hex'), 4)[:80])
@@ -113,3 +118,4 @@ if __name__ == '__main__':
     ba.getwork(100)
     ba.getwork()
     ba.getwork(_check=100)
+    ba.update(previous_block=ba.previous_block - 10).getwork(_check=100)
