@@ -189,7 +189,7 @@ def main(args):
                     continue
                 some_new = True
                 
-                #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.transport.getPeer() if share.peer is not None else None)
+                #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.addr if share.peer is not None else None)
                 
                 tracker.add(share)
                 #for peer2, share_hash in desired:

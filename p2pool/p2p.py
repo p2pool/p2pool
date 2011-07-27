@@ -40,6 +40,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
         
+        self.addr = self.transport.getPeer().host, self.transport.getPeer().port
+        
         self.send_version(
             version=self.version,
             services=0,
@@ -65,7 +67,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def _connect_timeout(self):
         if not self.connected2 and self.transport.connected:
-            print 'Handshake timed out, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
+            print 'Handshake timed out, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
     
     @defer.inlineCallbacks
@@ -97,11 +99,11 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.other_mode_var = variable.Variable(mode)
         
         if nonce == self.node.nonce:
-            #print 'Detected connection to self, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
+            #print 'Detected connection to self, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
             return
         if nonce in self.node.peers:
-            #print 'Detected duplicate connection, disconnecting from %s:%i' % (self.transport.getPeer().host, self.transport.getPeer().port)
+            #print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
             return
         
@@ -199,7 +201,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         for share1a in share1as:
             hash_ = bitcoin_data.block_header_type.hash256(share1a['header'])
             if hash_ <= share1a['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
+                print 'Dropping peer %s:%i due to invalid share' % self.addr
                 self.transport.loseConnection()
                 return
             share = p2pool_data.Share.from_share1a(share1a)
@@ -216,7 +218,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         for share1b in share1bs:
             hash_ = bitcoin_data.block_header_type.hash256(share1b['header'])
             if not hash_ <= share1b['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % (self.transport.getPeer().host, self.transport.getPeer().port)
+                print 'Dropping peer %s:%i due to invalid share' % self.addr
                 self.transport.loseConnection()
                 return
             share = p2pool_data.Share.from_share1b(share1b)
@@ -393,7 +395,7 @@ class Node(object):
             raise ValueError('already have peer')
         self.peers[conn.nonce] = conn
         
-        print 'Connected to peer %s:%i' % (conn.transport.getPeer().host, conn.transport.getPeer().port)
+        print 'Connected to peer %s:%i' % conn.addr
     
     def lost_conn(self, conn):
         if conn.nonce not in self.peers:
@@ -402,7 +404,7 @@ class Node(object):
             raise ValueError('wrong conn')
         del self.peers[conn.nonce]
         
-        print 'Lost peer %s:%i' % (conn.transport.getPeer().host, conn.transport.getPeer().port)
+        print 'Lost peer %s:%i' % conn.addr
     
     
     def got_addr(self, (host, port), services, timestamp):
