@@ -305,7 +305,7 @@ class AddrStore(dicts.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
@@ -317,6 +317,7 @@ class Node(object):
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts
         self.current_work = current_work
+        self.preferred_storage = preferred_storage
         
         self.nonce = random.randrange(2**64)
         self.attempts = {}
@@ -356,7 +357,7 @@ class Node(object):
     def _think2(self):
         while self.running:
             try:
-                if len(self.addr_store) < self.preferred_addrs and self.peers:
+                if len(self.addr_store) < self.preferred_storage and self.peers:
                     random.choice(self.peers.values()).send_getaddrs(count=8)
             except:
                 log.err()
