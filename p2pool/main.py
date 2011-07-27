@@ -96,6 +96,8 @@ def main(args):
         def get_chain(chain_id_data):
             return chains.setdefault(chain_id_data, Chain(chain_id_data))
         
+        peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
+        
         # information affecting work that should trigger a long-polling update
         current_work = variable.Variable(None)
         # information affecting work that should not trigger a long-polling update
@@ -104,8 +106,7 @@ def main(args):
         work_updated = variable.Event()
         tracker_updated = variable.Event()
         
-        requested = set()
-        task.LoopingCall(requested.clear).start(60)
+        requested = expiring_dict.ExpiringDict(300)
         
         @defer.inlineCallbacks
         def set_real_work1():
@@ -130,37 +131,27 @@ def main(args):
             t['best_share_hash'] = best
             current_work.set(t)
             
-            
-            
-            #if some_new:
-            #    share = shares[0]
-            #    
-            #    # instead, trigger main thread to call set_work
-            #    best, desired = yield tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
-            #    
-            #    if best == share.hash:
-            #        print ('MINE: ' if peer is None else '') + 'Accepted share, new best, will pass to peers! Hash: %x' % (share.hash % 2**32,)
-            #    else:
-            #        print ('MINE: ' if peer is None else '') + 'Accepted share, not best. Hash: %x' % (share.hash % 2**32,)
-            #    
-            #    w = dict(current_work.value)
-            #    w['best_share_hash'] = best
-            #    current_work.set(w)
-            
             for peer2, share_hash in desired:
-                if peer2 is None:
+                last_request_time = requested.get(share_hash, None)
+                if last_request_time is not None and last_request_time - 5 < time.time() < last_request_time + 10:
                     continue
-                if (peer2.nonce, share_hash) in requested:
+                potential_peers = set()
+                for head in tracker.tails[share_hash]:
+                    potential_peers.update(peer_heads.get(head, set()))
+                potential_peers = [peer for peer in potential_peers if peer.connected2]
+                peer = random.choice(potential_peers) if potential_peers and random.random() > .5 else peer2
+                if peer is None:
                     continue
-                print 'Requesting parent share %x' % (share_hash % 2**32,)
-                peer2.send_getshares(
+                
+                print 'Requesting parent share %x from %s' % (share_hash % 2**32, '%s:%i' % peer.addr)
+                peer.send_getshares(
                     hashes=[share_hash],
                     parents=2000,
                     stops=list(set(tracker.heads) | set(
                         tracker.get_nth_parent_hash(head, min(max(0, tracker.get_height_and_last(head)[0] - 1), 10)) for head in tracker.heads
                     )),
                 )
-                requested.add((peer2.nonce, share_hash))
+                requested[share_hash] = time.time()
         
         print 'Initializing work...'
         yield set_real_work1()
@@ -205,6 +196,9 @@ def main(args):
                     else:
                         print 'No bitcoind connection! Erp!'
             
+            if shares and peer is not None:
+                peer_heads.setdefault(shares[0].hash, set()).add(peer)
+            
             if some_new:
                 tracker_updated.happened()
             
@@ -219,6 +213,9 @@ def main(args):
                 else:
                     print 'Got share hash, requesting! Hash: %x' % (share_hash % 2**32,)
                     get_hashes.append(share_hash)
+            
+            if share_hashes and peer is not None:
+                peer_heads.setdefault(share_hashes[0], set()).add(peer)
             if get_hashes:
                 peer.send_getshares(hashes=get_hashes, parents=0, stops=[])
         
