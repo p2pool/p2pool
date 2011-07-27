@@ -334,6 +334,8 @@ class HeightTracker(object):
         self._clear_task = task.LoopingCall(self.requested.clear)
         self._clear_task.start(60)
         
+        self.last_notified_size = 0
+        
         self.think()
     
     def think(self):
@@ -362,12 +364,18 @@ class HeightTracker(object):
                 continue
             self.request([], tail)
         for head in self.tracker.heads:
+            if head == highest_head:
+                continue
             self.request([head], None)
     
     def heard_headers(self, headers):
         for header in headers:
             self.tracker.add(HeaderWrapper(header))
         self.think()
+        
+        if len(self.tracker.shares) > self.last_notified_size + 10:
+            print "Have %i block headers" % len(self.tracker.shares)
+            self.last_notified_size = len(self.tracker.shares)
     
     def heard_block(self, block_hash):
         self.request([], block_hash)
