@@ -48,7 +48,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 break
             yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
         
-        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work):
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work if x is not None):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
@@ -110,7 +110,7 @@ class WorkerInterface(jsonrpc.Server):
         work = self.work.value
         thought_work = last_cache_invalidation[request_id].value
         
-        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work):
+        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work if x is not None):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
