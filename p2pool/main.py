@@ -80,15 +80,6 @@ def main(args):
         print '    Payout script:', my_script.encode('hex')
         print
         
-        @defer.inlineCallbacks
-        def real_get_block(block_hash):
-            block = yield (yield factory.getProtocol()).get_block(block_hash)
-            print 'Got block %x' % (block_hash,)
-            defer.returnValue(block)
-        get_block = deferral.DeferredCacher(real_get_block, expiring_dict.ExpiringDict(3600))
-        
-        get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
-        
         ht = bitcoin.p2p.HeightTracker(factory)
         
         tracker = p2pool.OkayTracker(args.net)
@@ -381,16 +372,8 @@ def main(args):
         
         # done!
         
-        def get_blocks(start_hash):
-            while True:
-                try:
-                    block = get_block.call_now(start_hash)
-                except deferral.NotNowError:
-                    break
-                yield start_hash, block
-                start_hash = block['header']['previous_block']
-        
         tx_pool = expiring_dict.ExpiringDict(600, get_touches=False) # hash -> tx
+        get_raw_transaction = deferral.DeferredCacher(lambda tx_hash: bitcoind.rpc_getrawtransaction('%x' % tx_hash), expiring_dict.ExpiringDict(100))
         
         class Tx(object):
             def __init__(self, tx, seen_at_block):
@@ -428,16 +411,6 @@ def main(args):
                 x = self.is_good2()
                 #print 'is_good:', x
                 return x
-            
-            def is_good2(self):
-                for block_hash, block in itertools.islice(get_blocks(current_work.value['previous_block']), 10):
-                    if block_hash == self.seen_at_block:
-                        return True
-                    for tx in block['txs']:
-                        mentions = set([bitcoin.data.tx_type.hash256(tx)] + [tx_in['previous_output']['hash'] for tx_in in tx['tx_ins'] if tx_in['previous_output'] is not None])
-                        if mentions & self.mentions:
-                            return False
-                return False
         
         @defer.inlineCallbacks
         def new_tx(tx_hash):
