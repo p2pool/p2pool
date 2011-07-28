@@ -130,9 +130,12 @@ def main(args):
                 for head in tracker.tails[share_hash]:
                     potential_peers.update(peer_heads.get(head, set()))
                 potential_peers = [peer for peer in potential_peers if peer.connected2]
-                peer = random.choice(potential_peers) if potential_peers and random.random() > .5 else peer2
-                if peer is None:
-                    continue
+                if count == 0 and peer2 is not None and peer2.connected2:
+                    peer = peer2
+                else:
+                    peer = random.choice(potential_peers) if potential_peers and random.random() > .2 else peer2
+                    if peer is None:
+                        continue
                 
                 print 'Requesting parent share %x from %s' % (share_hash % 2**32, '%s:%i' % peer.addr)
                 peer.send_getshares(
