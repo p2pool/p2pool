@@ -6,7 +6,7 @@ class Base(object):
 
 class SkipList(Base):
     def __init__(self):
-        self.skips = expiring_dict.ExpiringDict(3600)
+        self.skips = expiring_dict.ExpiringDict(600)
     
     def __call__(self, start, *args, **kwargs):
         updates = {}
