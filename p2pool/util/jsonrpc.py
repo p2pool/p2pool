@@ -122,6 +122,8 @@ class Server(deferred_resource.DeferredResource):
             
             try:
                 result = yield method_meth(*params)
+            except Error:
+                raise
             except Exception:
                 print 'Squelched JSON method error:'
                 log.err()

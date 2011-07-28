@@ -4,6 +4,7 @@ import json
 import random
 
 from twisted.internet import defer, reactor
+from twisted.python import log
 
 from p2pool.util import jsonrpc, deferred_resource, variable
 
@@ -43,43 +44,59 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     
     @defer.inlineCallbacks
     def render_GET(self, request):
-        #id = random.randrange(10000)
-        #print "LONG POLL", id
+        try:
+            try:
+                #id = random.randrange(10000)
+                #print "LONG POLL", id
+                
+                request_id = get_id(request)
+                memory = get_memory(request.getHeader('User-Agent'))
+                
+                if request_id not in last_cache_invalidation:
+                    last_cache_invalidation[request_id] = variable.Variable((None, None))
+                
+                while True:
+                    work = self.work.value
+                    thought_work = last_cache_invalidation[request_id].value
+                    if work != thought_work[-1]:
+                        break
+                    yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
+                
+                if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):] if x is not None):
+                    # clients won't believe the update
+                    newwork = work.copy()
+                    newwork['previous_block'] = random.randrange(2**256)
+                    #print "longpoll faked"
+                    res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+                    newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+                else:
+                    newwork = work
+                    newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+                
+                reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
+                
+                request.setHeader('X-Long-Polling', '/long-polling')
+                request.setHeader('Content-Type', 'application/json')
+                request.write(json.dumps({
+                    'jsonrpc': '2.0',
+                    'id': 0,
+                    'result': merge(newres.getwork(), res.getwork()),
+                    'error': None,
+                }))
+            except jsonrpc.Error:
+                raise
+            except Exception:
+                log.err(None, 'Squelched long polling error:')
+                raise jsonrpc.Error(-32099, u'Unknown error')
         
-        request_id = get_id(request)
-        memory = get_memory(request.getHeader('User-Agent'))
+        except jsonrpc.Error, e:
+            request.write(json.dumps({
+                'jsonrpc': '2.0',
+                'id': 0,
+                'result': None,
+                'error': e._to_obj(),
+            }))
         
-        if request_id not in last_cache_invalidation:
-            last_cache_invalidation[request_id] = variable.Variable((None, None))
-        
-        while True:
-            work = self.work.value
-            thought_work = last_cache_invalidation[request_id].value
-            if work != thought_work[-1]:
-                break
-            yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
-        
-        if thought_work[-1] is not None and work != thought_work[-1] and any(work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):] if x is not None):
-            # clients won't believe the update
-            newwork = work.copy()
-            newwork['previous_block'] = random.randrange(2**256)
-            #print "longpoll faked"
-            res = self.compute(work, request.getHeader('X-All-Targets') is not None)
-            newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
-        else:
-            newwork = work
-            newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
-        
-        reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
-        
-        request.setHeader('X-Long-Polling', '/long-polling')
-        request.setHeader('Content-Type', 'application/json')
-        request.write(json.dumps({
-            'jsonrpc': '2.0',
-            'id': 0,
-            'result': merge(newres.getwork(), res.getwork()),
-            'error': None,
-        }))
         
         #print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
     render_POST = render_GET
