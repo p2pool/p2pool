@@ -6,6 +6,7 @@ import random
 from twisted.internet import defer, reactor
 from twisted.python import log
 
+import p2pool
 from p2pool.util import jsonrpc, deferred_resource, variable
 
 # TODO: branch on User-Agent to remove overhead of workarounds
@@ -46,8 +47,9 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def render_GET(self, request):
         try:
             try:
-                #id = random.randrange(10000)
-                #print "LONG POLL", id
+                id = random.randrange(10000)
+                if p2pool.DEBUG:
+                    print "LONG POLL", id
                 
                 request_id = get_id(request)
                 memory = get_memory(request.getHeader('User-Agent'))
@@ -60,13 +62,16 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     thought_work = last_cache_invalidation[request_id].value
                     if work != thought_work[-1]:
                         break
+                    if p2pool.DEBUG:
+                        print "POLL %i WAITING" % (id,)
                     yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
                 
                 if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
                     # clients won't believe the update
                     newwork = work.copy()
                     newwork['previous_block'] = random.randrange(2**256)
-                    #print "longpoll faked"
+                    if p2pool.DEBUG:
+                        print "longpoll faked", id
                     res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                     newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
                 else:
@@ -98,7 +103,8 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             }))
         
         
-        #print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
+        if p2pool.DEBUG:
+            print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
     render_POST = render_GET
 
 class RateInterface(deferred_resource.DeferredResource):
@@ -143,7 +149,8 @@ class WorkerInterface(jsonrpc.Server):
             # clients won't believe the update
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
-            #print "longpoll faked"
+            if p2pool.DEBUG:
+                print "getwork faked"
             res = self.compute(work, request.getHeader('X-All-Targets') is not None)
             newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
         else:
@@ -151,6 +158,8 @@ class WorkerInterface(jsonrpc.Server):
             newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
         reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
+        if p2pool.DEBUG:
+            print "END GETWORK %i" % (work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0,)
         
         return merge(newres.getwork(), res.getwork())
     rpc_getwork.takes_request = True
