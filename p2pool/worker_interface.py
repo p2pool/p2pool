@@ -3,7 +3,7 @@ from __future__ import division
 import json
 import random
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from p2pool.util import jsonrpc, deferred_resource, variable
 
