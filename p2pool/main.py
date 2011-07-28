@@ -123,8 +123,8 @@ def main(args):
             current_work.set(t)
             
             for peer2, share_hash in desired:
-                last_request_time = requested.get(share_hash, None)
-                if last_request_time is not None and last_request_time - 5 < time.time() < last_request_time + 10:
+                last_request_time, count = requested.get(share_hash, (None, 0))
+                if last_request_time is not None and last_request_time - 5 < time.time() < last_request_time + 10 * 1.5**count:
                     continue
                 potential_peers = set()
                 for head in tracker.tails[share_hash]:
@@ -142,7 +142,7 @@ def main(args):
                         tracker.get_nth_parent_hash(head, min(max(0, tracker.get_height_and_last(head)[0] - 1), 10)) for head in tracker.heads
                     )),
                 )
-                requested[share_hash] = time.time()
+                requested[share_hash] = time.time(), count + 1
         
         print 'Initializing work...'
         yield set_real_work1()
