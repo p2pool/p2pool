@@ -304,10 +304,7 @@ class OkayTracker(bitcoin_data.Tracker):
         try:
             share.check(self, now, self.net)
         except:
-            print
-            print 'Share check failed:'
-            log.err()
-            print
+            log.err(None, 'Share check failed:')
             return False
         else:
             self.verified.add(share)

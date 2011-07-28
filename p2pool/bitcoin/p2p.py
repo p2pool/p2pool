@@ -49,8 +49,7 @@ class BaseProtocol(protocol.Protocol):
                         continue
                     assert not len(payload) > self.max_payload_length
                 except:
-                    print 'FAILURE DECOMPRESSING'
-                    log.err()
+                    log.err(None, 'Failure decompressing message:')
                     continue
             else:
                 if len(compressed_payload) > self.max_payload_length:
@@ -74,7 +73,7 @@ class BaseProtocol(protocol.Protocol):
                 payload2 = type_.unpack(payload)
             except:
                 print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                log.err()
+                log.err(None, 'Error parsing message: (see RECV line)')
                 continue
             
             handler = getattr(self, 'handle_' + command, None)
@@ -89,7 +88,7 @@ class BaseProtocol(protocol.Protocol):
                 handler(**payload2)
             except:
                 print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                log.err()
+                log.err(None, 'Error handling message: (see RECV line)')
                 continue
     
     def sendPacket(self, command, payload2):

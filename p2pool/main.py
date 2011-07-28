@@ -240,10 +240,7 @@ def main(args):
         try:
             nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:
-            print
-            print 'Error resolving bootstrap node IP:'
-            log.err()
-            print
+            log.err(None, 'Error resolving bootstrap node IP:')
         
         p2p_node = p2p.Node(
             current_work=current_work,
@@ -358,10 +355,7 @@ def main(args):
                 # eg. good = share.hash == current_work.value['best_share_hash'] here
                 return good
             except:
-                print
-                print 'Error processing data received from worker:'
-                log.err()
-                print
+                log.err(None, 'Error processing data received from worker:')
                 return False
         
         def get_rate():
@@ -426,10 +420,7 @@ def main(args):
                 #print "GOT", tx
                 tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
             except:
-                print
-                print 'Error handling tx:'
-                log.err()
-                print
+                log.err(None, 'Error handling tx:')
         # disable for now, for testing impact on stales
         #factory.new_tx.watch(new_tx)
         
@@ -488,10 +479,7 @@ def main(args):
             except:
                 log.err()
     except:
-        print
-        print 'Fatal error:'
-        log.err()
-        print
+        log.err(None, 'Fatal error:')
         reactor.stop()
 
 def run():

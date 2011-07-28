@@ -25,11 +25,7 @@ def retry(message, delay):
                 try:
                     result = yield func(*args, **kwargs)
                 except:
-                    print
-                    print message
-                    log.err()
-                    print
-                    
+                    log.err(None, message)
                     yield sleep(delay)
                 else:
                     defer.returnValue(result)

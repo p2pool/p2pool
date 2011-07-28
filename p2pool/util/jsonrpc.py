@@ -125,8 +125,7 @@ class Server(deferred_resource.DeferredResource):
             except Error:
                 raise
             except Exception:
-                print 'Squelched JSON method error:'
-                log.err()
+                log.err(None, 'Squelched JSON method error:')
                 raise Error(-32099, u'Unknown error')
             
             if id_ is None:
