@@ -314,7 +314,7 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return self.conn.get_not_none()
 
 class HeaderWrapper(object):
-    target = -1
+    target = 0
     __slots__ = 'hash previous_hash'.split(' ')
     
     def __init__(self, header):
