@@ -235,12 +235,41 @@ class IPV6AddressType(Type):
         assert len(data) == 16, len(data)
         return file, data
 
+_record_types = {}
+
+def get_record(fields):
+    fields = tuple(sorted(fields))
+    if 'keys' in fields:
+        raise ValueError()
+    if fields not in _record_types:
+        class _Record(object):
+            __slots__ = fields
+            def __getitem__(self, key):
+                return getattr(self, key)
+            def __setitem__(self, key, value):
+                setattr(self, key, value)
+            #def __iter__(self):
+            #    for field in self.__slots__:
+            #        yield field, getattr(self, field)
+            def keys(self):
+                return self.__slots__
+            def __eq__(self, other):
+                if isinstance(other, dict):
+                    return dict(self) == other
+                elif isinstance(other, _Record):
+                    return all(self[k] == other[k] for k in self.keys())
+                raise TypeError()
+            def __ne__(self, other):
+                return not (self == other)
+        _record_types[fields] = _Record
+    return _record_types[fields]()
+
 class ComposedType(Type):
     def __init__(self, fields):
         self.fields = fields
     
     def read(self, file):
-        item = {}
+        item = get_record(k for k, v in self.fields)
         for key, type_ in self.fields:
             item[key], file = type_.read(file)
         return item, file
@@ -419,7 +448,7 @@ def pubkey_hash_to_script2(pubkey_hash):
 class Tracker(object):
     def __init__(self):
         self.shares = {} # hash -> share
-        self.ids = {} # hash -> (id, height)
+        #self.ids = {} # hash -> (id, height)
         self.reverse_shares = {} # previous_hash -> set of share_hashes
         
         self.heads = {} # head hash -> tail_hash
@@ -427,8 +456,10 @@ class Tracker(object):
         
         self.heights = {} # share_hash -> height_to, other_share_hash
         
+        '''
         self.id_generator = itertools.count()
         self.tails_by_id = {}
+        '''
         
         self.get_nth_parent_hash = skiplist.DistanceSkipList(self)
     
@@ -437,6 +468,7 @@ class Tracker(object):
         if share.hash in self.shares:
             return # XXX raise exception?
         
+        '''
         parent_id = self.ids.get(share.previous_hash, None)
         children_ids = set(self.ids.get(share2_hash) for share2_hash in self.reverse_shares.get(share.hash, set()))
         infos = set()
@@ -448,6 +480,7 @@ class Tracker(object):
             infos.add((self.id_generator.next(), 0))
         chosen = min(infos)
         self.ids[share.hash] = chosen
+        '''
         
         self.shares[share.hash] = share
         self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)

@@ -56,7 +56,7 @@ class BlockAttempt(object):
     
     @classmethod
     def from_getwork(cls, getwork, _check=3):
-        attrs = decode_data(getwork['data'])
+        attrs = dict(decode_data(getwork['data']))
         attrs.pop('nonce')
         attrs['target2'] = int(getwork['target'].decode('hex')[::-1].encode('hex'), 16)
         

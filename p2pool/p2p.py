@@ -206,7 +206,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 return
             share = p2pool_data.Share.from_share1a(share1a)
             share.peer = self # XXX
-            share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
             shares.append(share)
         self.node.handle_shares(shares, self)
     
@@ -223,7 +222,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 return
             share = p2pool_data.Share.from_share1b(share1b)
             share.peer = self # XXX
-            share.highest_block_on_arrival = self.node.current_work.value['previous_block'] # XXX
             shares.append(share)
         self.node.handle_shares(shares, self)
     

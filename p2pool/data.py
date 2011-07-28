@@ -97,9 +97,6 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
     )
 
 class Share(object):
-    peer = None
-    highest_block_on_arrival = None
-    
     @classmethod
     def from_block(cls, block):
         return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
@@ -111,6 +108,8 @@ class Share(object):
     @classmethod
     def from_share1b(cls, share1b):
         return cls(**share1b)
+    
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared peer'.split(' ')
     
     def __init__(self, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
@@ -158,8 +157,10 @@ class Share(object):
         if script.get_sigop_count(self.new_script) > 1:
             raise ValueError('too many sigops!')
         
+        # XXX eww
         self.time_seen = time.time()
         self.shared = False
+        self.peer = None
     
     def as_block(self, tracker, net):
         if self.other_txs is None:
@@ -195,8 +196,6 @@ class Share(object):
             
             if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
                 raise ValueError('''block size too large''')
-        
-        self.gentx = gentx
     
     def flag_shared(self):
         self.shared = True
