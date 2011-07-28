@@ -11,11 +11,12 @@ from p2pool.util import jsonrpc, deferred_resource, variable
 
 def get_memory(user_agent):
     user_agent2 = '' if user_agent is None else user_agent.lower()
-    if 'diablominer' in user_agent2: return 0
+    if 'java' in user_agent2: return 0 # hopefully diablominer...
+    if 'cpuminer' in user_agent2: return 0
     if 'cgminer' in user_agent2: return 1
     if 'poclbm' in user_agent2: return 1
     if 'phoenix' in user_agent2: return 2
-    print "Unknown miner User-Agent:", user_agent
+    print "Unknown miner User-Agent:", repr(user_agent)
     return 0
 
 def get_id(request):
