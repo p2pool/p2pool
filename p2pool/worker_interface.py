@@ -116,7 +116,7 @@ class RateInterface(deferred_resource.DeferredResource):
         request.write(json.dumps(self.get_rate()))
 
 class WorkerInterface(jsonrpc.Server):
-    def __init__(self, work, compute, response_callback, get_rate):
+    def __init__(self, work, compute, response_callback, get_rate, get_users):
         jsonrpc.Server.__init__(self)
         
         self.work = work
@@ -128,6 +128,8 @@ class WorkerInterface(jsonrpc.Server):
             LongPollingWorkerInterface(self.work, self.compute))
         self.putChild('rate',
             RateInterface(get_rate))
+        self.putChild('users',
+            RateInterface(get_users))
         self.putChild('', self)
     
     def rpc_getwork(self, request, data=None):

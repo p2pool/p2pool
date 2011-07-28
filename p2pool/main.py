@@ -364,7 +364,16 @@ def main(args):
                 att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                 return att_s
         
-        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate)))
+        def get_users():
+            height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+            weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
+            res = {}
+            for script in sorted(weights, key=lambda s: weights[s]):
+                res[script.encode('hex')] = weights[script]/total_weight
+            return res
+
+        
+        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate, get_users)))
         
         print '    ...success!'
         print
