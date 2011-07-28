@@ -349,7 +349,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x prev %x' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32), "DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "", time.time() - times[share.nonce], "s since getwork"
+                print 'GOT SHARE! %x prev %x age %.2fs' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32, time.time() - times[share.nonce]) + (" DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "")
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])
