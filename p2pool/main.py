@@ -11,7 +11,7 @@ import struct
 import sys
 import time
 
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, reactor
 from twisted.web import server
 from twisted.python import log
 
@@ -428,7 +428,7 @@ def main(args):
         # disable for now, for testing impact on stales
         #factory.new_tx.watch(new_tx)
         
-        def new_block(block):
+        def new_block(block_hash):
             work_updated.happened()
         factory.new_block.watch(new_block)
         
@@ -444,7 +444,6 @@ def main(args):
                 except:
                     log.err()
                 yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
-        
         
         @defer.inlineCallbacks
         def work2_thread():

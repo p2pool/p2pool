@@ -2,7 +2,6 @@ from __future__ import division
 
 import struct
 import hashlib
-import itertools
 import warnings
 
 from . import base58

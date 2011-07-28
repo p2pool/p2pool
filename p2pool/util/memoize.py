@@ -18,3 +18,6 @@ def memoize_with_backing(backing, inverse_of=None):
             return res
         return b
     return a
+
+def memoize(f):
+    return memoize_with_backing({})(f)
