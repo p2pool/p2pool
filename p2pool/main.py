@@ -165,7 +165,7 @@ def main(args):
         
         def p2p_shares(shares, peer=None):
             if len(shares) > 5:
-                print "Processing %i shares..." % (len(shares),)
+                print 'Processing %i shares...' % (len(shares),)
             
             some_new = False
             for share in shares:
@@ -197,7 +197,7 @@ def main(args):
                 tracker_updated.happened()
             
             if len(shares) > 5:
-                print "... done processing %i shares." % (len(shares),)
+                print '... done processing %i shares.' % (len(shares),)
         
         def p2p_share_hashes(share_hashes, peer):
             get_hashes = []
@@ -279,7 +279,7 @@ def main(args):
         
         def compute(state, all_targets):
             if state['best_share_hash'] is None:
-                raise jsonrpc.Error(-12345, u"p2pool is downloading shares")
+                raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -348,7 +348,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x prev %x age %.2fs' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32, time.time() - times[share.nonce]) + (" DEAD ON ARRIVAL" if share.previous_hash != current_work.value['best_share_hash'] else "")
+                print 'GOT SHARE! %x prev %x age %.2fs' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32, time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])
@@ -415,9 +415,9 @@ def main(args):
         def new_tx(tx_hash):
             try:
                 assert isinstance(tx_hash, (int, long))
-                #print "REQUESTING", tx_hash
+                #print 'REQUESTING', tx_hash
                 tx = yield (yield factory.getProtocol()).get_tx(tx_hash)
-                #print "GOT", tx
+                #print 'GOT', tx
                 tx_pool[bitcoin.data.tx_type.hash256(tx)] = Tx(tx, current_work.value['previous_block'])
             except:
                 log.err(None, 'Error handling tx:')
@@ -536,13 +536,13 @@ def run():
         class TimestampingPipe(object):
             def __init__(self, inner_file):
                 self.inner_file = inner_file
-                self.buf = ""
+                self.buf = ''
                 self.softspace = 0
             def write(self, data):
                 buf = self.buf + data
                 lines = buf.split('\n')
                 for line in lines[:-1]:
-                    self.inner_file.write("%s %s\n" % (time.strftime("%H:%M:%S"), line))
+                    self.inner_file.write('%s %s\n' % (time.strftime('%H:%M:%S'), line))
                 self.buf = lines[-1]
             def flush(self):
                 self.inner_file.flush()
@@ -560,7 +560,7 @@ def run():
         try:
             args.pubkey_hash = bitcoin.data.address_to_pubkey_hash(args.address, args.net)
         except Exception, e:
-            raise ValueError("error parsing address: " + repr(e))
+            raise ValueError('error parsing address: ' + repr(e))
     else:
         args.pubkey_hash = None
     

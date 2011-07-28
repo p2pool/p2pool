@@ -18,7 +18,7 @@ def get_memory(user_agent):
     if 'cgminer' in user_agent2: return 1
     if 'poclbm' in user_agent2: return 1
     if 'phoenix' in user_agent2: return 2
-    print "Unknown miner User-Agent:", repr(user_agent)
+    print 'Unknown miner User-Agent:', repr(user_agent)
     return 0
 
 def get_id(request):
@@ -49,7 +49,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             try:
                 id = random.randrange(10000)
                 if p2pool.DEBUG:
-                    print "LONG POLL", id
+                    print 'LONG POLL', id
                 
                 request_id = get_id(request)
                 memory = get_memory(request.getHeader('User-Agent'))
@@ -63,7 +63,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     if work != thought_work[-1]:
                         break
                     if p2pool.DEBUG:
-                        print "POLL %i WAITING" % (id,)
+                        print 'POLL %i WAITING' % (id,)
                     yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
                 
                 if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
@@ -71,7 +71,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     newwork = work.copy()
                     newwork['previous_block'] = random.randrange(2**256)
                     if p2pool.DEBUG:
-                        print "longpoll faked", id
+                        print 'longpoll faked', id
                     res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                     newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
                 else:
@@ -104,7 +104,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
         
         
         if p2pool.DEBUG:
-            print "END POLL %i %x" % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
+            print 'END POLL %i %x' % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
     render_POST = render_GET
 
 class RateInterface(deferred_resource.DeferredResource):
@@ -150,7 +150,7 @@ class WorkerInterface(jsonrpc.Server):
             newwork = work.copy()
             newwork['previous_block'] = random.randrange(2**256)
             if p2pool.DEBUG:
-                print "getwork faked"
+                print 'getwork faked'
             res = self.compute(work, request.getHeader('X-All-Targets') is not None)
             newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
         else:
@@ -159,7 +159,7 @@ class WorkerInterface(jsonrpc.Server):
         
         reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
         if p2pool.DEBUG:
-            print "END GETWORK %i" % (work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0,)
+            print 'END GETWORK %i' % (work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0,)
         
         return merge(newres.getwork(), res.getwork())
     rpc_getwork.takes_request = True

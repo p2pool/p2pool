@@ -673,8 +673,8 @@ if __name__ == '__main__':
     
     #t.remove(99)
     
-    print "HEADS", t.heads
-    print "TAILS", t.tails
+    print 'HEADS', t.heads
+    print 'TAILS', t.tails
     
     import random
     
@@ -689,15 +689,15 @@ if __name__ == '__main__':
             t.add(FakeShare(i, x))
         while t.shares:
             x = random.choice(list(t.shares))
-            print "DEL", x, t.__dict__
+            print 'DEL', x, t.__dict__
             try:
                 t.remove(x)
             except NotImplementedError:
-                print "aborted; not implemented"
+                print 'aborted; not implemented'
         import time
         time.sleep(.1)
-        print "HEADS", t.heads
-        print "TAILS", t.tails
+        print 'HEADS', t.heads
+        print 'TAILS', t.tails
     
     #for share_hash, share in sorted(t.shares.iteritems()):
     #    print share_hash, share.previous_hash, t.heads.get(share_hash), t.tails.get(share_hash)

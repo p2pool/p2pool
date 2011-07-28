@@ -117,7 +117,7 @@ class Server(deferred_resource.DeferredResource):
                 raise Error(-32601, u'Method not found')
             method_meth = getattr(self, method_name)
             
-            if hasattr(method_meth, "takes_request"):
+            if hasattr(method_meth, 'takes_request'):
                 params = [request] + list(params)
             
             try:

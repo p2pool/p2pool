@@ -15,7 +15,7 @@ def protoPUSHDATA(size_len):
 
 opcodes = {}
 for i in xrange(256):
-    opcodes[i] = "UNK_" + str(i), reads_nothing
+    opcodes[i] = 'UNK_' + str(i), reads_nothing
 
 opcodes[0] = '0', reads_nothing
 for i in xrange(1, 76):

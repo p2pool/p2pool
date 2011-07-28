@@ -349,7 +349,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 if not self.attempt_verify(share, now):
                     break
                 if random.random() < .001:
-                    #print "YIELDING"
+                    #print 'YIELDING'
                     yield deferral.sleep(.01)
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
@@ -382,7 +382,7 @@ class OkayTracker(bitcoin_data.Tracker):
             best_share = self.verified.shares[best]
             if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
-                    print "Stale detected!"
+                    print 'Stale detected!'
                 best = best_share.previous_hash
         
         defer.returnValue((best, desired))

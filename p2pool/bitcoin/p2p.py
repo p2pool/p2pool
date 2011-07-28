@@ -30,7 +30,7 @@ class BaseProtocol(protocol.Protocol):
             length, = struct.unpack('<I', (yield 4))
             
             if length > self.max_net_payload_length:
-                print "length too long"
+                print 'length too long'
                 continue
             
             if self.use_checksum:
@@ -45,7 +45,7 @@ class BaseProtocol(protocol.Protocol):
                     d = zlib.decompressobj()
                     payload = d.decompress(compressed_payload, self.max_payload_length)
                     if d.unconsumed_tail:
-                        print "compressed payload expanded too much"
+                        print 'compressed payload expanded too much'
                         continue
                     assert not len(payload) > self.max_payload_length
                 except:
@@ -53,7 +53,7 @@ class BaseProtocol(protocol.Protocol):
                     continue
             else:
                 if len(compressed_payload) > self.max_payload_length:
-                    print "compressed payload expanded too much"
+                    print 'compressed payload expanded too much'
                     continue
                 payload = compressed_payload
             
@@ -375,7 +375,7 @@ class HeightTracker(object):
         self.think()
         
         if len(self.tracker.shares) > self.last_notified_size + 10:
-            print "Have %i block headers" % len(self.tracker.shares)
+            print 'Have %i block headers' % len(self.tracker.shares)
             self.last_notified_size = len(self.tracker.shares)
     
     def heard_block(self, block_hash):
