@@ -7,16 +7,24 @@ from twisted.internet import defer, reactor
 from twisted.python import log
 
 import p2pool
+from p2pool import data as p2pool_data
 from p2pool.util import jsonrpc, deferred_resource, variable
 
 # TODO: branch on User-Agent to remove overhead of workarounds
 
-def get_memory(user_agent):
+def get_memory(request):
+    user_agent = request.getHeader('User-Agent')
     user_agent2 = '' if user_agent is None else user_agent.lower()
+    assert 'poclbm' in user_agent2 and request.getHeader('X-Work-Identifier') is not None
     if 'java' in user_agent2: return 0 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 0
+    if 'ufasoft' in user_agent2: return 0 # not confirmed
     if 'cgminer' in user_agent2: return 1
-    if 'poclbm' in user_agent2: return 1
+    if 'poclbm' in user_agent2:
+        if request.getHeader('X-Work-Identifier') is not None:
+            return 0
+        else:
+            return 1
     if 'phoenix' in user_agent2: return 2
     print 'Unknown miner User-Agent:', repr(user_agent)
     return 0
@@ -25,8 +33,27 @@ def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
 
 last_cache_invalidation = {} # XXX remove global
+holds = {}
 
-def merge(gw1, gw2):
+@defer.inlineCallbacks
+def wait_hold(request_id):
+    while request_id in holds:
+        print "CYCLE", request_id
+        yield holds[request_id].get_deferred()
+
+def set_hold(request_id, dt):
+    if request_id in holds:
+        raise ValueError('hold already present!')
+    holds[request_id] = variable.Event()
+    holds[request_id].status = 0
+    def cb():
+        if holds[request_id].status != 0:
+            raise AssertionError()
+        holds[request_id].status = 1
+        holds.pop(request_id).happened()
+    reactor.callLater(dt, cb)
+
+def merge(gw1, gw2, identifier=None):
     if gw1['hash1'] != gw2['hash1']:
         raise ValueError()
     if gw1['target'] != gw2['target']:
@@ -36,6 +63,7 @@ def merge(gw1, gw2):
         midstate=gw2['midstate'],
         hash1=gw1['hash1'],
         target=gw1['target'],
+        identifier=identifier,
     )
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
@@ -47,17 +75,21 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def render_GET(self, request):
         try:
             try:
+                request.setHeader('X-Long-Polling', '/long-polling')
+                request.setHeader('Content-Type', 'application/json')
+                
                 id = random.randrange(10000)
                 if p2pool.DEBUG:
                     print 'LONG POLL', id
                 
                 request_id = get_id(request)
-                memory = get_memory(request.getHeader('User-Agent'))
+                memory = get_memory(request)
                 
                 if request_id not in last_cache_invalidation:
                     last_cache_invalidation[request_id] = variable.Variable((None, None))
                 
                 while True:
+                    yield wait_hold(request_id)
                     work = self.work.value
                     thought_work = last_cache_invalidation[request_id].value
                     if work != thought_work[-1]:
@@ -74,18 +106,18 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                         print 'longpoll faked', id
                     res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                     newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+                    set_hold(request_id, .03)
                 else:
                     newwork = work
                     newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                 
-                reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
+                last_cache_invalidation[request_id].set((thought_work[-1], newwork))
                 
-                request.setHeader('X-Long-Polling', '/long-polling')
-                request.setHeader('Content-Type', 'application/json')
+
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
-                    'result': merge(newres.getwork(), res.getwork()),
+                    'result': merge(newres.getwork(), res.getwork(), work['best_share_hash']),
                     'error': None,
                 }))
                 
@@ -96,7 +128,6 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             except Exception:
                 log.err(None, 'Squelched long polling error:')
                 raise jsonrpc.Error(-32099, u'Unknown error')
-        
         except jsonrpc.Error, e:
             request.write(json.dumps({
                 'jsonrpc': '2.0',
@@ -131,18 +162,20 @@ class WorkerInterface(jsonrpc.Server):
             RateInterface(get_users))
         self.putChild('', self)
     
+    @defer.inlineCallbacks
     def rpc_getwork(self, request, data=None):
         request.setHeader('X-Long-Polling', '/long-polling')
         
         if data is not None:
-            return self.response_callback(data)
+            defer.returnValue(self.response_callback(data))
         
         request_id = get_id(request)
-        memory = get_memory(request.getHeader('User-Agent'))
+        memory = get_memory(request)
         
         if request_id not in last_cache_invalidation:
             last_cache_invalidation[request_id] = variable.Variable((None, None))
         
+        yield wait_hold(request_id)
         work = self.work.value
         thought_work = last_cache_invalidation[request_id].value
         
@@ -154,13 +187,15 @@ class WorkerInterface(jsonrpc.Server):
                 print 'getwork faked'
             res = self.compute(work, request.getHeader('X-All-Targets') is not None)
             newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+            set_hold(request_id, .03) # guarantee ordering
         else:
             newwork = work
             newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
+        
+        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
         if p2pool.DEBUG:
             print 'END GETWORK %s' % (p2pool_data.format_hash(work['best_share_hash']),)
         
-        return merge(newres.getwork(), res.getwork())
+        defer.returnValue(merge(newres.getwork(), res.getwork(), work['best_share_hash']))
     rpc_getwork.takes_request = True
