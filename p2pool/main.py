@@ -198,7 +198,7 @@ def main(args):
                 tracker_updated.happened()
             
             if len(shares) > 5:
-                print '... done processing %i shares. Have: %i' % (len(shares), len(tracker.shares))
+                print '... done processing %i shares. Have: %i/~%i' % (len(shares), len(tracker.shares), 2*args.net.CHAIN_LENGTH)
         
         def p2p_share_hashes(share_hashes, peer):
             get_hashes = []
