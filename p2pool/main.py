@@ -279,7 +279,7 @@ def main(args):
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
         def compute(state, all_targets):
-            if state['best_share_hash'] is None:
+            if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit

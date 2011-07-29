@@ -420,6 +420,7 @@ class Mainnet(bitcoin_data.Mainnet):
     ADDRS_TABLE = 'addrs'
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = True
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -432,3 +433,4 @@ class Testnet(bitcoin_data.Testnet):
     ADDRS_TABLE = 'addrs_testnet'
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
