@@ -6,9 +6,10 @@ import time
 from twisted.internet import defer, protocol, reactor
 from twisted.python import log
 
+import p2pool
+from p2pool import data as p2pool_data
 from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool import data as p2pool_data
 from p2pool.util import deferral, variable, dicts
 
 # mode
@@ -17,7 +18,7 @@ from p2pool.util import deferral, variable, dicts
 
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 1
-    sub_version = ''
+    sub_version = p2pool.__version__
     
     def __init__(self, node):
         self.node = node
