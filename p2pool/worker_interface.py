@@ -85,7 +85,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     work['previous_block'] = random.randrange(2**256)
                     if p2pool.DEBUG:
                         print 'POLL %i FAKED' % (id,)
-                    set_hold(request_id, .03)
+                    set_hold(request_id, .01)
                 res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                 
                 last_cache_invalidation[request_id].set((thought_work[-1], work))
@@ -160,7 +160,7 @@ class WorkerInterface(jsonrpc.Server):
             work['previous_block'] = random.randrange(2**256)
             if p2pool.DEBUG:
                 print 'GETWORK FAKED'
-            set_hold(request_id, .03) # guarantee ordering
+            set_hold(request_id, .01) # guarantee ordering
         res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
         last_cache_invalidation[request_id].set((thought_work[-1], work))
