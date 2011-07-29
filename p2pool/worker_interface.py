@@ -15,7 +15,6 @@ from p2pool.util import jsonrpc, deferred_resource, variable
 def get_memory(request):
     user_agent = request.getHeader('User-Agent')
     user_agent2 = '' if user_agent is None else user_agent.lower()
-    assert 'poclbm' in user_agent2 and request.getHeader('X-Work-Identifier') is not None
     if 'java' in user_agent2: return 0 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 0
     if 'ufasoft' in user_agent2: return 0 # not confirmed
@@ -38,7 +37,6 @@ holds = {}
 @defer.inlineCallbacks
 def wait_hold(request_id):
     while request_id in holds:
-        print "CYCLE", request_id
         yield holds[request_id].get_deferred()
 
 def set_hold(request_id, dt):
