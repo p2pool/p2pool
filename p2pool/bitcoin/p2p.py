@@ -16,6 +16,9 @@ from twisted.python import log
 from . import data as bitcoin_data
 from p2pool.util import variable, datachunker, deferral
 
+class TooLong(Exception):
+    pass
+
 class BaseProtocol(protocol.Protocol):
     def connectionMade(self):
         self.dataReceived = datachunker.DataChunker(self.dataReceiver())
@@ -100,14 +103,14 @@ class BaseProtocol(protocol.Protocol):
         #print 'SEND', command, repr(payload2)[:500]
         payload = type_.pack(payload2)
         if len(payload) > self.max_payload_length:
-            raise ValueError('payload too long')
+            raise TooLong('payload too long')
         if self.use_checksum:
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
         else:
             checksum = ''
         compressed_payload = zlib.compress(payload) if self.compress else payload
         if len(compressed_payload) > self.max_net_payload_length:
-            raise ValueError('compressed payload too long')
+            raise TooLong('compressed payload too long')
         data = self._prefix + struct.pack('<12sI', command, len(compressed_payload)) + checksum + compressed_payload
         self.transport.write(data)
     
@@ -393,14 +396,14 @@ class HeightTracker(object):
     def getHeight(self, block_hash):
         height, last = self.tracker.get_height_and_last(block_hash)
         if last is not None:
-            self.request([], last)
+            #self.request([], last)
             raise ValueError()
         return height
     
     def get_min_height(self, block_hash):
         height, last = self.tracker.get_height_and_last(block_hash)
-        if last is not None:
-            self.request([], last)
+        #if last is not None:
+        #    self.request([], last)
         return height
     
     def get_highest_height(self):

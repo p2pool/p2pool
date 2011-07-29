@@ -168,6 +168,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('count', bitcoin_data.StructType('<I')),
     ])
     def handle_getaddrs(self, count):
+        if count > 100:
+            count = 100
         self.send_addrs(addrs=[
             dict(
                 timestamp=self.node.addr_store[host, port][2],
@@ -242,9 +244,15 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     share1as.append(share.as_share1a())
                 else:
                     raise ValueError(self.mode)
-        if share1bs: self.send_share1bs(share1bs=share1bs)
-        if share0s: self.send_share0s(hashes=share0s)
-        if share1as: self.send_share1as(share1as=share1as)
+        def att(f, **kwargs):
+            try:
+                f(**kwargs)
+            except bitcoin_p2p.TooLong:
+                att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
+                att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+        if share1bs: att(self.send_share1bs, share1bs=share1bs)
+        if share0s: att(self.send_share0s, hashes=share0s)
+        if share1as: att(self.send_share1as, share1as=share1as)
     
     def connectionLost(self, reason):
         if self.node_var_watch is not None:

@@ -144,7 +144,7 @@ def main(args):
                     parents=2000,
                     stops=list(set(tracker.heads) | set(
                         tracker.get_nth_parent_hash(head, min(max(0, tracker.get_height_and_last(head)[0] - 1), 10)) for head in tracker.heads
-                    )),
+                    ))[:100],
                 )
                 requested[share_hash] = time.time(), count + 1
         
