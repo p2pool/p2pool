@@ -137,7 +137,7 @@ def main(args):
                     if peer is None:
                         continue
                 
-                print 'Requesting parent share %x from %s' % (share_hash % 2**32, '%s:%i' % peer.addr)
+                print 'Requesting parent share %s from %s' % (p2pool.format_hash(share_hash), '%s:%i' % peer.addr)
                 peer.send_getshares(
                     hashes=[share_hash],
                     parents=2000,
@@ -170,11 +170,11 @@ def main(args):
             some_new = False
             for share in shares:
                 if share.hash in tracker.shares:
-                    #print 'Got duplicate share, ignoring. Hash: %x' % (share.hash % 2**32,)
+                    #print 'Got duplicate share, ignoring. Hash: %s' % (p2pool.format_hash(share.hash),)
                     continue
                 some_new = True
                 
-                #print 'Received share %x from %r' % (share.hash % 2**32, share.peer.addr if share.peer is not None else None)
+                #print 'Received share %s from %r' % (p2pool.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
                 
                 tracker.add(share)
                 #for peer2, share_hash in desired:
@@ -183,7 +183,7 @@ def main(args):
                 
                 if share.bitcoin_hash <= share.header['target']:
                     print
-                    print 'GOT BLOCK! Passing to bitcoind! %x bitcoin: %x' % (share.hash % 2**32, share.bitcoin_hash,)
+                    print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool.format_hash(share.hash), share.bitcoin_hash,)
                     print
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=share.as_block(tracker, args.net))
@@ -203,9 +203,9 @@ def main(args):
             get_hashes = []
             for share_hash in share_hashes:
                 if share_hash in tracker.shares:
-                    pass # print 'Got share hash, already have, ignoring. Hash: %x' % (share_hash % 2**32,)
+                    pass # print 'Got share hash, already have, ignoring. Hash: %s' % (p2pool.format_hash(share_hash),)
                 else:
-                    print 'Got share hash, requesting! Hash: %x' % (share_hash % 2**32,)
+                    print 'Got share hash, requesting! Hash: %s' % (p2pool.format_hash(share_hash),)
                     get_hashes.append(share_hash)
             
             if share_hashes and peer is not None:
@@ -348,7 +348,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %x prev %x age %.2fs' % (share.hash % 2**32, 0 if share.previous_hash is None else share.previous_hash % 2**32, time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
+                print 'GOT SHARE! %s prev %s age %.2fs' % (p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])

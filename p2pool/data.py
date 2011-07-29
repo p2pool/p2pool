@@ -404,6 +404,10 @@ class OkayTracker(bitcoin_data.Tracker):
                 score2 = this_score
         return min(head_height, self.net.CHAIN_LENGTH), score2
 
+def format_hash(x):
+    if x is None:
+        return 'xxxxxxxx'
+    return '%08x' % (x % 2**32)
 
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds

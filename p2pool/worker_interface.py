@@ -88,6 +88,9 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     'result': merge(newres.getwork(), res.getwork()),
                     'error': None,
                 }))
+                
+                if p2pool.DEBUG:
+                    print 'END POLL %i %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
             except jsonrpc.Error:
                 raise
             except Exception:
@@ -101,10 +104,6 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 'result': None,
                 'error': e._to_obj(),
             }))
-        
-        
-        if p2pool.DEBUG:
-            print 'END POLL %i %x' % (id, work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0)
     render_POST = render_GET
 
 class RateInterface(deferred_resource.DeferredResource):
@@ -161,7 +160,7 @@ class WorkerInterface(jsonrpc.Server):
         
         reactor.callLater(.01, lambda: last_cache_invalidation[request_id].set((thought_work[-1], newwork)))
         if p2pool.DEBUG:
-            print 'END GETWORK %i' % (work['best_share_hash'] % 2**32 if work['best_share_hash'] is not None else 0,)
+            print 'END GETWORK %s' % (p2pool_data.format_hash(work['best_share_hash']),)
         
         return merge(newres.getwork(), res.getwork())
     rpc_getwork.takes_request = True
