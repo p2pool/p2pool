@@ -13,17 +13,15 @@ from p2pool.util import jsonrpc, deferred_resource, variable
 # TODO: branch on User-Agent to remove overhead of workarounds
 
 def get_memory(request):
+    if request.getHeader('X-Work-Identifier') is not None:
+        return 0
     user_agent = request.getHeader('User-Agent')
     user_agent2 = '' if user_agent is None else user_agent.lower()
     if 'java' in user_agent2: return 0 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 0
     if 'ufasoft' in user_agent2: return 0 # not confirmed
     if 'cgminer' in user_agent2: return 1
-    if 'poclbm' in user_agent2:
-        if request.getHeader('X-Work-Identifier') is not None:
-            return 0
-        else:
-            return 1
+    if 'poclbm' in user_agent2: return 1
     if 'phoenix' in user_agent2: return 2
     print 'Unknown miner User-Agent:', repr(user_agent)
     return 0
