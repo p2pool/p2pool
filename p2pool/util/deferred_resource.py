@@ -2,6 +2,7 @@ from __future__ import division
 
 from twisted.internet import defer
 from twisted.web import resource, server
+from twisted.python import log
 
 class DeferredResource(resource.Resource):
     def render(self, request):
@@ -18,7 +19,7 @@ class DeferredResource(resource.Resource):
             request.setResponseCode(500) # won't do anything if already written to
             request.write('---ERROR---')
             request.finish()
-            fail.printTraceback()
+            log.err(fail, "Error in DeferredResource handler:")
         
         defer.maybeDeferred(resource.Resource.render, self, request).addCallbacks(finish, finish_error)
         return server.NOT_DONE_YET
