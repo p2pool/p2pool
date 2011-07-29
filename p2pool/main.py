@@ -543,6 +543,15 @@ def run():
     
     if args.debug:
         p2pool_init.DEBUG = True
+        class TeePipe(object):
+            def __init__(self, outputs):
+                self.outputs = outputs
+            def write(self, data):
+                for output in self.outputs:
+                    output.write(data)
+            def flush(self):
+                for output in self.outputs:
+                    output.flush()
         class TimestampingPipe(object):
             def __init__(self, inner_file):
                 self.inner_file = inner_file
@@ -553,12 +562,11 @@ def run():
                 lines = buf.split('\n')
                 for line in lines[:-1]:
                     self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
+                    self.inner_file.flush()
                 self.buf = lines[-1]
             def flush(self):
-                self.inner_file.flush()
-        sys.stdout = TimestampingPipe(sys.stdout)
-        sys.stderr = TimestampingPipe(sys.stderr)
-        log.DefaultObserver.stderr = sys.stderr
+                pass
+        sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, open(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')]))
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
