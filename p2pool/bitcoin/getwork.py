@@ -30,7 +30,7 @@ class BlockAttempt(object):
     def __repr__(self):
         return 'BlockAttempt(%s)' % (', '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
     
-    def getwork(self, _check=3):
+    def getwork(self, _check=3, **extra):
         block_data = bitcoin_data.block_header_type.pack(dict(
             version=self.version,
             previous_block=self.previous_block,
@@ -51,6 +51,9 @@ class BlockAttempt(object):
             self2 = self.__class__.from_getwork(getwork, _check=_check - 1)
             if self2 != self:
                 raise ValueError('failed check - input invalid or implementation error')
+        
+        getwork = dict(getwork)
+        getwork.update(extra)
         
         return getwork
     

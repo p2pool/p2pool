@@ -10,8 +10,6 @@ import p2pool
 from p2pool import data as p2pool_data
 from p2pool.util import jsonrpc, deferred_resource, variable
 
-# TODO: branch on User-Agent to remove overhead of workarounds
-
 def get_memory(request):
     if request.getHeader('X-Work-Identifier') is not None:
         return 0
@@ -49,19 +47,6 @@ def set_hold(request_id, dt):
         holds.pop(request_id).happened()
     reactor.callLater(dt, cb)
 
-def merge(gw1, gw2, identifier=None):
-    if gw1['hash1'] != gw2['hash1']:
-        raise ValueError()
-    if gw1['target'] != gw2['target']:
-        raise ValueError()
-    return dict(
-        data=gw1['data'],
-        midstate=gw2['midstate'],
-        hash1=gw1['hash1'],
-        target=gw1['target'],
-        identifier=str(identifier),
-    )
-
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, work, compute):
         self.work = work
@@ -76,7 +61,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 
                 id = random.randrange(10000)
                 if p2pool.DEBUG:
-                    print 'LONG POLL', id
+                    print 'POLL %i START' % (id,)
                 
                 request_id = get_id(request)
                 memory = get_memory(request)
@@ -96,29 +81,23 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 
                 if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
                     # clients won't believe the update
-                    newwork = work.copy()
-                    newwork['previous_block'] = random.randrange(2**256)
+                    work = work.copy()
+                    work['previous_block'] = random.randrange(2**256)
                     if p2pool.DEBUG:
-                        print 'longpoll faked', id
-                    res = self.compute(work, request.getHeader('X-All-Targets') is not None)
-                    newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+                        print 'POLL %i FAKED' % (id,)
                     set_hold(request_id, .03)
-                else:
-                    newwork = work
-                    newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+                res = self.compute(work, request.getHeader('X-All-Targets') is not None)
                 
-                last_cache_invalidation[request_id].set((thought_work[-1], newwork))
-                
+                last_cache_invalidation[request_id].set((thought_work[-1], work))
+                if p2pool.DEBUG:
+                    print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
 
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
-                    'result': merge(newres.getwork(), res.getwork(), work['best_share_hash']),
+                    'result': res.getwork(identifier=str(work['best_share_hash'])),
                     'error': None,
                 }))
-                
-                if p2pool.DEBUG:
-                    print 'END POLL %i %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
             except jsonrpc.Error:
                 raise
             except Exception:
@@ -177,21 +156,16 @@ class WorkerInterface(jsonrpc.Server):
         
         if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
             # clients won't believe the update
-            newwork = work.copy()
-            newwork['previous_block'] = random.randrange(2**256)
+            work = work.copy()
+            work['previous_block'] = random.randrange(2**256)
             if p2pool.DEBUG:
-                print 'getwork faked'
-            res = self.compute(work, request.getHeader('X-All-Targets') is not None)
-            newres = self.compute(newwork, request.getHeader('X-All-Targets') is not None)
+                print 'GETWORK FAKED'
             set_hold(request_id, .03) # guarantee ordering
-        else:
-            newwork = work
-            newres = res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+        res = self.compute(work, request.getHeader('X-All-Targets') is not None)
         
-        
-        last_cache_invalidation[request_id].set((thought_work[-1], newwork))
+        last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
-            print 'END GETWORK %s' % (p2pool_data.format_hash(work['best_share_hash']),)
+            print 'GETWORK END %s' % (p2pool_data.format_hash(work['best_share_hash']),)
         
-        defer.returnValue(merge(newres.getwork(), res.getwork(), work['best_share_hash']))
+        defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
     rpc_getwork.takes_request = True
