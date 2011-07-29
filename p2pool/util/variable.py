@@ -1,7 +1,7 @@
 import itertools
 
 from twisted.internet import defer, reactor
-from twisted.python import failure
+from twisted.python import failure, log
 
 class Event(object):
     def __init__(self):
@@ -24,13 +24,19 @@ class Event(object):
         self.one_time_observers.pop(id)
     
     def happened(self, event=None):
-        for func in self.observers.itervalues():
-            func(event)
+        for id, func in sorted(self.observers.iteritems()):
+            try:
+                func(event)
+            except:
+                log.err(None, "Error while processing Event callbacks:")
         
         one_time_observers = self.one_time_observers
         self.one_time_observers = {}
-        for func in one_time_observers.itervalues():
-            func(event)
+        for id, func in sorted(one_time_observers.iteritems()):
+            try:
+                func(event)
+            except:
+                log.err(None, "Error while processing Event callbacks:")
     
     def get_deferred(self, timeout=None):
         df = defer.Deferred()
