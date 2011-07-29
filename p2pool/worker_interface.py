@@ -59,7 +59,7 @@ def merge(gw1, gw2, identifier=None):
         midstate=gw2['midstate'],
         hash1=gw1['hash1'],
         target=gw1['target'],
-        identifier=identifier,
+        identifier=str(identifier),
     )
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
