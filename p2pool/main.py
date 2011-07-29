@@ -198,7 +198,7 @@ def main(args):
                 tracker_updated.happened()
             
             if len(shares) > 5:
-                print '... done processing %i shares.' % (len(shares),)
+                print '... done processing %i shares. Have: %i' % (len(shares), len(tracker.shares))
         
         def p2p_share_hashes(share_hashes, peer):
             get_hashes = []
@@ -337,7 +337,7 @@ def main(args):
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
                 if hash_ <= block['header']['target'] or p2pool_init.DEBUG:
                     print
-                    print 'GOT BLOCK! Passing to bitcoind! %x' % (hash_,)
+                    print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                     print
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=block)
