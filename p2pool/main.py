@@ -3,6 +3,7 @@
 from __future__ import division
 
 import argparse
+import datetime
 import itertools
 import os
 import random
@@ -551,7 +552,7 @@ def run():
                 buf = self.buf + data
                 lines = buf.split('\n')
                 for line in lines[:-1]:
-                    self.inner_file.write('%s %s\n' % (time.strftime('%H:%M:%S'), line))
+                    self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
                 self.buf = lines[-1]
             def flush(self):
                 self.inner_file.flush()
