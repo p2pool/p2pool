@@ -203,9 +203,11 @@ class Share(object):
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
 
-def get_pool_attempts_per_second(tracker, previous_share_hash, net):
+def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
+    if dist is None:
+        dist = net.TARGET_LOOKBEHIND
     # XXX could be optimized to use nth_parent and cumulative_weights
-    chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.TARGET_LOOKBEHIND))
+    chain = list(itertools.islice(tracker.get_chain_to_root(previous_share_hash), dist))
     attempts = sum(bitcoin_data.target_to_average_attempts(share.target) for share in chain[:-1])
     time = chain[0].timestamp - chain[-1].timestamp
     if time == 0:

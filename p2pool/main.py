@@ -362,12 +362,12 @@ def main(args):
         def get_rate():
             if current_work.value['best_share_hash'] is not None:
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-                att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
+                att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height, 720))
                 return att_s
         
         def get_users():
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-            weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 1000), 2**100)
+            weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**256)
             res = {}
             for script in sorted(weights, key=lambda s: weights[s]):
                 res[script.encode('hex')] = weights[script]/total_weight
