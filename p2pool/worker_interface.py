@@ -86,12 +86,15 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     if p2pool.DEBUG:
                         print 'POLL %i FAKED' % (id,)
                     set_hold(request_id, .01)
-                res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+                res = self.compute(work)
                 
                 last_cache_invalidation[request_id].set((thought_work[-1], work))
                 if p2pool.DEBUG:
                     print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
 
+                if request.getHeader('X-All-Targets') is None and res.target2 > 2**256 - 1:
+                    res = res.update(target2=2**256 - 1)
+        
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
@@ -161,11 +164,14 @@ class WorkerInterface(jsonrpc.Server):
             if p2pool.DEBUG:
                 print 'GETWORK FAKED'
             set_hold(request_id, .01) # guarantee ordering
-        res = self.compute(work, request.getHeader('X-All-Targets') is not None)
+        res = self.compute(work)
         
         last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
             print 'GETWORK END %s' % (p2pool_data.format_hash(work['best_share_hash']),)
+        
+        if request.getHeader('X-All-Targets') is None and res.target2 > 2**256 - 1:
+            res = res.update(target2=2**256 - 1)
         
         defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
     rpc_getwork.takes_request = True

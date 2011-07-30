@@ -278,7 +278,7 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
-        def compute(state, all_targets):
+        def compute(state):
             if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
@@ -316,8 +316,6 @@ def main(args):
                     print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
             target2 = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
-            if not all_targets:
-                target2 = min(2**256//2**32 - 1, target2)
             times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
