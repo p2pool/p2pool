@@ -91,10 +91,10 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 last_cache_invalidation[request_id].set((thought_work[-1], work))
                 if p2pool.DEBUG:
                     print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
-
+                
                 if request.getHeader('X-All-Targets') is None and res.target2 > 2**256 - 1:
                     res = res.update(target2=2**256 - 1)
-        
+                
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
