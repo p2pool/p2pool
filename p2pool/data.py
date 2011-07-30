@@ -359,13 +359,23 @@ class OkayTracker(bitcoin_data.Tracker):
         # decide best tree
         best_tail = max(self.verified.tails, key=lambda h: self.score(max(self.verified.tails[h], key=self.verified.get_height), ht)) if self.verified.tails else None
         # decide best verified head
-        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))), ht.get_min_height(self.verified.shares[h].previous_block), self.verified.shares[h].peer is None, -self.verified.shares[h].time_seen))
+        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
+            self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
+            ht.get_min_height(self.verified.shares[h].previous_block),
+            self.verified.shares[h].peer is None,
+            -self.verified.shares[h].time_seen
+        ))
         
         
         if p2pool.DEBUG:
             print len(self.verified.tails.get(best_tail, []))
             for h in scores:
-                print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))), ht.get_min_height(self.verified.shares[h].previous_block), self.verified.shares[h].peer is None, -self.verified.shares[h].time_seen)
+                print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
+                    self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
+                    ht.get_min_height(self.verified.shares[h].previous_block),
+                    self.verified.shares[h].peer is None,
+                    -self.verified.shares[h].time_seen
+                )
         
         for share_hash in scores[:-5]:
             if self.shares[share_hash].time_seen > time.time() - 30:
