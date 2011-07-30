@@ -124,6 +124,8 @@ def main(args):
             current_work.set(t)
             
             for peer2, share_hash in desired:
+                if share_hash not in tracker.tails: # was received in the time tracker.think was running
+                    continue
                 last_request_time, count = requested.get(share_hash, (None, 0))
                 if last_request_time is not None and last_request_time - 5 < time.time() < last_request_time + 10 * 1.5**count:
                     continue
