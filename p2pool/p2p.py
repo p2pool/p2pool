@@ -96,6 +96,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version
+        self.other_sub_version = sub_version
         self.other_services = services
         self.other_mode_var = variable.Variable(mode)
         
@@ -403,7 +404,7 @@ class Node(object):
             raise ValueError('already have peer')
         self.peers[conn.nonce] = conn
         
-        print 'Connected to peer %s:%i' % conn.addr
+        print 'Connected to peer %s:%i %r' % (conn.addr[0], conn.addr[1], conn.other_sub_version)
     
     def lost_conn(self, conn):
         if conn.nonce not in self.peers:
@@ -412,7 +413,7 @@ class Node(object):
             raise ValueError('wrong conn')
         del self.peers[conn.nonce]
         
-        print 'Lost peer %s:%i' % conn.addr
+        print 'Lost peer %s:%i' % (conn.addr[0], conn.addr[1])
     
     
     def got_addr(self, (host, port), services, timestamp):
