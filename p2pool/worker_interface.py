@@ -125,16 +125,8 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
             }))
     render_POST = render_GET
 
-class RateInterface(deferred_resource.DeferredResource):
-    def __init__(self, get_rate):
-        self.get_rate = get_rate
-    
-    def render_GET(self, request):
-        request.setHeader('Content-Type', 'application/json')
-        request.write(json.dumps(self.get_rate()))
-
 class WorkerInterface(jsonrpc.Server):
-    def __init__(self, work, compute, response_callback, get_rate, get_users, net):
+    def __init__(self, work, compute, response_callback, net):
         jsonrpc.Server.__init__(self)
         
         self.work = work
@@ -144,10 +136,6 @@ class WorkerInterface(jsonrpc.Server):
         
         self.putChild('long-polling',
             LongPollingWorkerInterface(self.work, self.compute, net))
-        self.putChild('rate',
-            RateInterface(get_rate))
-        self.putChild('users',
-            RateInterface(get_users))
         self.putChild('', self)
     
     @defer.inlineCallbacks

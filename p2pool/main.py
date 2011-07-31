@@ -11,9 +11,10 @@ import sqlite3
 import struct
 import sys
 import time
+import json
 
 from twisted.internet import defer, reactor
-from twisted.web import server
+from twisted.web import server, resource
 from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
@@ -363,11 +364,14 @@ def main(args):
                 log.err(None, 'Error processing data received from worker:')
                 return False
         
+        web_root = worker_interface.WorkerInterface(current_work, compute, got_response, args.net)
+        
         def get_rate():
             if current_work.value['best_share_hash'] is not None:
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                 att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height, 720))
-                return att_s
+                return json.dumps(att_s)
+            return json.dumps(None)
         
         def get_users():
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
@@ -375,10 +379,20 @@ def main(args):
             res = {}
             for script in sorted(weights, key=lambda s: weights[s]):
                 res[script.encode('hex')] = weights[script]/total_weight
-            return res
-
+            return json.dumps(res)
         
-        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate, get_users, args.net)))
+        class WebInterface(resource.Resource):
+            def __init__(self, func, mime_type):
+                self.func, self.mime_type = func, mime_type
+            
+            def render_GET(self, request):
+                request.setHeader('Content-Type', self.mime_type)
+                return self.func()
+        
+        web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
+        web_root.putChild('users', WebInterface(get_users, 'application/json'))
+        
+        reactor.listenTCP(args.worker_port, server.Site(web_root))
         
         print '    ...success!'
         print
