@@ -17,8 +17,8 @@ from twisted.web import server
 from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
-from util import db, expiring_dict, jsonrpc, variable, deferral, math, skiplist
-from . import p2p, worker_interface
+from util import db, expiring_dict, jsonrpc, variable, deferral, math
+from . import p2p, worker_interface, skiplists
 import p2pool.data as p2pool
 import p2pool as p2pool_init
 
@@ -468,7 +468,7 @@ def main(args):
         work1_thread()
         work2_thread()
         
-        counter = skiplist.CountsSkipList(tracker, run_identifier)
+        counter = skiplists.CountsSkipList(tracker, run_identifier)
         
         while True:
             yield deferral.sleep(random.expovariate(1/1))

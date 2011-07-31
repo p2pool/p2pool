@@ -4,7 +4,7 @@ import struct
 import hashlib
 import warnings
 
-from . import base58
+from . import base58, skiplists
 from p2pool.util import bases, math, skiplist, intern2
 import p2pool
 
@@ -460,7 +460,7 @@ class Tracker(object):
         self.tails_by_id = {}
         '''
         
-        self.get_nth_parent_hash = skiplist.DistanceSkipList(self)
+        self.get_nth_parent_hash = skiplists.DistanceSkipList(self)
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
