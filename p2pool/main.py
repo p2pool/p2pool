@@ -374,7 +374,7 @@ def main(args):
             return res
 
         
-        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate, get_users)))
+        reactor.listenTCP(args.worker_port, server.Site(worker_interface.WorkerInterface(current_work, compute, got_response, get_rate, get_users, args.net)))
         
         print '    ...success!'
         print

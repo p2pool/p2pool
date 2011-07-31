@@ -48,9 +48,10 @@ def set_hold(request_id, dt):
     reactor.callLater(dt, cb)
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
-    def __init__(self, work, compute):
+    def __init__(self, work, compute, net):
         self.work = work
         self.compute = compute
+        self.net = net
     
     @defer.inlineCallbacks
     def render_GET(self, request):
@@ -124,16 +125,16 @@ class RateInterface(deferred_resource.DeferredResource):
         request.write(json.dumps(self.get_rate()))
 
 class WorkerInterface(jsonrpc.Server):
-    def __init__(self, work, compute, response_callback, get_rate, get_users):
+    def __init__(self, work, compute, response_callback, get_rate, get_users, net):
         jsonrpc.Server.__init__(self)
         
         self.work = work
         self.compute = compute
         self.response_callback = response_callback
-        self.get_rate = get_rate
+        self.net = net
         
         self.putChild('long-polling',
-            LongPollingWorkerInterface(self.work, self.compute))
+            LongPollingWorkerInterface(self.work, self.compute, net))
         self.putChild('rate',
             RateInterface(get_rate))
         self.putChild('users',
