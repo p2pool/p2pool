@@ -19,7 +19,7 @@ from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, worker_interface, skiplists
+from . import p2p, worker_interface, skiplists, draw
 import p2pool.data as p2pool
 import p2pool as p2pool_init
 
@@ -391,6 +391,7 @@ def main(args):
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
+        web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
         reactor.listenTCP(args.worker_port, server.Site(web_root))
         
