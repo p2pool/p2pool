@@ -5,7 +5,7 @@ import hashlib
 import warnings
 
 from . import base58, skiplists
-from p2pool.util import bases, math, skiplist, intern2
+from p2pool.util import bases, math, skiplist
 import p2pool
 
 class EarlyEnd(Exception):
@@ -307,7 +307,6 @@ class FloatingIntegerType(Type):
         if p2pool.DEBUG:
             if self._target_to_bits(target) != bits:
                 raise ValueError('bits in non-canonical form')
-        target = intern2.intern2(target)
         return target, file
     
     def write(self, file, item):
