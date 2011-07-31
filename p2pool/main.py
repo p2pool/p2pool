@@ -40,9 +40,9 @@ def getwork(bitcoind):
 def get_payout_script(factory):
     res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
     if res['reply'] == 'success':
-        my_script = res['script']
+        defer.returnValue(res['script'])
     elif res['reply'] == 'denied':
-        my_script = None
+        defer.returnValue(None)
     else:
         raise ValueError('Unexpected reply: %r' % (res,))
 
