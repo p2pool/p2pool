@@ -280,7 +280,9 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
-        def compute(state):
+        def compute(state, payout_script):
+            if payout_script is None:
+                payout_script = my_script
             if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
@@ -298,7 +300,7 @@ def main(args):
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
-                new_script=my_script,
+                new_script=payout_script,
                 subsidy=(50*100000000 >> (state['height'] + 1)//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
                 nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
                 block_target=state['target'],

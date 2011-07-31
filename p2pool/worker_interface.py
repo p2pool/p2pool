@@ -1,5 +1,6 @@
 from __future__ import division
 
+import base64
 import json
 import random
 
@@ -9,6 +10,14 @@ from twisted.python import log
 import p2pool
 from p2pool import data as p2pool_data
 from p2pool.util import jsonrpc, deferred_resource, variable
+from p2pool.bitcoin import data as bitcoin_data
+
+def get_payout_script(request, net):
+    try:
+        user = base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
+        return bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(user, net))
+    except: # XXX blah
+        return None
 
 def get_memory(request):
     if request.getHeader('X-Work-Identifier') is not None:
@@ -87,7 +96,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                     if p2pool.DEBUG:
                         print 'POLL %i FAKED' % (id,)
                     set_hold(request_id, .01)
-                res = self.compute(work)
+                res = self.compute(work, get_payout_script(request, self.net))
                 
                 last_cache_invalidation[request_id].set((thought_work[-1], work))
                 if p2pool.DEBUG:
@@ -165,7 +174,7 @@ class WorkerInterface(jsonrpc.Server):
             if p2pool.DEBUG:
                 print 'GETWORK FAKED'
             set_hold(request_id, .01) # guarantee ordering
-        res = self.compute(work)
+        res = self.compute(work, get_payout_script(request, self.net))
         
         last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
