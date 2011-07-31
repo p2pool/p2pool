@@ -19,7 +19,7 @@ from twisted.python import log
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, worker_interface, skiplists, draw
+from . import p2p, worker_interface, skiplists
 import p2pool.data as p2pool
 import p2pool as p2pool_init
 
@@ -55,6 +55,9 @@ def get_payout_script2(bitcoind, net):
 @defer.inlineCallbacks
 def main(args):
     try:
+        if args.charts:
+            from . import draw
+        
         print 'p2pool (version %s)' % (p2pool_init.__version__,)
         print
         
@@ -391,7 +394,8 @@ def main(args):
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
-        web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
+        if args.charts:
+            web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
         reactor.listenTCP(args.worker_port, server.Site(web_root))
         
@@ -526,6 +530,9 @@ def run():
     parser.add_argument('-a', '--address',
         help='generate to this address (defaults to requesting one from bitcoind)',
         type=str, action='store', default=None, dest='address')
+    parser.add_argument('--charts',
+        help='generate charts on the web interface (requires PIL and pygame)',
+        action='store_const', const=True, default=False, dest='charts')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
