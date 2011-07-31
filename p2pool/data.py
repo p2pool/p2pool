@@ -143,7 +143,7 @@ class Share(object):
         self.target = self.share_data['target']
         self.nonce = self.share_data['nonce']
         
-        if len(self.nonce) > 20:
+        if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
         
         self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
