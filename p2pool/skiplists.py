@@ -55,35 +55,34 @@ class CountsSkipList(skiplist.SkipList):
         return self.tracker.shares[element].previous_hash
     
     def get_delta(self, element):
-        from p2pool.bitcoin import data as bitcoin_data
         if element is None:
-            return 0 # XXX
+            raise AssertionError()
         share = self.tracker.shares[element]
-        weight = 1 if share.nonce[:8] == self.run_identifier else 0
-        return 1, weight, 1
+        return 1, set([share.hash]) if share.nonce[:8] == self.run_identifier else set() 
     
-    def combine_deltas(self, (share_count1, weights1, total_weight1), (share_count2, weights2, total_weight2)):
-        return share_count1 + share_count2, weights1 + weights2, total_weight1 + total_weight2
+    def combine_deltas(self, (share_count1, share_hashes1), (share_count2, share_hashes2)):
+        if share_hashes1 & share_hashes2:
+            raise AssertionError()
+        return share_count1 + share_count2, share_hashes1 | share_hashes2
     
-    def initial_solution(self, start, (max_shares, desired_weight)):
-        return 0, 0, 0
+    def initial_solution(self, start, (desired_shares,)):
+        return 0, set()
     
+    def apply_delta(self, (share_count1, share_hashes1), (share_count2, share_hashes2), (desired_shares,)):
+        if share_hashes1 & share_hashes2:
+            raise AssertionError()
+        return share_count1 + share_count2, share_hashes1 | share_hashes2
     
-    def apply_delta(self, (share_count1, weights1, total_weight1), (share_count2, weights2, total_weight2), (max_shares, desired_weight)):
-        return share_count1 + share_count2, weights1 + weights2, total_weight1 + total_weight2
-    
-    def judge(self, (share_count, weights, total_weight), (max_shares, desired_weight)):
-        if share_count > max_shares or total_weight > desired_weight:
+    def judge(self, (share_count, share_hashes), (desired_shares,)):
+        if share_count > desired_shares:
             return 1
-        elif share_count == max_shares or total_weight == desired_weight:
+        elif share_count == desired_shares:
             return 0
         else:
             return -1
     
-    def finalize(self, (share_count, weights, total_weight)):
-        if share_count != total_weight:
-            raise AssertionError()
-        return weights
+    def finalize(self, (share_count, share_hashes)):
+        return share_hashes
 
 if __name__ == '__main__':
     import random
