@@ -187,6 +187,9 @@ class Share(object):
         
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
+        if len(gentx['tx_ins'][0]['script']) > 100:
+            raise ValueError('''coinbase too large!''')
+        
         if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
         
