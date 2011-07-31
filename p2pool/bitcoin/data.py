@@ -1,8 +1,7 @@
 from __future__ import division
 
-import struct
 import hashlib
-import warnings
+import struct
 
 from . import base58, skiplists
 from p2pool.util import bases, math, skiplist
@@ -169,7 +168,7 @@ class HashType(Type):
         if not 0 <= item < 2**256:
             raise ValueError('invalid hash value - %r' % (item,))
         if item != 0 and item < 2**160:
-            warnings.warn('very low hash value - maybe you meant to use ShortHashType? %x' % (item,))
+            print 'Very low hash value - maybe you meant to use ShortHashType? %x' % (item,)
         return file, ('%064x' % (item,)).decode('hex')[::-1]
 
 class ShortHashType(Type):
