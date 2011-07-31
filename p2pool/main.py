@@ -477,13 +477,14 @@ def main(args):
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 120), 2**100)
                         count = counter(current_work.value['best_share_hash'], height, 2**100)
-                        print 'Pool: %sH/s in %i shares Recent: %.02f%% >%sH/s Shares: %i (%i stale)' % (
+                        print 'Pool: %sH/s in %i shares Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
                             math.format(att_s),
                             height,
                             weights.get(my_script, 0)/total_weight*100,
                             math.format(weights.get(my_script, 0)/total_weight*att_s),
                             len(my_shares),
                             len(my_shares) - count,
+                            len(p2p_node.peers),
                         )
                         #weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 100), 2**100)
                         #for k, v in weights.iteritems():
