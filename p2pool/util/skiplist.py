@@ -166,10 +166,9 @@ class WeightsSkipList(SkipList):
 class CountsSkipList(SkipList):
     # share_count, counts, total_count
     
-    def __init__(self, tracker, script, run_identifier):
+    def __init__(self, tracker, run_identifier):
         SkipList.__init__(self)
         self.tracker = tracker
-        self.script = script
         self.run_identifier = run_identifier
     
     def previous(self, element):
@@ -180,7 +179,7 @@ class CountsSkipList(SkipList):
         if element is None:
             return 0 # XXX
         share = self.tracker.shares[element]
-        weight = 1 if share.new_script == self.script and share.nonce[:8] == self.run_identifier else 0
+        weight = 1 if share.nonce[:8] == self.run_identifier else 0
         return 1, weight, 1
     
     def combine_deltas(self, (share_count1, weights1, total_weight1), (share_count2, weights2, total_weight2)):

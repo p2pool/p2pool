@@ -464,7 +464,7 @@ def main(args):
         work1_thread()
         work2_thread()
         
-        counter = skiplist.CountsSkipList(tracker, my_script, run_identifier)
+        counter = skiplist.CountsSkipList(tracker, run_identifier)
         
         while True:
             yield deferral.sleep(random.expovariate(1/1))
