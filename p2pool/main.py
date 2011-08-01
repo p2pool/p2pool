@@ -250,11 +250,16 @@ def main(args):
             ('72.14.191.28', args.net.P2P_PORT),
             ('62.204.197.159', args.net.P2P_PORT),
             ('142.58.248.28', args.net.P2P_PORT),
+            ('94.23.34.145', args.net.P2P_PORT),
         ])
-        try:
-            nodes.add(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
-        except:
-            log.err(None, 'Error resolving bootstrap node IP:')
+        for host in [
+            'p2pool.forre.st',
+            'dabuttonfactory.com',
+        ]:
+            try:
+                nodes.add(((yield reactor.resolve(host)), args.net.P2P_PORT))
+            except:
+                log.err(None, 'Error resolving bootstrap node IP:')
         
         p2p_node = p2p.Node(
             current_work=current_work,
