@@ -21,7 +21,7 @@ def get_uniform(bound, *data):
     return x % bound
 
 def get_pos(share, t, d):
-        x = get_uniform(d.get_width(), share.hash, "pos")
+        x = 5 + get_uniform(d.get_width() - 10, share.hash, "pos")
         y = d.get_height() - (t - share.time_seen)*10
         return v(x, y)
 
@@ -46,6 +46,8 @@ def go(share, tracker, t, d):
             (pos + perp_and_normalize_to(vec_to_previous, -5)).rounded,
             previous_pos.rounded,
         ])
+    if share.peer is None:
+        pygame.draw.circle(d, c, pos.rounded, 10, 2)
     for child_hash in tracker.reverse_shares.get(share.hash, set()):
         go(tracker.shares[child_hash], tracker, t, d)
 
