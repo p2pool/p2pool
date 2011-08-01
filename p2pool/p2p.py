@@ -313,7 +313,7 @@ class AddrStore(dicts.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=[], mode=0, desired_peers=10, max_attempts=100, preferred_storage=1000):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), mode=0, desired_peers=10, max_attempts=100, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
@@ -349,7 +349,7 @@ class Node(object):
             try:
                 if len(self.peers) < self.desired_peers and len(self.attempts) < self.max_attempts and (len(self.preferred_addrs) or len(self.addr_store)):
                     if (random.randrange(2) and len(self.preferred_addrs)) or not len(self.addr_store):
-                        host, port = random.choice(self.preferred_addrs)
+                        host, port = random.choice(list(self.preferred_addrs))
                     else:
                         host, port = random.choice(self.addr_store.keys())
                     

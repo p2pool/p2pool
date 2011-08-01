@@ -246,12 +246,13 @@ def main(args):
             else:
                 return x, args.net.P2P_PORT
         
-        nodes = [
+        nodes = set([
             ('72.14.191.28', args.net.P2P_PORT),
             ('62.204.197.159', args.net.P2P_PORT),
-        ]
+            ('142.58.248.28', args.net.P2P_PORT),
+        ])
         try:
-            nodes.append(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
+            nodes.add(((yield reactor.resolve('p2pool.forre.st')), args.net.P2P_PORT))
         except:
             log.err(None, 'Error resolving bootstrap node IP:')
         
@@ -261,7 +262,7 @@ def main(args):
             net=args.net,
             addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), args.net.ADDRS_TABLE),
             mode=0 if args.low_bandwidth else 1,
-            preferred_addrs=map(parse, args.p2pool_nodes) + nodes,
+            preferred_addrs=set(map(parse, args.p2pool_nodes)) | nodes,
         )
         p2p_node.handle_shares = p2p_shares
         p2p_node.handle_share_hashes = p2p_share_hashes
