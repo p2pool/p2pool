@@ -210,13 +210,17 @@ def main(args):
                 print '... done processing %i shares. Have: %i/~%i' % (len(shares), len(tracker.shares), 2*args.net.CHAIN_LENGTH)
         
         def p2p_share_hashes(share_hashes, peer):
+            t = time.time()
             get_hashes = []
             for share_hash in share_hashes:
                 if share_hash in tracker.shares:
-                    pass # print 'Got share hash, already have, ignoring. Hash: %s' % (p2pool.format_hash(share_hash),)
-                else:
-                    print 'Got share hash, requesting! Hash: %s' % (p2pool.format_hash(share_hash),)
-                    get_hashes.append(share_hash)
+                    continue
+                last_request_time, count = requested.get(share_hash, (None, 0))
+                if last_request_time is not None and last_request_time - 5 < t < last_request_time + 10 * 1.5**count:
+                    continue
+                print 'Got share hash, requesting! Hash: %s' % (p2pool.format_hash(share_hash),)
+                get_hashes.append(share_hash)
+                requested[share_hash] = t, count + 1
             
             if share_hashes and peer is not None:
                 peer_heads.setdefault(share_hashes[0], set()).add(peer)
