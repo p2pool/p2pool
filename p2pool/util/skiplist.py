@@ -1,4 +1,4 @@
-from p2pool.util import math, expiring_dict
+from p2pool.util import math, expiring_dict, memoize
 
 class Base(object):
     def finalize(self, sol):
@@ -10,6 +10,7 @@ class SkipList(Base):
     def __init__(self):
         self.skips = expiring_dict.ExpiringDict(600)
     
+    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5))
     def __call__(self, start, *args, **kwargs):
         updates = {}
         pos = start
