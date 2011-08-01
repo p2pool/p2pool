@@ -182,17 +182,6 @@ class ShortHashType(Type):
             raise ValueError('invalid hash value - %r' % (item,))
         return file, ('%040x' % (item,)).decode('hex')[::-1]
 
-class FrozenList(tuple):
-    def __eq__(self, other):
-        if isinstance(other, FrozenList):
-            return tuple.__eq__(self, other)
-        elif isinstance(other, list):
-            return len(self) == len(other) and all(a == b for a, b in itertools.izip(self, other))
-        else:
-            raise TypeError()
-    def __ne__(self, other):
-        return not (self == other)
-
 class ListType(Type):
     _inner_size = VarIntType()
     
@@ -205,7 +194,7 @@ class ListType(Type):
         for i in xrange(length):
             item, file = self.type.read(file)
             res.append(item)
-        return FrozenList(res), file
+        return res, file
     
     def write(self, file, item):
         file = self._inner_size.write(file, len(item))
