@@ -96,7 +96,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version
-        self.other_sub_version = sub_version
+        self.other_sub_version = sub_version[:512]
         self.other_services = services
         self.other_mode_var = variable.Variable(mode)
         
