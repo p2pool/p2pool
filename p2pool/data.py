@@ -315,7 +315,6 @@ class OkayTracker(bitcoin_data.Tracker):
             self.verified.add(share)
             return True
     
-    @defer.inlineCallbacks
     def think(self, ht, previous_block, now):
         desired = set()
         
@@ -353,9 +352,6 @@ class OkayTracker(bitcoin_data.Tracker):
             for share in itertools.islice(self.get_chain_known(last_hash), get):
                 if not self.attempt_verify(share, now):
                     break
-                if random.random() < .001:
-                    #print 'YIELDING'
-                    yield deferral.sleep(.01)
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
         
@@ -400,7 +396,7 @@ class OkayTracker(bitcoin_data.Tracker):
                     print 'Stale detected!'
                 best = best_share.previous_hash
         
-        defer.returnValue((best, desired))
+        return best, desired
     
     @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
     def score(self, share_hash, ht):

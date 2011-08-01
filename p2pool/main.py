@@ -119,9 +119,8 @@ def main(args):
                 clock_offset=time.time() - work.timestamp,
             ))
         
-        @defer.inlineCallbacks
         def set_real_work2():
-            best, desired = yield tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
+            best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
             
             t = dict(current_work.value)
             t['best_share_hash'] = best
@@ -129,8 +128,8 @@ def main(args):
             
             t = time.time()
             for peer2, share_hash in desired:
-                if share_hash not in tracker.tails: # was received in the time tracker.think was running
-                    continue
+                #if share_hash not in tracker.tails: # was received in the time tracker.think was running
+                #    continue
                 last_request_time, count = requested.get(share_hash, (None, 0))
                 if last_request_time is not None and last_request_time - 5 < t < last_request_time + 10 * 1.5**count:
                     continue
@@ -157,7 +156,7 @@ def main(args):
         
         print 'Initializing work...'
         yield set_real_work1()
-        yield set_real_work2()
+        set_real_work2()
         print '    ...success!'
         
         start_time = time.time() - current_work2.value['clock_offset']
@@ -484,7 +483,7 @@ def main(args):
             while True:
                 flag = tracker_updated.get_deferred()
                 try:
-                    yield set_real_work2()
+                    set_real_work2()
                 except:
                     log.err()
                 yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
