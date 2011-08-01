@@ -3,7 +3,7 @@ from __future__ import division
 import random
 import time
 
-from twisted.internet import reactor
+from twisted.internet import task
 
 class Node(object):
     def __init__(self, contents, prev=None, next=None):
@@ -62,7 +62,6 @@ class LinkedList(object):
             yield cur2
     
     def __getitem__(self, index):
-        # odd one out - probably should return Node instance instead of its contents
         if index < 0:
             cur = self.end
             for i in xrange(-index):
@@ -99,19 +98,18 @@ class LinkedList(object):
 
 
 class ExpiringDict(object):
-    def __init__(self, expiry_time=100, get_touches=True):
+    def __init__(self, expiry_time, get_touches=True):
         self.expiry_time = expiry_time
         self.get_touches = get_touches
         
         self.expiry_deque = LinkedList()
         self.d = dict() # key -> node, value
+        task.LoopingCall(self.expire).start(1) # XXX
     
     def __repr__(self):
-        reactor.callLater(0, self.expire)
         return 'ExpiringDict' + repr(self.__dict__)
     
     def __len__(self):
-        reactor.callLater(0, self.expire)
         return len(self.d)
     
     _nothing = object()
@@ -122,7 +120,7 @@ class ExpiringDict(object):
             node.delete()
         
         new_value = old_value if value is self._nothing else value
-        self.d[key] = self.expiry_deque.append((time.time() + random.expovariate(1/self.expiry_time), key)), new_value
+        self.d[key] = self.expiry_deque.append((time.time() + self.expiry_time, key)), new_value
         return new_value
     
     def expire(self):
@@ -142,24 +140,20 @@ class ExpiringDict(object):
             value = self.touch(key)
         else:
             node, value = self.d[key]
-        reactor.callLater(0, self.expire)
         return value
     
     def __setitem__(self, key, value):
         self.touch(key, value)
-        reactor.callLater(0, self.expire)
     
     def __delitem__(self, key):
         node, value = self.d.pop(key)
         node.delete()
-        reactor.callLater(0, self.expire)
     
     def get(self, key, default_value=None):
         if key in self.d:
             res = self[key]
         else:
             res = default_value
-            reactor.callLater(0, self.expire)
         return res
     
     def setdefault(self, key, default_value):
