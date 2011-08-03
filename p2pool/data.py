@@ -383,7 +383,8 @@ class OkayTracker(bitcoin_data.Tracker):
             if self.shares[share_hash].time_seen > time.time() - 30:
                 continue
             self.remove(share_hash)
-            self.verified.remove(share_hash)
+            if share_hash in self.verified.shares:
+                self.verified.remove(share_hash)
         
         for tail, heads in list(self.tails.iteritems()):
             continue
