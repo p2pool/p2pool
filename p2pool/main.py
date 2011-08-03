@@ -101,14 +101,13 @@ def main(args):
         current_work2 = variable.Variable(None)
         
         work_updated = variable.Event()
-        tracker_updated = variable.Event()
         
         requested = expiring_dict.ExpiringDict(300)
         
         @defer.inlineCallbacks
         def set_real_work1():
             work, height = yield getwork(bitcoind)
-            # XXX call tracker_updated
+            changed = work.previous_block != current_work.value['previous_block'] if current_work.value is not None else True
             current_work.set(dict(
                 version=work.version,
                 previous_block=work.previous_block,
@@ -119,6 +118,8 @@ def main(args):
             current_work2.set(dict(
                 clock_offset=time.time() - work.timestamp,
             ))
+            if changed:
+                set_real_work2()
         
         def set_real_work2():
             best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
@@ -204,7 +205,7 @@ def main(args):
                 peer_heads.setdefault(shares[0].hash, set()).add(peer)
             
             if some_new:
-                tracker_updated.happened()
+                set_real_work2()
             
             if len(shares) > 5:
                 print '... done processing %i shares. Have: %i/~%i' % (len(shares), len(tracker.shares), 2*args.net.CHAIN_LENGTH)
@@ -501,17 +502,16 @@ def main(args):
                     yield set_real_work1()
                 except:
                     log.err()
-                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
+                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/20))], fireOnOneCallback=True)
         
         @defer.inlineCallbacks
         def work2_thread():
             while True:
-                flag = tracker_updated.get_deferred()
                 try:
                     set_real_work2()
                 except:
                     log.err()
-                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/1))], fireOnOneCallback=True)
+                yield deferral.sleep(random.expovariate(1/20))
         
         work1_thread()
         work2_thread()
