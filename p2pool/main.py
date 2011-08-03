@@ -167,8 +167,8 @@ def main(args):
             for peer in p2p_node.peers.itervalues():
                 if peer is ignore_peer:
                     continue
-                if p2pool_init.DEBUG:
-                    print "Sending share %s to %r" % (p2pool.format_hash(share.hash), peer.addr)
+                #if p2pool_init.DEBUG:
+                #    print "Sending share %s to %r" % (p2pool.format_hash(share.hash), peer.addr)
                 peer.send_shares([share])
             share.flag_shared()
         
