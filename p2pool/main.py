@@ -78,7 +78,7 @@ def main(args):
         my_script = yield get_payout_script(factory)
         if args.pubkey_hash is None:
             if my_script is None:
-                print 'IP transaction denied ... falling back to sending to address.'
+                print '    IP transaction denied ... falling back to sending to address.'
                 my_script = yield get_payout_script2(bitcoind, args.net)
         else:
             my_script = bitcoin.data.pubkey_hash_to_script2(args.pubkey_hash)
