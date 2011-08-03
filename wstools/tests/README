@@ -1,0 +1,52 @@
+Two top level modules have been provided to run the tests. "test_wstools.py"
+is used to run all of the local tests. "test_wstools_net.py" is used to run
+all of the tests that require network access.
+
+Add the -v option for more informative feedback.
+
+ADDING TESTS:
+    1. For Stand-Alone tests add WSDL FILE to appropriate archive file
+        Need to add a NEW Archive?:
+            config.txt [files] "archive" -- tuple of all archive files, 
+            if you need to create a new archive append the archive 
+            name to the 'archive' tuple.
+
+    2. Edit config.txt section(s):
+        option -- name by which service will be referenced in test case.
+            Need an entry under appropriate section(s), this name
+            must be unique within each section it appears but it may 
+            appear in multiple sections.
+
+        config.txt "test" sections:
+          Stand-Alone --  add "option" under [services_by_file]
+		eg. amazon = exports/AmazonWebServices.wsdl
+
+          Network -- add "option" under [services_by_http]
+		eg. amazon = http://soap.amazon.com/schemas/AmazonWebServices.wsdl
+
+          Broken -- add "option" under [broken]
+
+    3. Done
+
+
+CONTENTS OF SAMPLE WSDL/XSD:
+    schema -- Taken from globus-3.0.1(http://www.globus.org)
+    xmethods -- Taken from XMethods(http://www.xmethods.com)
+         airport.wsdl
+         AmazonWebServices.wsdl
+         books.wsdl
+         Distance.wsdl
+         freedb.wsdl
+         globalweather.wsdl
+         IHaddock.wsdl
+         ip2geo.wsdl
+         magic.wsdl
+         query.wsdl
+         RateInfo.wsdl
+         SHA1Encrypt.wsdl
+         siteInspect.wsdl
+         TemperatureService.wsdl
+         usweather.wsdl
+         rtf2html.xml
+         SolveSystem.wsdl.xml
+         zip2geo.wsdl
