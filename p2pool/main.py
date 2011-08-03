@@ -16,6 +16,7 @@ import json
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 from twisted.python import log
+from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
@@ -287,6 +288,22 @@ def main(args):
         print '    ...success!'
         print
         
+        @defer.inlineCallbacks
+        def upnp_thread():
+            while True:
+                try:
+                    is_lan, lan_ip = yield ipdiscover.get_local_ip()
+                    if not is_lan:
+                        continue
+                    pm = yield portmapper.get_port_mapper()
+                    yield pm._upnp.add_port_mapping(lan_ip, args.net.P2P_PORT, args.net.P2P_PORT, 'p2pool', 'TCP')
+                except:
+                    log.err()
+                yield deferral.sleep(random.expovariate(1/120))
+        
+        if args.upnp:
+            upnp_thread()
+         
         # start listening for workers with a JSON-RPC server
         
         print 'Listening for workers on port %i...' % (args.worker_port,)
@@ -554,6 +571,9 @@ def run():
     parser.add_argument('-l', '--low-bandwidth',
         help='trade lower bandwidth usage for higher latency (reduced efficiency)',
         action='store_true', default=False, dest='low_bandwidth')
+    parser.add_argument('--disable-upnp',
+        help='''don't attempt to forward port 9333 (19333 for testnet) from the WAN to this computer using UPnP''',
+        action='store_false', default=True, dest='upnp')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
