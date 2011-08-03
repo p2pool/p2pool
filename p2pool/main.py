@@ -519,7 +519,7 @@ def main(args):
         counter = skiplists.CountsSkipList(tracker, run_identifier)
         
         while True:
-            yield deferral.sleep(random.expovariate(1/1))
+            yield deferral.sleep(3)
             try:
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
