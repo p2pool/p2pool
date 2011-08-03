@@ -299,7 +299,8 @@ def main(args):
                     pm = yield portmapper.get_port_mapper()
                     yield pm._upnp.add_port_mapping(lan_ip, args.net.P2P_PORT, args.net.P2P_PORT, 'p2pool', 'TCP')
                 except:
-                    log.err()
+                    if p2pool_init.DEBUG:
+                        log.err()
                 yield deferral.sleep(random.expovariate(1/120))
         
         if args.upnp:
