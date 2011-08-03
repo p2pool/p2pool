@@ -491,6 +491,8 @@ def main(args):
         print 'Started successfully!'
         print
         
+        ht.updated.watch(lambda x: set_real_work2())
+        
         @defer.inlineCallbacks
         def work1_thread():
             while True:

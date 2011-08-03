@@ -340,6 +340,8 @@ class HeightTracker(object):
         
         self.last_notified_size = 0
         
+        self.updated = variable.Event()
+        
         self.think()
     
     def think(self):
@@ -373,8 +375,15 @@ class HeightTracker(object):
             self.request([head], None)
     
     def heard_headers(self, headers):
+        changed = False
         for header in headers:
-            self.tracker.add(HeaderWrapper(header))
+            hw = HeaderWrapper(header)
+            if hw.hash in self.tracker.shares:
+                continue
+            changed = True
+            self.tracker.add(hw)
+        if changed:
+            self.updated.happened()
         self.think()
         
         if len(self.tracker.shares) > self.last_notified_size + 10:
