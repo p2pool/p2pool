@@ -377,21 +377,37 @@ class OkayTracker(bitcoin_data.Tracker):
                 )
         
         # eat away at heads
-        for share_hash in list(self.heads):
-            if share_hash in scores[-5:]:
-                continue
-            if self.shares[share_hash].time_seen > time.time() - 30:
-                continue
-            self.remove(share_hash)
-            if share_hash in self.verified.shares:
-                self.verified.remove(share_hash)
+        while True:
+            removed = False
+            for share_hash in list(self.heads):
+                if share_hash in scores[-5:]:
+                    continue
+                if self.shares[share_hash].time_seen > time.time() - 30:
+                    continue
+                self.remove(share_hash)
+                if share_hash in self.verified.shares:
+                    self.verified.remove(share_hash)
+                removed = True
+            if not removed:
+                break
         
-        for tail, heads in list(self.tails.iteritems()):
-            continue
-            if min(self.get_height(head) for head in heads) > 2*self.net.CHAIN_LENGTH + 10:
-                print "removing!"
-                self.remove(tail)
-                self.verified.remove(tail)
+        # drop tails
+        while True:
+            removed = False
+            # if removed from this, it must be removed from verified
+            for tail, heads in list(self.tails.iteritems()):
+                if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
+                    continue
+                start = time.time()
+                for aftertail in list(self.reverse_shares.get(tail, set())):
+                    self.remove(aftertail)
+                    if tail in self.verified.shares:
+                        self.verified.remove(aftertail)
+                    removed = True
+                end = time.time()
+                print "removed! %x %f" % (tail, end - start)
+            if not removed:
+                break
         
         best = scores[-1] if scores else None
         

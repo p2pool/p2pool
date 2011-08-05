@@ -539,6 +539,7 @@ class Tracker(object):
         if share_hash not in self.shares:
             raise KeyError()
         share = self.shares[share_hash]
+        children = self.reverse_shares.get(share_hash, set())
         del share_hash
         
         if share.hash in self.heads and share.previous_hash in self.tails:
@@ -555,7 +556,7 @@ class Tracker(object):
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
         elif share.previous_hash in self.tails:
-            raise NotImplementedError() # will break other things..
+            #raise NotImplementedError() # will break other things..
             heads = self.tails[share.previous_hash]
             if len(self.reverse_shares[share.previous_hash]) > 1:
                 raise NotImplementedError()
@@ -566,6 +567,21 @@ class Tracker(object):
                 self.tails[share.hash] = set(heads)
         else:
             raise NotImplementedError()
+        
+        for share_hash2 in self.heights:
+            height_to, other_share_hash, work_inc = self.heights[share_hash2]
+            if other_share_hash != share.previous_hash:
+                continue
+            assert children
+            if len(children) == 1:
+                height_to -= 1
+                other_share_hash = share.hash
+                work_inc -= target_to_average_attempts(share.target)
+                self.heights[share_hash2] = height_to, other_share_hash, work_inc
+            else:
+                del self.heights[share_hash2]
+        if share.hash in self.heights:
+            del self.heights[share.hash]
         
         '''
         height, tail = self.get_height_and_last(share.hash)
