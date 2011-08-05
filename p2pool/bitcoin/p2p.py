@@ -90,7 +90,7 @@ class BaseProtocol(protocol.Protocol):
             try:
                 handler(**payload2)
             except:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'RECV', command, len(payload), checksum.encode('hex')[:1000]
                 log.err(None, 'Error handling message: (see RECV line)')
                 continue
     
