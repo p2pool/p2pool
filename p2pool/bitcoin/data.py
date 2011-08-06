@@ -445,7 +445,7 @@ def script2_to_human(script2, net):
     try:
         pubkey = script2[1:-1]
         script2_test = pubkey_to_script2(pubkey)
-    except: # XXX
+    except EarlyEnd, LateEnd:
         pass
     else:
         if script2_test == script2:
@@ -454,7 +454,7 @@ def script2_to_human(script2, net):
     try:
         pubkey_hash = ShortHashType().unpack(script2[3:-2])
         script2_test2 = pubkey_hash_to_script2(pubkey_hash)
-    except: # XXX
+    except EarlyEnd, LateEnd:
         pass
     else:
         if script2_test2 == script2:
@@ -485,7 +485,7 @@ class Tracker(object):
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
         if share.hash in self.shares:
-            return # XXX raise exception?
+            raise ValueError('share already present')
         
         '''
         parent_id = self.ids.get(share.previous_hash, None)

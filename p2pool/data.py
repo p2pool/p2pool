@@ -426,9 +426,7 @@ class OkayTracker(bitcoin_data.Tracker):
         score2 = 0
         attempts = 0
         max_height = 0
-        # XXX should only look past a certain share, not at recent ones
         share2_hash = self.verified.get_nth_parent_hash(share_hash, min(self.net.CHAIN_LENGTH//2, head_height//2)) if last is not None else share_hash
-        # XXX this must go in the opposite direction for max_height to make sense
         for share in reversed(list(itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH))):
             max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
             attempts += bitcoin_data.target_to_average_attempts(share.target)

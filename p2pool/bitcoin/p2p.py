@@ -400,8 +400,6 @@ class HeightTracker(object):
         self.requested.add((tuple(have), last))
         (yield self.factory.getProtocol()).send_getheaders(version=1, have=have, last=last)
     
-    #@defer.inlineCallbacks
-    #XXX should defer?
     def getHeight(self, block_hash):
         height, last = self.tracker.get_height_and_last(block_hash)
         if last is not None:
