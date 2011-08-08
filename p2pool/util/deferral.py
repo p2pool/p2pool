@@ -48,7 +48,7 @@ class ReplyMatcher(object):
         df = defer.Deferred()
         def timeout():
             df, timer = self.map[id].pop(uniq)
-            df.errback(failure.Failure(defer.TimeoutError()))
+            df.errback(failure.Failure(defer.TimeoutError('in ReplyMatcher')))
             if not self.map[id]:
                 del self.map[id]
         self.map.setdefault(id, {})[uniq] = (df, reactor.callLater(self.timeout, timeout))
@@ -80,7 +80,7 @@ class GenericDeferrer(object):
         df = defer.Deferred()
         def timeout():
             self.map.pop(id)
-            df.errback(failure.Failure(defer.TimeoutError()))
+            df.errback(failure.Failure(defer.TimeoutError('in GenericDeferrer')))
         timer = reactor.callLater(self.timeout, timeout)
         self.func(id, *args, **kwargs)
         self.map[id] = df, timer
