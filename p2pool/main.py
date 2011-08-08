@@ -642,11 +642,12 @@ def run():
                 pass
         logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
         sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
-        def sigusr1(signum, frame):
-            print '''Caught SIGUSR1, closing 'debug.log'...'''
-            logfile.reopen()
-            print '''...and reopened 'debug.log' after catching SIGUSR1.'''
-        signal.signal(signal.SIGUSR1, sigusr1)
+        if hasattr(signal, "SIGUSR1"):
+            def sigusr1(signum, frame):
+                print '''Caught SIGUSR1, closing 'debug.log'...'''
+                logfile.reopen()
+                print '''...and reopened 'debug.log' after catching SIGUSR1.'''
+            signal.signal(signal.SIGUSR1, sigusr1)
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
