@@ -232,30 +232,10 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
     
-    '''
-    class fake_share(object):
-        pass
-    fake_share.new_script = new_script
-    fake_share.target = target
-    
-    dest_weights = {}
-    total_weight = 0
-    for share in itertools.chain([fake_share], itertools.islice(tracker.get_chain_to_root(previous_share_hash), net.CHAIN_LENGTH)):
-        weight = bitcoin_data.target_to_average_attempts(share.target)
-        if weight > max_weight - total_weight:
-            weight = max_weight - total_weight
-        
-        dest_weights[share.new_script] = dest_weights.get(share.new_script, 0) + weight
-        total_weight += weight
-        
-        if total_weight == max_weight:
-            break
-    '''
-    
     this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
-    total_weight = sum(dest_weights.itervalues())
+    assert total_weight == sum(dest_weights.itervalues())
     
     amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
     amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
