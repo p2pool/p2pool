@@ -526,8 +526,8 @@ def main(args):
             try:
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-                    if height > 5:
-                        att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net)
+                    if height > 2:
+                        att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 120))
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 120), 2**100)
                         matching_in_chain = counter(current_work.value['best_share_hash'], height)
                         shares_in_chain = my_shares & matching_in_chain
