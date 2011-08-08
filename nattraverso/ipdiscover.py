@@ -123,8 +123,8 @@ def _get_via_multicast():
 	except:
 		raise
 
-	logging.debug("Multicast ping to retreive local IP")
-	return LocalNetworkMulticast().discover().addCallback(_got_multicast_ip)
+	logging.debug("Multicast ping to retrieve local IP")
+	return _discover_multicast().addCallback(_got_multicast_ip)
 
 def _get_via_connected_udp(ipaddr):
 	"""
@@ -142,66 +142,62 @@ def _get_via_connected_udp(ipaddr):
 	port.stopListening()
 	
 	if is_bogus_ip(localip):
-		raise RuntimeError, "Invalid IP addres returned"
+		raise RuntimeError, "Invalid IP address returned"
 	else:
 		return (is_rfc1918_ip(localip), localip)
 		
-class LocalNetworkMulticast(DatagramProtocol, object):
+class _LocalNetworkMulticast(DatagramProtocol):
+	def __init__(self, nonce):
+		from p2pool.util import variable
+		
+		self.nonce = nonce
+		self.address_received = variable.Event()
+	
+	def datagramReceived(self, dgram, addr):
+		"""Datagram received, we callback the IP address."""
+		logging.debug("Received multicast pong: %s; addr:%r", dgram, addr)
+		if dgram != self.nonce:
+			return
+		self.address_received.happened(addr[0])
+
+@defer.inlineCallbacks
+def _discover_multicast():
 	"""
 	Local IP discovery protocol via multicast:
 		- Broadcast 3 ping multicast packet with "ping" in it
 		- Wait for an answer
-		- Retreive the ip address from the returning packet, which is ours
+		- Retrieve the ip address from the returning packet, which is ours
 	"""
-	def __init__(self, *args, **kwargs):
-		super(LocalNetworkMulticast, self).__init__(*args, **kwargs)
-		
-		# Nothing found yet
-		self.completed = False
-		self.result = defer.Deferred()
-		
-	def discover(self):
-		"""
-		Launch the discovery of an UPnP device on the local network. You should
-		always call this after having created the object.
-		
-		>>> result = LocalNetworkMulticast().discover().addCallback(got_upnpdevice_ip)
-		
-		@return: A deferred called with the IP address of the UPnP device
-		@rtype: L{twisted.internet.defer.Deferred}
-		"""
-		#The port we listen on
-		mcast_port = 0
-		#The result of listenMulticast
-		mcast = None
-
-		# 5 different UDP ports
-		ports = [11000+random.randint(0, 5000) for port in range(5)]
-		for attempt, port in enumerate(ports):
-			try:
-				mcast = reactor.listenMulticast(port, self)
-				mcast_port = port
-				break
-			except CannotListenError:
-				if attempt < 5:
-					print "Trying another multicast UDP port", port
-				else:
-					raise
-		
-		logging.debug("Sending multicast ping")
-		mcast.joinGroup('239.255.255.250', socket.INADDR_ANY)
-		self.transport.write('ping', ('239.255.255.250', mcast_port))
-		self.transport.write('ping', ('239.255.255.250', mcast_port))
-		self.transport.write('ping', ('239.255.255.250', mcast_port))
-		return self.result
-
-	def datagramReceived(self, dgram, addr):
-		"""Datagram received, we callback the IP address."""
-		logging.debug("Received multicast pong: %s; addr:%r", dgram, addr)
-		if self.completed or dgram != 'ping':
-			# Result already handled, do nothing
-			return
+	
+	nonce = str(random.randrange(2**64))
+	p = _LocalNetworkMulticast(nonce)
+	
+	# 5 different UDP ports
+	ports = [11000+random.randint(0, 5000) for port in range(5)]
+	for attempt, port in enumerate(ports):
+		try:
+			mcast = reactor.listenMulticast(port, p)
+			mcast_port = port
+		except CannotListenError:
+			if attempt < 5:
+				print "Trying another multicast UDP port", port
+			else:
+				raise
 		else:
-			self.completed = True
-			# Return the upn device ip address
-			self.result.callback(addr[0])
+			break
+	
+	try:
+		yield mcast.joinGroup('239.255.255.250', socket.INADDR_ANY)
+		
+		try:
+			logging.debug("Sending multicast ping")
+			for i in xrange(3):
+				p.transport.write(nonce, ('239.255.255.250', mcast_port))
+			
+	        	address, = yield p.address_received.get_deferred(5)
+		finally:
+			mcast.leaveGroup('239.255.255.250', socket.INADDR_ANY)
+	finally:
+		mcast.stopListening()
+	
+	defer.returnValue(address)
