@@ -605,6 +605,17 @@ def run():
     
     if args.debug:
         p2pool_init.DEBUG = True
+        class ReopeningFile(object):
+            def __init__(self, *open_args, **open_kwargs):
+                self.open_args, self.open_kwargs = open_args, open_kwargs
+                self.inner_file = open(*self.open_args, **self.open_kwargs)
+            def reopen(self):
+                self.inner_file.close()
+                self.inner_file = open(*self.open_args, **self.open_kwargs)
+            def write(self, data):
+                self.inner_file.write(data)
+            def flush(self):
+                self.inner_file.flush()
         class TeePipe(object):
             def __init__(self, outputs):
                 self.outputs = outputs
@@ -628,7 +639,9 @@ def run():
                 self.buf = lines[-1]
             def flush(self):
                 pass
-        sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, open(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')]))
+        logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
+        sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
+        signal.signal(signal.SIG_USR1, logfile.reopen)
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
