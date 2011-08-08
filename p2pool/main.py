@@ -374,13 +374,14 @@ def main(args):
                 block = dict(header=header, txs=transactions)
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
                 if hash_ <= block['header']['target'] or p2pool_init.DEBUG:
-                    print
-                    print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
-                    print
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=block)
                     else:
                         print 'No bitcoind connection! Erp!'
+                    if hash_ <= block['header']['target']:
+                        print
+                        print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
+                        print
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
                 if hash_ > target:
                     print 'Received invalid share from worker - %x/%x' % (hash_, target)
