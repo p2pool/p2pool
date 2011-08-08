@@ -540,7 +540,7 @@ def main(args):
                             len(shares_in_chain) + len(stale_shares),
                             len(stale_shares),
                             len(p2p_node.peers),
-                        )
+                        ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool_init.DEBUG else '')
                         #weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 100), 2**100)
                         #for k, v in weights.iteritems():
                         #    print k.encode('hex'), v/total_weight
