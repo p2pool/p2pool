@@ -17,6 +17,7 @@ from twisted.internet import reactor, defer
 from twisted.web import client
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.error import CannotListenError
+from twisted.python import failure
 
 from nattraverso.pynupnp.soap import SoapProxy
 from nattraverso.pynupnp.upnpxml import UPnPXml
