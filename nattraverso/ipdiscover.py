@@ -12,16 +12,18 @@ TODO: Example
 
 __revision__ = "$id"
 
-import random, socket, logging
+import random, socket, logging, itertools
 
 from twisted.internet import defer, reactor
 
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.error import CannotListenError
 from twisted.internet.interfaces import IReactorMulticast
+from twisted.python import log
 
 from nattraverso.utils import is_rfc1918_ip, is_bogus_ip
 
+@defer.inlineCallbacks
 def get_local_ip():
     """
     Returns a deferred which will be called with a
@@ -37,10 +39,27 @@ def get_local_ip():
     """
     # first we try a connected udp socket, then via multicast
     logging.debug("Resolving dns to get udp ip")
-    result = reactor.resolve('A.ROOT-SERVERS.NET')
-    result.addCallbacks(_get_via_connected_udp, lambda x:_get_via_multicast())
-    return result
+    try:
+        ipaddr = yield reactor.resolve('A.ROOT-SERVERS.NET')
+    except:
+        pass
+    else:
+        udpprot = DatagramProtocol()
+        port = reactor.listenUDP(0, udpprot)
+        udpprot.transport.connect(ipaddr, 7)
+        localip = udpprot.transport.getHost().host
+        port.stopListening()
+        
+        if is_bogus_ip(localip):
+            raise RuntimeError, "Invalid IP address returned"
+        else:
+            defer.returnValue((is_rfc1918_ip(localip), localip))
+    
+    logging.debug("Multicast ping to retrieve local IP")
+    ipaddr = yield _discover_multicast()
+    defer.returnValue((is_rfc1918_ip(ipaddr), ipaddr))
 
+@defer.inlineCallbacks
 def get_external_ip():
     """
     Returns a deferred which will be called with a
@@ -54,97 +73,21 @@ def get_external_ip():
     @return: A deferred called with the above defined tuple
     @rtype: L{twisted.internet.defer.Deferred}
     """
-    return get_local_ip().addCallbacks(_on_local_ip, _on_no_local_ip)
-
-#Private----------
-def _on_upnp_external_found(ipaddr):
-    """
-    Called when an external ip is found through UPNP.
     
-    @param ipaddr: The WAN ip address
-    @type ipaddr: an IP string "x.x.x.x"
-    """
-    return (True, ipaddr)
-
-def _on_no_upnp_external_found(error, ipaddr):
-    """
-    Called when the UPnP device failed to return external address.
-    
-    @param ipaddr: The LAN ip address
-    @type ipaddr: an IP string "x.x.x.x"
-    """
-    return (False, ipaddr)
-
-def _on_local_ip(result):
-    """
-    Called when we got the local ip of this machine. If we have a WAN address,
-    we return immediately, else we try to discover ip address through UPnP.
-    
-    @param result: a tuple (lan_flag, ip_addr)
-    @type result: a tuple (bool, ip string)
-    """
-    local, ipaddr = result
-    if not local:
-        return (True, ipaddr)
-    else:
-        logging.debug("Got local ip, trying to use upnp to get WAN ip")
-        import nattraverso.pynupnp
-        return nattraverso.pynupnp.get_external_ip().addCallbacks(
-            _on_upnp_external_found,
-            lambda x: _on_no_upnp_external_found(x, ipaddr))
-
-def _on_no_local_ip(error):
-    """
-    Called when we could not retreive by any mean the ip of this machine.
-    We simply assume there is no connectivity, and return localhost address.
-    """
-    return (None, "127.0.0.1")
-
-def _got_multicast_ip(ipaddr):
-    """
-    Called when we received the ip address via udp multicast.
-    
-    @param ipaddr: an ip address
-    @type ipaddr: a string "x.x.x.x"
-    """
-    return (is_rfc1918_ip(ipaddr), ipaddr)
-
-def _get_via_multicast():
-    """
-    Init a multicast ip address discovery.
-    
-    @return: A deferred called with the discovered ip address
-    @rtype: L{twisted.internet.defer.Deferred}
-    @raise Exception: When an error occurs during the multicast engine init
-    """
     try:
-        # Init multicast engine
-        IReactorMulticast(reactor)
+        local, ipaddr = yield get_local_ip()
     except:
-        raise
-    
-    logging.debug("Multicast ping to retrieve local IP")
-    return _discover_multicast().addCallback(_got_multicast_ip)
-
-def _get_via_connected_udp(ipaddr):
-    """
-    Init a UDP socket ip discovery. We do a dns query, and retreive our
-    ip address from the connected udp socket.
-    
-    @param ipaddr: The ip address of a dns server
-    @type ipaddr: a string "x.x.x.x"
-    @raise RuntimeError: When the ip is a bogus ip (0.0.0.0 or alike)
-    """
-    udpprot = DatagramProtocol()
-    port = reactor.listenUDP(0, udpprot)
-    udpprot.transport.connect(ipaddr, 7)
-    localip = udpprot.transport.getHost().host
-    port.stopListening()
-    
-    if is_bogus_ip(localip):
-        raise RuntimeError, "Invalid IP address returned"
+        defer.returnValue((None, "127.0.0.1"))
+    if not local:
+        defer.returnValue((True, ipaddr))
+    logging.debug("Got local ip, trying to use upnp to get WAN ip")
+    import nattraverso.pynupnp
+    try:
+        ipaddr2 = yield nattraverso.pynupnp.get_external_ip()
+    except:
+        defer.returnValue((False, ipaddr))
     else:
-        return (is_rfc1918_ip(localip), localip)
+        defer.returnValue((True, ipaddr2))
 
 class _LocalNetworkMulticast(DatagramProtocol):
     def __init__(self, nonce):
@@ -172,31 +115,25 @@ def _discover_multicast():
     nonce = str(random.randrange(2**64))
     p = _LocalNetworkMulticast(nonce)
     
-    # 5 different UDP ports
-    ports = [11000+random.randint(0, 5000) for port in range(5)]
-    for attempt, port in enumerate(ports):
+    for attempt in itertools.count():
+        port = 11000 + random.randint(0, 5000)
         try:
             mcast = reactor.listenMulticast(port, p)
-            mcast_port = port
         except CannotListenError:
-            if attempt < 5:
-                print "Trying another multicast UDP port", port
-            else:
+            if attempt >= 10:
                 raise
+            continue
         else:
             break
     
     try:
         yield mcast.joinGroup('239.255.255.250', socket.INADDR_ANY)
         
-        try:
-            logging.debug("Sending multicast ping")
-            for i in xrange(3):
-                p.transport.write(nonce, ('239.255.255.250', mcast_port))
-            
-            address, = yield p.address_received.get_deferred(5)
-        finally:
-            mcast.leaveGroup('239.255.255.250', socket.INADDR_ANY)
+        logging.debug("Sending multicast ping")
+        for i in xrange(3):
+            p.transport.write(nonce, ('239.255.255.250', port))
+        
+        address, = yield p.address_received.get_deferred(5)
     finally:
         mcast.stopListening()
     
