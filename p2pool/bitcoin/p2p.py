@@ -62,14 +62,12 @@ class BaseProtocol(protocol.Protocol):
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
-                    print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                    print 'INVALID HASH'
+                    print 'invalid hash for', repr(command), checksum.encode('hex') if checksum is not None else None, repr(payload[:100].encode('hex')), len(payload)
                     continue
             
             type_ = getattr(self, 'message_' + command, None)
             if type_ is None:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print 'NO TYPE FOR', repr(command)
+                print 'no type for', repr(command)
                 continue
             
             try:
@@ -81,16 +79,13 @@ class BaseProtocol(protocol.Protocol):
             
             handler = getattr(self, 'handle_' + command, None)
             if handler is None:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print 'NO HANDLER FOR', command
+                print 'no handler for', repr(command)
                 continue
-            
-            #print 'RECV', command, repr(payload2)[:500]
             
             try:
                 handler(**payload2)
             except:
-                print 'RECV', command, len(payload), checksum.encode('hex')[:1000]
+                print 'RECV', command, repr(payload2)[:100]
                 log.err(None, 'Error handling message: (see RECV line)')
                 continue
     
