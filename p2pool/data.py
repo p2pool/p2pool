@@ -381,7 +381,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 start = time.time()
                 for aftertail in list(self.reverse_shares.get(tail, set())):
                     self.remove(aftertail)
-                    if tail in self.verified.shares:
+                    if aftertail in self.verified.shares:
                         self.verified.remove(aftertail)
                     removed = True
                 end = time.time()
