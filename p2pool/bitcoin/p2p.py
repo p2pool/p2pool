@@ -294,7 +294,7 @@ class Protocol(BaseProtocol):
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol
     
-    maxDelay = 15
+    maxDelay = 1
     
     def __init__(self, net):
         self.net = net
