@@ -164,6 +164,7 @@ def main(args):
         yield set_real_work1()
         set_real_work2()
         print '    ...success!'
+        print
         
         start_time = time.time() - current_work2.value['clock_offset']
         
