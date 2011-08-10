@@ -362,19 +362,23 @@ class OkayTracker(bitcoin_data.Tracker):
                 )
         
         # eat away at heads
-        while True:
-            removed = False
-            for share_hash in list(self.heads):
-                if share_hash in scores[-5:]:
-                    continue
-                if self.shares[share_hash].time_seen > time.time() - 30:
-                    continue
-                self.remove(share_hash)
-                if share_hash in self.verified.shares:
-                    self.verified.remove(share_hash)
-                removed = True
-            if not removed:
-                break
+        if scores:
+            while True:
+                to_remove = set()
+                for share_hash, tail in self.heads.iteritems():
+                    if share_hash in scores[-5:]:
+                        continue
+                    if self.shares[share_hash].time_seen > time.time() - 30:
+                        continue
+                    if max(self.shares[before_tail_hash].time_seen for before_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120:
+                        continue
+                    to_remove.add(share_hash)
+                for share_hash in to_remove:
+                    self.remove(share_hash)
+                    if share_hash in self.verified.shares:
+                        self.verified.remove(share_hash)
+                if not to_remove:
+                    break
         
         # drop tails
         while True:
