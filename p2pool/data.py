@@ -4,13 +4,12 @@ import itertools
 import random
 import time
 
-from twisted.internet import defer
 from twisted.python import log
 
 import p2pool
 from p2pool import skiplists
 from p2pool.bitcoin import data as bitcoin_data, script
-from p2pool.util import memoize, expiring_dict, math, deferral
+from p2pool.util import memoize, expiring_dict, math
 
 
 merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
@@ -279,7 +278,7 @@ class OkayTracker(bitcoin_data.Tracker):
         self.verified = bitcoin_data.Tracker()
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
-
+    
     def add(self, share, known_verified=False):
         bitcoin_data.Tracker.add(self, share)
         if known_verified:

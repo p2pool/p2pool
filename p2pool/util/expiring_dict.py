@@ -1,6 +1,5 @@
 from __future__ import division
 
-import random
 import time
 
 from twisted.internet import task

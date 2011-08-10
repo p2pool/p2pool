@@ -18,8 +18,6 @@ from twisted.internet import defer, reactor
 
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.error import CannotListenError
-from twisted.internet.interfaces import IReactorMulticast
-from twisted.python import log
 
 from nattraverso.utils import is_rfc1918_ip, is_bogus_ip
 

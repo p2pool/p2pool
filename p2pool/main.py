@@ -310,7 +310,7 @@ def main(args):
         
         if args.upnp:
             upnp_thread()
-         
+        
         # start listening for workers with a JSON-RPC server
         
         print 'Listening for workers on port %i...' % (args.worker_port,)

@@ -1,13 +1,11 @@
 import pygame
-import random
 import time
-import itertools
 import hashlib
 import math
 import StringIO
 from PIL import Image
 
-from p2pool.util.vector import v, Vector
+from p2pool.util.vector import v
 
 @apply
 class color(object):
@@ -21,9 +19,9 @@ def get_uniform(bound, *data):
     return x % bound
 
 def get_pos(share, t, d):
-        x = 5 + get_uniform(d.get_width() - 10, share.hash, "pos")
-        y = d.get_height() - (t - share.time_seen)*10
-        return v(x, y)
+    x = 5 + get_uniform(d.get_width() - 10, share.hash, "pos")
+    y = d.get_height() - (t - share.time_seen)*10
+    return v(x, y)
 
 def get_color(data):
     return [get_uniform(256, data, x) for x in "rgb"]

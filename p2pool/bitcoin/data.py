@@ -1,11 +1,10 @@
 from __future__ import division
 
 import hashlib
-import itertools
 import struct
 
 from . import base58, skiplists
-from p2pool.util import bases, math, skiplist, variable
+from p2pool.util import bases, math, variable
 import p2pool
 
 class EarlyEnd(Exception):

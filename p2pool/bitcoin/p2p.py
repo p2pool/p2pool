@@ -317,7 +317,7 @@ class HeaderWrapper(object):
     @classmethod
     def from_header(cls, header):
         return cls(bitcoin_data.block_header_type.hash256(header), header['previous_block'])
-
+    
     def __init__(self, hash, previous_hash):
         self.hash, self.previous_hash = hash, previous_hash
 
@@ -348,21 +348,21 @@ class HeightTracker(object):
     def _load_backing(self):
         open(self.backing, 'ab').close()
         with open(self.backing, 'rb') as f:
-          count = 0
-          for line in f:
-            try:
-                hash, previous_hash, checksum = (int(x, 16) for x in line.strip().split(' '))
-            except Exception:
-                print "skipping over bad data in headers.dat"
-            else:
-                if (hash - previous_hash) % 2**256 != checksum:
-                   print "checksum failed"
-                   continue
-                if previous_hash == 0: previous_hash = None
-                count += 1
-                if count % 10000 == 0 and count: print count
-                if hash not in self.tracker.shares:
-                    self.tracker.add(HeaderWrapper(hash, previous_hash))
+            count = 0
+            for line in f:
+                try:
+                    hash, previous_hash, checksum = (int(x, 16) for x in line.strip().split(' '))
+                except Exception:
+                    print "skipping over bad data in headers.dat"
+                else:
+                    if (hash - previous_hash) % 2**256 != checksum:
+                        print "checksum failed"
+                        continue
+                    if previous_hash == 0: previous_hash = None
+                    count += 1
+                    if count % 10000 == 0 and count: print count
+                    if hash not in self.tracker.shares:
+                        self.tracker.add(HeaderWrapper(hash, previous_hash))
     
     def think(self):
         highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
