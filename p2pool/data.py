@@ -432,6 +432,7 @@ class Mainnet(bitcoin_data.Mainnet):
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    HEADERSTORE_FILENAME = 'headers.dat'
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -445,3 +446,4 @@ class Testnet(bitcoin_data.Testnet):
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    HEADERSTORE_FILENAME = 'testnet_headers.dat'

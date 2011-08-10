@@ -311,19 +311,23 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return self.conn.get_not_none()
 
 class HeaderWrapper(object):
-    target = 0
+    target = 2**256 - 1
     __slots__ = 'hash previous_hash'.split(' ')
     
-    def __init__(self, header):
-        self.hash = bitcoin_data.block_header_type.hash256(header)
-        self.previous_hash = header['previous_block']
+    @classmethod
+    def from_header(cls, header):
+        return cls(bitcoin_data.block_header_type.hash256(header), header['previous_block'])
+
+    def __init__(self, hash, previous_hash):
+        self.hash, self.previous_hash = hash, previous_hash
 
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, factory):
+    def __init__(self, factory, backing):
         self.factory = factory
         self.tracker = bitcoin_data.Tracker()
+        self.backing = backing
         self.most_recent = None
         
         self._watch1 = self.factory.new_headers.watch(self.heard_headers)
@@ -337,7 +341,28 @@ class HeightTracker(object):
         
         self.updated = variable.Event()
         
+        self._load_backing()
+        
         self.think()
+    
+    def _load_backing(self):
+        open(self.backing, 'ab').close()
+        with open(self.backing, 'rb') as f:
+          count = 0
+          for line in f:
+            try:
+                hash, previous_hash, checksum = (int(x, 16) for x in line.strip().split(' '))
+            except Exception:
+                print "skipping over bad data in headers.dat"
+            else:
+                if (hash - previous_hash) % 2**256 != checksum:
+                   print "checksum failed"
+                   continue
+                if previous_hash == 0: previous_hash = None
+                count += 1
+                if count % 10000 == 0 and count: print count
+                if hash not in self.tracker.shares:
+                    self.tracker.add(HeaderWrapper(hash, previous_hash))
     
     def think(self):
         highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
@@ -371,12 +396,16 @@ class HeightTracker(object):
     
     def heard_headers(self, headers):
         changed = False
+        b = open(self.backing, 'ab')
         for header in headers:
-            hw = HeaderWrapper(header)
+            hw = HeaderWrapper.from_header(header)
             if hw.hash in self.tracker.shares:
                 continue
             changed = True
             self.tracker.add(hw)
+            hash, prev = hw.hash, 0 if hw.previous_hash is None else hw.previous_hash
+            b.write('%x %x %x\n' % (hash, prev, (hash - prev) % 2**256))
+        b.close()
         if changed:
             self.updated.happened()
         self.think()

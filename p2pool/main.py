@@ -87,7 +87,10 @@ def main(args):
         print '    Payout script:', my_script.encode('hex')
         print
         
-        ht = bitcoin.p2p.HeightTracker(factory)
+        print 'Loading cached block headers...'
+        ht = bitcoin.p2p.HeightTracker(factory, args.net.HEADERSTORE_FILENAME)
+        print '   ...done loading %i cached block headers.' % (len(ht.tracker.shares),)
+        print
         
         tracker = p2pool.OkayTracker(args.net)
         chains = expiring_dict.ExpiringDict(300)
