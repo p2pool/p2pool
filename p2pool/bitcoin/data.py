@@ -643,6 +643,10 @@ class Tracker(object):
         height, work, last = self.get_height_work_and_last(share_hash)
         return work
     
+    def get_last(self, share_hash):
+        height, work, last = self.get_height_work_and_last(share_hash)
+        return last
+    
     def get_height_and_last(self, share_hash):
         height, work, last = self.get_height_work_and_last(share_hash)
         return height, last
