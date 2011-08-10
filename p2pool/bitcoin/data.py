@@ -573,6 +573,7 @@ class Tracker(object):
         else:
             raise NotImplementedError()
         
+        to_remove = set()
         for share_hash2 in self.heights:
             height_to, other_share_hash, work_inc = self.heights[share_hash2]
             if other_share_hash != share.previous_hash:
@@ -584,7 +585,9 @@ class Tracker(object):
                 work_inc -= target_to_average_attempts(share.target)
                 self.heights[share_hash2] = height_to, other_share_hash, work_inc
             else:
-                del self.heights[share_hash2]
+                to_remove.add(share_hash2)
+        for share_hash2 in to_remove:
+            del self.heights[share_hash2]
         if share.hash in self.heights:
             del self.heights[share.hash]
         
