@@ -279,6 +279,11 @@ class OkayTracker(bitcoin_data.Tracker):
         self.verified = bitcoin_data.Tracker()
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
+
+    def add(self, share, known_verified=False):
+        bitcoin_data.Tracker.add(self, share)
+        if known_verified:
+            self.verified.add(share)
     
     def attempt_verify(self, share, now):
         if share.hash in self.verified.shares:

@@ -5,7 +5,7 @@ import itertools
 import struct
 
 from . import base58, skiplists
-from p2pool.util import bases, math, skiplist
+from p2pool.util import bases, math, skiplist, variable
 import p2pool
 
 class EarlyEnd(Exception):
@@ -481,6 +481,9 @@ class Tracker(object):
         '''
         
         self.get_nth_parent_hash = skiplists.DistanceSkipList(self)
+        
+        self.added = variable.Event()
+        self.removed = variable.Event()
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
@@ -523,6 +526,8 @@ class Tracker(object):
         
         for head in heads:
             self.heads[head] = tail
+        
+        self.added.happened(share)
     
     def test(self):
         t = Tracker()
@@ -625,6 +630,7 @@ class Tracker(object):
             self.reverse_shares.pop(share.previous_hash)
         
         #assert self.test() is None
+        self.removed.happened(share)
     
     def get_height(self, share_hash):
         height, work, last = self.get_height_work_and_last(share_hash)
