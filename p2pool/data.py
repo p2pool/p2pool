@@ -278,6 +278,7 @@ class OkayTracker(bitcoin_data.Tracker):
         bitcoin_data.Tracker.__init__(self)
         self.net = net
         self.verified = bitcoin_data.Tracker()
+        self.verified.get_nth_parent_hash = self.get_nth_parent_hash # self is a superset of self.verified
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
     
