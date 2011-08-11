@@ -218,6 +218,7 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
 
 def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
     height, last = tracker.get_height_and_last(previous_share_hash)
+    assert height >= net.CHAIN_LENGTH + 1 or last is None
     if height < net.TARGET_LOOKBEHIND:
         target = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
     else:
@@ -288,7 +289,7 @@ class OkayTracker(bitcoin_data.Tracker):
         if share.hash in self.verified.shares:
             return True
         height, last = self.get_height_and_last(share.hash)
-        if height < self.net.CHAIN_LENGTH and last is not None:
+        if height < self.net.CHAIN_LENGTH + 1 and last is not None:
             raise AssertionError()
         try:
             share.check(self, now, self.net)
