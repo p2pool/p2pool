@@ -1,6 +1,7 @@
 from __future__ import division
 
 import hashlib
+import itertools
 import struct
 
 from . import base58, skiplists
@@ -472,12 +473,12 @@ class Tracker(object):
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
         
-        self.heights = {} # share_hash -> height_to, other_share_hash
+        self.heights = {} # share_hash -> height_to, ref, work_inc
+        self.reverse_heights = {} # ref -> set of share_hashes
         
-        '''
-        self.id_generator = itertools.count()
-        self.tails_by_id = {}
-        '''
+        self.ref_generator = itertools.count()
+        self.height_refs = {} # ref -> height, share_hash, work_inc
+        self.reverse_height_refs = {} # share_hash -> ref
         
         self.get_nth_parent_hash = skiplists.DistanceSkipList(self)
         
@@ -489,23 +490,6 @@ class Tracker(object):
         if share.hash in self.shares:
             raise ValueError('share already present')
         
-        '''
-        parent_id = self.ids.get(share.previous_hash, None)
-        children_ids = set(self.ids.get(share2_hash) for share2_hash in self.reverse_shares.get(share.hash, set()))
-        infos = set()
-        if parent_id is not None:
-            infos.add((parent_id[0], parent_id[1] + 1))
-        for child_id in children_ids:
-            infos.add((child_id[0], child_id[1] - 1))
-        if not infos:
-            infos.add((self.id_generator.next(), 0))
-        chosen = min(infos)
-        self.ids[share.hash] = chosen
-        '''
-        
-        self.shares[share.hash] = share
-        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
-        
         if share.hash in self.tails:
             heads = self.tails.pop(share.hash)
         else:
@@ -514,10 +498,14 @@ class Tracker(object):
         if share.previous_hash in self.heads:
             tail = self.heads.pop(share.previous_hash)
         else:
-            #dist, tail = self.get_height_and_last(share.previous_hash) # XXX this should be moved out of the critical area even though it shouldn't matter
-            tail = share.previous_hash
-            while tail in self.shares:
-                tail = self.shares[tail].previous_hash
+            tail = self.get_last(share.previous_hash)
+            #tail2 = share.previous_hash
+            #while tail2 in self.shares:
+            #    tail2 = self.shares[tail2].previous_hash
+            #assert tail == tail2
+        
+        self.shares[share.hash] = share
+        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
         
         self.tails.setdefault(tail, set()).update(heads)
         if share.previous_hash in self.tails[tail]:
@@ -542,9 +530,17 @@ class Tracker(object):
         assert isinstance(share_hash, (int, long, type(None)))
         if share_hash not in self.shares:
             raise KeyError()
+        
         share = self.shares[share_hash]
-        children = self.reverse_shares.get(share_hash, set())
         del share_hash
+        
+        children = self.reverse_shares.get(share.hash, set())
+        
+        # move height refs referencing children down to this, so they can be moved up in one step
+        if share.previous_hash in self.reverse_height_refs:
+            for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
+                self.get_last(x)
+            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
         
         if share.hash in self.heads and share.previous_hash in self.tails:
             tail = self.heads.pop(share.hash)
@@ -560,7 +556,6 @@ class Tracker(object):
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
         elif share.previous_hash in self.tails:
-            #raise NotImplementedError() # will break other things..
             heads = self.tails[share.previous_hash]
             if len(self.reverse_shares[share.previous_hash]) > 1:
                 raise NotImplementedError()
@@ -572,59 +567,25 @@ class Tracker(object):
         else:
             raise NotImplementedError()
         
-        to_remove = set()
-        for share_hash2 in self.heights:
-            height_to, other_share_hash, work_inc = self.heights[share_hash2]
-            if other_share_hash != share.previous_hash:
-                continue
-            assert children
-            if len(children) == 1:
-                height_to -= 1
-                other_share_hash = share.hash
-                work_inc -= target_to_average_attempts(share.target)
-                self.heights[share_hash2] = height_to, other_share_hash, work_inc
-            else:
-                to_remove.add(share_hash2)
-        for share_hash2 in to_remove:
-            del self.heights[share_hash2]
+        # move ref pointing to this up
+        if share.previous_hash in self.reverse_height_refs:
+            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set()))
+            
+            ref = self.reverse_height_refs[share.previous_hash]
+            cur_height, cur_hash, cur_work = self.height_refs[ref]
+            assert cur_hash == share.previous_hash
+            self.height_refs[ref] = cur_height - 1, share.hash, cur_work - target_to_average_attempts(share.target)
+            del self.reverse_height_refs[share.previous_hash]
+            self.reverse_height_refs[share.hash] = ref
+        
+        # delete height entry, and ref if it is empty
         if share.hash in self.heights:
-            del self.heights[share.hash]
-        
-        '''
-        height, tail = self.get_height_and_last(share.hash)
-        
-        if share.hash in self.heads:
-            my_heads = set([share.hash])
-        elif share.previous_hash in self.tails:
-            my_heads = self.tails[share.previous_hash]
-        else:
-            some_heads = self.tails[tail]
-            some_heads_heights = dict((that_head, self.get_height_and_last(that_head)[0]) for that_head in some_heads)
-            my_heads = set(that_head for that_head in some_heads
-                if some_heads_heights[that_head] > height and
-                self.get_nth_parent_hash(that_head, some_heads_heights[that_head] - height) == share.hash)
-        
-        if share.previous_hash != tail:
-            self.heads[share.previous_hash] = tail
-        
-        for head in my_heads:
-            if head != share.hash:
-                self.heads[head] = share.hash
-            else:
-                self.heads.pop(head)
-        
-        if share.hash in self.heads:
-            self.heads.pop(share.hash)
-        
-        
-        self.tails[tail].difference_update(my_heads)
-        if share.previous_hash != tail:
-            self.tails[tail].add(share.previous_hash)
-        if not self.tails[tail]:
-            self.tails.pop(tail)
-        if my_heads != set([share.hash]):
-            self.tails[share.hash] = set(my_heads) - set([share.hash])
-        '''
+            _, ref, _ = self.heights.pop(share.hash)
+            self.reverse_heights[ref].remove(share.hash)
+            if not self.reverse_heights[ref]:
+                del self.reverse_heights[ref]
+                _, ref_hash, _ = self.height_refs.pop(ref)
+                del self.reverse_height_refs[ref_hash]
         
         self.shares.pop(share.hash)
         self.reverse_shares[share.previous_hash].remove(share.hash)
@@ -650,24 +611,52 @@ class Tracker(object):
         height, work, last = self.get_height_work_and_last(share_hash)
         return height, last
     
+    def _get_height_jump(self, share_hash):
+        if share_hash in self.heights:
+            height_to1, ref, work_inc1 = self.heights[share_hash]
+            height_to2, share_hash, work_inc2 = self.height_refs[ref]
+            height_inc = height_to1 + height_to2
+            work_inc = work_inc1 + work_inc2
+        else:
+            height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, target_to_average_attempts(self.shares[share_hash].target)
+        return height_inc, share_hash, work_inc
+    
+    def _set_height_jump(self, share_hash, height_inc, other_share_hash, work_inc):
+        if other_share_hash not in self.reverse_height_refs:
+            ref = self.ref_generator.next()
+            assert ref not in self.height_refs
+            self.height_refs[ref] = 0, other_share_hash, 0
+            self.reverse_height_refs[other_share_hash] = ref
+            del ref
+        
+        ref = self.reverse_height_refs[other_share_hash]
+        ref_height_to, ref_share_hash, ref_work_inc = self.height_refs[ref]
+        assert ref_share_hash == other_share_hash
+        
+        if share_hash in self.heights:
+            prev_ref = self.heights[share_hash][1]
+            self.reverse_heights[prev_ref].remove(share_hash)
+            if not self.reverse_heights[prev_ref] and prev_ref != ref:
+                self.reverse_heights.pop(prev_ref)
+                _, x, _ = self.height_refs.pop(prev_ref)
+                self.reverse_height_refs.pop(x)
+        self.heights[share_hash] = height_inc - ref_height_to, ref, work_inc - ref_work_inc
+        self.reverse_heights.setdefault(ref, set()).add(share_hash)
+    
+    # XXX cache this
     def get_height_work_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
         orig = share_hash
         height = 0
         work = 0
         updates = []
-        while True:
-            if share_hash is None or share_hash not in self.shares:
-                break
+        while share_hash in self.shares:
             updates.append((share_hash, height, work))
-            if share_hash in self.heights:
-                height_inc, share_hash, work_inc = self.heights[share_hash]
-            else:
-                height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, target_to_average_attempts(self.shares[share_hash].target)
+            height_inc, share_hash, work_inc = self._get_height_jump(share_hash)
             height += height_inc
             work += work_inc
         for update_hash, height_then, work_then in updates:
-            self.heights[update_hash] = height - height_then, share_hash, work - work_then
+            self._set_height_jump(update_hash, height - height_then, share_hash, work - work_then)
         return height, work, share_hash
     
     def get_chain_known(self, start_hash):
