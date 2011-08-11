@@ -323,6 +323,8 @@ class OkayTracker(bitcoin_data.Tracker):
         for bad in bads:
             assert bad not in self.verified.shares
             assert bad in self.heads
+            if p2pool.DEBUG:
+                print "BAD", bad
             self.remove(bad)
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
@@ -352,8 +354,10 @@ class OkayTracker(bitcoin_data.Tracker):
         
         
         if p2pool.DEBUG:
-            print len(self.verified.tails.get(best_tail, []))
-            for h in scores:
+            print len(self.verified.tails.get(best_tail, [])), '\\/\\/\\/\\/\\/'
+            if len(scores) > 10:
+                print '    ...'
+            for h in scores[-10:]:
                 print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
                     self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
                     ht.get_min_height(self.verified.shares[h].previous_block),
