@@ -93,9 +93,19 @@ def main(args):
         print
         
         tracker = p2pool.OkayTracker(args.net)
-        chains = expiring_dict.ExpiringDict(300)
-        def get_chain(chain_id_data):
-            return chains.setdefault(chain_id_data, Chain(chain_id_data))
+        ss = p2pool.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), args.net.SHARESTORE_FILENAME), args.net)
+        print "Loading shares..."
+        for i, share in enumerate(ss.get_shares()):
+            if share.hash in tracker.shares:
+                continue
+            share.shared = True
+            share.stored = True
+            tracker.add(share, known_verified=True)
+            if len(tracker.shares) % 1000 == 0 and tracker.shares:
+                print "    %i" % (len(tracker.shares),)
+        print "    ...done!"
+        print
+        tracker.verified.added.watch(ss.add_share)
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         

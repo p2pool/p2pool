@@ -108,7 +108,7 @@ class Share(object):
     def from_share1b(cls, share1b):
         return cls(**share1b)
     
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared peer'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared stored peer'.split(' ')
     
     def __init__(self, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
@@ -159,6 +159,7 @@ class Share(object):
         # XXX eww
         self.time_seen = time.time()
         self.shared = False
+        self.stored = False
         self.peer = None
     
     def as_block(self, tracker, net):
@@ -444,6 +445,38 @@ def format_hash(x):
         return 'xxxxxxxx'
     return '%08x' % (x % 2**32)
 
+class ShareStore(object):
+    def __init__(self, filename, net):
+        self.filename = filename
+        self.net = net
+    
+    def get_shares(self):
+        open(self.filename, 'a').close() # make empty file if it doesn't exist
+        
+        with open(self.filename) as f:
+            for line in f:
+                try:
+                    type_id_str, data_hex = line.strip().split(' ')
+                    type_id, data = int(type_id_str), data_hex.decode('hex')
+                    if type_id == 0:
+                        share = Share.from_share1a(share1a_type.unpack(data))
+                    elif type_id == 1:
+                        share = Share.from_share1b(share1b_type.unpack(data))
+                    else:
+                        raise NotImplementedError("share type %i" % (type_id,))
+                    yield share
+                except Exception:
+                    log.err(None, "Error while reading saved shares, continuing where left off:")
+    
+    def add_share(self, share):
+        f = open(self.filename, 'a')
+        if share.bitcoin_hash <= share.header['target']:
+            type_id, data = 1, share1b_type.pack(share.as_share1b())
+        else:
+            type_id, data = 0, share1a_type.pack(share.as_share1a())
+        f.write("%i %s\n" % (type_id, data.encode('hex')))
+        f.close()
+
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
@@ -456,6 +489,7 @@ class Mainnet(bitcoin_data.Mainnet):
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    SHARESTORE_FILENAME = 'shares.dat'
     HEADERSTORE_FILENAME = 'headers.dat'
 
 class Testnet(bitcoin_data.Testnet):
@@ -470,4 +504,5 @@ class Testnet(bitcoin_data.Testnet):
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    SHARESTORE_FILENAME = 'testnet_shares.dat'
     HEADERSTORE_FILENAME = 'testnet_headers.dat'
