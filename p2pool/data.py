@@ -371,36 +371,47 @@ class OkayTracker(bitcoin_data.Tracker):
                 to_remove = set()
                 for share_hash, tail in self.heads.iteritems():
                     if share_hash in scores[-5:]:
+                        #print 1
                         continue
                     if self.shares[share_hash].time_seen > time.time() - 30:
+                        #print 2
                         continue
-                    if max(self.shares[before_tail_hash].time_seen for before_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120:
+                    if share_hash not in self.verified.shares and max(self.shares[after_tail_hash].time_seen for after_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120: # XXX stupid
+                        #print 3
                         continue
                     to_remove.add(share_hash)
+                if not to_remove:
+                    break
                 for share_hash in to_remove:
                     self.remove(share_hash)
                     if share_hash in self.verified.shares:
                         self.verified.remove(share_hash)
-                if not to_remove:
-                    break
+                #print "_________", to_remove
         
         # drop tails
         while True:
-            removed = False
-            # if removed from this, it must be removed from verified
-            for tail, heads in list(self.tails.iteritems()):
+            to_remove = set()
+            for tail, heads in self.tails.iteritems():
                 if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
                     continue
-                start = time.time()
-                for aftertail in list(self.reverse_shares.get(tail, set())):
-                    self.remove(aftertail)
-                    if aftertail in self.verified.shares:
-                        self.verified.remove(aftertail)
-                    removed = True
-                end = time.time()
-                print "removed! %x %f" % (tail, end - start)
-            if not removed:
+                for aftertail in self.reverse_shares.get(tail, set()):
+                    if len(self.reverse_shares[self.shares[aftertail].previous_hash]) > 1: # XXX
+                        print "raw"
+                        continue
+                    to_remove.add(aftertail)
+            if not to_remove:
                 break
+            # if removed from this, it must be removed from verified
+            #start = time.time()
+            for aftertail in to_remove:
+                if self.shares[aftertail].previous_hash not in self.tails:
+                    print "erk", aftertail, self.shares[aftertail].previous_hash
+                    continue
+                self.remove(aftertail)
+                if aftertail in self.verified.shares:
+                    self.verified.remove(aftertail)
+            #end = time.time()
+            #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
         
         best = scores[-1] if scores else None
         
