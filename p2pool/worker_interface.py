@@ -34,7 +34,7 @@ def get_memory(request):
     return 0
 
 def get_id(request):
-    return request.getClientIP(), request.getHeader('Authorization'), request.getHeader('User-Agent')
+    return request.getClientIP(), request.getHeader('Authorization')
 
 last_cache_invalidation = {} # XXX remove global
 holds = {}
