@@ -458,14 +458,15 @@ class ShareStore(object):
             for line in f:
                 try:
                     type_id_str, data_hex = line.strip().split(' ')
-                    type_id, data = int(type_id_str), data_hex.decode('hex')
+                    type_id = int(type_id_str)
                     if type_id == 0:
-                        share = Share.from_share1a(share1a_type.unpack(data))
+                        yield 'share', Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')))
                     elif type_id == 1:
-                        share = Share.from_share1b(share1b_type.unpack(data))
+                        yield 'share', Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')))
+                    elif type_id == 2:
+                        yield 'verified_hash', int(data_hex, 16)
                     else:
                         raise NotImplementedError("share type %i" % (type_id,))
-                    yield share
                 except Exception:
                     log.err(None, "Error while reading saved shares, continuing where left off:")
     
@@ -476,6 +477,11 @@ class ShareStore(object):
         else:
             type_id, data = 0, share1a_type.pack(share.as_share1a())
         f.write("%i %s\n" % (type_id, data.encode('hex')))
+        f.close()
+    
+    def add_verified_hash(self, share_hash):
+        f = open(self.filename, 'a')
+        f.write("%i %x\n" % (2, share_hash))
         f.close()
 
 class Mainnet(bitcoin_data.Mainnet):

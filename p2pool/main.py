@@ -94,18 +94,30 @@ def main(args):
         
         tracker = p2pool.OkayTracker(args.net)
         ss = p2pool.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), args.net.SHARESTORE_FILENAME), args.net)
+        known_verified = set()
         print "Loading shares..."
-        for i, share in enumerate(ss.get_shares()):
-            if share.hash in tracker.shares:
+        for i, (mode, contents) in enumerate(ss.get_shares()):
+            if mode == 'share':
+                if contents.hash in tracker.shares:
+                    continue
+                contents.shared = True
+                contents.stored = True
+                tracker.add(contents)
+                if len(tracker.shares) % 1000 == 0 and tracker.shares:
+                    print "    %i" % (len(tracker.shares),)
+            elif mode == 'verified_hash':
+                known_verified.add(contents)
+            else:
+                raise AssertionError()
+        print "    ...inserting %i verified shares..." % (len(known_verified),)
+        for h in known_verified:
+            if h not in tracker.shares:
                 continue
-            share.shared = True
-            share.stored = True
-            tracker.add(share, known_verified=True)
-            if len(tracker.shares) % 1000 == 0 and tracker.shares:
-                print "    %i" % (len(tracker.shares),)
-        print "    ...done!"
+            tracker.verified.add(tracker.shares[h])
+        print "    ...done loading %i shares!" % (len(tracker.shares),)
         print
-        tracker.verified.added.watch(ss.add_share)
+        tracker.added.watch(ss.add_share)
+        tracker.verified.added.watch(lambda share: ss.add_verified_hash(share.hash))
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         
