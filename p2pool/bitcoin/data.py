@@ -643,7 +643,6 @@ class Tracker(object):
         self.heights[share_hash] = height_inc - ref_height_to, ref, work_inc - ref_work_inc
         self.reverse_heights.setdefault(ref, set()).add(share_hash)
     
-    # XXX cache this
     def get_height_work_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
         orig = share_hash
