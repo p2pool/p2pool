@@ -410,7 +410,7 @@ def main(args):
                         print
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
                 if hash_ > target:
-                    print 'Received invalid share from worker - %x/%x' % (hash_, target)
+                    print 'Worker submitted share with hash (%x) > target (%x)' % (hash_, target)
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
