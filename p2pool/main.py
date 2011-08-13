@@ -13,8 +13,9 @@ import sys
 import time
 import json
 import signal
+import traceback
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, task
 from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -544,6 +545,15 @@ def main(args):
         
         work1_thread()
         work2_thread()
+        
+        
+        def watchdog_handler(signum, frame):
+            print "Watchdog timer went off at:"
+            traceback.print_exc()
+        
+        signal.signal(signal.SIGALRM, watchdog_handler)
+        task.LoopingCall(signal.alarm, 30).start(1)
+        
         
         counter = skiplists.CountsSkipList(tracker, run_identifier)
         
