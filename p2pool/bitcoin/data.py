@@ -155,9 +155,13 @@ class EnumType(Type):
     
     def read(self, file):
         data, file = self.inner.read(file)
+        if data not in self.keys:
+            raise ValueError('enum data (%r) not in values (%r)' % (data, self.values))
         return self.keys[data], file
     
     def write(self, file, item):
+        if item not in self.values:
+            raise ValueError('enum item (%r) not in values (%r)' % (item, self.values))
         return self.inner.write(file, self.values[item])
 
 class HashType(Type):
@@ -319,7 +323,7 @@ class FloatingIntegerType(Type):
         target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
         if p2pool.DEBUG:
             assert target == self._bits_to_target1(struct.pack('<I', bits2))
-            assert self._target_to_bits(target, _check=False) == bits2
+            assert self._target_to_bits(target, _check=False) == bits2, (target, self._target_to_bits(target, _check=False), bits2)
         return target
     
     def _bits_to_target1(self, bits):
