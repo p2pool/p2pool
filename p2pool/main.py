@@ -591,9 +591,12 @@ def main(args):
 def run():
     parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,))
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
+    parser.add_argument('--namecoin',
+        help='use namecoin instead of bitcoin',
+        action='store_const', const=True, default=False, dest='namecoin')
     parser.add_argument('--testnet',
         help='use the testnet',
-        action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
+        action='store_const', const=True, default=False, dest='testnet')
     parser.add_argument('--debug',
         help='debugging mode',
         action='store_const', const=True, default=False, dest='debug')
@@ -687,6 +690,13 @@ def run():
                 logfile.reopen()
                 print '''...and reopened 'debug.log' after catching SIGUSR1.'''
             signal.signal(signal.SIGUSR1, sigusr1)
+    
+    args.net = {
+        (False, False): p2pool.Mainnet,
+        (False, True): p2pool.Testnet,
+        (True, False): p2pool.NamecoinMainnet,
+        (True, True): p2pool.NamecoinTestnet,
+    }[args.namecoin, args.testnet]
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT

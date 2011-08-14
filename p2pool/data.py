@@ -7,7 +7,7 @@ import time
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists
+from p2pool import skiplists, namecoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -513,3 +513,34 @@ class Testnet(bitcoin_data.Testnet):
     PERSIST = False
     SHARESTORE_FILENAME = 'testnet_shares.dat'
     HEADERSTORE_FILENAME = 'testnet_headers.dat'
+
+class NamecoinMainnet(namecoin.NamecoinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    TARGET_LOOKBEHIND = 3600//10 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
+    IDENTIFIER = 'd5b1192062c4c454'.decode('hex')
+    PREFIX = 'b56f3d0fb24fc982'.decode('hex')
+    ADDRS_TABLE = 'addrs_namecoin'
+    P2P_PORT = 9334
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = True
+    SHARESTORE_FILENAME = 'namecoin_shares.dat'
+    HEADERSTORE_FILENAME = 'namecoin_headers.dat'
+
+class NamecoinTestnet(namecoin.NamecoinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = '8dd303d014a01a60'.decode('hex')
+    PREFIX = '4d6581d24f51acbf'.decode('hex')
+    ADDRS_TABLE = 'addrs_namecoin_testnet'
+    P2P_PORT = 19334
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
+    SHARESTORE_FILENAME = 'namecoin_testnet_shares.dat'
+    HEADERSTORE_FILENAME = 'namecoin_testnet_headers.dat'
+
