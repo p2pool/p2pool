@@ -68,6 +68,10 @@ def main(args):
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
+        good = yield args.net.BITCOIN_RPC_CHECK(bitcoind)
+        if not good:
+            print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
+            return
         temp_work, temp_height = yield getwork(bitcoind)
         print '    ...success!'
         print '    Current block hash: %x height: %i' % (temp_work.previous_block, temp_height)
@@ -265,6 +269,7 @@ def main(args):
                     if share.hash in stops:
                         break
                     shares.append(share)
+            print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
             peer.send_shares(shares, full=True)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
@@ -322,10 +327,9 @@ def main(args):
             while True:
                 try:
                     is_lan, lan_ip = yield ipdiscover.get_local_ip()
-                    if not is_lan:
-                        continue
-                    pm = yield portmapper.get_port_mapper()
-                    yield pm._upnp.add_port_mapping(lan_ip, args.net.P2P_PORT, args.net.P2P_PORT, 'p2pool', 'TCP')
+                    if is_lan:
+                        pm = yield portmapper.get_port_mapper()
+                        yield pm._upnp.add_port_mapping(lan_ip, args.p2pool_port, args.p2pool_port, 'p2pool', 'TCP') # XXX try to forward external correct port?
                 except:
                     if p2pool_init.DEBUG:
                         log.err(None, "UPnP error:")
@@ -348,6 +352,8 @@ def main(args):
                 payout_script = my_script
             if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
+            if len(p2p_node.peers) == 0 and args.net.PERSIST:
+                raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -586,14 +592,18 @@ def main(args):
                 log.err()
     except:
         log.err(None, 'Fatal error:')
+    finally:
         reactor.stop()
 
 def run():
     parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,))
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
+    parser.add_argument('--namecoin',
+        help='use namecoin instead of bitcoin',
+        action='store_const', const=True, default=False, dest='namecoin')
     parser.add_argument('--testnet',
         help='use the testnet',
-        action='store_const', const=p2pool.Testnet, default=p2pool.Mainnet, dest='net')
+        action='store_const', const=True, default=False, dest='testnet')
     parser.add_argument('--debug',
         help='debugging mode',
         action='store_const', const=True, default=False, dest='debug')
@@ -687,6 +697,13 @@ def run():
                 logfile.reopen()
                 print '''...and reopened 'debug.log' after catching SIGUSR1.'''
             signal.signal(signal.SIGUSR1, sigusr1)
+    
+    args.net = {
+        (False, False): p2pool.Mainnet,
+        (False, True): p2pool.Testnet,
+        (True, False): p2pool.NamecoinMainnet,
+        (True, True): p2pool.NamecoinTestnet,
+    }[args.namecoin, args.testnet]
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT

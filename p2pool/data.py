@@ -7,7 +7,7 @@ import time
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists
+from p2pool import skiplists, namecoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -221,14 +221,14 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
     if height < net.TARGET_LOOKBEHIND:
-        target = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
-        target = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block
@@ -421,7 +421,7 @@ class OkayTracker(bitcoin_data.Tracker):
             best_share = self.verified.shares[best]
             if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
-                    print 'Stale detected!'
+                    print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
         
         return best, desired
@@ -513,3 +513,34 @@ class Testnet(bitcoin_data.Testnet):
     PERSIST = False
     SHARESTORE_FILENAME = 'testnet_shares.dat'
     HEADERSTORE_FILENAME = 'testnet_headers.dat'
+
+class NamecoinMainnet(namecoin.NamecoinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    TARGET_LOOKBEHIND = 3600//10 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
+    IDENTIFIER = 'd5b1192062c4c454'.decode('hex')
+    PREFIX = 'b56f3d0fb24fc982'.decode('hex')
+    ADDRS_TABLE = 'addrs_namecoin'
+    P2P_PORT = 9334
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = True
+    SHARESTORE_FILENAME = 'namecoin_shares.dat'
+    HEADERSTORE_FILENAME = 'namecoin_headers.dat'
+
+class NamecoinTestnet(namecoin.NamecoinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = '8dd303d014a01a60'.decode('hex')
+    PREFIX = '4d6581d24f51acbf'.decode('hex')
+    ADDRS_TABLE = 'addrs_namecoin_testnet'
+    P2P_PORT = 19334
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
+    SHARESTORE_FILENAME = 'namecoin_testnet_shares.dat'
+    HEADERSTORE_FILENAME = 'namecoin_testnet_headers.dat'
+
