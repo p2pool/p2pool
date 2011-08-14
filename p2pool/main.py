@@ -596,7 +596,8 @@ def main(args):
         reactor.stop()
 
 def run():
-    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,))
+    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
+    parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--namecoin',
         help='use namecoin instead of bitcoin',
