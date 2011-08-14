@@ -421,7 +421,7 @@ class OkayTracker(bitcoin_data.Tracker):
             best_share = self.verified.shares[best]
             if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
-                    print 'Stale detected!'
+                    print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
         
         return best, desired
