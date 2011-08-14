@@ -349,6 +349,8 @@ def main(args):
                 payout_script = my_script
             if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
+            if len(p2p_node.peers) == 0 and args.net.PERSIST:
+                raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
