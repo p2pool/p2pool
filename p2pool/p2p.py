@@ -92,7 +92,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('nonce', bitcoin_data.StructType('<Q')),
         ('sub_version', bitcoin_data.VarStrType()),
         ('mode', bitcoin_data.StructType('<I')),
-        ('best_share_hash', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+        ('best_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version

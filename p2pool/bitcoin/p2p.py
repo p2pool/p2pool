@@ -212,12 +212,12 @@ class Protocol(BaseProtocol):
     message_getblocks = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     message_getheaders = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     message_getaddr = bitcoin_data.ComposedType([])
     message_checkorder = bitcoin_data.ComposedType([
@@ -265,7 +265,7 @@ class Protocol(BaseProtocol):
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
-        ('script', bitcoin_data.PossiblyNone('', bitcoin_data.VarStrType())),
+        ('script', bitcoin_data.PossiblyNoneType('', bitcoin_data.VarStrType())),
     ])
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))

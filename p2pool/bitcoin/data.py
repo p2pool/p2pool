@@ -379,7 +379,7 @@ class FloatingIntegerType(Type):
     def write(self, file, item):
         return self._inner.write(file, item._bits)
 
-class PossiblyNone(Type):
+class PossiblyNoneType(Type):
     def __init__(self, none_value, inner):
         self.none_value = none_value
         self.inner = inner
@@ -402,12 +402,12 @@ address_type = ComposedType([
 tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
-        ('previous_output', PossiblyNone(dict(hash=0, index=2**32 - 1), ComposedType([
+        ('previous_output', PossiblyNoneType(dict(hash=0, index=2**32 - 1), ComposedType([
             ('hash', HashType()),
             ('index', StructType('<I')),
         ]))),
         ('script', VarStrType()),
-        ('sequence', PossiblyNone(2**32 - 1, StructType('<I'))),
+        ('sequence', PossiblyNoneType(2**32 - 1, StructType('<I'))),
     ]))),
     ('tx_outs', ListType(ComposedType([
         ('value', StructType('<Q')),
@@ -418,7 +418,7 @@ tx_type = ComposedType([
 
 block_header_type = ComposedType([
     ('version', StructType('<I')),
-    ('previous_block', PossiblyNone(0, HashType())),
+    ('previous_block', PossiblyNoneType(0, HashType())),
     ('merkle_root', HashType()),
     ('timestamp', StructType('<I')),
     ('target', FloatingIntegerType()),

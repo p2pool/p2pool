@@ -19,7 +19,7 @@ merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
 
 
 share_data_type = bitcoin_data.ComposedType([
-    ('previous_share_hash', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ('target', bitcoin_data.FloatingIntegerType()),
     ('nonce', bitcoin_data.VarStrType()),
 ])
