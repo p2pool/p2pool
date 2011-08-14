@@ -1,4 +1,4 @@
-from .bitcoin import p2p as bitcoin_p2p
+from twisted.internet import defer
 
 class NamecoinMainnet(object):
     BITCOIN_P2P_PREFIX = 'f9beb4fe'.decode('hex')
