@@ -247,6 +247,8 @@ def get_record(fields):
     if fields not in _record_types:
         class _Record(object):
             __slots__ = fields
+            def __repr__(self):
+                return repr(dict(self))
             def __getitem__(self, key):
                 return getattr(self, key)
             def __setitem__(self, key, value):
