@@ -350,7 +350,7 @@ class OkayTracker(bitcoin_data.Tracker):
         scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             ht.get_min_height(self.verified.shares[h].previous_block),
-            self.verified.shares[h].peer is None,
+            #self.verified.shares[h].peer is None,
             -self.verified.shares[h].time_seen
         ))
         
@@ -419,7 +419,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
+            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block: # and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
