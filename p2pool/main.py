@@ -327,10 +327,9 @@ def main(args):
             while True:
                 try:
                     is_lan, lan_ip = yield ipdiscover.get_local_ip()
-                    if not is_lan:
-                        continue
-                    pm = yield portmapper.get_port_mapper()
-                    yield pm._upnp.add_port_mapping(lan_ip, args.p2pool_port, args.p2pool_port, 'p2pool', 'TCP') # XXX try to forward external correct port?
+                    if is_lan:
+                        pm = yield portmapper.get_port_mapper()
+                        yield pm._upnp.add_port_mapping(lan_ip, args.p2pool_port, args.p2pool_port, 'p2pool', 'TCP') # XXX try to forward external correct port?
                 except:
                     if p2pool_init.DEBUG:
                         log.err(None, "UPnP error:")
