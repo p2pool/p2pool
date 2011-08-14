@@ -221,14 +221,14 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
     if height < net.TARGET_LOOKBEHIND:
-        target = bitcoin_data.FloatingIntegerType().truncate_to(2**256//2**20 - 1)
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
-        target = bitcoin_data.FloatingIntegerType().truncate_to(pre_target3)
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
     max_weight = net.SPREAD * attempts_to_block

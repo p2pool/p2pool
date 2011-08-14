@@ -300,47 +300,80 @@ class ChecksummedType(Type):
         data = self.inner.pack(item)
         return (file, data), hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
 
-class FloatingIntegerType(Type):
-    # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
-    # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
-    _inner = StructType('<I')
+class FloatingInteger(object):
+    __slots__ = ['_bits']
     
-    def read(self, file):
-        bits, file = self._inner.read(file)
-        target = self._bits_to_target(bits)
-        if p2pool.DEBUG:
-            if self._target_to_bits(target) != bits:
-                raise ValueError('bits in non-canonical form')
-        return target, file
-    
-    def write(self, file, item):
-        return self._inner.write(file, self._target_to_bits(item))
-    
-    def truncate_to(self, x):
-        return self._bits_to_target(self._target_to_bits(x, _check=False))
-    
-    def _bits_to_target(self, bits2):
-        target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
-        if p2pool.DEBUG:
-            assert target == self._bits_to_target1(struct.pack('<I', bits2))
-            assert self._target_to_bits(target, _check=False) == bits2, (target, self._target_to_bits(target, _check=False), bits2)
-        return target
-    
-    def _bits_to_target1(self, bits):
-        bits = bits[::-1]
-        length = ord(bits[0])
-        return bases.string_to_natural((bits[1:] + '\0'*length)[:length])
-    
-    def _target_to_bits(self, target, _check=True):
+    @classmethod
+    def from_target_upper_bound(cls, target):
         n = bases.natural_to_string(target)
         if n and ord(n[0]) >= 128:
             n = '\x00' + n
         bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
         bits = struct.unpack('<I', bits2)[0]
-        if _check:
-            if self._bits_to_target(bits) != target:
-                raise ValueError(repr((target, self._bits_to_target(bits, _check=False))))
-        return bits
+        return cls(bits)
+    
+    def __init__(self, bits):
+        self._bits = bits
+    
+    @property
+    def _value(self):
+        return math.shift_left(self._bits & 0x00ffffff, 8 * ((self._bits >> 24) - 3))
+    
+    def __hash__(self):
+        return hash(self._value)
+    
+    def __cmp__(self, other):
+        if isinstance(other, FloatingInteger):
+            return cmp(self._value, other._value)
+        elif isinstance(other, (int, long)):
+            return cmp(self._value, other)
+        else:
+            raise NotImplementedError()
+    
+    def __int__(self):
+        return self._value
+    
+    def __repr__(self):
+        return 'FloatingInteger(bits=%s (%x))' % (hex(self._bits), self)
+    
+    def __add__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value + other
+        raise NotImplementedError()
+    __radd__ = __add__
+    def __mul__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value * other
+        raise NotImplementedError()
+    __rmul__ = __mul__
+    def __truediv__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value / other
+        raise NotImplementedError()
+    def __floordiv__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value // other
+        raise NotImplementedError()
+    __div__ = __truediv__
+    def __rtruediv__(self, other):
+        if isinstance(other, (int, long)):
+            return other / self._value
+        raise NotImplementedError()
+    def __rfloordiv__(self, other):
+        if isinstance(other, (int, long)):
+            return other // self._value
+        raise NotImplementedError()
+    __rdiv__ = __rtruediv__
+
+class FloatingIntegerType(Type):
+    _inner = StructType('<I')
+    
+    def read(self, file):
+        bits, file = self._inner.read(file)
+        return FloatingInteger(bits), file
+    
+    def write(self, file, item):
+        return self._inner.write(file, item._bits)
 
 class PossiblyNone(Type):
     def __init__(self, none_value, inner):
