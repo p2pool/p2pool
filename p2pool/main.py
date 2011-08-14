@@ -68,6 +68,10 @@ def main(args):
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
+        good = yield args.net.BITCOIN_RPC_CHECK(bitcoind)
+        if not good:
+            print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
+            return
         temp_work, temp_height = yield getwork(bitcoind)
         print '    ...success!'
         print '    Current block hash: %x height: %i' % (temp_work.previous_block, temp_height)
@@ -589,6 +593,7 @@ def main(args):
                 log.err()
     except:
         log.err(None, 'Fatal error:')
+    finally:
         reactor.stop()
 
 def run():
