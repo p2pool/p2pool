@@ -670,8 +670,8 @@ def run():
         help='connect to a bitcoind at this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332)',
-        type=int, action='store', default=8332, dest='bitcoind_rpc_port')
+        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332, 8338 for ixcoin)',
+        type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
         help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 normally. 18333 for testnet)',
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
@@ -738,6 +738,9 @@ def run():
         ('ixcoin', False): p2pool.IxcoinMainnet,
         ('ixcoin', True): p2pool.IxcoinTestnet,
     }[args.net_name, args.testnet]
+    
+    if args.bitcoind_rpc_port is None:
+        args.bitcoind_rpc_port = args.net.BITCOIN_RPC_PORT
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
