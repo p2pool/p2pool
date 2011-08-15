@@ -736,6 +736,14 @@ class Tracker(object):
     
     def get_highest_height(self):
         return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
+    
+    def is_child_of(self, share_hash, possible_child_hash):
+        height, last = self.get_height_and_last(share_hash)
+        child_height, child_last = self.get_height_and_last(possible_child_hash)
+        if child_last != last:
+            return None # not connected, so can't be determined
+        height_up = child_height - height
+        return height_up >= 0 and self.get_nth_parent_hash(possible_child_hash, height_up) == share_hash
 
 class FakeShare(object):
     def __init__(self, **kwargs):

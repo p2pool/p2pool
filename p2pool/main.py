@@ -343,12 +343,17 @@ def main(args):
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
         share_counter = skiplists.CountsSkipList(tracker, run_identifier)
+        removed_unstales = set()
         def get_share_counts():
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-            matching_in_chain = share_counter(current_work.value['best_share_hash'], height)
+            matching_in_chain = share_counter(current_work.value['best_share_hash'], height) | removed_unstales
             shares_in_chain = my_shares & matching_in_chain
             stale_shares = my_shares - matching_in_chain
             return len(shares_in_chain) + len(stale_shares), len(stale_shares)
+        @tracker.verified.removed.watch
+        def _(share):
+            if share.hash in my_shares and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
+                removed_unstales.add(share.hash)
         
         def compute(state, payout_script):
             if payout_script is None:
