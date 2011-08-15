@@ -28,16 +28,11 @@ import p2pool as p2pool_init
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
-def getwork(bitcoind):
+def getwork(bitcoind, ht):
     # a block could arrive in between these two queries
-    getwork_df, height_df = bitcoind.rpc_getwork(), bitcoind.rpc_getblocknumber()
-    try:
-        getwork, height = bitcoin.getwork.BlockAttempt.from_getwork((yield getwork_df)), (yield height_df)
-    finally:
-        # get rid of residual errors
-        getwork_df.addErrback(lambda fail: None)
-        height_df.addErrback(lambda fail: None)
-    defer.returnValue((getwork, height))
+    work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
+    height = ht.getHeight(work.previous_block)
+    defer.returnValue((work, height))
 
 @deferral.retry('Error getting payout script from bitcoind:', 1)
 @defer.inlineCallbacks
@@ -72,9 +67,9 @@ def main(args):
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
-        temp_work, temp_height = yield getwork(bitcoind)
+        temp_work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
         print '    ...success!'
-        print '    Current block hash: %x height: %i' % (temp_work.previous_block, temp_height)
+        print '    Current block hash: %x' % (temp_work.previous_block,)
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
@@ -137,7 +132,7 @@ def main(args):
         
         @defer.inlineCallbacks
         def set_real_work1():
-            work, height = yield getwork(bitcoind)
+            work, height = yield getwork(bitcoind, ht)
             changed = work.previous_block != current_work.value['previous_block'] if current_work.value is not None else True
             current_work.set(dict(
                 version=work.version,
