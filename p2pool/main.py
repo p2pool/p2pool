@@ -119,8 +119,8 @@ def main(args):
             tracker.verified.add(tracker.shares[h])
         print "    ...done loading %i shares!" % (len(tracker.shares),)
         print
-        tracker.added.watch(lambda share: threads.deferToThread(ss.add_share, share))
-        tracker.verified.added.watch(lambda share: threads.deferToThread(ss.add_verified_hash, share.hash))
+        tracker.added.watch(lambda share: ss.add_share(share))
+        tracker.verified.added.watch(lambda share: ss.add_verified_hash(share.hash))
         tracker.removed.watch(lambda share: ss.forget_share(share.hash))
         tracker.verified.removed.watch(lambda share: ss.forget_verified_share(share.hash))
         
