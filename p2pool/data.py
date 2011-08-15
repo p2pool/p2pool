@@ -555,7 +555,7 @@ class IxcoinMainnet(ixcoin.IxcoinMainnet):
     ADDRS_TABLE = 'addrs_ixcoin'
     P2P_PORT = 9335
     MAX_TARGET = 2**256//2**32 - 1
-    PERSIST = False
+    PERSIST = True
     SHARESTORE_FILENAME = 'ixcoin_shares.dat'
     HEADERSTORE_FILENAME = 'ixcoin_headers.dat'
 
