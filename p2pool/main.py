@@ -31,7 +31,10 @@ import p2pool as p2pool_init
 def getwork(bitcoind, ht):
     # a block could arrive in between these two queries
     work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
-    height = ht.getHeight(work.previous_block)
+    try:
+        height = ht.getHeight(work.previous_block)
+    except ValueError:
+        height = 1000 # XXX
     defer.returnValue((work, height))
 
 @deferral.retry('Error getting payout script from bitcoind:', 1)
