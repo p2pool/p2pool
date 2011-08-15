@@ -11,6 +11,7 @@ class NamecoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'NMC'
 
 class NamecoinTestnet(object):
     BITCOIN_P2P_PREFIX = 'fabfb5fe'.decode('hex')
@@ -23,3 +24,4 @@ class NamecoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'tNMC'

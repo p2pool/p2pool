@@ -807,6 +807,7 @@ class Mainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'BTC'
 
 class Testnet(object):
     BITCOIN_P2P_PREFIX = 'fabfb5da'.decode('hex')
@@ -819,3 +820,4 @@ class Testnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'tBTC'
