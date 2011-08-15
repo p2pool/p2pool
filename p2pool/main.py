@@ -146,6 +146,7 @@ def main(args):
             ))
             current_work2.set(dict(
                 clock_offset=time.time() - work.timestamp,
+                last_update=time.time(),
             ))
             if changed:
                 set_real_work2()
@@ -365,6 +366,8 @@ def main(args):
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             if len(p2p_node.peers) == 0 and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
+            if time.time() > current_work2.value['last_update'] + 60:
+                raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             pre_extra_txs = [tx for tx in tx_pool.itervalues() if tx.is_good()]
             pre_extra_txs = pre_extra_txs[:2**16 - 1] # merkle_branch limit
             extra_txs = []
@@ -555,7 +558,7 @@ def main(args):
                     yield set_real_work1()
                 except:
                     log.err()
-                yield defer.DeferredList([flag, deferral.sleep(random.expovariate(1/20))], fireOnOneCallback=True)
+                yield defer.DeferredList([flag, deferral.sleep(random.uniform(1, 10))], fireOnOneCallback=True)
         
         @defer.inlineCallbacks
         def work2_thread():
