@@ -91,12 +91,12 @@ def main(args):
         print
         
         print 'Loading cached block headers...'
-        ht = bitcoin.p2p.HeightTracker(factory, args.net.HEADERSTORE_FILENAME)
+        ht = bitcoin.p2p.HeightTracker(factory, args.net.NAME + '_headers.dat')
         print '   ...done loading %i cached block headers.' % (len(ht.tracker.shares),)
         print
         
         tracker = p2pool.OkayTracker(args.net)
-        ss = p2pool.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), args.net.SHARESTORE_FILENAME), args.net)
+        ss = p2pool.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), args.net.NAME + '_shares.'), args.net)
         known_verified = set()
         print "Loading shares..."
         for i, (mode, contents) in enumerate(ss.get_shares()):
@@ -301,7 +301,7 @@ def main(args):
             current_work=current_work,
             port=args.p2pool_port,
             net=args.net,
-            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), args.net.ADDRS_TABLE),
+            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), args.net.NAME),
             mode=0 if args.low_bandwidth else 1,
             preferred_addrs=set(map(parse, args.p2pool_nodes)) | nodes,
         )

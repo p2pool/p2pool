@@ -448,8 +448,8 @@ def format_hash(x):
     return '%08x' % (x % 2**32)
 
 class ShareStore(object):
-    def __init__(self, filename, net):
-        self.filename = filename + '.'
+    def __init__(self, prefix, net):
+        self.filename = prefix
         self.net = net
         self.known = None # will be filename -> set of share hashes, set of verified hashes
     
@@ -510,7 +510,7 @@ class ShareStore(object):
         verified_hashes.add(share_hash)
     
     def get_filenames_and_next(self):
-        suffixes = sorted(int(x[len(self.filename):]) for x in os.listdir('.') if x.startswith(self.filename))
+        suffixes = sorted(int(x[len(self.filename):]) for x in os.listdir('.') if x.startswith(self.filename) and x[len(self.filename):].isdigit())
         return [self.filename + str(suffix) for suffix in suffixes], self.filename + str(suffixes[-1] + 1) if suffixes else self.filename + str(0)
     
     def forget_share(self, share_hash):
@@ -545,12 +545,10 @@ class Mainnet(bitcoin_data.Mainnet):
     SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
     IDENTIFIER = 'fc70035c7a81bc6f'.decode('hex')
     PREFIX = '2472ef181efcd37b'.decode('hex')
-    ADDRS_TABLE = 'addrs'
+    NAME = 'bitcoin'
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
-    SHARESTORE_FILENAME = 'shares.dat'
-    HEADERSTORE_FILENAME = 'headers.dat'
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -560,12 +558,10 @@ class Testnet(bitcoin_data.Testnet):
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '5fc2be2d4f0d6bfb'.decode('hex')
     PREFIX = '3f6057a15036f441'.decode('hex')
-    ADDRS_TABLE = 'addrs_testnet'
+    NAME = 'bitcoin_testnet'
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
-    SHARESTORE_FILENAME = 'testnet_shares.dat'
-    HEADERSTORE_FILENAME = 'testnet_headers.dat'
 
 class NamecoinMainnet(namecoin.NamecoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -575,12 +571,10 @@ class NamecoinMainnet(namecoin.NamecoinMainnet):
     SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
     IDENTIFIER = 'd5b1192062c4c454'.decode('hex')
     PREFIX = 'b56f3d0fb24fc982'.decode('hex')
-    ADDRS_TABLE = 'addrs_namecoin'
+    NAME = 'namecoin'
     P2P_PORT = 9334
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
-    SHARESTORE_FILENAME = 'namecoin_shares.dat'
-    HEADERSTORE_FILENAME = 'namecoin_headers.dat'
 
 class NamecoinTestnet(namecoin.NamecoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -590,12 +584,10 @@ class NamecoinTestnet(namecoin.NamecoinTestnet):
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '8dd303d014a01a60'.decode('hex')
     PREFIX = '4d6581d24f51acbf'.decode('hex')
-    ADDRS_TABLE = 'addrs_namecoin_testnet'
+    NAME = 'namecoin_testnet'
     P2P_PORT = 19334
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
-    SHARESTORE_FILENAME = 'namecoin_testnet_shares.dat'
-    HEADERSTORE_FILENAME = 'namecoin_testnet_headers.dat'
 
 class IxcoinMainnet(ixcoin.IxcoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -605,12 +597,10 @@ class IxcoinMainnet(ixcoin.IxcoinMainnet):
     SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
     IDENTIFIER = '27b564116e2a2666'.decode('hex')
     PREFIX = '9dd6c4a619401f2f'.decode('hex')
-    ADDRS_TABLE = 'addrs_ixcoin'
+    NAME = 'ixcoin'
     P2P_PORT = 9335
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
-    SHARESTORE_FILENAME = 'ixcoin_shares.dat'
-    HEADERSTORE_FILENAME = 'ixcoin_headers.dat'
 
 class IxcoinTestnet(ixcoin.IxcoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -620,9 +610,7 @@ class IxcoinTestnet(ixcoin.IxcoinTestnet):
     SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '7430cbeb01249e44'.decode('hex')
     PREFIX = '7cfffda946709c1f'.decode('hex')
-    ADDRS_TABLE = 'addrs_ixcoin_testnet'
+    NAME = 'ixcoin_testnet'
     P2P_PORT = 19335
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
-    SHARESTORE_FILENAME = 'ixcoin_testnet_shares.dat'
-    HEADERSTORE_FILENAME = 'ixcoin_testnet_headers.dat'
