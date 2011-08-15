@@ -15,7 +15,7 @@ import json
 import signal
 import traceback
 
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, reactor, task, threads
 from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -119,8 +119,8 @@ def main(args):
             tracker.verified.add(tracker.shares[h])
         print "    ...done loading %i shares!" % (len(tracker.shares),)
         print
-        tracker.added.watch(ss.add_share)
-        tracker.verified.added.watch(lambda share: ss.add_verified_hash(share.hash))
+        tracker.added.watch(lambda share: threads.deferToThread(ss.add_share, share))
+        tracker.verified.added.watch(lambda share: threads.deferToThread(ss.add_verified_hash, share.hash))
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         
