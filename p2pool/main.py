@@ -573,12 +573,13 @@ def main(args):
         work2_thread()
         
         
-        def watchdog_handler(signum, frame):
-            print "Watchdog timer went off at:"
-            traceback.print_exc()
-        
-        signal.signal(signal.SIGALRM, watchdog_handler)
-        task.LoopingCall(signal.alarm, 30).start(1)
+        if hasattr(signal, 'SIGALRM'):
+            def watchdog_handler(signum, frame):
+                print 'Watchdog timer went off at:'
+                traceback.print_exc()
+            
+            signal.signal(signal.SIGALRM, watchdog_handler)
+            task.LoopingCall(signal.alarm, 30).start(1)
         
         
         def read_stale_frac(share):
