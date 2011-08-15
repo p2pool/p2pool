@@ -347,6 +347,14 @@ def main(args):
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         run_identifier = struct.pack('<Q', random.randrange(2**64))
         
+        share_counter = skiplists.CountsSkipList(tracker, run_identifier)
+        def get_share_counts():
+            height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+            matching_in_chain = share_counter(current_work.value['best_share_hash'], height)
+            shares_in_chain = my_shares & matching_in_chain
+            stale_shares = my_shares - matching_in_chain
+            return len(shares_in_chain) + len(stale_shares), len(stale_shares)
+        
         def compute(state, payout_script):
             if payout_script is None:
                 payout_script = my_script
@@ -366,12 +374,18 @@ def main(args):
                 size += this_size
             # XXX check sigops!
             # XXX assuming generate_tx is smallish here..
+            def get_stale_frac():
+                shares, stale_shares = get_share_counts()
+                if shares == 0:
+                    return ""
+                frac = stale_shares/shares
+                return 2*struct.pack('<H', int(65535*frac + .5))
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
                 new_script=payout_script,
-                subsidy=(50*100000000 >> (state['height'] + 1)//210000) + sum(tx.value_in - tx.value_out for tx in extra_txs),
-                nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
+                subsidy=args.net.BITCOIN_SUBSIDY_FUNC(state['height']) + sum(tx.value_in - tx.value_out for tx in extra_txs),
+                nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)) + get_stale_frac(),
                 block_target=state['target'],
                 net=args.net,
             )
@@ -561,7 +575,13 @@ def main(args):
         task.LoopingCall(signal.alarm, 30).start(1)
         
         
-        counter = skiplists.CountsSkipList(tracker, run_identifier)
+        def read_stale_frac(share):
+            if len(share.nonce) != 20:
+                return None
+            a, b = struct.unpack("<HH", share.nonce[-4:])
+            if a != b:
+                return None
+            return a/65535
         
         while True:
             yield deferral.sleep(3)
@@ -571,9 +591,7 @@ def main(args):
                     if height > 2:
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 120))
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 120), 2**100)
-                        matching_in_chain = counter(current_work.value['best_share_hash'], height)
-                        shares_in_chain = my_shares & matching_in_chain
-                        stale_shares = my_shares - matching_in_chain
+                        shares, stale_shares = get_share_counts()
                         print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
                             math.format(att_s),
                             height,
@@ -581,13 +599,20 @@ def main(args):
                             len(tracker.shares),
                             weights.get(my_script, 0)/total_weight*100,
                             math.format(weights.get(my_script, 0)/total_weight*att_s),
-                            len(shares_in_chain) + len(stale_shares),
-                            len(stale_shares),
+                            shares,
+                            stale_shares,
                             len(p2p_node.peers),
                         ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool_init.DEBUG else '')
-                        #weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 100), 2**100)
-                        #for k, v in weights.iteritems():
-                        #    print k.encode('hex'), v/total_weight
+                        fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
+                        if fracs:
+                            med = math.median(fracs)
+                            print 'Median stale proportion:', med
+                            if shares:
+                                print '    Own:', stale_shares/shares
+                                if med < .99:
+                                    print '    Own efficiency: %.02f%%' % (100*(1 - stale_shares/shares)/(1 - med),)
+                            
+                            
             except:
                 log.err()
     except:
