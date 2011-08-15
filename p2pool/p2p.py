@@ -404,7 +404,7 @@ class Node(object):
             raise ValueError('already have peer')
         self.peers[conn.nonce] = conn
         
-        print 'Connected to peer %s:%i. P2pool version: %r' % (conn.addr[0], conn.addr[1], conn.other_sub_version)
+        print 'Connected to peer %s:%i. p2pool version: %r' % (conn.addr[0], conn.addr[1], conn.other_sub_version)
     
     def lost_conn(self, conn):
         if conn.nonce not in self.peers:
