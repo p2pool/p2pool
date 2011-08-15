@@ -121,6 +121,8 @@ def main(args):
         print
         tracker.added.watch(lambda share: threads.deferToThread(ss.add_share, share))
         tracker.verified.added.watch(lambda share: threads.deferToThread(ss.add_verified_hash, share.hash))
+        tracker.removed.watch(lambda share: ss.forget_share(share.hash))
+        tracker.verified.removed.watch(lambda share: ss.forget_verified_share(share.hash))
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         

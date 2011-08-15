@@ -3,6 +3,7 @@ from __future__ import division
 import itertools
 import random
 import time
+import os
 
 from twisted.python import log
 
@@ -448,41 +449,93 @@ def format_hash(x):
 
 class ShareStore(object):
     def __init__(self, filename, net):
-        self.filename = filename
+        self.filename = filename + '.'
         self.net = net
+        self.known = None # will be filename -> set of share hashes, set of verified hashes
     
     def get_shares(self):
-        open(self.filename, 'a').close() # make empty file if it doesn't exist
+        if self.known is not None:
+            raise AssertionError()
+        known = {}
+        filenames, next = self.get_filenames_and_next()
+        for filename in filenames:
+            share_hashes, verified_hashes = known.setdefault(filename, (set(), set()))
+            with open(filename, 'rb') as f:
+                for line in f:
+                    try:
+                        type_id_str, data_hex = line.strip().split(' ')
+                        type_id = int(type_id_str)
+                        if type_id == 0:
+                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')))
+                            yield 'share', share
+                            share_hashes.add(share.hash)
+                        elif type_id == 1:
+                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')))
+                            yield 'share', share
+                            share_hashes.add(share.hash)
+                        elif type_id == 2:
+                            verified_hash = int(data_hex, 16)
+                            yield 'verified_hash', verified_hash
+                            verified_hashes.add(verified_hash)
+                        else:
+                            raise NotImplementedError("share type %i" % (type_id,))
+                    except Exception:
+                        log.err(None, "Error while reading saved shares, continuing where left off:")
+        self.known = known
+    
+    def _add_line(self, line):
+        filenames, next = self.get_filenames_and_next()
+        if filenames and os.path.getsize(filenames[-1]) < 10e6:
+            filename = filenames[-1]
+        else:
+            filename = next
         
-        with open(self.filename) as f:
-            for line in f:
-                try:
-                    type_id_str, data_hex = line.strip().split(' ')
-                    type_id = int(type_id_str)
-                    if type_id == 0:
-                        yield 'share', Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')))
-                    elif type_id == 1:
-                        yield 'share', Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')))
-                    elif type_id == 2:
-                        yield 'verified_hash', int(data_hex, 16)
-                    else:
-                        raise NotImplementedError("share type %i" % (type_id,))
-                except Exception:
-                    log.err(None, "Error while reading saved shares, continuing where left off:")
+        with open(filename, 'ab') as f:
+            f.write(line + '\n')
+        
+        return filename
     
     def add_share(self, share):
-        f = open(self.filename, 'a')
         if share.bitcoin_hash <= share.header['target']:
             type_id, data = 1, share1b_type.pack(share.as_share1b())
         else:
             type_id, data = 0, share1a_type.pack(share.as_share1a())
-        f.write("%i %s\n" % (type_id, data.encode('hex')))
-        f.close()
+        filename = self._add_line("%i %s" % (type_id, data.encode('hex')))
+        share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+        share_hashes.add(share.hash)
     
     def add_verified_hash(self, share_hash):
-        f = open(self.filename, 'a')
-        f.write("%i %x\n" % (2, share_hash))
-        f.close()
+        filename = self._add_line("%i %x" % (2, share_hash))
+        share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+        verified_hashes.add(share_hash)
+    
+    def get_filenames_and_next(self):
+        suffixes = sorted(int(x[len(self.filename):]) for x in os.listdir('.') if x.startswith(self.filename))
+        return [self.filename + str(suffix) for suffix in suffixes], self.filename + str(suffixes[-1] + 1) if suffixes else self.filename + str(0)
+    
+    def forget_share(self, share_hash):
+        to_remove = set()
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            if share_hash in share_hashes:
+                share_hashes.remove(share_hash)
+            if not share_hashes and not verified_hashes:
+                to_remove.add(filename)
+        for filename in to_remove:
+            self.known.pop(filename)
+            os.remove(filename)
+            print "REMOVED", filename
+    
+    def forget_verified_share(self, share_hash):
+        to_remove = set()
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            if share_hash in verified_hashes:
+                verified_hashes.remove(share_hash)
+            if not share_hashes and not verified_hashes:
+                to_remove.add(filename)
+        for filename in to_remove:
+            self.known.pop(filename)
+            os.remove(filename)
+            print "REMOVED", filename
 
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
