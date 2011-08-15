@@ -7,7 +7,7 @@ import time
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin
+from p2pool import skiplists, namecoin, ixcoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -544,3 +544,32 @@ class NamecoinTestnet(namecoin.NamecoinTestnet):
     SHARESTORE_FILENAME = 'namecoin_testnet_shares.dat'
     HEADERSTORE_FILENAME = 'namecoin_testnet_headers.dat'
 
+class IxcoinMainnet(ixcoin.IxcoinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    TARGET_LOOKBEHIND = 3600//10 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
+    IDENTIFIER = '27b564116e2a2666'.decode('hex')
+    PREFIX = '9dd6c4a619401f2f'.decode('hex')
+    ADDRS_TABLE = 'addrs_ixcoin'
+    P2P_PORT = 9335
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = False
+    SHARESTORE_FILENAME = 'ixcoin_shares.dat'
+    HEADERSTORE_FILENAME = 'ixcoin_headers.dat'
+
+class IxcoinTestnet(ixcoin.IxcoinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = '7430cbeb01249e44'.decode('hex')
+    PREFIX = '7cfffda946709c1f'.decode('hex')
+    ADDRS_TABLE = 'addrs_ixcoin_testnet'
+    P2P_PORT = 19335
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
+    SHARESTORE_FILENAME = 'ixcoin_testnet_shares.dat'
+    HEADERSTORE_FILENAME = 'ixcoin_testnet_headers.dat'

@@ -599,9 +599,9 @@ def run():
     parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
     parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
-    parser.add_argument('--namecoin',
-        help='use namecoin instead of bitcoin',
-        action='store_const', const=True, default=False, dest='namecoin')
+    parser.add_argument('--net',
+        help='use specified network (choices: bitcoin (default), namecoin, ixcoin)',
+        action='store', choices=set(['bitcoin', 'namecoin', 'ixcoin']), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
         help='use the testnet',
         action='store_const', const=True, default=False, dest='testnet')
@@ -700,11 +700,13 @@ def run():
             signal.signal(signal.SIGUSR1, sigusr1)
     
     args.net = {
-        (False, False): p2pool.Mainnet,
-        (False, True): p2pool.Testnet,
-        (True, False): p2pool.NamecoinMainnet,
-        (True, True): p2pool.NamecoinTestnet,
-    }[args.namecoin, args.testnet]
+        ('bitcoin', False): p2pool.Mainnet,
+        ('bitcoin', True): p2pool.Testnet,
+        ('namecoin', False): p2pool.NamecoinMainnet,
+        ('namecoin', True): p2pool.NamecoinTestnet,
+        ('ixcoin', False): p2pool.IxcoinMainnet,
+        ('ixcoin', True): p2pool.IxcoinTestnet,
+    }[args.net_name, args.testnet]
     
     if args.bitcoind_p2p_port is None:
         args.bitcoind_p2p_port = args.net.BITCOIN_P2P_PORT
