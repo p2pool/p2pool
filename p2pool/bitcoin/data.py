@@ -4,8 +4,10 @@ import hashlib
 import itertools
 import struct
 
+from twisted.internet import defer
+
 from . import base58, skiplists
-from p2pool.util import bases, math, skiplist
+from p2pool.util import bases, math, variable
 import p2pool
 
 class EarlyEnd(Exception):
@@ -155,9 +157,13 @@ class EnumType(Type):
     
     def read(self, file):
         data, file = self.inner.read(file)
+        if data not in self.keys:
+            raise ValueError('enum data (%r) not in values (%r)' % (data, self.values))
         return self.keys[data], file
     
     def write(self, file, item):
+        if item not in self.values:
+            raise ValueError('enum item (%r) not in values (%r)' % (item, self.values))
         return self.inner.write(file, self.values[item])
 
 class HashType(Type):
@@ -243,6 +249,8 @@ def get_record(fields):
     if fields not in _record_types:
         class _Record(object):
             __slots__ = fields
+            def __repr__(self):
+                return repr(dict(self))
             def __getitem__(self, key):
                 return getattr(self, key)
             def __setitem__(self, key, value):
@@ -296,49 +304,82 @@ class ChecksummedType(Type):
         data = self.inner.pack(item)
         return (file, data), hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
 
-class FloatingIntegerType(Type):
-    # redundancy doesn't matter here because bitcoin checks binary bits against its own computed bits
-    # so it will always be encoded 'normally' in blocks (they way bitcoin does it)
-    _inner = StructType('<I')
+class FloatingInteger(object):
+    __slots__ = ['_bits']
     
-    def read(self, file):
-        bits, file = self._inner.read(file)
-        target = self._bits_to_target(bits)
-        if p2pool.DEBUG:
-            if self._target_to_bits(target) != bits:
-                raise ValueError('bits in non-canonical form')
-        return target, file
-    
-    def write(self, file, item):
-        return self._inner.write(file, self._target_to_bits(item))
-    
-    def truncate_to(self, x):
-        return self._bits_to_target(self._target_to_bits(x, _check=False))
-    
-    def _bits_to_target(self, bits2):
-        target = math.shift_left(bits2 & 0x00ffffff, 8 * ((bits2 >> 24) - 3))
-        if p2pool.DEBUG:
-            assert target == self._bits_to_target1(struct.pack('<I', bits2))
-            assert self._target_to_bits(target, _check=False) == bits2
-        return target
-    
-    def _bits_to_target1(self, bits):
-        bits = bits[::-1]
-        length = ord(bits[0])
-        return bases.string_to_natural((bits[1:] + '\0'*length)[:length])
-    
-    def _target_to_bits(self, target, _check=True):
+    @classmethod
+    def from_target_upper_bound(cls, target):
         n = bases.natural_to_string(target)
         if n and ord(n[0]) >= 128:
             n = '\x00' + n
         bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
         bits = struct.unpack('<I', bits2)[0]
-        if _check:
-            if self._bits_to_target(bits) != target:
-                raise ValueError(repr((target, self._bits_to_target(bits, _check=False))))
-        return bits
+        return cls(bits)
+    
+    def __init__(self, bits):
+        self._bits = bits
+    
+    @property
+    def _value(self):
+        return math.shift_left(self._bits & 0x00ffffff, 8 * ((self._bits >> 24) - 3))
+    
+    def __hash__(self):
+        return hash(self._value)
+    
+    def __cmp__(self, other):
+        if isinstance(other, FloatingInteger):
+            return cmp(self._value, other._value)
+        elif isinstance(other, (int, long)):
+            return cmp(self._value, other)
+        else:
+            raise NotImplementedError()
+    
+    def __int__(self):
+        return self._value
+    
+    def __repr__(self):
+        return 'FloatingInteger(bits=%s (%x))' % (hex(self._bits), self)
+    
+    def __add__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value + other
+        raise NotImplementedError()
+    __radd__ = __add__
+    def __mul__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value * other
+        raise NotImplementedError()
+    __rmul__ = __mul__
+    def __truediv__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value / other
+        raise NotImplementedError()
+    def __floordiv__(self, other):
+        if isinstance(other, (int, long)):
+            return self._value // other
+        raise NotImplementedError()
+    __div__ = __truediv__
+    def __rtruediv__(self, other):
+        if isinstance(other, (int, long)):
+            return other / self._value
+        raise NotImplementedError()
+    def __rfloordiv__(self, other):
+        if isinstance(other, (int, long)):
+            return other // self._value
+        raise NotImplementedError()
+    __rdiv__ = __rtruediv__
 
-class PossiblyNone(Type):
+class FloatingIntegerType(Type):
+    _inner = StructType('<I')
+    
+    def read(self, file):
+        bits, file = self._inner.read(file)
+        return FloatingInteger(bits), file
+    
+    def write(self, file, item):
+        return self._inner.write(file, item._bits)
+
+class PossiblyNoneType(Type):
     def __init__(self, none_value, inner):
         self.none_value = none_value
         self.inner = inner
@@ -361,12 +402,12 @@ address_type = ComposedType([
 tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
-        ('previous_output', PossiblyNone(dict(hash=0, index=2**32 - 1), ComposedType([
+        ('previous_output', PossiblyNoneType(dict(hash=0, index=2**32 - 1), ComposedType([
             ('hash', HashType()),
             ('index', StructType('<I')),
         ]))),
         ('script', VarStrType()),
-        ('sequence', PossiblyNone(2**32 - 1, StructType('<I'))),
+        ('sequence', PossiblyNoneType(2**32 - 1, StructType('<I'))),
     ]))),
     ('tx_outs', ListType(ComposedType([
         ('value', StructType('<Q')),
@@ -377,7 +418,7 @@ tx_type = ComposedType([
 
 block_header_type = ComposedType([
     ('version', StructType('<I')),
-    ('previous_block', PossiblyNone(0, HashType())),
+    ('previous_block', PossiblyNoneType(0, HashType())),
     ('merkle_root', HashType()),
     ('timestamp', StructType('<I')),
     ('target', FloatingIntegerType()),
@@ -441,6 +482,27 @@ def pubkey_to_script2(pubkey):
 def pubkey_hash_to_script2(pubkey_hash):
     return '\x76\xa9' + ('\x14' + ShortHashType().pack(pubkey_hash)) + '\x88\xac'
 
+def script2_to_human(script2, net):
+    try:
+        pubkey = script2[1:-1]
+        script2_test = pubkey_to_script2(pubkey)
+    except:
+        pass
+    else:
+        if script2_test == script2:
+            return 'Pubkey. Address: %s' % (pubkey_to_address(pubkey, net),)
+    
+    try:
+        pubkey_hash = ShortHashType().unpack(script2[3:-2])
+        script2_test2 = pubkey_hash_to_script2(pubkey_hash)
+    except:
+        pass
+    else:
+        if script2_test2 == script2:
+            return 'Address. Address: %s' % (pubkey_hash_to_address(pubkey_hash, net),)
+    
+    return 'Unknown. Script: %s'  % (script2.encode('hex'),)
+
 # linked list tracker
 
 class Tracker(object):
@@ -452,36 +514,22 @@ class Tracker(object):
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
         
-        self.heights = {} # share_hash -> height_to, other_share_hash
+        self.heights = {} # share_hash -> height_to, ref, work_inc
+        self.reverse_heights = {} # ref -> set of share_hashes
         
-        '''
-        self.id_generator = itertools.count()
-        self.tails_by_id = {}
-        '''
+        self.ref_generator = itertools.count()
+        self.height_refs = {} # ref -> height, share_hash, work_inc
+        self.reverse_height_refs = {} # share_hash -> ref
         
         self.get_nth_parent_hash = skiplists.DistanceSkipList(self)
+        
+        self.added = variable.Event()
+        self.removed = variable.Event()
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
         if share.hash in self.shares:
-            return # XXX raise exception?
-        
-        '''
-        parent_id = self.ids.get(share.previous_hash, None)
-        children_ids = set(self.ids.get(share2_hash) for share2_hash in self.reverse_shares.get(share.hash, set()))
-        infos = set()
-        if parent_id is not None:
-            infos.add((parent_id[0], parent_id[1] + 1))
-        for child_id in children_ids:
-            infos.add((child_id[0], child_id[1] - 1))
-        if not infos:
-            infos.add((self.id_generator.next(), 0))
-        chosen = min(infos)
-        self.ids[share.hash] = chosen
-        '''
-        
-        self.shares[share.hash] = share
-        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
+            raise ValueError('share already present')
         
         if share.hash in self.tails:
             heads = self.tails.pop(share.hash)
@@ -491,10 +539,14 @@ class Tracker(object):
         if share.previous_hash in self.heads:
             tail = self.heads.pop(share.previous_hash)
         else:
-            #dist, tail = self.get_height_and_last(share.previous_hash) # XXX this should be moved out of the critical area even though it shouldn't matter
-            tail = share.previous_hash
-            while tail in self.shares:
-                tail = self.shares[tail].previous_hash
+            tail = self.get_last(share.previous_hash)
+            #tail2 = share.previous_hash
+            #while tail2 in self.shares:
+            #    tail2 = self.shares[tail2].previous_hash
+            #assert tail == tail2
+        
+        self.shares[share.hash] = share
+        self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
         
         self.tails.setdefault(tail, set()).update(heads)
         if share.previous_hash in self.tails[tail]:
@@ -502,6 +554,8 @@ class Tracker(object):
         
         for head in heads:
             self.heads[head] = tail
+        
+        self.added.happened(share)
     
     def test(self):
         t = Tracker()
@@ -517,8 +571,17 @@ class Tracker(object):
         assert isinstance(share_hash, (int, long, type(None)))
         if share_hash not in self.shares:
             raise KeyError()
+        
         share = self.shares[share_hash]
         del share_hash
+        
+        children = self.reverse_shares.get(share.hash, set())
+        
+        # move height refs referencing children down to this, so they can be moved up in one step
+        if share.previous_hash in self.reverse_height_refs:
+            for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
+                self.get_last(x)
+            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
         
         if share.hash in self.heads and share.previous_hash in self.tails:
             tail = self.heads.pop(share.hash)
@@ -534,7 +597,6 @@ class Tracker(object):
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
         elif share.previous_hash in self.tails:
-            raise NotImplementedError() # will break other things..
             heads = self.tails[share.previous_hash]
             if len(self.reverse_shares[share.previous_hash]) > 1:
                 raise NotImplementedError()
@@ -546,41 +608,25 @@ class Tracker(object):
         else:
             raise NotImplementedError()
         
-        '''
-        height, tail = self.get_height_and_last(share.hash)
+        # move ref pointing to this up
+        if share.previous_hash in self.reverse_height_refs:
+            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set()))
+            
+            ref = self.reverse_height_refs[share.previous_hash]
+            cur_height, cur_hash, cur_work = self.height_refs[ref]
+            assert cur_hash == share.previous_hash
+            self.height_refs[ref] = cur_height - 1, share.hash, cur_work - target_to_average_attempts(share.target)
+            del self.reverse_height_refs[share.previous_hash]
+            self.reverse_height_refs[share.hash] = ref
         
-        if share.hash in self.heads:
-            my_heads = set([share.hash])
-        elif share.previous_hash in self.tails:
-            my_heads = self.tails[share.previous_hash]
-        else:
-            some_heads = self.tails[tail]
-            some_heads_heights = dict((that_head, self.get_height_and_last(that_head)[0]) for that_head in some_heads)
-            my_heads = set(that_head for that_head in some_heads
-                if some_heads_heights[that_head] > height and
-                self.get_nth_parent_hash(that_head, some_heads_heights[that_head] - height) == share.hash)
-        
-        if share.previous_hash != tail:
-            self.heads[share.previous_hash] = tail
-        
-        for head in my_heads:
-            if head != share.hash:
-                self.heads[head] = share.hash
-            else:
-                self.heads.pop(head)
-        
-        if share.hash in self.heads:
-            self.heads.pop(share.hash)
-        
-        
-        self.tails[tail].difference_update(my_heads)
-        if share.previous_hash != tail:
-            self.tails[tail].add(share.previous_hash)
-        if not self.tails[tail]:
-            self.tails.pop(tail)
-        if my_heads != set([share.hash]):
-            self.tails[share.hash] = set(my_heads) - set([share.hash])
-        '''
+        # delete height entry, and ref if it is empty
+        if share.hash in self.heights:
+            _, ref, _ = self.heights.pop(share.hash)
+            self.reverse_heights[ref].remove(share.hash)
+            if not self.reverse_heights[ref]:
+                del self.reverse_heights[ref]
+                _, ref_hash, _ = self.height_refs.pop(ref)
+                del self.reverse_height_refs[ref_hash]
         
         self.shares.pop(share.hash)
         self.reverse_shares[share.previous_hash].remove(share.hash)
@@ -588,6 +634,7 @@ class Tracker(object):
             self.reverse_shares.pop(share.previous_hash)
         
         #assert self.test() is None
+        self.removed.happened(share)
     
     def get_height(self, share_hash):
         height, work, last = self.get_height_work_and_last(share_hash)
@@ -597,9 +644,45 @@ class Tracker(object):
         height, work, last = self.get_height_work_and_last(share_hash)
         return work
     
+    def get_last(self, share_hash):
+        height, work, last = self.get_height_work_and_last(share_hash)
+        return last
+    
     def get_height_and_last(self, share_hash):
         height, work, last = self.get_height_work_and_last(share_hash)
         return height, last
+    
+    def _get_height_jump(self, share_hash):
+        if share_hash in self.heights:
+            height_to1, ref, work_inc1 = self.heights[share_hash]
+            height_to2, share_hash, work_inc2 = self.height_refs[ref]
+            height_inc = height_to1 + height_to2
+            work_inc = work_inc1 + work_inc2
+        else:
+            height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, target_to_average_attempts(self.shares[share_hash].target)
+        return height_inc, share_hash, work_inc
+    
+    def _set_height_jump(self, share_hash, height_inc, other_share_hash, work_inc):
+        if other_share_hash not in self.reverse_height_refs:
+            ref = self.ref_generator.next()
+            assert ref not in self.height_refs
+            self.height_refs[ref] = 0, other_share_hash, 0
+            self.reverse_height_refs[other_share_hash] = ref
+            del ref
+        
+        ref = self.reverse_height_refs[other_share_hash]
+        ref_height_to, ref_share_hash, ref_work_inc = self.height_refs[ref]
+        assert ref_share_hash == other_share_hash
+        
+        if share_hash in self.heights:
+            prev_ref = self.heights[share_hash][1]
+            self.reverse_heights[prev_ref].remove(share_hash)
+            if not self.reverse_heights[prev_ref] and prev_ref != ref:
+                self.reverse_heights.pop(prev_ref)
+                _, x, _ = self.height_refs.pop(prev_ref)
+                self.reverse_height_refs.pop(x)
+        self.heights[share_hash] = height_inc - ref_height_to, ref, work_inc - ref_work_inc
+        self.reverse_heights.setdefault(ref, set()).add(share_hash)
     
     def get_height_work_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
@@ -607,18 +690,13 @@ class Tracker(object):
         height = 0
         work = 0
         updates = []
-        while True:
-            if share_hash is None or share_hash not in self.shares:
-                break
+        while share_hash in self.shares:
             updates.append((share_hash, height, work))
-            if share_hash in self.heights:
-                height_inc, share_hash, work_inc = self.heights[share_hash]
-            else:
-                height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, target_to_average_attempts(self.shares[share_hash].target)
+            height_inc, share_hash, work_inc = self._get_height_jump(share_hash)
             height += height_inc
             work += work_inc
         for update_hash, height_then, work_then in updates:
-            self.heights[update_hash] = height - height_then, share_hash, work - work_then
+            self._set_height_jump(update_hash, height - height_then, share_hash, work - work_then)
         return height, work, share_hash
     
     def get_chain_known(self, start_hash):
@@ -658,6 +736,14 @@ class Tracker(object):
     
     def get_highest_height(self):
         return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
+    
+    def is_child_of(self, share_hash, possible_child_hash):
+        height, last = self.get_height_and_last(share_hash)
+        child_height, child_last = self.get_height_and_last(possible_child_hash)
+        if child_last != last:
+            return None # not connected, so can't be determined
+        height_up = child_height - height
+        return height_up >= 0 and self.get_nth_parent_hash(possible_child_hash, height_up) == share_hash
 
 class FakeShare(object):
     def __init__(self, **kwargs):
@@ -722,8 +808,24 @@ class Mainnet(object):
     BITCOIN_P2P_PREFIX = 'f9beb4d9'.decode('hex')
     BITCOIN_P2P_PORT = 8333
     BITCOIN_ADDRESS_VERSION = 0
+    BITCOIN_RPC_PORT = 8332
+    BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
+        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        not (yield bitcoind.rpc_getinfo())['testnet']
+    )))
+    BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'BTC'
 
 class Testnet(object):
     BITCOIN_P2P_PREFIX = 'fabfb5da'.decode('hex')
     BITCOIN_P2P_PORT = 18333
     BITCOIN_ADDRESS_VERSION = 111
+    BITCOIN_RPC_PORT = 8332
+    BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
+        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        (yield bitcoind.rpc_getinfo())['testnet']
+    )))
+    BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_SYMBOL = 'tBTC'

@@ -6,8 +6,8 @@ from twisted.python import failure, log
 class Event(object):
     def __init__(self):
         self.observers = {}
-        self.one_time_observers = {}
         self.id_generator = itertools.count()
+        self._once = None
     
     def watch(self, func):
         id = self.id_generator.next()
@@ -16,38 +16,35 @@ class Event(object):
     def unwatch(self, id):
         self.observers.pop(id)
     
-    def watch_one_time(self, func):
-        id = self.id_generator.next()
-        self.one_time_observers[id] = func
-        return id
-    def unwatch_one_time(self, id):
-        self.one_time_observers.pop(id)
+    @property
+    def once(self):
+        res = self._once
+        if res is None:
+            res = self._once = Event()
+        return res
     
-    def happened(self, event=None):
+    def happened(self, *event):
         for id, func in sorted(self.observers.iteritems()):
             try:
-                func(event)
+                func(*event)
             except:
                 log.err(None, "Error while processing Event callbacks:")
         
-        one_time_observers = self.one_time_observers
-        self.one_time_observers = {}
-        for id, func in sorted(one_time_observers.iteritems()):
-            try:
-                func(event)
-            except:
-                log.err(None, "Error while processing Event callbacks:")
+        if self._once is not None:
+            self._once.happened(*event)
+            self._once = None
     
     def get_deferred(self, timeout=None):
+        once = self.once
         df = defer.Deferred()
-        id1 = self.watch_one_time(df.callback)
+        id1 = once.watch(lambda *event: df.callback(event))
         if timeout is not None:
             def do_timeout():
-                df.errback(failure.Failure(defer.TimeoutError()))
-                self.unwatch_one_time(id1)
-                self.unwatch_one_time(x)
+                df.errback(failure.Failure(defer.TimeoutError('in Event.get_deferred')))
+                once.unwatch(id1)
+                once.unwatch(x)
             delay = reactor.callLater(timeout, do_timeout)
-            x = self.watch_one_time(lambda value: delay.cancel())
+            x = once.watch(lambda *event: delay.cancel())
         return df
 
 class Variable(object):
@@ -67,5 +64,5 @@ class Variable(object):
             return defer.succeed(self.value)
         else:
             df = defer.Deferred()
-            self.changed.watch_one_time(df.callback)
+            self.changed.once.watch(df.callback)
             return df

@@ -62,14 +62,12 @@ class BaseProtocol(protocol.Protocol):
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
-                    print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                    print 'INVALID HASH'
+                    print 'invalid hash for', repr(command), checksum.encode('hex') if checksum is not None else None, repr(payload[:100].encode('hex')), len(payload)
                     continue
             
             type_ = getattr(self, 'message_' + command, None)
             if type_ is None:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print 'NO TYPE FOR', repr(command)
+                print 'no type for', repr(command)
                 continue
             
             try:
@@ -81,16 +79,13 @@ class BaseProtocol(protocol.Protocol):
             
             handler = getattr(self, 'handle_' + command, None)
             if handler is None:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
-                print 'NO HANDLER FOR', command
+                print 'no handler for', repr(command)
                 continue
-            
-            #print 'RECV', command, repr(payload2)[:500]
             
             try:
                 handler(**payload2)
             except:
-                print 'RECV', command, checksum.encode('hex') if checksum is not None else None, repr(payload.encode('hex')), len(payload)
+                print 'RECV', command, repr(payload2)[:100]
                 log.err(None, 'Error handling message: (see RECV line)')
                 continue
     
@@ -217,12 +212,12 @@ class Protocol(BaseProtocol):
     message_getblocks = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     message_getheaders = bitcoin_data.ComposedType([
         ('version', bitcoin_data.StructType('<I')),
         ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNone(0, bitcoin_data.HashType())),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     message_getaddr = bitcoin_data.ComposedType([])
     message_checkorder = bitcoin_data.ComposedType([
@@ -270,7 +265,7 @@ class Protocol(BaseProtocol):
     message_reply = bitcoin_data.ComposedType([
         ('hash', bitcoin_data.HashType()),
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
-        ('script', bitcoin_data.PossiblyNone('', bitcoin_data.VarStrType())),
+        ('script', bitcoin_data.PossiblyNoneType('', bitcoin_data.VarStrType())),
     ])
     def handle_reply(self, hash, reply, script):
         self.check_order.got_response(hash, dict(reply=reply, script=script))
@@ -294,7 +289,7 @@ class Protocol(BaseProtocol):
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol
     
-    maxDelay = 15
+    maxDelay = 1
     
     def __init__(self, net):
         self.net = net
@@ -316,19 +311,23 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return self.conn.get_not_none()
 
 class HeaderWrapper(object):
-    target = 0
+    target = 2**256 - 1
     __slots__ = 'hash previous_hash'.split(' ')
     
-    def __init__(self, header):
-        self.hash = bitcoin_data.block_header_type.hash256(header)
-        self.previous_hash = header['previous_block']
+    @classmethod
+    def from_header(cls, header):
+        return cls(bitcoin_data.block_header_type.hash256(header), header['previous_block'])
+    
+    def __init__(self, hash, previous_hash):
+        self.hash, self.previous_hash = hash, previous_hash
 
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, factory):
+    def __init__(self, factory, backing):
         self.factory = factory
         self.tracker = bitcoin_data.Tracker()
+        self.backing = backing
         self.most_recent = None
         
         self._watch1 = self.factory.new_headers.watch(self.heard_headers)
@@ -342,7 +341,28 @@ class HeightTracker(object):
         
         self.updated = variable.Event()
         
+        self._load_backing()
+        
         self.think()
+    
+    def _load_backing(self):
+        open(self.backing, 'ab').close()
+        with open(self.backing, 'rb') as f:
+            count = 0
+            for line in f:
+                try:
+                    hash, previous_hash, checksum = (int(x, 16) for x in line.strip().split(' '))
+                except Exception:
+                    print "skipping over bad data in headers.dat"
+                else:
+                    if (hash - previous_hash) % 2**256 != checksum:
+                        print "checksum failed"
+                        continue
+                    if previous_hash == 0: previous_hash = None
+                    count += 1
+                    if count % 10000 == 0 and count: print count
+                    if hash not in self.tracker.shares:
+                        self.tracker.add(HeaderWrapper(hash, previous_hash))
     
     def think(self):
         highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
@@ -376,12 +396,16 @@ class HeightTracker(object):
     
     def heard_headers(self, headers):
         changed = False
+        b = open(self.backing, 'ab')
         for header in headers:
-            hw = HeaderWrapper(header)
+            hw = HeaderWrapper.from_header(header)
             if hw.hash in self.tracker.shares:
                 continue
             changed = True
             self.tracker.add(hw)
+            hash, prev = hw.hash, 0 if hw.previous_hash is None else hw.previous_hash
+            b.write('%x %x %x\n' % (hash, prev, (hash - prev) % 2**256))
+        b.close()
         if changed:
             self.updated.happened()
         self.think()
@@ -400,8 +424,6 @@ class HeightTracker(object):
         self.requested.add((tuple(have), last))
         (yield self.factory.getProtocol()).send_getheaders(version=1, have=have, last=last)
     
-    #@defer.inlineCallbacks
-    #XXX should defer?
     def getHeight(self, block_hash):
         height, last = self.tracker.get_height_and_last(block_hash)
         if last is not None:
