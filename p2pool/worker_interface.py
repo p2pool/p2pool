@@ -79,12 +79,11 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
                 if request_id not in last_cache_invalidation:
                     last_cache_invalidation[request_id] = variable.Variable((None, None))
                 
-                while True:
-                    yield wait_hold(request_id)
-                    work = self.work.value
-                    thought_work = last_cache_invalidation[request_id].value
-                    if work != thought_work[-1]:
-                        break
+                yield wait_hold(request_id)
+                work = self.work.value
+                thought_work = last_cache_invalidation[request_id].value
+                
+                if work == thought_work[-1]:
                     if p2pool.DEBUG:
                         print 'POLL %i WAITING' % (id,)
                     yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
