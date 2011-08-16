@@ -205,7 +205,7 @@ class Share(object):
         self.shared = True
     
     def __repr__(self):
-        return '<Share %s>' % (' '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
+        return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
     if dist is None:
