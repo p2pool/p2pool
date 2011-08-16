@@ -36,79 +36,41 @@ def get_memory(request):
 def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization')
 
-last_cache_invalidation = {} # XXX remove global
-holds = {}
-
-@defer.inlineCallbacks
-def wait_hold(request_id):
-    while request_id in holds:
-        yield holds[request_id].get_deferred()
-
-def set_hold(request_id, dt):
-    if request_id in holds:
-        raise ValueError('hold already present!')
-    holds[request_id] = variable.Event()
-    holds[request_id].status = 0
-    def cb():
-        if holds[request_id].status != 0:
-            raise AssertionError()
-        holds[request_id].status = 1
-        holds.pop(request_id).happened()
-    reactor.callLater(dt, cb)
+class Holds(object):
+    def __init__(self):
+        self.holds = {}
+    
+    @defer.inlineCallbacks
+    def wait_hold(self, request_id):
+        while request_id in self.holds:
+            yield self.holds[request_id].get_deferred()
+    
+    def set_hold(self, request_id, dt):
+        if request_id in self.holds:
+            raise ValueError('hold already present!')
+        self.holds[request_id] = variable.Event()
+        self.holds[request_id].status = 0
+        def cb():
+            if self.holds[request_id].status != 0:
+                raise AssertionError()
+            self.holds[request_id].status = 1
+            self.holds.pop(request_id).happened()
+        reactor.callLater(dt, cb)
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
-    def __init__(self, work, compute, net):
-        self.work = work
-        self.compute = compute
-        self.net = net
+    def __init__(self, parent):
+        self.parent = parent
     
     @defer.inlineCallbacks
     def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        request.setHeader('X-Long-Polling', '/long-polling')
         try:
             try:
-                request.setHeader('X-Long-Polling', '/long-polling')
-                request.setHeader('Content-Type', 'application/json')
-                
-                id = random.randrange(10000)
-                if p2pool.DEBUG:
-                    print 'POLL %i START' % (id,)
-                
-                request_id = get_id(request)
-                memory = get_memory(request)
-                
-                if request_id not in last_cache_invalidation:
-                    last_cache_invalidation[request_id] = variable.Variable((None, None))
-                
-                while True:
-                    yield wait_hold(request_id)
-                    work = self.work.value
-                    thought_work = last_cache_invalidation[request_id].value
-                    if work != thought_work[-1]:
-                        break
-                    if p2pool.DEBUG:
-                        print 'POLL %i WAITING' % (id,)
-                    yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
-                
-                if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
-                    # clients won't believe the update
-                    work = work.copy()
-                    work['previous_block'] = random.randrange(2**256)
-                    if p2pool.DEBUG:
-                        print 'POLL %i FAKED' % (id,)
-                    set_hold(request_id, .01)
-                res = self.compute(work, get_payout_script(request, self.net))
-                
-                last_cache_invalidation[request_id].set((thought_work[-1], work))
-                if p2pool.DEBUG:
-                    print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
-                
-                if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
-                    res = res.update(target2=2**256//2**32 - 1)
-                
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
-                    'result': res.getwork(identifier=str(work['best_share_hash'])),
+                    'result': (yield self.parent.getwork(request, long_poll=True)),
                     'error': None,
                 }))
             except jsonrpc.Error:
@@ -133,9 +95,10 @@ class WorkerInterface(jsonrpc.Server):
         self.compute = compute
         self.response_callback = response_callback
         self.net = net
+        self.holds = Holds()
+        self.last_cache_invalidation = {}
         
-        self.putChild('long-polling',
-            LongPollingWorkerInterface(self.work, self.compute, net))
+        self.putChild('long-polling', LongPollingWorkerInterface(self))
         self.putChild('', self)
     
     @defer.inlineCallbacks
@@ -145,31 +108,45 @@ class WorkerInterface(jsonrpc.Server):
         if data is not None:
             defer.returnValue(self.response_callback(data))
         
+        defer.returnValue((yield self.getwork(request)))
+    rpc_getwork.takes_request = True
+    
+    @defer.inlineCallbacks
+    def getwork(self, request, long_poll=False):
+        id = random.randrange(10000)
+        if p2pool.DEBUG:
+            print 'POLL %i START long_poll=%r' % (id, long_poll)
+        
         request_id = get_id(request)
         memory = get_memory(request)
         
-        if request_id not in last_cache_invalidation:
-            last_cache_invalidation[request_id] = variable.Variable((None, None))
+        if request_id not in self.last_cache_invalidation:
+            self.last_cache_invalidation[request_id] = variable.Variable((None, None))
         
-        yield wait_hold(request_id)
+        yield self.holds.wait_hold(request_id)
         work = self.work.value
-        thought_work = last_cache_invalidation[request_id].value
+        thought_work = self.last_cache_invalidation[request_id].value
+        
+        if long_poll and work == thought_work[-1]:
+            if p2pool.DEBUG:
+                print 'POLL %i WAITING' % (id,)
+            yield defer.DeferredList([self.work.changed.get_deferred(), self.last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
+        work = self.work.value
         
         if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
             # clients won't believe the update
             work = work.copy()
             work['previous_block'] = random.randrange(2**256)
             if p2pool.DEBUG:
-                print 'GETWORK FAKED'
-            set_hold(request_id, .01) # guarantee ordering
+                print 'POLL %i FAKED' % (id,)
+            self.holds.set_hold(request_id, .01)
         res = self.compute(work, get_payout_script(request, self.net))
         
-        last_cache_invalidation[request_id].set((thought_work[-1], work))
+        self.last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
-            print 'GETWORK END %s' % (p2pool_data.format_hash(work['best_share_hash']),)
+            print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
         
         if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
             res = res.update(target2=2**256//2**32 - 1)
         
         defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
-    rpc_getwork.takes_request = True
