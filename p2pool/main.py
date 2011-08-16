@@ -70,7 +70,7 @@ def main(args):
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
-        temp_work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
+        temp_work = yield deferral.retry('Error while testing getwork:', 1)(defer.inlineCallbacks(lambda: defer.returnValue(bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())))))()
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work.previous_block,)
         print
