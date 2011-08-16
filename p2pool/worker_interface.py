@@ -56,6 +56,46 @@ def set_hold(request_id, dt):
         holds.pop(request_id).happened()
     reactor.callLater(dt, cb)
 
+@defer.inlineCallbacks
+def getwork(self, request, long_poll):
+
+    id = random.randrange(10000)
+    if p2pool.DEBUG:
+        print 'POLL %i START long_poll=%r' % (id, long_poll)
+
+    request_id = get_id(request)
+    memory = get_memory(request)
+
+    if request_id not in last_cache_invalidation:
+        last_cache_invalidation[request_id] = variable.Variable((None, None))
+
+    yield wait_hold(request_id)
+    work = self.work.value
+    thought_work = last_cache_invalidation[request_id].value
+
+    if long_poll and work == thought_work[-1]:
+        if p2pool.DEBUG:
+            print 'POLL %i WAITING' % (id,)
+        yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
+
+    if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
+        # clients won't believe the update
+        work = work.copy()
+        work['previous_block'] = random.randrange(2**256)
+        if p2pool.DEBUG:
+            print 'POLL %i FAKED' % (id,)
+        set_hold(request_id, .01)
+    res = self.compute(work, get_payout_script(request, self.net))
+
+    last_cache_invalidation[request_id].set((thought_work[-1], work))
+    if p2pool.DEBUG:
+        print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
+
+    if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
+        res = res.update(target2=2**256//2**32 - 1)
+
+    defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
+
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, work, compute, net):
         self.work = work
@@ -64,50 +104,14 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     
     @defer.inlineCallbacks
     def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        request.setHeader('X-Long-Polling', '/long-polling')
         try:
             try:
-                request.setHeader('X-Long-Polling', '/long-polling')
-                request.setHeader('Content-Type', 'application/json')
-                
-                id = random.randrange(10000)
-                if p2pool.DEBUG:
-                    print 'POLL %i START' % (id,)
-                
-                request_id = get_id(request)
-                memory = get_memory(request)
-                
-                if request_id not in last_cache_invalidation:
-                    last_cache_invalidation[request_id] = variable.Variable((None, None))
-                
-                yield wait_hold(request_id)
-                work = self.work.value
-                thought_work = last_cache_invalidation[request_id].value
-                
-                if work == thought_work[-1]:
-                    if p2pool.DEBUG:
-                        print 'POLL %i WAITING' % (id,)
-                    yield defer.DeferredList([self.work.changed.get_deferred(), last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
-                
-                if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
-                    # clients won't believe the update
-                    work = work.copy()
-                    work['previous_block'] = random.randrange(2**256)
-                    if p2pool.DEBUG:
-                        print 'POLL %i FAKED' % (id,)
-                    set_hold(request_id, .01)
-                res = self.compute(work, get_payout_script(request, self.net))
-                
-                last_cache_invalidation[request_id].set((thought_work[-1], work))
-                if p2pool.DEBUG:
-                    print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
-                
-                if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
-                    res = res.update(target2=2**256//2**32 - 1)
-                
                 request.write(json.dumps({
                     'jsonrpc': '2.0',
                     'id': 0,
-                    'result': res.getwork(identifier=str(work['best_share_hash'])),
+                    'result': (yield getwork(self, request, True)),
                     'error': None,
                 }))
             except jsonrpc.Error:
@@ -144,31 +148,5 @@ class WorkerInterface(jsonrpc.Server):
         if data is not None:
             defer.returnValue(self.response_callback(data))
         
-        request_id = get_id(request)
-        memory = get_memory(request)
-        
-        if request_id not in last_cache_invalidation:
-            last_cache_invalidation[request_id] = variable.Variable((None, None))
-        
-        yield wait_hold(request_id)
-        work = self.work.value
-        thought_work = last_cache_invalidation[request_id].value
-        
-        if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
-            # clients won't believe the update
-            work = work.copy()
-            work['previous_block'] = random.randrange(2**256)
-            if p2pool.DEBUG:
-                print 'GETWORK FAKED'
-            set_hold(request_id, .01) # guarantee ordering
-        res = self.compute(work, get_payout_script(request, self.net))
-        
-        last_cache_invalidation[request_id].set((thought_work[-1], work))
-        if p2pool.DEBUG:
-            print 'GETWORK END %s' % (p2pool_data.format_hash(work['best_share_hash']),)
-        
-        if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
-            res = res.update(target2=2**256//2**32 - 1)
-        
-        defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
+        defer.returnValue((yield getwork(self, request, False)))
     rpc_getwork.takes_request = True
