@@ -634,8 +634,8 @@ def run():
     parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--net',
-        help='use specified network (choices: bitcoin (default), namecoin, ixcoin)',
-        action='store', choices=set(['bitcoin', 'namecoin', 'ixcoin']), default='bitcoin', dest='net_name')
+        help='use specified network (choices: bitcoin (default), namecoin, ixcoin, i0coin)',
+        action='store', choices=set(['bitcoin', 'namecoin', 'ixcoin', 'i0coin']), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
         help='use the testnet',
         action='store_const', const=True, default=False, dest='testnet')
@@ -740,6 +740,8 @@ def run():
         ('namecoin', True): p2pool.NamecoinTestnet,
         ('ixcoin', False): p2pool.IxcoinMainnet,
         ('ixcoin', True): p2pool.IxcoinTestnet,
+        ('i0coin', False): p2pool.I0coinMainnet,
+        ('i0coin', True): p2pool.I0coinTestnet,
     }[args.net_name, args.testnet]
     
     if args.bitcoind_rpc_port is None:
