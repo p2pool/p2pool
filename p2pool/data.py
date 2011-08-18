@@ -549,6 +549,7 @@ class Mainnet(bitcoin_data.Mainnet):
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9332
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -562,6 +563,7 @@ class Testnet(bitcoin_data.Testnet):
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19332
 
 class NamecoinMainnet(namecoin.NamecoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -575,6 +577,7 @@ class NamecoinMainnet(namecoin.NamecoinMainnet):
     P2P_PORT = 9334
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9331
 
 class NamecoinTestnet(namecoin.NamecoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -588,6 +591,7 @@ class NamecoinTestnet(namecoin.NamecoinTestnet):
     P2P_PORT = 19334
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19331
 
 class IxcoinMainnet(ixcoin.IxcoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -601,6 +605,7 @@ class IxcoinMainnet(ixcoin.IxcoinMainnet):
     P2P_PORT = 9335
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9330
 
 class IxcoinTestnet(ixcoin.IxcoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -614,6 +619,7 @@ class IxcoinTestnet(ixcoin.IxcoinTestnet):
     P2P_PORT = 19335
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19330
 
 class I0coinMainnet(i0coin.I0coinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -627,6 +633,7 @@ class I0coinMainnet(i0coin.I0coinMainnet):
     P2P_PORT = 9336
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = False
+    WORKER_PORT = 9329
 
 class I0coinTestnet(i0coin.I0coinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -640,4 +647,5 @@ class I0coinTestnet(i0coin.I0coinTestnet):
     P2P_PORT = 19336
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19329
 

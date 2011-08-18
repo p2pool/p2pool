@@ -665,8 +665,8 @@ def run():
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 9332)',
-        type=int, action='store', default=9332, dest='worker_port')
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329, +10000 for testnets)',
+        type=int, action='store', default=None, dest='worker_port')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
@@ -752,6 +752,9 @@ def run():
     
     if args.p2pool_port is None:
         args.p2pool_port = args.net.P2P_PORT
+    
+    if args.worker_port is None:
+        args.worker_port = args.net.WORKER_PORT
     
     if args.address is not None:
         try:
