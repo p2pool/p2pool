@@ -578,7 +578,7 @@ def main(args):
         if hasattr(signal, 'SIGALRM'):
             def watchdog_handler(signum, frame):
                 print 'Watchdog timer went off at:'
-                traceback.print_exc()
+                traceback.print_stack()
             
             signal.signal(signal.SIGALRM, watchdog_handler)
             task.LoopingCall(signal.alarm, 30).start(1)
