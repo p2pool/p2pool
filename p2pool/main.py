@@ -418,7 +418,7 @@ def main(args):
         my_shares = set()
         times = {}
         
-        def got_response(data):
+        def got_response(data, user):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
@@ -443,7 +443,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %s prev %s age %.2fs' % (p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
+                print 'GOT SHARE! %s %s prev %s age %.2fs' % (user, p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])
