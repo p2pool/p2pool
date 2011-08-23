@@ -652,7 +652,7 @@ def run():
         help='generate charts on the web interface (requires PIL and pygame)',
         action='store_const', const=True, default=False, dest='charts')
     parser.add_argument('--logfile',
-        help='log to specific file (defaults to <network_name>.log)',
+        help='''log to specific file (defaults to <network_name>.log in run_p2pool.py's directory)''',
         type=str, action='store', default=None, dest='logfile')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
@@ -698,7 +698,7 @@ def run():
         p2pool_init.DEBUG = True
     
     if args.logfile is None:
-       args.logfile = args.net_name + ('_testnet' if args.testnet else '') + '.log'
+       args.logfile = os.path.join(os.path.dirname(sys.argv[0]), args.net_name + ('_testnet' if args.testnet else '') + '.log')
     
     class ReopeningFile(object):
         def __init__(self, *open_args, **open_kwargs):
@@ -734,7 +734,7 @@ def run():
             self.buf = lines[-1]
         def flush(self):
             pass
-    logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
+    logfile = ReopeningFile(args.logfile, 'w')
     sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
     if hasattr(signal, "SIGUSR1"):
         def sigusr1(signum, frame):
