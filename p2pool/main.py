@@ -115,6 +115,7 @@ def main(args):
         print "    ...inserting %i verified shares..." % (len(known_verified),)
         for h in known_verified:
             if h not in tracker.shares:
+                ss.forget_verified_share(h)
                 continue
             tracker.verified.add(tracker.shares[h])
         print "    ...done loading %i shares!" % (len(tracker.shares),)
