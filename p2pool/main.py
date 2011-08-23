@@ -685,10 +685,10 @@ def run():
         help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 normally. 18333 for testnet)',
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
-    bitcoind_group.add_argument(metavar='BITCOIND_RPC_USERNAME',
-        help='bitcoind RPC interface username',
-        type=str, action='store', dest='bitcoind_rpc_username')
-    bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
+    bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
+        help='bitcoind RPC interface username (default: empty)',
+        type=str, action='store', default='', nargs='?', dest='bitcoind_rpc_username')
+    bitcoind_group.add_argument(metavar='BITCOIND_RPCPASSWORD',
         help='bitcoind RPC interface password',
         type=str, action='store', dest='bitcoind_rpc_password')
     
