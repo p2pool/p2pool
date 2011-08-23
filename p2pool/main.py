@@ -648,6 +648,9 @@ def run():
     parser.add_argument('--charts',
         help='generate charts on the web interface (requires PIL and pygame)',
         action='store_const', const=True, default=False, dest='charts')
+    parser.add_argument('--logfile',
+        help='log to specific file (defaults to <network_name>.log)',
+        type=str, action='store', default=None, dest='logfile')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
@@ -690,48 +693,52 @@ def run():
     
     if args.debug:
         p2pool_init.DEBUG = True
-        class ReopeningFile(object):
-            def __init__(self, *open_args, **open_kwargs):
-                self.open_args, self.open_kwargs = open_args, open_kwargs
-                self.inner_file = open(*self.open_args, **self.open_kwargs)
-            def reopen(self):
-                self.inner_file.close()
-                self.inner_file = open(*self.open_args, **self.open_kwargs)
-            def write(self, data):
-                self.inner_file.write(data)
-            def flush(self):
+    
+    if args.logfile is None:
+       args.logfile = args.net_name + ('_testnet' if args.testnet else '') + '.log'
+    
+    class ReopeningFile(object):
+        def __init__(self, *open_args, **open_kwargs):
+            self.open_args, self.open_kwargs = open_args, open_kwargs
+            self.inner_file = open(*self.open_args, **self.open_kwargs)
+        def reopen(self):
+            self.inner_file.close()
+            self.inner_file = open(*self.open_args, **self.open_kwargs)
+        def write(self, data):
+            self.inner_file.write(data)
+        def flush(self):
+            self.inner_file.flush()
+    class TeePipe(object):
+        def __init__(self, outputs):
+            self.outputs = outputs
+        def write(self, data):
+            for output in self.outputs:
+                output.write(data)
+        def flush(self):
+            for output in self.outputs:
+                output.flush()
+    class TimestampingPipe(object):
+        def __init__(self, inner_file):
+            self.inner_file = inner_file
+            self.buf = ''
+            self.softspace = 0
+        def write(self, data):
+            buf = self.buf + data
+            lines = buf.split('\n')
+            for line in lines[:-1]:
+                self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
                 self.inner_file.flush()
-        class TeePipe(object):
-            def __init__(self, outputs):
-                self.outputs = outputs
-            def write(self, data):
-                for output in self.outputs:
-                    output.write(data)
-            def flush(self):
-                for output in self.outputs:
-                    output.flush()
-        class TimestampingPipe(object):
-            def __init__(self, inner_file):
-                self.inner_file = inner_file
-                self.buf = ''
-                self.softspace = 0
-            def write(self, data):
-                buf = self.buf + data
-                lines = buf.split('\n')
-                for line in lines[:-1]:
-                    self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
-                    self.inner_file.flush()
-                self.buf = lines[-1]
-            def flush(self):
-                pass
-        logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
-        sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
-        if hasattr(signal, "SIGUSR1"):
-            def sigusr1(signum, frame):
-                print '''Caught SIGUSR1, closing 'debug.log'...'''
-                logfile.reopen()
-                print '''...and reopened 'debug.log' after catching SIGUSR1.'''
-            signal.signal(signal.SIGUSR1, sigusr1)
+            self.buf = lines[-1]
+        def flush(self):
+            pass
+    logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
+    sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
+    if hasattr(signal, "SIGUSR1"):
+        def sigusr1(signum, frame):
+            print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
+            logfile.reopen()
+            print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
+        signal.signal(signal.SIGUSR1, sigusr1)
     
     args.net = {
         ('bitcoin', False): p2pool.Mainnet,
