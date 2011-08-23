@@ -370,7 +370,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         # eat away at heads
         if scores:
-            while True:
+            for i in xrange(1000):
                 to_remove = set()
                 for share_hash, tail in self.heads.iteritems():
                     if share_hash in scores[-5:]:
@@ -392,7 +392,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 #print "_________", to_remove
         
         # drop tails
-        while True:
+        for i in xrange(1000):
             to_remove = set()
             for tail, heads in self.tails.iteritems():
                 if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
