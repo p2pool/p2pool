@@ -633,7 +633,37 @@ def main(args):
         reactor.stop()
 
 def run():
-    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
+    class FixedArgumentParser(argparse.ArgumentParser):
+        def _read_args_from_files(self, arg_strings):
+            # expand arguments referencing files
+            new_arg_strings = []
+            for arg_string in arg_strings:
+                
+                # for regular arguments, just add them back into the list
+                if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
+                    new_arg_strings.append(arg_string)
+                
+                # replace arguments referencing files with the file content
+                else:
+                    try:
+                        args_file = open(arg_string[1:])
+                        try:
+                            arg_strings = []
+                            for arg_line in args_file.read().splitlines():
+                                for arg in self.convert_arg_line_to_args(arg_line):
+                                    arg_strings.append(arg)
+                            arg_strings = self._read_args_from_files(arg_strings)
+                            new_arg_strings.extend(arg_strings)
+                        finally:
+                            args_file.close()
+                    except IOError:
+                        err = sys.exc_info()[1]
+                        self.error(str(err))
+            
+            # return the modified argument list
+            return new_arg_strings
+    
+    parser = FixedArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
     parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--net',
