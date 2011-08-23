@@ -376,7 +376,7 @@ class OkayTracker(bitcoin_data.Tracker):
                     if share_hash in scores[-5:]:
                         #print 1
                         continue
-                    if self.shares[share_hash].time_seen > time.time() - 30:
+                    if self.shares[share_hash].time_seen > time.time() - 300:
                         #print 2
                         continue
                     if share_hash not in self.verified.shares and max(self.shares[after_tail_hash].time_seen for after_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120: # XXX stupid
