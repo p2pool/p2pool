@@ -636,10 +636,10 @@ def run():
     parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--net',
-        help='use specified network (choices: bitcoin (default), namecoin, ixcoin, i0coin)',
-        action='store', choices=set(['bitcoin', 'namecoin', 'ixcoin', 'i0coin']), default='bitcoin', dest='net_name')
+        help='use specified network (default: bitcoin)',
+        action='store', choices=sorted(x for x in p2pool.nets if 'testnet' not in x), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
-        help='use the testnet',
+        help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
     parser.add_argument('--debug',
         help='debugging mode',
@@ -742,16 +742,7 @@ def run():
             print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
         signal.signal(signal.SIGUSR1, sigusr1)
     
-    args.net = {
-        ('bitcoin', False): p2pool.Mainnet,
-        ('bitcoin', True): p2pool.Testnet,
-        ('namecoin', False): p2pool.NamecoinMainnet,
-        ('namecoin', True): p2pool.NamecoinTestnet,
-        ('ixcoin', False): p2pool.IxcoinMainnet,
-        ('ixcoin', True): p2pool.IxcoinTestnet,
-        ('i0coin', False): p2pool.I0coinMainnet,
-        ('i0coin', True): p2pool.I0coinTestnet,
-    }[args.net_name, args.testnet]
+    args.net = p2pool.nets[args.net_name + ('_testnet' if args.testnet else '')]
     
     if args.bitcoind_rpc_port is None:
         args.bitcoind_rpc_port = args.net.BITCOIN_RPC_PORT

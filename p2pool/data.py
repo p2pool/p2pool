@@ -649,3 +649,4 @@ class I0coinTestnet(i0coin.I0coinTestnet):
     PERSIST = False
     WORKER_PORT = 19329
 
+nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet]))
