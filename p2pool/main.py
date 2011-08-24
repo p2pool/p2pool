@@ -603,7 +603,7 @@ def main(args):
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     if height > 2:
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 120))
-                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 120), 2**100)
+                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**100)
                         shares, stale_shares = get_share_counts()
                         print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
                             math.format(att_s),
