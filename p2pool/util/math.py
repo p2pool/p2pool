@@ -58,7 +58,7 @@ def add_dicts(dicts):
 def format(x):
     prefixes = 'kMGTPEZY'
     count = 0
-    while x >= 10000 and count < len(prefixes) - 2:
+    while x >= 100000 and count < len(prefixes) - 2:
         x = x//1000
         count += 1
     s = '' if count == 0 else prefixes[count - 1]

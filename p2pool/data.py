@@ -8,7 +8,7 @@ import os
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin, ixcoin
+from p2pool import skiplists, namecoin, ixcoin, i0coin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -225,8 +225,11 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
+        period = net.SHARE_PERIOD
+        if previous_share.timestamp >= 1314582520 and hasattr(net, 'SHARE_PERIOD2'):
+            period = net.SHARE_PERIOD2
+        pre_target = 2**256//(period*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
@@ -370,13 +373,13 @@ class OkayTracker(bitcoin_data.Tracker):
         
         # eat away at heads
         if scores:
-            while True:
+            for i in xrange(1000):
                 to_remove = set()
                 for share_hash, tail in self.heads.iteritems():
                     if share_hash in scores[-5:]:
                         #print 1
                         continue
-                    if self.shares[share_hash].time_seen > time.time() - 30:
+                    if self.shares[share_hash].time_seen > time.time() - 300:
                         #print 2
                         continue
                     if share_hash not in self.verified.shares and max(self.shares[after_tail_hash].time_seen for after_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120: # XXX stupid
@@ -392,7 +395,7 @@ class OkayTracker(bitcoin_data.Tracker):
                 #print "_________", to_remove
         
         # drop tails
-        while True:
+        for i in xrange(1000):
             to_remove = set()
             for tail, heads in self.tails.iteritems():
                 if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
@@ -539,6 +542,7 @@ class ShareStore(object):
 
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
+    SHARE_PERIOD2 = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
@@ -549,6 +553,7 @@ class Mainnet(bitcoin_data.Mainnet):
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9332
 
 class Testnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
@@ -562,6 +567,7 @@ class Testnet(bitcoin_data.Testnet):
     P2P_PORT = 19333
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19332
 
 class NamecoinMainnet(namecoin.NamecoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -575,6 +581,7 @@ class NamecoinMainnet(namecoin.NamecoinMainnet):
     P2P_PORT = 9334
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9331
 
 class NamecoinTestnet(namecoin.NamecoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -588,6 +595,7 @@ class NamecoinTestnet(namecoin.NamecoinTestnet):
     P2P_PORT = 19334
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19331
 
 class IxcoinMainnet(ixcoin.IxcoinMainnet):
     SHARE_PERIOD = 10 # seconds
@@ -601,6 +609,7 @@ class IxcoinMainnet(ixcoin.IxcoinMainnet):
     P2P_PORT = 9335
     MAX_TARGET = 2**256//2**32 - 1
     PERSIST = True
+    WORKER_PORT = 9330
 
 class IxcoinTestnet(ixcoin.IxcoinTestnet):
     SHARE_PERIOD = 1 # seconds
@@ -614,3 +623,34 @@ class IxcoinTestnet(ixcoin.IxcoinTestnet):
     P2P_PORT = 19335
     MAX_TARGET = 2**256//2**20 - 1
     PERSIST = False
+    WORKER_PORT = 19330
+
+class I0coinMainnet(i0coin.I0coinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    TARGET_LOOKBEHIND = 3600//10 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = 'b32e3f10c2ff221b'.decode('hex')
+    PREFIX = '6155537ed977a3b5'.decode('hex')
+    NAME = 'i0coin'
+    P2P_PORT = 9336
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = False
+    WORKER_PORT = 9329
+
+class I0coinTestnet(i0coin.I0coinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = '7712c1a8181b5f2e'.decode('hex')
+    PREFIX = '792d2e7d770fbe68'.decode('hex')
+    NAME = 'i0coin_testnet'
+    P2P_PORT = 19336
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
+    WORKER_PORT = 19329
+
+nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet]))

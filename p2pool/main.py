@@ -105,6 +105,7 @@ def main(args):
                     continue
                 contents.shared = True
                 contents.stored = True
+                contents.time_seen = 0
                 tracker.add(contents)
                 if len(tracker.shares) % 1000 == 0 and tracker.shares:
                     print "    %i" % (len(tracker.shares),)
@@ -115,6 +116,7 @@ def main(args):
         print "    ...inserting %i verified shares..." % (len(known_verified),)
         for h in known_verified:
             if h not in tracker.shares:
+                ss.forget_verified_share(h)
                 continue
             tracker.verified.add(tracker.shares[h])
         print "    ...done loading %i shares!" % (len(tracker.shares),)
@@ -388,16 +390,17 @@ def main(args):
                     return ""
                 frac = stale_shares/shares
                 return 2*struct.pack('<H', int(65535*frac + .5))
+            subsidy = args.net.BITCOIN_SUBSIDY_FUNC(state['height']) + sum(tx.value_in - tx.value_out for tx in extra_txs)
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
                 new_script=payout_script,
-                subsidy=args.net.BITCOIN_SUBSIDY_FUNC(state['height']) + sum(tx.value_in - tx.value_out for tx in extra_txs),
+                subsidy=subsidy,
                 nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)) + get_stale_frac(),
                 block_target=state['target'],
                 net=args.net,
             )
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], generate_tx['tx_outs'][-1]['value']*1e-8, args.net.BITCOIN_SYMBOL)
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL)
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + [tx.tx for tx in extra_txs]
@@ -418,7 +421,7 @@ def main(args):
         my_shares = set()
         times = {}
         
-        def got_response(data):
+        def got_response(data, user):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
@@ -443,7 +446,7 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
-                print 'GOT SHARE! %s prev %s age %.2fs' % (p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
+                print 'GOT SHARE! %s %s prev %s age %.2fs' % (user, p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])
@@ -578,7 +581,7 @@ def main(args):
         if hasattr(signal, 'SIGALRM'):
             def watchdog_handler(signum, frame):
                 print 'Watchdog timer went off at:'
-                traceback.print_exc()
+                traceback.print_stack()
             
             signal.signal(signal.SIGALRM, watchdog_handler)
             task.LoopingCall(signal.alarm, 30).start(1)
@@ -595,11 +598,13 @@ def main(args):
         while True:
             yield deferral.sleep(3)
             try:
+                if time.time() > current_work2.value['last_update'] + 60:
+                    print '''LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead'''
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     if height > 2:
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 120))
-                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 120), 2**100)
+                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**100)
                         shares, stale_shares = get_share_counts()
                         print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
                             math.format(att_s),
@@ -630,14 +635,44 @@ def main(args):
         reactor.stop()
 
 def run():
-    parser = argparse.ArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
+    class FixedArgumentParser(argparse.ArgumentParser):
+        def _read_args_from_files(self, arg_strings):
+            # expand arguments referencing files
+            new_arg_strings = []
+            for arg_string in arg_strings:
+                
+                # for regular arguments, just add them back into the list
+                if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
+                    new_arg_strings.append(arg_string)
+                
+                # replace arguments referencing files with the file content
+                else:
+                    try:
+                        args_file = open(arg_string[1:])
+                        try:
+                            arg_strings = []
+                            for arg_line in args_file.read().splitlines():
+                                for arg in self.convert_arg_line_to_args(arg_line):
+                                    arg_strings.append(arg)
+                            arg_strings = self._read_args_from_files(arg_strings)
+                            new_arg_strings.extend(arg_strings)
+                        finally:
+                            args_file.close()
+                    except IOError:
+                        err = sys.exc_info()[1]
+                        self.error(str(err))
+            
+            # return the modified argument list
+            return new_arg_strings
+    
+    parser = FixedArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
     parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--net',
-        help='use specified network (choices: bitcoin (default), namecoin, ixcoin)',
-        action='store', choices=set(['bitcoin', 'namecoin', 'ixcoin']), default='bitcoin', dest='net_name')
+        help='use specified network (default: bitcoin)',
+        action='store', choices=sorted(x for x in p2pool.nets if 'testnet' not in x), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
-        help='use the testnet',
+        help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
     parser.add_argument('--debug',
         help='debugging mode',
@@ -648,6 +683,9 @@ def run():
     parser.add_argument('--charts',
         help='generate charts on the web interface (requires PIL and pygame)',
         action='store_const', const=True, default=False, dest='charts')
+    parser.add_argument('--logfile',
+        help='''log to specific file (defaults to <network_name>.log in run_p2pool.py's directory)''',
+        type=str, action='store', default=None, dest='logfile')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
@@ -665,8 +703,8 @@ def run():
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: 9332)',
-        type=int, action='store', default=9332, dest='worker_port')
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329, +10000 for testnets)',
+        type=int, action='store', default=None, dest='worker_port')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
@@ -679,10 +717,10 @@ def run():
         help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 normally. 18333 for testnet)',
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
-    bitcoind_group.add_argument(metavar='BITCOIND_RPC_USERNAME',
-        help='bitcoind RPC interface username',
-        type=str, action='store', dest='bitcoind_rpc_username')
-    bitcoind_group.add_argument(metavar='BITCOIND_RPC_PASSWORD',
+    bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
+        help='bitcoind RPC interface username (default: empty)',
+        type=str, action='store', default='', nargs='?', dest='bitcoind_rpc_username')
+    bitcoind_group.add_argument(metavar='BITCOIND_RPCPASSWORD',
         help='bitcoind RPC interface password',
         type=str, action='store', dest='bitcoind_rpc_password')
     
@@ -690,57 +728,54 @@ def run():
     
     if args.debug:
         p2pool_init.DEBUG = True
-        class ReopeningFile(object):
-            def __init__(self, *open_args, **open_kwargs):
-                self.open_args, self.open_kwargs = open_args, open_kwargs
-                self.inner_file = open(*self.open_args, **self.open_kwargs)
-            def reopen(self):
-                self.inner_file.close()
-                self.inner_file = open(*self.open_args, **self.open_kwargs)
-            def write(self, data):
-                self.inner_file.write(data)
-            def flush(self):
-                self.inner_file.flush()
-        class TeePipe(object):
-            def __init__(self, outputs):
-                self.outputs = outputs
-            def write(self, data):
-                for output in self.outputs:
-                    output.write(data)
-            def flush(self):
-                for output in self.outputs:
-                    output.flush()
-        class TimestampingPipe(object):
-            def __init__(self, inner_file):
-                self.inner_file = inner_file
-                self.buf = ''
-                self.softspace = 0
-            def write(self, data):
-                buf = self.buf + data
-                lines = buf.split('\n')
-                for line in lines[:-1]:
-                    self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
-                    self.inner_file.flush()
-                self.buf = lines[-1]
-            def flush(self):
-                pass
-        logfile = ReopeningFile(os.path.join(os.path.dirname(sys.argv[0]), 'debug.log'), 'w')
-        sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
-        if hasattr(signal, "SIGUSR1"):
-            def sigusr1(signum, frame):
-                print '''Caught SIGUSR1, closing 'debug.log'...'''
-                logfile.reopen()
-                print '''...and reopened 'debug.log' after catching SIGUSR1.'''
-            signal.signal(signal.SIGUSR1, sigusr1)
     
-    args.net = {
-        ('bitcoin', False): p2pool.Mainnet,
-        ('bitcoin', True): p2pool.Testnet,
-        ('namecoin', False): p2pool.NamecoinMainnet,
-        ('namecoin', True): p2pool.NamecoinTestnet,
-        ('ixcoin', False): p2pool.IxcoinMainnet,
-        ('ixcoin', True): p2pool.IxcoinTestnet,
-    }[args.net_name, args.testnet]
+    if args.logfile is None:
+       args.logfile = os.path.join(os.path.dirname(sys.argv[0]), args.net_name + ('_testnet' if args.testnet else '') + '.log')
+    
+    class ReopeningFile(object):
+        def __init__(self, *open_args, **open_kwargs):
+            self.open_args, self.open_kwargs = open_args, open_kwargs
+            self.inner_file = open(*self.open_args, **self.open_kwargs)
+        def reopen(self):
+            self.inner_file.close()
+            self.inner_file = open(*self.open_args, **self.open_kwargs)
+        def write(self, data):
+            self.inner_file.write(data)
+        def flush(self):
+            self.inner_file.flush()
+    class TeePipe(object):
+        def __init__(self, outputs):
+            self.outputs = outputs
+        def write(self, data):
+            for output in self.outputs:
+                output.write(data)
+        def flush(self):
+            for output in self.outputs:
+                output.flush()
+    class TimestampingPipe(object):
+        def __init__(self, inner_file):
+            self.inner_file = inner_file
+            self.buf = ''
+            self.softspace = 0
+        def write(self, data):
+            buf = self.buf + data
+            lines = buf.split('\n')
+            for line in lines[:-1]:
+                self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
+                self.inner_file.flush()
+            self.buf = lines[-1]
+        def flush(self):
+            pass
+    logfile = ReopeningFile(args.logfile, 'w')
+    sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
+    if hasattr(signal, "SIGUSR1"):
+        def sigusr1(signum, frame):
+            print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
+            logfile.reopen()
+            print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
+        signal.signal(signal.SIGUSR1, sigusr1)
+    
+    args.net = p2pool.nets[args.net_name + ('_testnet' if args.testnet else '')]
     
     if args.bitcoind_rpc_port is None:
         args.bitcoind_rpc_port = args.net.BITCOIN_RPC_PORT
@@ -750,6 +785,9 @@ def run():
     
     if args.p2pool_port is None:
         args.p2pool_port = args.net.P2P_PORT
+    
+    if args.worker_port is None:
+        args.worker_port = args.net.WORKER_PORT
     
     if args.address is not None:
         try:

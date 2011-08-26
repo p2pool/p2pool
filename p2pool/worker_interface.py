@@ -12,9 +12,17 @@ from p2pool import data as p2pool_data
 from p2pool.util import jsonrpc, deferred_resource, variable
 from p2pool.bitcoin import data as bitcoin_data
 
-def get_payout_script(request, net):
+def get_username(request):
     try:
-        user = base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
+        return base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
+    except: # XXX
+        return None
+
+def get_payout_script(request, net):
+    user = get_username(request)
+    if user is None:
+        return None
+    try:
         return bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(user, net))
     except: # XXX blah
         return None
@@ -106,19 +114,19 @@ class WorkerInterface(jsonrpc.Server):
         request.setHeader('X-Long-Polling', '/long-polling')
         
         if data is not None:
-            defer.returnValue(self.response_callback(data))
+            defer.returnValue(self.response_callback(data, get_username(request)))
         
         defer.returnValue((yield self.getwork(request)))
     rpc_getwork.takes_request = True
     
     @defer.inlineCallbacks
     def getwork(self, request, long_poll=False):
-        id = random.randrange(10000)
-        if p2pool.DEBUG:
-            print 'POLL %i START long_poll=%r' % (id, long_poll)
-        
         request_id = get_id(request)
         memory = get_memory(request)
+        
+        id = random.randrange(10000)
+        if p2pool.DEBUG:
+            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'))
         
         if request_id not in self.last_cache_invalidation:
             self.last_cache_invalidation[request_id] = variable.Variable((None, None))
