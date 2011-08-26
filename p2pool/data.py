@@ -8,7 +8,7 @@ import os
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin, ixcoin, i0coin
+from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -653,4 +653,18 @@ class I0coinTestnet(i0coin.I0coinTestnet):
     PERSIST = False
     WORKER_PORT = 19329
 
-nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet]))
+class SolidcoinMainnet(solidcoin.SolidcoinMainnet):
+    SHARE_PERIOD = 10
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    TARGET_LOOKBEHIND = 3600//10 # shares
+    SPREAD = 3 # blocks
+    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', solidcoin.SolidcoinMainnet))
+    IDENTIFIER = '9cc9c421cca258cd'.decode('hex')
+    PREFIX = 'c059125b8070f00a'.decode('hex')
+    NAME = 'solidcoin'
+    P2P_PORT = 9337
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = True
+    WORKER_PORT = 9328
+
+nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet]))
