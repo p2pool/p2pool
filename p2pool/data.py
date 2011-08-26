@@ -227,7 +227,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         period = net.SHARE_PERIOD
-        if previous_share.timestamp >= 1314582520 and hasattr(net, 'SHARE_PERIOD2'):
+        if previous_share.timestamp >= 1314582520 and hasattr(net, 'SHARE_PERIOD2'): # note that this is 3 days from that commit, not a week
             period = net.SHARE_PERIOD2
         pre_target = 2**256//(period*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
