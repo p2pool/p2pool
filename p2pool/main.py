@@ -105,6 +105,7 @@ def main(args):
                     continue
                 contents.shared = True
                 contents.stored = True
+                contents.time_seen = 0
                 tracker.add(contents)
                 if len(tracker.shares) % 1000 == 0 and tracker.shares:
                     print "    %i" % (len(tracker.shares),)
