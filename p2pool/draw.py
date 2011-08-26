@@ -21,6 +21,8 @@ def get_uniform(bound, *data):
 def get_pos(share, t, d):
     x = 5 + get_uniform(d.get_width() - 10, share.hash, "pos")
     y = d.get_height() - (t - share.time_seen)*10
+    if y < -10000: y = -10000
+    if y > 10000: y = 10000
     return v(x, y)
 
 def get_color(data):
