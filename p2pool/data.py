@@ -225,8 +225,11 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
+        period = net.SHARE_PERIOD
+        if previous_share.timestamp >= 1314582520 and hasattr(net, 'SHARE_PERIOD2'):
+            period = net.SHARE_PERIOD2
+        pre_target = 2**256//(period*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
@@ -539,6 +542,7 @@ class ShareStore(object):
 
 class Mainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 5 # seconds
+    SHARE_PERIOD2 = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
