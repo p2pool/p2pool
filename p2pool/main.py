@@ -774,6 +774,7 @@ def run():
             logfile.reopen()
             print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
         signal.signal(signal.SIGUSR1, sigusr1)
+    task.LoopingCall(logfile.reopen).start(5)
     
     args.net = p2pool.nets[args.net_name + ('_testnet' if args.testnet else '')]
     
