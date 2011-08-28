@@ -126,7 +126,7 @@ class WorkerInterface(jsonrpc.Server):
         
         id = random.randrange(10000)
         if p2pool.DEBUG:
-            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'))
+            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), get_username(request))
         
         if request_id not in self.last_cache_invalidation:
             self.last_cache_invalidation[request_id] = variable.Variable((None, None))
