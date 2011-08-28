@@ -137,7 +137,7 @@ class WorkerInterface(jsonrpc.Server):
         
         if long_poll and work == thought_work[-1]:
             if p2pool.DEBUG:
-                print 'POLL %i WAITING' % (id,)
+                print 'POLL %i WAITING user=%r' % (id, get_username(request))
             yield defer.DeferredList([self.work.changed.get_deferred(), self.last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
         work = self.work.value
         
@@ -146,13 +146,13 @@ class WorkerInterface(jsonrpc.Server):
             work = work.copy()
             work['previous_block'] = random.randrange(2**256)
             if p2pool.DEBUG:
-                print 'POLL %i FAKED' % (id,)
+                print 'POLL %i FAKED user=%r' % (id, get_username(request))
             self.holds.set_hold(request_id, .01)
         res = self.compute(work, get_payout_script(request, self.net))
         
         self.last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
-            print 'POLL %i END %s' % (id, p2pool_data.format_hash(work['best_share_hash']))
+            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(work['best_share_hash']), get_username(request))
         
         if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
             res = res.update(target2=2**256//2**32 - 1)
