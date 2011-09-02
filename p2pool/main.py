@@ -728,6 +728,7 @@ def run():
             self.buf = lines[-1]
         def flush(self):
             pass
+    open(args.logfile, 'w').close()
     logfile = ReopeningFile(args.logfile, 'a')
     sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
     if hasattr(signal, "SIGUSR1"):
