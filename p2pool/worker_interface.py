@@ -154,7 +154,7 @@ class WorkerInterface(jsonrpc.Server):
         if p2pool.DEBUG:
             print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(work['best_share_hash']), get_username(request))
         
-        if request.getHeader('X-All-Targets') is None and res.target2 > 2**256//2**32 - 1:
-            res = res.update(target2=2**256//2**32 - 1)
+        if request.getHeader('X-All-Targets') is None and res.share_target > 2**256//2**32 - 1:
+            res = res.update(share_target=2**256//2**32 - 1)
         
         defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))

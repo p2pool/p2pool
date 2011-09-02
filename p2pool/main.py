@@ -28,14 +28,36 @@ import p2pool as p2pool_init
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
-def getwork(bitcoind, ht):
-    # a block could arrive in between these two queries
-    work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
+def getwork(bitcoind, ht, net):
     try:
-        height = ht.getHeight(work.previous_block)
-    except ValueError:
-        height = 1000 # XXX
-    defer.returnValue((work, height))
+        work = yield bitcoind.rpc_getmemorypool()
+        defer.returnValue(dict(
+            version=work['version'],
+            previous_block_hash=int(work['previousblockhash'], 16),
+            transactions=[bitcoin.data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
+            subsidy=work['coinbasevalue'],
+            time=work['time'],
+            target=bitcoin.data.FloatingInteger(work['bits']),
+        ))
+    except jsonrpc.Error, e:
+        if e.code != -32601:
+            raise
+        
+        print "---> Update your bitcoind to support the 'getmemorypool' RPC call. Not including transactions in generated blocks! <---"
+        work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
+        try:
+            subsidy = net.BITCOIN_SUBSIDY_FUNC(ht.getHeight(work.previous_block))
+        except ValueError:
+            subsidy = net.BITCOIN_SUBSIDY_FUNC(1000)
+        
+        defer.returnValue(dict(
+            version=work.version,
+            previous_block_hash=work.previous_block,
+            transactions=[],
+            subsidy=subsidy,
+            time=work.timestamp,
+            target=work.block_target,
+        ))
 
 @deferral.retry('Error getting payout script from bitcoind:', 1)
 @defer.inlineCallbacks
@@ -139,17 +161,18 @@ def main(args):
         
         @defer.inlineCallbacks
         def set_real_work1():
-            work, height = yield getwork(bitcoind, ht)
-            changed = work.previous_block != current_work.value['previous_block'] if current_work.value is not None else True
+            work = yield getwork(bitcoind, ht, args.net)
+            changed = work['previous_block_hash'] != current_work.value['previous_block'] if current_work.value is not None else True
             current_work.set(dict(
-                version=work.version,
-                previous_block=work.previous_block,
-                target=work.target,
-                height=height,
+                version=work['version'],
+                previous_block=work['previous_block_hash'],
+                target=work['target'],
                 best_share_hash=current_work.value['best_share_hash'] if current_work.value is not None else None,
             ))
             current_work2.set(dict(
-                clock_offset=time.time() - work.timestamp,
+                transactions=work['transactions'],
+                subsidy=work['subsidy'],
+                clock_offset=time.time() - work['time'],
                 last_update=time.time(),
             ))
             if changed:
@@ -373,11 +396,6 @@ def main(args):
             if time.time() > current_work2.value['last_update'] + 60:
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
-            extra_txs_hashes, extra_txs_fees = memorypools.get(state['previous_block'], ([], 0))
-            extra_txs = [get_transaction.call_now(tx_hash, None) for tx_hash in extra_txs_hashes]
-            if any(x is None for x in extra_txs):
-                print "haven't gotten all yet", sum(x is None for x in extra_txs), len(extra_txs)
-                extra_txs, extra_txs_fees = [], 0
             # XXX assuming generate_tx is smallish here..
             def get_stale_frac():
                 shares, stale_shares = get_share_counts()
@@ -385,7 +403,7 @@ def main(args):
                     return ""
                 frac = stale_shares/shares
                 return 2*struct.pack('<H', int(65535*frac + .5))
-            subsidy = args.net.BITCOIN_SUBSIDY_FUNC(state['height']) + extra_txs_fees
+            subsidy = current_work2.value['subsidy']
             generate_tx = p2pool.generate_transaction(
                 tracker=tracker,
                 previous_share_hash=state['best_share_hash'],
@@ -395,10 +413,10 @@ def main(args):
                 block_target=state['target'],
                 net=args.net,
             )
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Includes %i transactions with %.6f %s fees' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, len(extra_txs), extra_txs_fees*1e-8, args.net.BITCOIN_SYMBOL)
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
-            transactions = [generate_tx] + list(extra_txs)
+            transactions = [generate_tx] + list(current_work2.value['transactions'])
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             
@@ -487,23 +505,6 @@ def main(args):
         print
         
         # done!
-        
-        get_transaction = deferral.DeferredCacher(defer.inlineCallbacks(lambda tx_hash: defer.returnValue((yield (yield factory.getProtocol()).get_tx(tx_hash)))), expiring_dict.ExpiringDict(300))
-        memorypools = expiring_dict.ExpiringDict(300)
-        
-        @defer.inlineCallbacks
-        def memorypool_thread():
-            while True:
-                try:
-                    res = yield deferral.retry('Error while getting memory pool:', 1)(bitcoind.rpc_getmemorypool)()
-                    tx_hashes = [int(tx_hash_hex, 16) for tx_hash_hex in res['transactions']]
-                    memorypools[int(res['previous_block'], 16)] = tx_hashes, res['fees']
-                    for tx_hash in tx_hashes:
-                        get_transaction.call_now(tx_hash, None)
-                except:
-                    log.err(None, 'Error while getting memory pool:')
-                yield deferral.sleep(random.expovariate(1/10))
-        memorypool_thread()
         
         # do new getwork when a block is heard on the p2p interface
         

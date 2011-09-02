@@ -15,14 +15,14 @@ class Error(Exception):
             raise TypeError('code must be an int')
         if not isinstance(message, unicode):
             raise TypeError('message must be a unicode')
-        self._code, self._message, self._data = code, message, data
+        self.code, self.message, self.data = code, message, data
     def __str__(self):
-        return '%i %s' % (self._code, self._message) + (' %r' % (self._data, ) if self._data is not None else '')
+        return '%i %s' % (self.code, self.message) + (' %r' % (self.data, ) if self.data is not None else '')
     def _to_obj(self):
         return {
-            'code': self._code,
-            'message': self._message,
-            'data': self._data,
+            'code': self.code,
+            'message': self.message,
+            'data': self.data,
         }
 
 class Proxy(object):
