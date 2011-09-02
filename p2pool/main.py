@@ -561,7 +561,7 @@ def main(args):
             yield deferral.sleep(3)
             try:
                 if time.time() > current_work2.value['last_update'] + 60:
-                    print '''LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead'''
+                    print '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
                 if current_work.value['best_share_hash'] is not None:
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     if height > 2:
