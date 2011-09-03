@@ -109,7 +109,7 @@ def main(args):
         else:
             my_script = bitcoin.data.pubkey_hash_to_script2(args.pubkey_hash)
         print '    ...success!'
-        print '    Payout script:', my_script.encode('hex')
+        print '    Payout script:', bitcoin.data.script2_to_human(my_script, args.net)
         print
         
         print 'Loading cached block headers...'
