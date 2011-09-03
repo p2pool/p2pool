@@ -694,13 +694,28 @@ def run():
     if args.logfile is None:
        args.logfile = os.path.join(os.path.dirname(sys.argv[0]), args.net_name + ('_testnet' if args.testnet else '') + '.log')
     
-    class ReopeningFile(object):
-        def __init__(self, *open_args, **open_kwargs):
-            self.open_args, self.open_kwargs = open_args, open_kwargs
-            self.inner_file = open(*self.open_args, **self.open_kwargs)
+    class LogFile(object):
+        def __init__(self, filename):
+            self.filename = filename
+            self.inner_file = None
+            self.reopen()
         def reopen(self):
-            self.inner_file.close()
-            self.inner_file = open(*self.open_args, **self.open_kwargs)
+            if self.inner_file is not None:
+                self.inner_file.close()
+            f = open(self.filename, 'rb')
+            f.seek(0, os.SEEK_END)
+            length = f.tell()
+            if length > 100*1000*1000:
+                f.seek(-1000*1000, os.SEEK_END)
+                while True:
+                    if f.read(1) in ('', '\n'):
+                        break
+                data = f.read()
+                f.close()
+                f = open(self.filename, 'wb')
+                f.write(data)
+            f.close()
+            self.inner_file = open(self.filename, 'a')
         def write(self, data):
             self.inner_file.write(data)
         def flush(self):
@@ -728,8 +743,7 @@ def run():
             self.buf = lines[-1]
         def flush(self):
             pass
-    open(args.logfile, 'w').close()
-    logfile = ReopeningFile(args.logfile, 'a')
+    logfile = LogFile(args.logfile)
     sys.stdout = sys.stderr = log.DefaultObserver.stderr = TimestampingPipe(TeePipe([sys.stderr, logfile]))
     if hasattr(signal, "SIGUSR1"):
         def sigusr1(signum, frame):
