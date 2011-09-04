@@ -702,6 +702,7 @@ def run():
         def reopen(self):
             if self.inner_file is not None:
                 self.inner_file.close()
+            open(self.filename, 'a').close()
             f = open(self.filename, 'rb')
             f.seek(0, os.SEEK_END)
             length = f.tell()
