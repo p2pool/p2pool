@@ -246,18 +246,6 @@ def main(args):
                 #print 'Received share %s from %r' % (p2pool.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
                 
                 tracker.add(share)
-                #for peer2, share_hash in desired:
-                #    print 'Requesting parent share %x' % (share_hash,)
-                #    peer2.send_getshares(hashes=[share_hash], parents=2000)
-                
-                if share.bitcoin_hash <= share.header['target']:
-                    print
-                    print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool.format_hash(share.hash), share.bitcoin_hash,)
-                    print
-                    if factory.conn.value is not None:
-                        factory.conn.value.send_block(block=share.as_block(tracker, args.net))
-                    else:
-                        print 'No bitcoind connection! Erp!'
             
             if shares and peer is not None:
                 peer_heads.setdefault(shares[0].hash, set()).add(peer)
@@ -267,6 +255,17 @@ def main(args):
             
             if len(shares) > 5:
                 print '... done processing %i shares. Have: %i/~%i' % (len(shares), len(tracker.shares), 2*args.net.CHAIN_LENGTH)
+        
+        @tracker.verified.added.watch
+        def _(share):
+            if share.bitcoin_hash <= share.header['target']:
+                print
+                print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool.format_hash(share.hash), share.bitcoin_hash,)
+                print
+                if factory.conn.value is not None:
+                    factory.conn.value.send_block(block=share.as_block(tracker, args.net))
+                else:
+                    print 'No bitcoind connection! Erp!'
         
         def p2p_share_hashes(share_hashes, peer):
             t = time.time()
