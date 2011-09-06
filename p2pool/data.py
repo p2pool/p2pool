@@ -357,7 +357,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         
         if p2pool.DEBUG:
-            print len(self.verified.tails.get(best_tail, [])), '\\/\\/\\/\\/\\/'
+            print len(self.verified.tails.get(best_tail, [])), 'chain heads. Top 10:'
             if len(scores) > 10:
                 print '    ...'
             for h in scores[-10:]:
