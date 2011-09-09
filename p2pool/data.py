@@ -514,22 +514,21 @@ class ShareStore(object):
         return [self.filename + str(suffix) for suffix in suffixes], self.filename + str(suffixes[-1] + 1) if suffixes else self.filename + str(0)
     
     def forget_share(self, share_hash):
-        to_remove = set()
         for filename, (share_hashes, verified_hashes) in self.known.iteritems():
             if share_hash in share_hashes:
                 share_hashes.remove(share_hash)
-            if not share_hashes and not verified_hashes:
-                to_remove.add(filename)
-        for filename in to_remove:
-            self.known.pop(filename)
-            os.remove(filename)
-            print "REMOVED", filename
+        self.check_remove()
     
     def forget_verified_share(self, share_hash):
-        to_remove = set()
         for filename, (share_hashes, verified_hashes) in self.known.iteritems():
             if share_hash in verified_hashes:
                 verified_hashes.remove(share_hash)
+        self.check_remove()
+    
+    def check_remove(self):
+        to_remove = set()
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            #print filename, len(share_hashes) + len(verified_hashes)
             if not share_hashes and not verified_hashes:
                 to_remove.add(filename)
         for filename in to_remove:
