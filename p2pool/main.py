@@ -236,12 +236,13 @@ def main(args):
             if len(shares) > 5:
                 print 'Processing %i shares...' % (len(shares),)
             
-            some_new = False
+            new_count = 0
             for share in shares:
                 if share.hash in tracker.shares:
                     #print 'Got duplicate share, ignoring. Hash: %s' % (p2pool.format_hash(share.hash),)
                     continue
-                some_new = True
+                
+                new_count += 1
                 
                 #print 'Received share %s from %r' % (p2pool.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
                 
@@ -250,11 +251,11 @@ def main(args):
             if shares and peer is not None:
                 peer_heads.setdefault(shares[0].hash, set()).add(peer)
             
-            if some_new:
+            if new_count:
                 set_real_work2()
             
             if len(shares) > 5:
-                print '... done processing %i shares. Have: %i/~%i' % (len(shares), len(tracker.shares), 2*args.net.CHAIN_LENGTH)
+                print '... done processing %i shares. New: %i Have: %i/~%i' % (len(shares), new_count, len(tracker.shares), 2*args.net.CHAIN_LENGTH)
         
         @tracker.verified.added.watch
         def _(share):
