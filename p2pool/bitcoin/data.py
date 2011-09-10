@@ -7,7 +7,7 @@ import struct
 from twisted.internet import defer
 
 from . import base58, skiplists
-from p2pool.util import bases, math, variable
+from p2pool.util import bases, math, variable, expiring_dict, memoize, dicts
 import p2pool
 
 class EarlyEnd(Exception):
@@ -28,13 +28,21 @@ def size((data, pos)):
 class Type(object):
     # the same data can have only one unpacked representation, but multiple packed binary representations
     
-    #def __hash__(self):
-    #    return hash(tuple(self.__dict__.items()))
+    def __hash__(self):
+        rval = getattr(self, '_hash', None)
+        if rval is None:
+            try:
+                rval = self._hash = hash((type(self), frozenset(self.__dict__.items())))
+            except:
+                print self.__dict__
+                raise
+        return rval
     
-    #def __eq__(self, other):
-    #    if not isinstance(other, Type):
-    #        raise NotImplementedError()
-    #    return self.__dict__ == other.__dict__
+    def __eq__(self, other):
+        return type(other) is type(self) and other.__dict__ == self.__dict__
+    
+    def __ne__(self, other):
+        return not (self == other)
     
     def _unpack(self, data):
         obj, (data2, pos) = self.read((data, 0))
@@ -68,14 +76,21 @@ class Type(object):
         
         return obj
     
-    def pack(self, obj):
+    def pack2(self, obj):
         data = self._pack(obj)
         
         if p2pool.DEBUG:
             if self._unpack(data) != obj:
-                raise AssertionError()
+                raise AssertionError((self._unpack(data), obj))
         
         return data
+    
+    _backing = expiring_dict.ExpiringDict(100)
+    pack2 = memoize.memoize_with_backing(_backing, [unpack])(pack2)
+    unpack = memoize.memoize_with_backing(_backing)(unpack) # doesn't have an inverse
+    
+    def pack(self, obj):
+        return self.pack2(dicts.immutify(obj))
     
     
     def pack_base58(self, obj):
@@ -147,13 +162,14 @@ class FixedStrType(Type):
 class EnumType(Type):
     def __init__(self, inner, values):
         self.inner = inner
-        self.values = values
+        self.values = dicts.frozendict(values)
         
-        self.keys = {}
+        keys = {}
         for k, v in values.iteritems():
-            if v in self.keys:
+            if v in keys:
                 raise ValueError('duplicate value in values')
-            self.keys[v] = k
+            keys[v] = k
+        self.keys = dicts.frozendict(keys)
     
     def read(self, file):
         data, file = self.inner.read(file)
@@ -273,7 +289,7 @@ def get_record(fields):
 
 class ComposedType(Type):
     def __init__(self, fields):
-        self.fields = fields
+        self.fields = tuple(fields)
     
     def read(self, file):
         item = get_record(k for k, v in self.fields)
@@ -402,7 +418,7 @@ address_type = ComposedType([
 tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
-        ('previous_output', PossiblyNoneType(dict(hash=0, index=2**32 - 1), ComposedType([
+        ('previous_output', PossiblyNoneType(dicts.frozendict(hash=0, index=2**32 - 1), ComposedType([
             ('hash', HashType()),
             ('index', StructType('<I')),
         ]))),

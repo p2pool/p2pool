@@ -1,6 +1,6 @@
 _nothing = object()
 
-def memoize_with_backing(backing, inverse_of=None):
+def memoize_with_backing(backing, has_inverses=set()):
     def a(f):
         def b(*args):
             res = backing.get((f, args), _nothing)
@@ -10,10 +10,8 @@ def memoize_with_backing(backing, inverse_of=None):
             res = f(*args)
             
             backing[(f, args)] = res
-            if inverse_of is not None:
-                if len(args) != 1:
-                    raise ValueError('inverse_of can only be used for functions taking one argument')
-                backing[(inverse_of, (res,))] = args[0]
+            for inverse in has_inverses:
+                backing[(inverse, args[:-1] + (res,))] = args[-1]
             
             return res
         return b
