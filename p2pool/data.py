@@ -560,7 +560,7 @@ class Testnet(bitcoin_data.Testnet):
     PREFIX = '3f6057a15036f441'.decode('hex')
     NAME = 'bitcoin_testnet'
     P2P_PORT = 19333
-    MAX_TARGET = 2**256//2**20 - 1
+    MAX_TARGET = 2**256//2**32 - 1
     PERSIST = False
     WORKER_PORT = 19332
 
