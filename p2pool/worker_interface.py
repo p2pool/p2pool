@@ -28,6 +28,8 @@ def get_payout_script(request, net):
         return None
 
 def get_memory(request):
+    if request.getHeader('X-Miner-Extensions') is not None and 'workidentifier' in request.getHeader('X-Miner-Extensions').split(' '):
+        return 0
     if request.getHeader('X-Work-Identifier') is not None:
         return 0
     user_agent = request.getHeader('User-Agent')
