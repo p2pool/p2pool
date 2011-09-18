@@ -475,7 +475,8 @@ def main(args):
             if current_work.value['best_share_hash'] is not None:
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                 att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 720))
-                return json.dumps(att_s)
+                fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
+                return json.dumps(int(att_s / (1. - (math.median(fracs) if fracs else 0))))
             return json.dumps(None)
         
         def get_users():
@@ -568,18 +569,18 @@ def main(args):
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 720))
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**100)
                         shares, stale_shares = get_share_counts()
+                        fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
                         print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
-                            math.format(att_s),
+                            math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,
                             len(tracker.verified.shares),
                             len(tracker.shares),
                             weights.get(my_script, 0)/total_weight*100,
-                            math.format(weights.get(my_script, 0)/total_weight*att_s),
+                            math.format(int(weights.get(my_script, 0)*att_s//total_weight / (1. - (math.median(fracs) if fracs else 0)))),
                             shares,
                             stale_shares,
                             len(p2p_node.peers),
                         ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool_init.DEBUG else '')
-                        fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
                         if fracs:
                             med = math.median(fracs)
                             print 'Median stale proportion:', med
