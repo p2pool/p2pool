@@ -377,11 +377,15 @@ def main(args):
         
         share_counter = skiplists.CountsSkipList(tracker, run_identifier)
         removed_unstales = set()
-        def get_share_counts():
+        def get_share_counts(doa=False):
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
             matching_in_chain = share_counter(current_work.value['best_share_hash'], max(0, height - 1)) | removed_unstales
             shares_in_chain = my_shares & matching_in_chain
             stale_shares = my_shares - matching_in_chain
+            if doa:
+                stale_doa_shares = stale_shares & doa_shares
+                stale_not_doa_shares = stale_shares - stale_doa_shares
+                return len(shares_in_chain) + len(stale_shares), len(stale_doa_shares), len(stale_not_doa_shares)
             return len(shares_in_chain) + len(stale_shares), len(stale_shares)
         @tracker.verified.removed.watch
         def _(share):
@@ -434,6 +438,7 @@ def main(args):
             return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
         
         my_shares = set()
+        doa_shares = set()
         times = {}
         
         def got_response(data, user):
@@ -461,6 +466,8 @@ def main(args):
                     return False
                 share = p2pool.Share.from_block(block)
                 my_shares.add(share.hash)
+                if share.previous_hash != current_work.value['best_share_hash']:
+                    doa_shares.add(share.hash)
                 print 'GOT SHARE! %s %s prev %s age %.2fs' % (user, p2pool.format_hash(share.hash), p2pool.format_hash(share.previous_hash), time.time() - times[share.nonce]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
@@ -570,9 +577,10 @@ def main(args):
                     if height > 2:
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 720))
                         weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**100)
-                        shares, stale_shares = get_share_counts()
+                        shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
+                        stale_shares = stale_doa_shares + stale_not_doa_shares
                         fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
-                        print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i stale) Peers: %i' % (
+                        print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                             math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,
                             len(tracker.verified.shares),
@@ -580,7 +588,8 @@ def main(args):
                             weights.get(my_script, 0)/total_weight*100,
                             math.format(int(weights.get(my_script, 0)*att_s//total_weight / (1. - (math.median(fracs) if fracs else 0)))),
                             shares,
-                            stale_shares,
+                            stale_not_doa_shares,
+                            stale_doa_shares,
                             len(p2p_node.peers),
                         ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool_init.DEBUG else '')
                         if fracs:
