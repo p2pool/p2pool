@@ -350,8 +350,8 @@ class OkayTracker(bitcoin_data.Tracker):
         # decide best verified head
         scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-            ht.get_min_height(self.verified.shares[h].previous_block),
             #self.verified.shares[h].peer is None,
+            ht.get_min_height(self.verified.shares[h].previous_block),
             -self.verified.shares[h].time_seen
         ))
         
@@ -363,8 +363,8 @@ class OkayTracker(bitcoin_data.Tracker):
             for h in scores[-10:]:
                 print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
                     self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-                    ht.get_min_height(self.verified.shares[h].previous_block),
                     self.verified.shares[h].peer is None,
+                    ht.get_min_height(self.verified.shares[h].previous_block),
                     -self.verified.shares[h].time_seen
                 )
         
