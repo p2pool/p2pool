@@ -393,7 +393,7 @@ def main(args):
                 removed_unstales.add(share.hash)
         
         def compute(state, payout_script):
-            if payout_script is None:
+            if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
             if state['best_share_hash'] is None and args.net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
@@ -506,6 +506,7 @@ def main(args):
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
+        web_root.putChild('fee', WebInterface(lambda: json.dumps(arg.worker_fee), 'application/json'))
         if args.charts:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
@@ -679,6 +680,9 @@ def run():
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
         help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329, +10000 for testnets)',
         type=int, action='store', default=None, dest='worker_port')
+    worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
+        help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:9332/fee . default: 0''',
+        type=float, action='store', default=0, dest='worker_fee')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
