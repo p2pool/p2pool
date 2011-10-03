@@ -70,6 +70,11 @@ class BaseProtocol(protocol.Protocol):
                 print 'RECV', command, repr(payload2)[:100]
                 log.err(None, 'Error handling message: (see RECV line)')
                 continue
+            
+            self.gotPacket()
+    
+    def gotPacket(self):
+        pass
     
     def sendPacket(self, command, payload2):
         if len(command) >= 12:
