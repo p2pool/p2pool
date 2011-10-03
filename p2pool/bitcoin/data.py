@@ -595,6 +595,8 @@ class Tracker(object):
         
         # move height refs referencing children down to this, so they can be moved up in one step
         if share.previous_hash in self.reverse_height_refs:
+            for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.previous_hash, object()), set())):
+                self.get_last(x)
             for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
                 self.get_last(x)
             assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
