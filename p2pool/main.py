@@ -78,11 +78,14 @@ def get_payout_script2(bitcoind, net):
 @defer.inlineCallbacks
 def main(args):
     try:
-        if args.charts:
-            from . import draw
-        
         print 'p2pool (version %s)' % (p2pool_init.__version__,)
         print
+        try:
+            from . import draw
+        except ImportError:
+            draw = None
+            print "Install Pygame and PIL to enable visualizations! Visualizations disabled."
+            print
         
         # connect to bitcoind over JSON-RPC and do initial getwork
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
@@ -507,7 +510,7 @@ def main(args):
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
         web_root.putChild('fee', WebInterface(lambda: json.dumps(arg.worker_fee), 'application/json'))
-        if args.charts:
+        if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
         reactor.listenTCP(args.worker_port, server.Site(web_root))
@@ -655,9 +658,6 @@ def run():
     parser.add_argument('-a', '--address',
         help='generate to this address (defaults to requesting one from bitcoind)',
         type=str, action='store', default=None, dest='address')
-    parser.add_argument('--charts',
-        help='generate charts on the web interface (requires PIL and pygame)',
-        action='store_const', const=True, default=False, dest='charts')
     parser.add_argument('--logfile',
         help='''log to specific file (defaults to <network_name>.log in run_p2pool.py's directory)''',
         type=str, action='store', default=None, dest='logfile')
