@@ -8,7 +8,6 @@ import hashlib
 import random
 import struct
 import time
-import zlib
 
 from twisted.internet import defer, protocol, reactor, task
 from twisted.python import log
@@ -32,8 +31,8 @@ class BaseProtocol(protocol.Protocol):
             command = (yield 12).rstrip('\0')
             length, = struct.unpack('<I', (yield 4))
             
-            if length > self.max_net_payload_length:
-                print 'length too long'
+            if length > self.max_payload_length:
+                print 'length too large'
                 continue
             
             if self.use_checksum:
@@ -41,24 +40,7 @@ class BaseProtocol(protocol.Protocol):
             else:
                 checksum = None
             
-            compressed_payload = yield length
-            
-            if self.compress:
-                try:
-                    d = zlib.decompressobj()
-                    payload = d.decompress(compressed_payload, self.max_payload_length)
-                    if d.unconsumed_tail:
-                        print 'compressed payload expanded too much'
-                        continue
-                    assert not len(payload) > self.max_payload_length
-                except:
-                    log.err(None, 'Failure decompressing message:')
-                    continue
-            else:
-                if len(compressed_payload) > self.max_payload_length:
-                    print 'compressed payload expanded too much'
-                    continue
-                payload = compressed_payload
+            payload = yield length
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
@@ -103,10 +85,7 @@ class BaseProtocol(protocol.Protocol):
             checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
         else:
             checksum = ''
-        compressed_payload = zlib.compress(payload) if self.compress else payload
-        if len(compressed_payload) > self.max_net_payload_length:
-            raise TooLong('compressed payload too long')
-        data = self._prefix + struct.pack('<12sI', command, len(compressed_payload)) + checksum + compressed_payload
+        data = self._prefix + struct.pack('<12sI', command, len(payload)) + checksum + payload
         self.transport.write(data)
     
     def __getattr__(self, attr):
@@ -123,9 +102,8 @@ class Protocol(BaseProtocol):
     
     version = 0
     
-    max_payload_length = max_net_payload_length = 1000000
+    max_payload_length = 1000000
     
-    compress = False
     @property
     def use_checksum(self):
         return self.version >= 209
