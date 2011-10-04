@@ -24,15 +24,16 @@ class Event(object):
         return res
     
     def happened(self, *event):
+        once, self._once = self._once, None
+        
         for id, func in sorted(self.observers.iteritems()):
             try:
                 func(*event)
             except:
                 log.err(None, "Error while processing Event callbacks:")
         
-        if self._once is not None:
-            self._once.happened(*event)
-            self._once = None
+        if once is not None:
+            once.happened(*event)
     
     def get_deferred(self, timeout=None):
         once = self.once
