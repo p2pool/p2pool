@@ -15,7 +15,7 @@ import json
 import signal
 import traceback
 
-from twisted.internet import defer, reactor, task, threads
+from twisted.internet import defer, reactor, task
 from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -603,8 +603,8 @@ def main(args):
                                 print '    Own:', stale_shares/shares
                                 if med < .99:
                                     print '    Own efficiency: %.02f%%' % (100*(1 - stale_shares/shares)/(1 - med),)
-                            
-                            
+            
+            
             except:
                 log.err()
     except:
@@ -642,9 +642,11 @@ def run():
             
             # return the modified argument list
             return new_arg_strings
+        
+        def convert_arg_line_to_args(self, arg_line):
+            return [arg for arg in arg_line.split() if arg.strip()]
     
     parser = FixedArgumentParser(description='p2pool (version %s)' % (p2pool_init.__version__,), fromfile_prefix_chars='@')
-    parser.convert_arg_line_to_args = lambda arg_line: (arg for arg in arg_line.split() if arg.strip())
     parser.add_argument('--version', action='version', version=p2pool_init.__version__)
     parser.add_argument('--net',
         help='use specified network (default: bitcoin)',
@@ -708,7 +710,7 @@ def run():
         p2pool_init.DEBUG = True
     
     if args.logfile is None:
-       args.logfile = os.path.join(os.path.dirname(sys.argv[0]), args.net_name + ('_testnet' if args.testnet else '') + '.log')
+        args.logfile = os.path.join(os.path.dirname(sys.argv[0]), args.net_name + ('_testnet' if args.testnet else '') + '.log')
     
     class LogFile(object):
         def __init__(self, filename):
