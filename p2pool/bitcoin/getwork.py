@@ -75,9 +75,10 @@ class BlockAttempt(object):
         
         if _check:
             extra = dict(getwork)
-            del extra['data'], extra['hash1'], extra['target'], extra['midstate']
+            del extra['data'], extra['hash1'], extra['target']
+            extra.pop('midstate', None)
             getwork_check = ba.getwork(_check=False, **extra)
-            if getwork_check != getwork:
+            if getwork_check != getwork and dict((k, v) for k, v in getwork_check.iteritems() if k != 'midstate') != getwork:
                 raise AssertionError('failed check - input invalid or implementation error')
         
         return ba
@@ -99,6 +100,12 @@ if __name__ == '__main__':
 }, _check=100)
     BlockAttempt.from_getwork({
         'midstate' : 'f4a9b048c0cb9791bc94b13ee0eec21e713963d524fd140b58bb754dd7b0955f',
+        'data' : '000000019a1d7342fb62090bda686b22d90f9f73d0f5c418b9c980cd0000011a00000000680b07c8a2f97ecd831f951806857e09f98a3b81cdef1fa71982934fef8dc3444e18585d1a0abbcf00000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
+        'hash1' : '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
+        'target' : '0000000000000000000000000000000000000000000000cfbb0a000000000000',
+        'extrathing': 'hi!',
+    })
+    BlockAttempt.from_getwork({
         'data' : '000000019a1d7342fb62090bda686b22d90f9f73d0f5c418b9c980cd0000011a00000000680b07c8a2f97ecd831f951806857e09f98a3b81cdef1fa71982934fef8dc3444e18585d1a0abbcf00000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
         'hash1' : '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
         'target' : '0000000000000000000000000000000000000000000000cfbb0a000000000000',
