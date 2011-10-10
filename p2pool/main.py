@@ -37,7 +37,7 @@ def getwork(bitcoind, ht, net):
             transactions=[bitcoin.data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
             subsidy=work['coinbasevalue'],
             time=work['time'],
-            target=bitcoin.data.FloatingInteger(work['bits']),
+            target=bitcoin.data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin.data.FloatingInteger(work['bits']),
         ))
     except jsonrpc.Error, e:
         if e.code != -32601:
