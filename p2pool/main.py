@@ -509,7 +509,7 @@ def main(args):
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
-        web_root.putChild('fee', WebInterface(lambda: json.dumps(arg.worker_fee), 'application/json'))
+        web_root.putChild('fee', WebInterface(lambda: json.dumps(args.worker_fee), 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
