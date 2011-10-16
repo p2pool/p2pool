@@ -790,7 +790,7 @@ def run():
         try:
             args.pubkey_hash = bitcoin.data.address_to_pubkey_hash(args.address, args.net)
         except Exception, e:
-            raise ValueError('error parsing address: ' + repr(e))
+            parser.error('error parsing address: ' + repr(e))
     else:
         args.pubkey_hash = None
     
