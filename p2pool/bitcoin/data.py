@@ -432,6 +432,13 @@ tx_type = ComposedType([
     ('lock_time', StructType('<I')),
 ])
 
+merkle_tx_type = ComposedType([
+    ('tx', tx_type),
+    ('block_hash', HashType()),
+    ('merkle_branch', ListType(HashType())),
+    ('index', StructType('<i')),
+])
+
 block_header_type = ComposedType([
     ('version', StructType('<I')),
     ('previous_block', PossiblyNoneType(0, HashType())),
@@ -444,6 +451,13 @@ block_header_type = ComposedType([
 block_type = ComposedType([
     ('header', block_header_type),
     ('txs', ListType(tx_type)),
+])
+
+aux_pow_type = ComposedType([
+    ('merkle_tx', merkle_tx_type),
+    ('merkle_branch', ListType(HashType())),
+    ('index', StructType('<i')),
+    ('parent_block_header', block_header_type),
 ])
 
 

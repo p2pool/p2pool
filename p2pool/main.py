@@ -171,6 +171,7 @@ def main(args):
                 previous_block=work['previous_block_hash'],
                 target=work['target'],
                 best_share_hash=current_work.value['best_share_hash'] if current_work.value is not None else None,
+                aux_work=current_work.value['aux_work'] if current_work.value is not None else None,
             ))
             current_work2.set(dict(
                 transactions=work['transactions'],
@@ -221,6 +222,24 @@ def main(args):
         set_real_work2()
         print '    ...success!'
         print
+        
+        @defer.inlineCallbacks
+        def set_merged_work():
+            if not args.merged_url:
+                return
+            while True:
+                merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
+                auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged.rpc_getauxblock)()
+                x = dict(current_work.value)
+                x['aux_work'] = dict(
+                    hash=int(auxblock['hash'], 16),
+                    target=bitcoin.data.HashType().unpack(auxblock['target'].decode('hex')),
+                    chain_id=auxblock['chainid'],
+                )
+                #print x['aux_work']
+                current_work.set(x)
+                yield deferral.sleep(1)
+        set_merged_work()
         
         start_time = time.time() - current_work2.value['clock_offset']
         
@@ -376,7 +395,7 @@ def main(args):
         # setup worker logic
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
-        run_identifier = struct.pack('<Q', random.randrange(2**64))
+        run_identifier = struct.pack('<I', random.randrange(2**32))
         
         share_counter = skiplists.CountsSkipList(tracker, run_identifier)
         removed_unstales = set()
@@ -405,6 +424,11 @@ def main(args):
             if time.time() > current_work2.value['last_update'] + 60:
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
+            if state['aux_work'] is not None:
+                aux_str = '\xfa\xbemm' + bitcoin.data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)
+            else:
+                aux_str = ''
+            
             # XXX assuming generate_tx is smallish here..
             def get_stale_frac():
                 shares, stale_shares = get_share_counts()
@@ -418,7 +442,7 @@ def main(args):
                 previous_share_hash=state['best_share_hash'],
                 new_script=payout_script,
                 subsidy=subsidy,
-                nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)) + get_stale_frac(),
+                nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + get_stale_frac() + aux_str,
                 block_target=state['target'],
                 net=args.net,
             )
@@ -463,6 +487,27 @@ def main(args):
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
+                try:
+                    aux_pow = dict(
+                        merkle_tx=dict(
+                            tx=transactions[0],
+                            block_hash=hash_,
+                            merkle_branch=[x['hash'] for x in p2pool.calculate_merkle_branch(transactions, 0)],
+                            index=0,
+                        ),
+                        merkle_branch=[],
+                        index=0,
+                        parent_block_header=header,
+                    )
+                    
+                    a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin.data.aux_pow_type.pack(aux_pow).encode('hex')
+                    #print a, b
+                    merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
+                    def _(res):
+                        print "MERGED RESULT:", res
+                    merged.rpc_getauxblock(a, b).addBoth(_)
+                except:
+                    log.err(None, 'Error while processing merged mining POW:')
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
                 if hash_ > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (hash_, target)
@@ -663,6 +708,12 @@ def run():
     parser.add_argument('--logfile',
         help='''log to specific file (defaults to <network_name>.log in run_p2pool.py's directory)''',
         type=str, action='store', default=None, dest='logfile')
+    parser.add_argument('--merged-url',
+        help='call getauxblock on this url to get work for merged mining',
+        type=str, action='store', default=None, dest='merged_url')
+    parser.add_argument('--merged-userpass',
+        help='merge daemon user and password, separated by a colon. Example: ncuser:ncpass',
+        type=str, action='store', default=None, dest='merged_userpass')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
@@ -793,6 +844,9 @@ def run():
             parser.error('error parsing address: ' + repr(e))
     else:
         args.pubkey_hash = None
+    
+    if (args.merged_url is None) ^ (args.merged_userpass is None):
+        parser.error('must specify --merged-url and --merged-userpass')
     
     reactor.callWhenRunning(main, args)
     reactor.run()
