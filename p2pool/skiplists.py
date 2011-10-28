@@ -58,7 +58,7 @@ class CountsSkipList(skiplist.SkipList):
         if element is None:
             raise AssertionError()
         share = self.tracker.shares[element]
-        return 1, set([share.hash]) if share.nonce[:8] == self.run_identifier else set()
+        return 1, set([share.hash]) if share.nonce.startswith(self.run_identifier) else set()
     
     def combine_deltas(self, (share_count1, share_hashes1), (share_count2, share_hashes2)):
         if share_hashes1 & share_hashes2:

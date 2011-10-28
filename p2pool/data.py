@@ -189,7 +189,7 @@ class Share(object):
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
         if len(gentx['tx_ins'][0]['script']) > 100:
-            raise ValueError('''coinbase too large!''')
+            raise ValueError('''coinbase too large! %i bytes''' % (len(gentx['tx_ins'][0]['script']),))
         
         if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
@@ -350,21 +350,21 @@ class OkayTracker(bitcoin_data.Tracker):
         # decide best verified head
         scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-            ht.get_min_height(self.verified.shares[h].previous_block),
             #self.verified.shares[h].peer is None,
+            ht.get_min_height(self.verified.shares[h].previous_block),
             -self.verified.shares[h].time_seen
         ))
         
         
         if p2pool.DEBUG:
-            print len(self.verified.tails.get(best_tail, [])), '\\/\\/\\/\\/\\/'
+            print len(self.verified.tails), "chain tails and", len(self.verified.tails.get(best_tail, [])), 'chain heads. Top 10 tails:'
             if len(scores) > 10:
                 print '    ...'
             for h in scores[-10:]:
                 print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
                     self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-                    ht.get_min_height(self.verified.shares[h].previous_block),
                     self.verified.shares[h].peer is None,
+                    ht.get_min_height(self.verified.shares[h].previous_block),
                     -self.verified.shares[h].time_seen
                 )
         
@@ -514,22 +514,21 @@ class ShareStore(object):
         return [self.filename + str(suffix) for suffix in suffixes], self.filename + str(suffixes[-1] + 1) if suffixes else self.filename + str(0)
     
     def forget_share(self, share_hash):
-        to_remove = set()
         for filename, (share_hashes, verified_hashes) in self.known.iteritems():
             if share_hash in share_hashes:
                 share_hashes.remove(share_hash)
-            if not share_hashes and not verified_hashes:
-                to_remove.add(filename)
-        for filename in to_remove:
-            self.known.pop(filename)
-            os.remove(filename)
-            print "REMOVED", filename
+        self.check_remove()
     
     def forget_verified_share(self, share_hash):
-        to_remove = set()
         for filename, (share_hashes, verified_hashes) in self.known.iteritems():
             if share_hash in verified_hashes:
                 verified_hashes.remove(share_hash)
+        self.check_remove()
+    
+    def check_remove(self):
+        to_remove = set()
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            #print filename, len(share_hashes) + len(verified_hashes)
             if not share_hashes and not verified_hashes:
                 to_remove.add(filename)
         for filename in to_remove:
@@ -561,7 +560,7 @@ class Testnet(bitcoin_data.Testnet):
     PREFIX = '3f6057a15036f441'.decode('hex')
     NAME = 'bitcoin_testnet'
     P2P_PORT = 19333
-    MAX_TARGET = 2**256//2**20 - 1
+    MAX_TARGET = 2**256//2**32 - 1
     PERSIST = False
     WORKER_PORT = 19332
 

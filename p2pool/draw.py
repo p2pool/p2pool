@@ -41,11 +41,12 @@ def go(share, tracker, t, d):
         previous_share = tracker.shares[share.previous_hash]
         previous_pos = get_pos(previous_share, t, d)
         vec_to_previous = previous_pos - pos
-        pygame.draw.polygon(d, c, [
-            (pos + perp_and_normalize_to(vec_to_previous, 5)).rounded,
-            (pos + perp_and_normalize_to(vec_to_previous, -5)).rounded,
-            previous_pos.rounded,
-        ])
+        if vec_to_previous.mag() > 1:
+            pygame.draw.polygon(d, c, [
+                (pos + perp_and_normalize_to(vec_to_previous, 5)).rounded,
+                (pos + perp_and_normalize_to(vec_to_previous, -5)).rounded,
+                previous_pos.rounded,
+            ])
     if share.peer is None:
         pygame.draw.circle(d, c, pos.rounded, 10, 2)
     for child_hash in tracker.reverse_shares.get(share.hash, set()):

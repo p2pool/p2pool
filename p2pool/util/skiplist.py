@@ -10,7 +10,7 @@ class SkipList(Base):
     def __init__(self):
         self.skips = expiring_dict.ExpiringDict(600)
     
-    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5))
+    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
     def __call__(self, start, *args, **kwargs):
         updates = {}
         pos = start

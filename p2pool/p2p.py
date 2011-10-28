@@ -26,9 +26,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._prefix = self.node.net.PREFIX
     
     max_payload_length = 1000000
-    max_net_payload_length = 2000000
     use_checksum = True
-    compress = False
     
     other_version = None
     node_var_watch = None
@@ -65,10 +63,21 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_setmode(mode=new_mode))
         
         reactor.callLater(10, self._connect_timeout)
+        self.timeout_delayed = reactor.callLater(100, self._timeout)
     
     def _connect_timeout(self):
         if not self.connected2 and self.transport.connected:
             print 'Handshake timed out, disconnecting from %s:%i' % self.addr
+            self.transport.loseConnection()
+    
+    def gotPacket(self):
+        if not self.timeout_delayed.called:
+            self.timeout_delayed.cancel()
+            self.timeout_delayed = reactor.callLater(100, self._timeout)
+    
+    def _timeout(self):
+        if self.transport.connected:
+            print 'Connection timed out, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
     
     @defer.inlineCallbacks

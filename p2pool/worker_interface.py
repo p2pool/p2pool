@@ -28,6 +28,8 @@ def get_payout_script(request, net):
         return None
 
 def get_memory(request):
+    if request.getHeader('X-Miner-Extensions') is not None and 'workidentifier' in request.getHeader('X-Miner-Extensions').split(' '):
+        return 0
     if request.getHeader('X-Work-Identifier') is not None:
         return 0
     user_agent = request.getHeader('User-Agent')
@@ -73,6 +75,7 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def render_GET(self, request):
         request.setHeader('Content-Type', 'application/json')
         request.setHeader('X-Long-Polling', '/long-polling')
+        request.setHeader('X-Roll-NTime', 'expire=60')
         try:
             try:
                 request.write(json.dumps({
@@ -112,6 +115,7 @@ class WorkerInterface(jsonrpc.Server):
     @defer.inlineCallbacks
     def rpc_getwork(self, request, data=None):
         request.setHeader('X-Long-Polling', '/long-polling')
+        request.setHeader('X-Roll-NTime', 'expire=60')
         
         if data is not None:
             defer.returnValue(self.response_callback(data, get_username(request)))
