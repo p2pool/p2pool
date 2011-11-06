@@ -672,7 +672,7 @@ class LitecoinMainnet(litecoin.LitecoinMainnet):
     PREFIX = '7208c1a53ef629b0'.decode('hex')
     NAME = 'litecoin'
     P2P_PORT = 9338
-    MAX_TARGET = 2**256//2**32 - 1
+    MAX_TARGET = 2**256//2**20 - 1
     PERSIST = True
     WORKER_PORT = 9327
 
