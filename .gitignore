@@ -1,0 +1,6 @@
+*.pyc
+*.dat
+*.iml
+*.log
+*_shares.*
+.idea

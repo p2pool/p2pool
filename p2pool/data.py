@@ -8,7 +8,7 @@ import os
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin
+from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin, litecoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -662,4 +662,32 @@ class SolidcoinMainnet(solidcoin.SolidcoinMainnet):
     PERSIST = True
     WORKER_PORT = 9328
 
-nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet]))
+class LitecoinMainnet(litecoin.LitecoinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 12 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
+    PREFIX = '7208c1a53ef629b0'.decode('hex')
+    NAME = 'litecoin'
+    P2P_PORT = 9338
+    MAX_TARGET = 2**256//2**32 - 1
+    PERSIST = True
+    WORKER_PORT = 9327
+
+class LitecoinTestnet(litecoin.LitecoinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 12 # blocks
+    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
+    PREFIX = 'ad9614f6466a39cf'.decode('hex')
+    NAME = 'litecoin_testnet'
+    P2P_PORT = 19338
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = False
+    WORKER_PORT = 19327
+
+nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet, LitecoinMainnet, LitecoinTestnet]))
