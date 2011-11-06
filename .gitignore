@@ -4,3 +4,4 @@
 *.log
 *_shares.*
 .idea
+p2pool/litecoin/build/*
