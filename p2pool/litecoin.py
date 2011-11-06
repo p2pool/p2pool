@@ -10,6 +10,7 @@ class LitecoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
+    BITCOIN_POW_SCRYPT = True;
     BITCOIN_SYMBOL = 'LTC'
 
 class LitecoinTestnet(object):
@@ -22,4 +23,5 @@ class LitecoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
+    BITCOIN_POW_SCRYPT = True;
     BITCOIN_SYMBOL = 'tLTC'

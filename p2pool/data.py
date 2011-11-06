@@ -98,20 +98,20 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
 
 class Share(object):
     @classmethod
-    def from_block(cls, block):
-        return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
+    def from_block(cls, block, net):
+        return cls(net, block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
     
     @classmethod
-    def from_share1a(cls, share1a):
-        return cls(**share1a)
+    def from_share1a(cls, share1a, net):
+        return cls(net, **share1a)
     
     @classmethod
-    def from_share1b(cls, share1b):
-        return cls(**share1b)
+    def from_share1b(cls, share1b, net):
+        return cls(net, **share1b)
     
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared stored peer'.split(' ')
     
-    def __init__(self, header, share_info, merkle_branch=None, other_txs=None):
+    def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -145,13 +145,18 @@ class Share(object):
         
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
-        
-        self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
-        self.hash = share1a_type.hash256(self.as_share1a())
-        
+
+        # use scrypt for Litecoin
+        if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
+            self.bitcoin_hash = bitcoin_data.block_header_type.scrypt(header)
+            self.hash = share1a_type.scrypt(self.as_share1a())
+        else:
+            self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
+            self.hash = share1a_type.hash256(self.as_share1a())
+
         if self.bitcoin_hash > self.target:
-            print 'hash', hex(self.bitcoin_hash)
-            print 'targ', hex(self.target)
+            print 'hash %x' % self.bitcoin_hash
+            print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
         if script.get_sigop_count(self.new_script) > 1:
@@ -466,11 +471,11 @@ class ShareStore(object):
                         type_id_str, data_hex = line.strip().split(' ')
                         type_id = int(type_id_str)
                         if type_id == 0:
-                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')))
+                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         elif type_id == 1:
-                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')))
+                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         elif type_id == 2:
@@ -686,7 +691,7 @@ class LitecoinTestnet(litecoin.LitecoinTestnet):
     PREFIX = 'ad9614f6466a39cf'.decode('hex')
     NAME = 'litecoin_testnet'
     P2P_PORT = 19338
-    MAX_TARGET = 2**256//2**20 - 1
+    MAX_TARGET = 2**256//2**17 - 1
     PERSIST = False
     WORKER_PORT = 19327
 

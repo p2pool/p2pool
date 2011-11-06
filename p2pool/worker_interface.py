@@ -118,7 +118,7 @@ class WorkerInterface(jsonrpc.Server):
         request.setHeader('X-Roll-NTime', 'expire=60')
         
         if data is not None:
-            defer.returnValue(self.response_callback(data, get_username(request)))
+            defer.returnValue(self.response_callback(data, get_username(request), self.net))
         
         defer.returnValue((yield self.getwork(request)))
     rpc_getwork.takes_request = True

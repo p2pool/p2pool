@@ -468,7 +468,7 @@ def main(args):
         doa_shares = set()
         times = {}
         
-        def got_response(data, user):
+        def got_response(data, user, net):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
@@ -478,12 +478,22 @@ def main(args):
                     return False
                 block = dict(header=header, txs=transactions)
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
-                if hash_ <= block['header']['target'] or p2pool_init.DEBUG:
+                pow = hash_;
+
+                # use scrypt for Litecoin
+                if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
+                    pow = bitcoin.data.block_header_type.scrypt(block['header']);
+#                    print 'LTC: hash256 %x' % hash_
+#                    print 'LTC: scrypt  %x' % pow
+#                    print 'LTC: target  %x' % block['header']['target']
+#                    print 'LTC: starget %x' % p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
+
+                if pow <= block['header']['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=block)
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if hash_ <= block['header']['target']:
+                    if pow <= block['header']['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
@@ -509,10 +519,10 @@ def main(args):
                 except:
                     log.err(None, 'Error while processing merged mining POW:')
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
-                if hash_ > target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (hash_, target)
+                if pow > target:
+                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
                     return False
-                share = p2pool.Share.from_block(block)
+                share = p2pool.Share.from_block(block, net)
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)

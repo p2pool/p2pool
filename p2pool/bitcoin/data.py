@@ -106,6 +106,13 @@ class Type(object):
     def hash256(self, obj):
         return HashType().unpack(hashlib.sha256(hashlib.sha256(self.pack(obj)).digest()).digest())
 
+    ltc_scrypt = None
+    def scrypt(self, obj):
+        # dynamically import ltc_scrypt so you will only get an error on runtime
+        if (not self.ltc_scrypt):
+            self.ltc_scrypt = __import__('ltc_scrypt')
+        return HashType().unpack(self.ltc_scrypt.getPoWHash(self.pack(obj)))
+
 class VarIntType(Type):
     # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
     def read(self, file):
