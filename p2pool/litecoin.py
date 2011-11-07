@@ -11,6 +11,7 @@ class LitecoinMainnet(object):
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
     BITCOIN_POW_SCRYPT = True;
+    BITCOIN_FEE = False;
     BITCOIN_SYMBOL = 'LTC'
 
 class LitecoinTestnet(object):
@@ -24,4 +25,5 @@ class LitecoinTestnet(object):
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
     BITCOIN_POW_SCRYPT = True;
+    BITCOIN_FEE = False;
     BITCOIN_SYMBOL = 'tLTC'

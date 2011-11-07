@@ -243,11 +243,17 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
-    
-    amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+
+    if getattr(net, 'BITCOIN_FEE', True):
+        amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
+        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    else:
+        amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
     if any(x < 0 for x in amounts.itervalues()):
