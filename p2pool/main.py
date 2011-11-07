@@ -487,27 +487,30 @@ def main(args):
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
-                try:
-                    aux_pow = dict(
-                        merkle_tx=dict(
-                            tx=transactions[0],
-                            block_hash=hash_,
-                            merkle_branch=[x['hash'] for x in p2pool.calculate_merkle_branch(transactions, 0)],
+                
+                if args.merged_url is not None:
+                    try:
+                        aux_pow = dict(
+                            merkle_tx=dict(
+                                tx=transactions[0],
+                                block_hash=hash_,
+                                merkle_branch=[x['hash'] for x in p2pool.calculate_merkle_branch(transactions, 0)],
+                                index=0,
+                            ),
+                            merkle_branch=[],
                             index=0,
-                        ),
-                        merkle_branch=[],
-                        index=0,
-                        parent_block_header=header,
-                    )
-                    
-                    a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin.data.aux_pow_type.pack(aux_pow).encode('hex')
-                    #print a, b
-                    merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
-                    def _(res):
-                        print "MERGED RESULT:", res
-                    merged.rpc_getauxblock(a, b).addBoth(_)
-                except:
-                    log.err(None, 'Error while processing merged mining POW:')
+                            parent_block_header=header,
+                        )
+                        
+                        a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin.data.aux_pow_type.pack(aux_pow).encode('hex')
+                        #print a, b
+                        merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
+                        def _(res):
+                            print "MERGED RESULT:", res
+                        merged.rpc_getauxblock(a, b).addBoth(_)
+                    except:
+                        log.err(None, 'Error while processing merged mining POW:')
+                
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
                 if hash_ > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (hash_, target)
