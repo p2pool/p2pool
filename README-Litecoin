@@ -1,0 +1,28 @@
+In order to run p2pool with the Litecoin network, you would need to build and install the
+ltc_scrypt module that includes the scrypt proof of work code that Litecoin uses for hashes.
+
+    cd p2pool/litecoin
+    python setup.py install
+        or if on linux:
+    sudo python setup.py install
+
+
+To use p2pool, you must be running your own local litecoind. p2pool connects to
+this litecoin over both its p2p interface and its RPC interface. For standard
+configurations, using p2p should be as simple as:
+
+    python run_p2pool.py --net litecoin <rpc_username> <rpc_password>
+
+Then run your miner program, connecting to 127.0.0.1 on port 9327 (19327 for testnet) with any
+username and password.
+
+
+If you are behind a NAT, it will help to enable TCP port forwarding on your
+router. Forward port 9338 (19338 for testnet) to the host running p2pool.py.
+
+
+Use
+
+    python run_p2pool.py --help
+
+for additional options.
