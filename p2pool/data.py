@@ -244,7 +244,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
 
-    if getattr(net, 'BITCOIN_FEE', True):
+    if net.SCRIPT:
         amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
         amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
@@ -678,7 +678,7 @@ class LitecoinMainnet(litecoin.LitecoinMainnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    SCRIPT = None # no fee
     IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
     PREFIX = '7208c1a53ef629b0'.decode('hex')
     NAME = 'litecoin'
@@ -692,7 +692,7 @@ class LitecoinTestnet(litecoin.LitecoinTestnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
+    SCRIPT = None # no fee
     IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
     PREFIX = 'ad9614f6466a39cf'.decode('hex')
     NAME = 'litecoin_testnet'
