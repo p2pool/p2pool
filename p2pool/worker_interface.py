@@ -36,6 +36,7 @@ def get_memory(request):
     user_agent2 = '' if user_agent is None else user_agent.lower()
     if 'java' in user_agent2 or 'diablominer' in user_agent2: return 0 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 0
+    if 'tenebrix miner' in user_agent2: return 0
     if 'ufasoft' in user_agent2: return 0 # not confirmed
     if 'cgminer' in user_agent2: return 1
     if 'poclbm' in user_agent2: return 1
