@@ -416,7 +416,7 @@ def main(args):
         def _(share):
             if share.hash in my_shares and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_unstales.add(share.hash)
-        
+
         def compute(state, payout_script):
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
@@ -631,7 +631,8 @@ def main(args):
             if a != b:
                 return None
             return a/65535
-        
+
+        pool_str = None;
         while True:
             yield deferral.sleep(3)
             try:
@@ -645,7 +646,7 @@ def main(args):
                         shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                         stale_shares = stale_doa_shares + stale_not_doa_shares
                         fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
-                        print 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
+                        str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                             math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,
                             len(tracker.verified.shares),
@@ -657,6 +658,9 @@ def main(args):
                             stale_doa_shares,
                             len(p2p_node.peers),
                         ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool_init.DEBUG else '')
+                        if (str != pool_str):
+                            print str;
+                            pool_str = str;
                         if fracs:
                             med = math.median(fracs)
                             print 'Median stale proportion:', med
