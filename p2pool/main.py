@@ -442,7 +442,7 @@ def main(args):
                 previous_share_hash=state['best_share_hash'],
                 new_script=payout_script,
                 subsidy=subsidy,
-                nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + get_stale_frac() + aux_str,
+                nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + aux_str + get_stale_frac(),
                 block_target=state['target'],
                 net=args.net,
             )
