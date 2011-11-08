@@ -104,7 +104,7 @@ class Server(deferred_resource.DeferredResource):
         try:
             try:
                 method = req['method']
-                if not isinstance(method, unicode):
+                if not isinstance(method, basestring):
                     raise ValueError()
                 params = req.get('params', [])
                 if not isinstance(params, list):
