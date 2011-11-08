@@ -36,6 +36,7 @@ def get_memory(request):
     user_agent2 = '' if user_agent is None else user_agent.lower()
     if 'java' in user_agent2 or 'diablominer' in user_agent2: return 0 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 0
+    if 'tenebrix miner' in user_agent2: return 0
     if 'ufasoft' in user_agent2: return 0 # not confirmed
     if 'cgminer' in user_agent2: return 1
     if 'poclbm' in user_agent2: return 1
@@ -118,7 +119,7 @@ class WorkerInterface(jsonrpc.Server):
         request.setHeader('X-Roll-NTime', 'expire=60')
         
         if data is not None:
-            defer.returnValue(self.response_callback(data, get_username(request)))
+            defer.returnValue(self.response_callback(data, get_username(request), self.net))
         
         defer.returnValue((yield self.getwork(request)))
     rpc_getwork.takes_request = True
@@ -158,7 +159,7 @@ class WorkerInterface(jsonrpc.Server):
         if p2pool.DEBUG:
             print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(work['best_share_hash']), get_username(request))
         
-        if request.getHeader('X-All-Targets') is None and res.share_target > 2**256//2**32 - 1:
-            res = res.update(share_target=2**256//2**32 - 1)
-        
+        if request.getHeader('X-All-Targets') is None and res.share_target > self.net.MAX_TARGET:
+            res = res.update(share_target=self.net.MAX_TARGET)
+
         defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))

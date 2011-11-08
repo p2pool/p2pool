@@ -343,6 +343,9 @@ def main(args):
                 nodes.add(((yield reactor.resolve(host)), args.net.P2P_PORT))
             except:
                 log.err(None, 'Error resolving bootstrap node IP:')
+
+        if args.net_name == 'litecoin':
+            nodes.add(((yield reactor.resolve('liteco.in')), args.net.P2P_PORT))
         
         p2p_node = p2p.Node(
             current_work=current_work,
@@ -468,7 +471,7 @@ def main(args):
         doa_shares = set()
         times = {}
         
-        def got_response(data, user):
+        def got_response(data, user, net):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
@@ -478,12 +481,22 @@ def main(args):
                     return False
                 block = dict(header=header, txs=transactions)
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
-                if hash_ <= block['header']['target'] or p2pool_init.DEBUG:
+                pow = hash_;
+
+                # use scrypt for Litecoin
+                if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
+                    pow = bitcoin.data.block_header_type.scrypt(block['header']);
+#                    print 'LTC: hash256 %x' % hash_
+#                    print 'LTC: scrypt  %x' % pow
+#                    print 'LTC: target  %x' % block['header']['target']
+#                    print 'LTC: starget %x' % p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
+
+                if pow <= block['header']['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=block)
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if hash_ <= block['header']['target']:
+                    if pow <= block['header']['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
@@ -512,10 +525,10 @@ def main(args):
                         log.err(None, 'Error while processing merged mining POW:')
                 
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
-                if hash_ > target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (hash_, target)
+                if pow > target:
+                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
                     return False
-                share = p2pool.Share.from_block(block)
+                share = p2pool.Share.from_block(block, net)
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)
@@ -734,7 +747,7 @@ def run():
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329, +10000 for testnets)',
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329 solidcoin: 9328 litecoin: 9327, +10000 for testnets)',
         type=int, action='store', default=None, dest='worker_port')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:9332/fee . default: 0''',
@@ -745,10 +758,10 @@ def run():
         help='connect to a bitcoind at this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332, 8338 for ixcoin)',
+        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332 ixcoin: 8338 i0coin: 7332 litecoin: 9332)',
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 normally. 18333 for testnet)',
+        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 namecoin: 8334 ixcoin: 8337 i0coin: 7333 solidcoin: 7555 litecoin: 9333, +10000 for testnets)',
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',

@@ -1,0 +1,7 @@
+*.pyc
+*.dat
+*.iml
+*.log
+*_shares.*
+.idea
+p2pool/litecoin/build/*
