@@ -8,7 +8,7 @@ import os
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin
+from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin, litecoin
 from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math
 
@@ -98,20 +98,20 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
 
 class Share(object):
     @classmethod
-    def from_block(cls, block):
-        return cls(block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
+    def from_block(cls, block, net):
+        return cls(net, block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
     
     @classmethod
-    def from_share1a(cls, share1a):
-        return cls(**share1a)
+    def from_share1a(cls, share1a, net):
+        return cls(net, **share1a)
     
     @classmethod
-    def from_share1b(cls, share1b):
-        return cls(**share1b)
+    def from_share1b(cls, share1b, net):
+        return cls(net, **share1b)
     
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared stored peer'.split(' ')
     
-    def __init__(self, header, share_info, merkle_branch=None, other_txs=None):
+    def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -145,13 +145,18 @@ class Share(object):
         
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
-        
-        self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
-        self.hash = share1a_type.hash256(self.as_share1a())
-        
+
+        # use scrypt for Litecoin
+        if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
+            self.bitcoin_hash = bitcoin_data.block_header_type.scrypt(header)
+            self.hash = share1a_type.scrypt(self.as_share1a())
+        else:
+            self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
+            self.hash = share1a_type.hash256(self.as_share1a())
+
         if self.bitcoin_hash > self.target:
-            print 'hash', hex(self.bitcoin_hash)
-            print 'targ', hex(self.target)
+            print 'hash %x' % self.bitcoin_hash
+            print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
         if script.get_sigop_count(self.new_script) > 1:
@@ -238,11 +243,17 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
-    
-    amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
-    amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+
+    if net.SCRIPT:
+        amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
+        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    else:
+        amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+        amounts[new_script] = amounts.get(new_script, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
     if any(x < 0 for x in amounts.itervalues()):
@@ -466,11 +477,11 @@ class ShareStore(object):
                         type_id_str, data_hex = line.strip().split(' ')
                         type_id = int(type_id_str)
                         if type_id == 0:
-                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')))
+                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         elif type_id == 1:
-                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')))
+                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         elif type_id == 2:
@@ -662,4 +673,32 @@ class SolidcoinMainnet(solidcoin.SolidcoinMainnet):
     PERSIST = True
     WORKER_PORT = 9328
 
-nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet]))
+class LitecoinMainnet(litecoin.LitecoinMainnet):
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 12 # blocks
+    SCRIPT = None # no fee
+    IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
+    PREFIX = '7208c1a53ef629b0'.decode('hex')
+    NAME = 'litecoin'
+    P2P_PORT = 9338
+    MAX_TARGET = 2**256//2**20 - 1
+    PERSIST = True
+    WORKER_PORT = 9327
+
+class LitecoinTestnet(litecoin.LitecoinTestnet):
+    SHARE_PERIOD = 1 # seconds
+    CHAIN_LENGTH = 24*60*60//5 # shares
+    TARGET_LOOKBEHIND = 200 # shares
+    SPREAD = 12 # blocks
+    SCRIPT = None # no fee
+    IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
+    PREFIX = 'ad9614f6466a39cf'.decode('hex')
+    NAME = 'litecoin_testnet'
+    P2P_PORT = 19338
+    MAX_TARGET = 2**256//2**17 - 1
+    PERSIST = False
+    WORKER_PORT = 19327
+
+nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet, LitecoinMainnet, LitecoinTestnet]))
