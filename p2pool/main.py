@@ -471,7 +471,7 @@ def main(args):
         doa_shares = set()
         times = {}
         
-        def got_response(data, user, net):
+        def got_response(data, user):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
@@ -484,7 +484,7 @@ def main(args):
                 pow = hash_;
 
                 # use scrypt for Litecoin
-                if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
+                if (getattr(args.net, 'BITCOIN_POW_SCRYPT', False)):
                     pow = bitcoin.data.block_header_type.scrypt(block['header']);
 #                    print 'LTC: hash256 %x' % hash_
 #                    print 'LTC: scrypt  %x' % pow
@@ -528,7 +528,7 @@ def main(args):
                 if pow > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
                     return False
-                share = p2pool.Share.from_block(block, net)
+                share = p2pool.Share.from_block(block, args.net)
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)
