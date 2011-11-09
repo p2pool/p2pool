@@ -625,7 +625,7 @@ def main(args):
         
         
         def read_stale_frac(share):
-            if len(share.nonce) != 20:
+            if len(share.nonce) < 4:
                 return None
             a, b = struct.unpack("<HH", share.nonce[-4:])
             if a != b:
