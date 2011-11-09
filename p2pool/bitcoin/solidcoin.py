@@ -1,6 +1,6 @@
 from twisted.internet import defer
 
-class SolidcoinMainnet(object):
+class Mainnet(object):
     BITCOIN_P2P_PREFIX = 'deadbabe'.decode('hex')
     BITCOIN_P2P_PORT = 7555
     BITCOIN_ADDRESS_VERSION = 125

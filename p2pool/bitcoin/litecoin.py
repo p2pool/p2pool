@@ -1,6 +1,6 @@
 from twisted.internet import defer
 
-class LitecoinMainnet(object):
+class Mainnet(object):
     BITCOIN_P2P_PREFIX = 'fbc0b6db'.decode('hex')
     BITCOIN_P2P_PORT = 9333
     BITCOIN_ADDRESS_VERSION = 48
@@ -13,7 +13,7 @@ class LitecoinMainnet(object):
     BITCOIN_POW_SCRYPT = True;
     BITCOIN_SYMBOL = 'LTC'
 
-class LitecoinTestnet(object):
+class Testnet(object):
     BITCOIN_P2P_PREFIX = 'fcc1b7dc'.decode('hex')
     BITCOIN_P2P_PORT = 19333
     BITCOIN_ADDRESS_VERSION = 111

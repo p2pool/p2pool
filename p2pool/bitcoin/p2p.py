@@ -429,7 +429,7 @@ class HeightTracker(object):
         self._clear_task.stop()
 
 if __name__ == '__main__':
-    factory = ClientFactory(bitcoin_data.Mainnet)
+    factory = ClientFactory(bitcoin_data.BitcoinMainnet)
     reactor.connectTCP('127.0.0.1', 8333, factory)
     h = HeightTracker(factory)
     

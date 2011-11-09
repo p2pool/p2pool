@@ -8,8 +8,8 @@ import os
 from twisted.python import log
 
 import p2pool
-from p2pool import skiplists, namecoin, ixcoin, i0coin, solidcoin, litecoin
-from p2pool.bitcoin import data as bitcoin_data, script
+from p2pool import skiplists
+from p2pool.bitcoin import data as bitcoin_data, script, namecoin, ixcoin, i0coin, solidcoin, litecoin
 from p2pool.util import memoize, expiring_dict, math
 
 
@@ -547,7 +547,7 @@ class ShareStore(object):
             os.remove(filename)
             print "REMOVED", filename
 
-class Mainnet(bitcoin_data.Mainnet):
+class BitcoinMainnet(bitcoin_data.Mainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -561,7 +561,7 @@ class Mainnet(bitcoin_data.Mainnet):
     PERSIST = True
     WORKER_PORT = 9332
 
-class Testnet(bitcoin_data.Testnet):
+class BitcoinTestnet(bitcoin_data.Testnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -575,7 +575,7 @@ class Testnet(bitcoin_data.Testnet):
     PERSIST = False
     WORKER_PORT = 19332
 
-class NamecoinMainnet(namecoin.NamecoinMainnet):
+class NamecoinMainnet(namecoin.Mainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -589,7 +589,7 @@ class NamecoinMainnet(namecoin.NamecoinMainnet):
     PERSIST = True
     WORKER_PORT = 9331
 
-class NamecoinTestnet(namecoin.NamecoinTestnet):
+class NamecoinTestnet(namecoin.Testnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -603,7 +603,7 @@ class NamecoinTestnet(namecoin.NamecoinTestnet):
     PERSIST = False
     WORKER_PORT = 19331
 
-class IxcoinMainnet(ixcoin.IxcoinMainnet):
+class IxcoinMainnet(ixcoin.Mainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -617,7 +617,7 @@ class IxcoinMainnet(ixcoin.IxcoinMainnet):
     PERSIST = True
     WORKER_PORT = 9330
 
-class IxcoinTestnet(ixcoin.IxcoinTestnet):
+class IxcoinTestnet(ixcoin.Testnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -631,7 +631,7 @@ class IxcoinTestnet(ixcoin.IxcoinTestnet):
     PERSIST = False
     WORKER_PORT = 19330
 
-class I0coinMainnet(i0coin.I0coinMainnet):
+class I0coinMainnet(i0coin.Mainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -645,7 +645,7 @@ class I0coinMainnet(i0coin.I0coinMainnet):
     PERSIST = False
     WORKER_PORT = 9329
 
-class I0coinTestnet(i0coin.I0coinTestnet):
+class I0coinTestnet(i0coin.Testnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -659,12 +659,12 @@ class I0coinTestnet(i0coin.I0coinTestnet):
     PERSIST = False
     WORKER_PORT = 19329
 
-class SolidcoinMainnet(solidcoin.SolidcoinMainnet):
+class SolidcoinMainnet(solidcoin.Mainnet):
     SHARE_PERIOD = 10
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', solidcoin.SolidcoinMainnet))
+    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', solidcoin.Mainnet))
     IDENTIFIER = '9cc9c421cca258cd'.decode('hex')
     PREFIX = 'c059125b8070f00a'.decode('hex')
     NAME = 'solidcoin'
@@ -673,7 +673,7 @@ class SolidcoinMainnet(solidcoin.SolidcoinMainnet):
     PERSIST = True
     WORKER_PORT = 9328
 
-class LitecoinMainnet(litecoin.LitecoinMainnet):
+class LitecoinMainnet(litecoin.Mainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -687,7 +687,7 @@ class LitecoinMainnet(litecoin.LitecoinMainnet):
     PERSIST = True
     WORKER_PORT = 9327
 
-class LitecoinTestnet(litecoin.LitecoinTestnet):
+class LitecoinTestnet(litecoin.Testnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -701,4 +701,4 @@ class LitecoinTestnet(litecoin.LitecoinTestnet):
     PERSIST = False
     WORKER_PORT = 19327
 
-nets = dict((net.NAME, net) for net in set([Mainnet, Testnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet, LitecoinMainnet, LitecoinTestnet]))
+nets = dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, NamecoinMainnet, NamecoinTestnet, IxcoinMainnet, IxcoinTestnet, I0coinMainnet, I0coinTestnet, SolidcoinMainnet, LitecoinMainnet, LitecoinTestnet]))

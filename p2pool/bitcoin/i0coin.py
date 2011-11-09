@@ -1,6 +1,6 @@
 from twisted.internet import defer
 
-class I0coinMainnet(object):
+class Mainnet(object):
     BITCOIN_P2P_PREFIX = 'f1b2b3d4'.decode('hex')
     BITCOIN_P2P_PORT = 7333
     BITCOIN_ADDRESS_VERSION = 105
@@ -14,7 +14,7 @@ class I0coinMainnet(object):
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 48*100000000 >> (height + 1)//218750)
     BITCOIN_SYMBOL = 'I0C'
 
-class I0coinTestnet(object):
+class Testnet(object):
     BITCOIN_P2P_PREFIX = 'f5b6b7d8'.decode('hex')
     BITCOIN_P2P_PORT = 17333
     BITCOIN_ADDRESS_VERSION = 112
