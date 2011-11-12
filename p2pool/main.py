@@ -501,7 +501,7 @@ def main(args):
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
                 
-                if args.merged_url is not None:
+                if current_work.value['aux_work'] is not None and pow <= current_work.value['aux_work']['target']:
                     try:
                         aux_pow = dict(
                             merkle_tx=dict(
