@@ -628,7 +628,7 @@ def main(args):
             if len(share.nonce) < 4:
                 return None
             a, b = struct.unpack("<HH", share.nonce[-4:])
-            if a != b:
+            if a == 0 or a != b:
                 return None
             return a/65535
 
