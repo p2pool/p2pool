@@ -448,8 +448,9 @@ def main(args):
                     print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
             
-            if timestamp > 42:
-                generate_tx = p2pool.new_generate_transaction(
+            if timestamp > 42e20:
+                is_new = True
+                new_share_data, generate_tx = p2pool.new_generate_transaction(
                     tracker=tracker,
                     new_share_data=dict(
                         previous_share_hash=state['best_share_hash'],
@@ -464,7 +465,8 @@ def main(args):
                     net=args.net,
                 )
             else:
-                generate_tx = p2pool.generate_transaction(
+                is_new = False
+                share_data, generate_tx = p2pool.generate_transaction(
                     tracker=tracker,
                     previous_share_hash=state['best_share_hash'],
                     new_script=payout_script,
@@ -479,7 +481,7 @@ def main(args):
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + list(current_work2.value['transactions'])
             merkle_root = bitcoin.data.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
+            merkle_root_to_transactions[merkle_root] = is_new, new_share_data if is_new else share_data, transactions
             
             target2 = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
@@ -494,28 +496,22 @@ def main(args):
             try:
                 # match up with transactions
                 header = bitcoin.getwork.decode_data(data)
-                transactions = merkle_root_to_transactions.get(header['merkle_root'], None)
-                if transactions is None:
+                share_data = merkle_root_to_transactions.get(header['merkle_root'], None)
+                if share_data is None:
                     print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                     return False
-                block = dict(header=header, txs=transactions)
-                hash_ = bitcoin.data.block_header_type.hash256(block['header'])
-                pow = hash_;
-
-                # use scrypt for Litecoin
-                if (getattr(args.net, 'BITCOIN_POW_SCRYPT', False)):
-                    pow = bitcoin.data.block_header_type.scrypt(block['header']);
-#                    print 'LTC: hash256 %x' % hash_
-#                    print 'LTC: scrypt  %x' % pow
-#                    print 'LTC: target  %x' % block['header']['target']
-#                    print 'LTC: starget %x' % p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
-
-                if pow <= block['header']['target'] or p2pool_init.DEBUG:
+                is_new, share_info, transactions = share_data
+                
+                hash_ = bitcoin.data.block_header_type.hash256(header)
+                
+                pow = bitcoin.data.block_header_type.scrypt(header) if getattr(args.net, 'BITCOIN_POW_SCRYPT', False) else hash_
+                
+                if pow <= header['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
-                        factory.conn.value.send_block(block=block)
+                        factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if pow <= block['header']['target']:
+                    if pow <= header['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
@@ -547,7 +543,10 @@ def main(args):
                 if pow > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
                     return False
-                share = p2pool.Share.from_block(block, args.net)
+                if is_new:
+                    share = p2pool.NewShare(args.net, header, share_info, other_txs=transactions[1:])
+                else:
+                    share = p2pool.Share(args.net, header, share_info, other_txs=transactions[1:])
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)
@@ -573,7 +572,7 @@ def main(args):
         
         def get_users():
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-            weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**256)
+            weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
             res = {}
             for script in sorted(weights, key=lambda s: weights[s]):
                 res[bitcoin.data.script2_to_human(script, args.net)] = weights[script]/total_weight
@@ -661,7 +660,7 @@ def main(args):
                     height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                     if height > 2:
                         att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 720))
-                        weights, total_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 2**100)
+                        weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
                         shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                         stale_shares = stale_doa_shares + stale_not_doa_shares
                         fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]

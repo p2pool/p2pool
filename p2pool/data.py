@@ -114,9 +114,11 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
         nonce=share_info['share_data']['nonce'],
         block_target=block_target,
         net=net,
-    )
+    )[1]
 
 class Share(object):
+    donation = 0
+    
     @classmethod
     def from_block(cls, block, net):
         return cls(net, block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
@@ -200,6 +202,9 @@ class Share(object):
         return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
     
     def as_share1b(self):
+        if self.other_txs is None:
+            raise ValueError('share does not contain all txs')
+        
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def check(self, tracker, now, net):
@@ -257,12 +262,12 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
-    max_weight = net.SPREAD * attempts_to_block
+    max_weight = 65535 * net.SPREAD * attempts_to_block
     
-    this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
-    other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
-    dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
-    assert total_weight == sum(dest_weights.itervalues())
+    this_weight = 65535 * min(bitcoin_data.target_to_average_attempts(target), max_weight)
+    other_weights, other_weights_total, other_donation_weight_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
+    dest_weights, total_weight, donation_weight_total = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total, other_donation_weight_total
+    assert total_weight == sum(dest_weights.itervalues()) + donation_weight_total
     
     if net.SCRIPT:
         amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
@@ -285,18 +290,26 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
-    return dict(
+    share_data = dict(
+        previous_share_hash=previous_share_hash,
+        nonce=nonce,
+        target=target,
+    )
+    
+    share_info = dict(
+        share_data=share_data,
+        new_script=new_script,
+        subsidy=subsidy,
+    )
+    
+    return share_info, dict(
         version=1,
         tx_ins=[dict(
             previous_output=None,
             sequence=None,
             script=coinbase_type.pack(dict(
                 identifier=net.IDENTIFIER,
-                share_data=dict(
-                    previous_share_hash=previous_share_hash,
-                    nonce=nonce,
-                    target=target,
-                ),
+                share_data=share_data,
             )),
         )],
         tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]],
@@ -325,7 +338,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     max_weight = net.SPREAD * attempts_to_block
     
     this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
-    other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
+    other_weights, other_weights_total, other_donation_weight_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), 65535*max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: (this_weight, this_weight*donation)}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
     
@@ -345,15 +358,17 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
-    return dict(
+    new_share_info = dict(
+        new_share_data=new_share_data,
+        target=target,
+    )
+    
+    return new_share_info, dict(
         version=1,
         tx_ins=[dict(
             previous_output=None,
             sequence=None,
-            script=new_share_data['coinbase_pre'] + new_share_data_type.hash256(dict(
-                new_share_data=new_share_data,
-                target=target,
-            )) + new_share_data['coinbase_post'],
+            script=new_share_data['coinbase_pre'] + new_share_info_type.hash256(new_share_info) + new_share_data['coinbase_post'],
         )],
         tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
