@@ -307,6 +307,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     previous_share_hash = new_share_data['previous_share_hash']
     new_script = new_share_data['new_script']
     subsidy = new_share_data['subsidy']
+    donation = new_share_data['subsidy']
     
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
@@ -325,7 +326,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     
     this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
-    dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
+    dest_weights, total_weight = math.add_dicts([{new_script: (this_weight, this_weight*donation)}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
     
     amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
