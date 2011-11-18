@@ -50,6 +50,33 @@ share1b_type = bitcoin_data.ComposedType([
     ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
 ])
 
+new_share_data_type = bitcoin_data.ComposedType([
+    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
+    ('pre_coinbase', bitcoin_data.VarStrType()),
+    ('post_coinbase', bitcoin_data.VarStrType()),
+    ('nonce', bitcoin_data.VarStrType()),
+    ('new_script', bitcoin_data.VarStrType()),
+    ('subsidy', bitcoin_data.StructType('<Q')),
+    ('donation', bitcoin_data.StructType('<H')),
+])
+
+new_share_info_type = bitcoin_data.ComposedType([
+    ('new_share_data', new_share_data_type),
+    ('target', bitcoin_data.FloatingIntegerType()),
+])
+
+new_share1a_type = bitcoin_data.ComposedType([
+    ('header', bitcoin_data.block_header_type),
+    ('share_info', new_share_info_type),
+    ('merkle_branch', merkle_branch_type),
+])
+
+new_share1b_type = bitcoin_data.ComposedType([
+    ('header', bitcoin_data.block_header_type),
+    ('share_info', new_share_info_type),
+    ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
+])
+
 def calculate_merkle_branch(txs, index):
     hash_list = [(bitcoin_data.tx_type.hash256(tx), i == index, []) for i, tx in enumerate(txs)]
     
@@ -77,13 +104,6 @@ def check_merkle_branch(tx, branch):
         else:
             hash_ = bitcoin_data.merkle_record_type.hash256(dict(left=hash_, right=step['hash']))
     return hash_
-
-def gentx_to_share_info(gentx):
-    return dict(
-        share_data=coinbase_type.unpack(gentx['tx_ins'][0]['script'])['share_data'],
-        subsidy=sum(tx_out['value'] for tx_out in gentx['tx_outs']),
-        new_script=gentx['tx_outs'][-1]['script'],
-    )
 
 def share_info_to_gentx(share_info, block_target, tracker, net):
     return generate_transaction(
@@ -145,7 +165,7 @@ class Share(object):
         
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
-
+        
         # use scrypt for Litecoin
         if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
             self.bitcoin_hash = bitcoin_data.block_header_type.scrypt(header)
@@ -153,7 +173,7 @@ class Share(object):
         else:
             self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
             self.hash = share1a_type.hash256(self.as_share1a())
-
+        
         if self.bitcoin_hash > self.target:
             print 'hash %x' % self.bitcoin_hash
             print 'targ %x' % self.target
@@ -243,7 +263,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
     dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
     assert total_weight == sum(dest_weights.itervalues())
-
+    
     if net.SCRIPT:
         amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
@@ -253,7 +273,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
         amounts[new_script] = amounts.get(new_script, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-
+    
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
     if any(x < 0 for x in amounts.itervalues()):
@@ -283,6 +303,60 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         lock_time=0,
     )
 
+def new_generate_transaction(tracker, new_share_data, block_target, net):
+    previous_share_hash = new_share_data['previous_share_hash']
+    new_script = new_share_data['new_script']
+    subsidy = new_share_data['subsidy']
+    
+    height, last = tracker.get_height_and_last(previous_share_hash)
+    assert height >= net.CHAIN_LENGTH or last is None
+    if height < net.TARGET_LOOKBEHIND:
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
+    else:
+        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
+        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
+        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
+        pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
+        pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
+        target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
+    
+    attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
+    max_weight = net.SPREAD * attempts_to_block
+    
+    this_weight = min(bitcoin_data.target_to_average_attempts(target), max_weight)
+    other_weights, other_weights_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
+    dest_weights, total_weight = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total
+    assert total_weight == sum(dest_weights.itervalues())
+    
+    amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+    amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
+    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
+    
+    if sum(amounts.itervalues()) != subsidy:
+        raise ValueError()
+    if any(x < 0 for x in amounts.itervalues()):
+        raise ValueError()
+    
+    pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
+    pre_dests = pre_dests[-4000:] # block length limit, unlikely to ever be hit
+    
+    dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
+    assert dests[-1] == new_script
+    
+    return dict(
+        version=1,
+        tx_ins=[dict(
+            previous_output=None,
+            sequence=None,
+            script=new_share_data['coinbase_pre'] + new_share_data_type.hash256(dict(
+                new_share_data=new_share_data,
+                target=target,
+            )) + new_share_data['coinbase_post'],
+        )],
+        tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        lock_time=0,
+    )
 
 
 class OkayTracker(bitcoin_data.Tracker):
