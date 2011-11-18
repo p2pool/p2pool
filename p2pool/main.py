@@ -440,21 +440,6 @@ def main(args):
                 frac = stale_shares/shares
                 return 2*struct.pack('<H', int(65535*frac + .5))
             subsidy = current_work2.value['subsidy']
-            generate_tx = p2pool.generate_transaction(
-                tracker=tracker,
-                previous_share_hash=state['best_share_hash'],
-                new_script=payout_script,
-                subsidy=subsidy,
-                nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + aux_str + get_stale_frac(),
-                block_target=state['target'],
-                net=args.net,
-            )
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
-            #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
-            #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
-            transactions = [generate_tx] + list(current_work2.value['transactions'])
-            merkle_root = bitcoin.data.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
             
             timestamp = int(time.time() - current_work2.value['clock_offset'])
             if state['best_share_hash'] is not None:
@@ -462,6 +447,40 @@ def main(args):
                 if timestamp2 > timestamp:
                     print 'Toff', timestamp2 - timestamp
                     timestamp = timestamp2
+            
+            if timestamp > 42:
+                generate_tx = p2pool.new_generate_transaction(
+                    tracker=tracker,
+                    new_share_data=dict(
+                        previous_share_hash=state['best_share_hash'],
+                        pre_coinbase="",
+                        post_coinbase=aux_str,
+                        nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)) + get_stale_frac(),
+                        new_script=payout_script,
+                        subsidy=subsidy,
+                        donation=math.perfect_round(65535*args.donation_amount/100),
+                    ),
+                    block_target=state['target'],
+                    net=args.net,
+                )
+            else:
+                generate_tx = p2pool.generate_transaction(
+                    tracker=tracker,
+                    previous_share_hash=state['best_share_hash'],
+                    new_script=payout_script,
+                    subsidy=subsidy,
+                    nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + aux_str + get_stale_frac(),
+                    block_target=state['target'],
+                    net=args.net,
+                )
+            
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (0xffff*2**208/p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'], (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
+            #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
+            #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
+            transactions = [generate_tx] + list(current_work2.value['transactions'])
+            merkle_root = bitcoin.data.merkle_hash(transactions)
+            merkle_root_to_transactions[merkle_root] = transactions # will stay for 1000 seconds
+            
             target2 = p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             times[p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['nonce']] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
@@ -734,6 +753,9 @@ def run():
     parser.add_argument('--merged-userpass',
         help='merge daemon user and password, separated by a colon. Example: ncuser:ncpass',
         type=str, action='store', default=None, dest='merged_userpass')
+    parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
+        help='percentage amount to donate to author of p2pool. Default: 0.5',
+        type=float, action='store', default=0.5, dest='donation')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
