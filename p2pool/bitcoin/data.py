@@ -439,10 +439,12 @@ tx_type = ComposedType([
     ('lock_time', StructType('<I')),
 ])
 
+merkle_branch_type = ListType(HashType())
+
 merkle_tx_type = ComposedType([
     ('tx', tx_type),
     ('block_hash', HashType()),
-    ('merkle_branch', ListType(HashType())),
+    ('merkle_branch', merkle_branch_type),
     ('index', StructType('<i')),
 ])
 
@@ -462,7 +464,7 @@ block_type = ComposedType([
 
 aux_pow_type = ComposedType([
     ('merkle_tx', merkle_tx_type),
-    ('merkle_branch', ListType(HashType())),
+    ('merkle_branch', merkle_branch_type),
     ('index', StructType('<i')),
     ('parent_block_header', block_header_type),
 ])
@@ -481,6 +483,36 @@ def merkle_hash(tx_list):
         hash_list = [merkle_record_type.hash256(dict(left=left, right=left if right is None else right))
             for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
     return hash_list[0]
+
+def calculate_merkle_branch(txs, index):
+    # XXX optimize this
+    
+    hash_list = [(tx_type.hash256(tx), i == index, []) for i, tx in enumerate(txs)]
+    
+    while len(hash_list) > 1:
+        hash_list = [
+            (
+                merkle_record_type.hash256(dict(left=left, right=right)),
+                left_f or right_f,
+                (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
+            )
+            for (left, left_f, left_l), (right, right_f, right_l) in
+                zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
+        ]
+    
+    res = [x['hash'] for x in hash_list[0][2]]
+    
+    assert hash_list[0][1]
+    assert check_merkle_branch(txs[index], index, res) == hash_list[0][0]
+    assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
+    
+    return res
+
+def check_merkle_branch(tx, index, merkle_branch):
+    return reduce(lambda c, (i, h): merkle_record_type.hash256(
+        dict(left=h, right=c) if 2**i & index else
+        dict(left=c, right=h)
+    ), enumerate(merkle_branch), tx_type.hash256(tx))
 
 def target_to_average_attempts(target):
     return 2**256//(target + 1)

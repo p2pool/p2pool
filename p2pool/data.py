@@ -67,7 +67,7 @@ new_share_info_type = bitcoin_data.ComposedType([
 new_share1a_type = bitcoin_data.ComposedType([
     ('header', bitcoin_data.block_header_type),
     ('share_info', new_share_info_type),
-    ('merkle_branch', merkle_branch_type),
+    ('merkle_branch', bitcoin_data.merkle_branch_type),
 ])
 
 new_share1b_type = bitcoin_data.ComposedType([
@@ -241,7 +241,7 @@ class NewShare(Share):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
-            new_merkle_branch = calculate_merkle_branch([dict(version=0, tx_ins=[], tx_outs=[], lock_time=0)] + other_txs, 0)
+            new_merkle_branch = bitcoin_data.calculate_merkle_branch([dict(version=0, tx_ins=[], tx_outs=[], lock_time=0)] + other_txs, 0)
             if merkle_branch is not None:
                 if merke_branch != new_merkle_branch:
                     raise ValueError('invalid merkle_branch and other_txs')
@@ -309,7 +309,7 @@ class NewShare(Share):
         if len(gentx['tx_ins'][0]['script']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(gentx['tx_ins'][0]['script']),))
         
-        if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
+        if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
         
         if self.other_txs is not None:
