@@ -9,7 +9,7 @@ from twisted.python import log
 
 import p2pool
 from p2pool import skiplists
-from p2pool.bitcoin import data as bitcoin_data, script, namecoin, ixcoin, i0coin, solidcoin, litecoin
+from p2pool.bitcoin import data as bitcoin_data, script, networks
 from p2pool.util import memoize, expiring_dict, math
 
 
@@ -547,7 +547,7 @@ class ShareStore(object):
             os.remove(filename)
             print "REMOVED", filename
 
-class BitcoinMainnet(bitcoin_data.Mainnet):
+class BitcoinMainnet(networks.BitcoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -561,7 +561,7 @@ class BitcoinMainnet(bitcoin_data.Mainnet):
     PERSIST = True
     WORKER_PORT = 9332
 
-class BitcoinTestnet(bitcoin_data.Testnet):
+class BitcoinTestnet(networks.BitcoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -575,7 +575,7 @@ class BitcoinTestnet(bitcoin_data.Testnet):
     PERSIST = False
     WORKER_PORT = 19332
 
-class NamecoinMainnet(namecoin.Mainnet):
+class NamecoinMainnet(networks.NamecoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -589,7 +589,7 @@ class NamecoinMainnet(namecoin.Mainnet):
     PERSIST = True
     WORKER_PORT = 9331
 
-class NamecoinTestnet(namecoin.Testnet):
+class NamecoinTestnet(networks.NamecoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -603,7 +603,7 @@ class NamecoinTestnet(namecoin.Testnet):
     PERSIST = False
     WORKER_PORT = 19331
 
-class IxcoinMainnet(ixcoin.Mainnet):
+class IxcoinMainnet(networks.IxcoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -617,7 +617,7 @@ class IxcoinMainnet(ixcoin.Mainnet):
     PERSIST = True
     WORKER_PORT = 9330
 
-class IxcoinTestnet(ixcoin.Testnet):
+class IxcoinTestnet(networks.IxcoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -631,7 +631,7 @@ class IxcoinTestnet(ixcoin.Testnet):
     PERSIST = False
     WORKER_PORT = 19330
 
-class I0coinMainnet(i0coin.Mainnet):
+class I0coinMainnet(networks.I0coinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
@@ -645,7 +645,7 @@ class I0coinMainnet(i0coin.Mainnet):
     PERSIST = False
     WORKER_PORT = 9329
 
-class I0coinTestnet(i0coin.Testnet):
+class I0coinTestnet(networks.I0coinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -659,12 +659,12 @@ class I0coinTestnet(i0coin.Testnet):
     PERSIST = False
     WORKER_PORT = 19329
 
-class SolidcoinMainnet(solidcoin.Mainnet):
+class SolidcoinMainnet(networks.SolidcoinMainnet):
     SHARE_PERIOD = 10
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', solidcoin.Mainnet))
+    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', networks.SolidcoinMainnet))
     IDENTIFIER = '9cc9c421cca258cd'.decode('hex')
     PREFIX = 'c059125b8070f00a'.decode('hex')
     NAME = 'solidcoin'
@@ -673,7 +673,7 @@ class SolidcoinMainnet(solidcoin.Mainnet):
     PERSIST = True
     WORKER_PORT = 9328
 
-class LitecoinMainnet(litecoin.Mainnet):
+class LitecoinMainnet(networks.LitecoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
@@ -687,7 +687,7 @@ class LitecoinMainnet(litecoin.Mainnet):
     PERSIST = True
     WORKER_PORT = 9327
 
-class LitecoinTestnet(litecoin.Testnet):
+class LitecoinTestnet(networks.LitecoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares

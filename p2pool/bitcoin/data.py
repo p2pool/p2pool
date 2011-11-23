@@ -841,31 +841,3 @@ if __name__ == '__main__':
             for a in x[1]:
                 print str(a).rjust(10),
         print
-
-# network definitions
-
-class Mainnet(object):
-    BITCOIN_P2P_PREFIX = 'f9beb4d9'.decode('hex')
-    BITCOIN_P2P_PORT = 8333
-    BITCOIN_ADDRESS_VERSION = 0
-    BITCOIN_RPC_PORT = 8332
-    BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
-        not (yield bitcoind.rpc_getinfo())['testnet']
-    )))
-    BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
-    BITCOIN_SYMBOL = 'BTC'
-
-class Testnet(object):
-    BITCOIN_P2P_PREFIX = 'fabfb5da'.decode('hex')
-    BITCOIN_P2P_PORT = 18333
-    BITCOIN_ADDRESS_VERSION = 111
-    BITCOIN_RPC_PORT = 8332
-    BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
-        (yield bitcoind.rpc_getinfo())['testnet']
-    )))
-    BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
-    BITCOIN_SYMBOL = 'tBTC'
