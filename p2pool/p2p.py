@@ -212,12 +212,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share1as(self, share1as):
         shares = []
         for share1a in share1as:
-            # use scrypt for Litecoin
-            if (getattr(self.node.net, 'BITCOIN_POW_SCRYPT', False)):
-                hash_ = bitcoin_data.block_header_type.scrypt(share1a['header']);
-            else:
-                hash_ = bitcoin_data.block_header_type.hash256(share1a['header'])
-            if hash_ <= share1a['header']['target']:
+            if self.node.net.BITCOIN_POW_FUNC(share1a['header']) <= share1a['header']['target']:
                 print 'Dropping peer %s:%i due to invalid share' % self.addr
                 self.transport.loseConnection()
                 return
@@ -232,12 +227,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share1bs(self, share1bs):
         shares = []
         for share1b in share1bs:
-            # use scrypt for Litecoin
-            if (getattr(self.node.net, 'BITCOIN_POW_SCRYPT', False)):
-                hash_ = bitcoin_data.block_header_type.scrypt(share1b['header']);
-            else:
-                hash_ = bitcoin_data.block_header_type.hash256(share1b['header'])
-            if not hash_ <= share1b['header']['target']:
+            if not self.node.net.BITCOIN_POW_FUNC(share1a['header']) <= share1b['header']['target']:
                 print 'Dropping peer %s:%i due to invalid share' % self.addr
                 self.transport.loseConnection()
                 return

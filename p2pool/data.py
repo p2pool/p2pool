@@ -145,15 +145,10 @@ class Share(object):
         
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
-
-        # use scrypt for Litecoin
-        if (getattr(net, 'BITCOIN_POW_SCRYPT', False)):
-            self.bitcoin_hash = bitcoin_data.block_header_type.scrypt(header)
-            self.hash = share1a_type.scrypt(self.as_share1a())
-        else:
-            self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
-            self.hash = share1a_type.hash256(self.as_share1a())
-
+        
+        self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
+        self.hash = net.BITCOIN_POW_FUNC(header) # XXX was a bug in litecoin pull
+        
         if self.bitcoin_hash > self.target:
             print 'hash %x' % self.bitcoin_hash
             print 'targ %x' % self.target

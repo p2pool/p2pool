@@ -481,27 +481,19 @@ def main(args):
                     return False
                 block = dict(header=header, txs=transactions)
                 hash_ = bitcoin.data.block_header_type.hash256(block['header'])
-                pow = hash_;
-
-                # use scrypt for Litecoin
-                if (getattr(args.net, 'BITCOIN_POW_SCRYPT', False)):
-                    pow = bitcoin.data.block_header_type.scrypt(block['header']);
-#                    print 'LTC: hash256 %x' % hash_
-#                    print 'LTC: scrypt  %x' % pow
-#                    print 'LTC: target  %x' % block['header']['target']
-#                    print 'LTC: starget %x' % p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
-
-                if pow <= block['header']['target'] or p2pool_init.DEBUG:
+                pow_hash = args.net.BITCOIN_POW_FUNC(block['header'])
+                
+                if pow_hash <= block['header']['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=block)
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if pow <= block['header']['target']:
+                    if pow_hash <= block['header']['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
                 
-                if current_work.value['aux_work'] is not None and pow <= current_work.value['aux_work']['target']:
+                if current_work.value['aux_work'] is not None and pow_hash <= current_work.value['aux_work']['target']:
                     try:
                         aux_pow = dict(
                             merkle_tx=dict(
@@ -525,8 +517,8 @@ def main(args):
                         log.err(None, 'Error while processing merged mining POW:')
                 
                 target = p2pool.coinbase_type.unpack(transactions[0]['tx_ins'][0]['script'])['share_data']['target']
-                if pow > target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
+                if pow_hash > target:
+                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, target)
                     return False
                 share = p2pool.Share.from_block(block, args.net)
                 my_shares.add(share.hash)

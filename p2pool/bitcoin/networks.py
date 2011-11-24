@@ -1,5 +1,7 @@
 from twisted.internet import defer
 
+from . import data
+
 
 class BitcoinMainnet(object):
     BITCOIN_P2P_PREFIX = 'f9beb4d9'.decode('hex')
@@ -12,6 +14,7 @@ class BitcoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'BTC'
 
 class BitcoinTestnet(object):
@@ -25,6 +28,7 @@ class BitcoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'tBTC'
 
 
@@ -39,6 +43,7 @@ class NamecoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'NMC'
 
 class NamecoinTestnet(object):
@@ -52,6 +57,7 @@ class NamecoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'tNMC'
 
 
@@ -66,6 +72,7 @@ class IxcoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 96*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'IXC'
 
 class IxcoinTestnet(object):
@@ -79,6 +86,7 @@ class IxcoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 96*100000000 >> (height + 1)//210000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'tIXC'
 
 
@@ -94,6 +102,7 @@ class I0coinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 48*100000000 >> (height + 1)//218750)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'I0C'
 
 class I0coinTestnet(object):
@@ -108,6 +117,7 @@ class I0coinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 48*100000000 >> (height + 1)//218750)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'tI0C'
 
 
@@ -121,6 +131,7 @@ class SolidcoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 32*100000000 >> (height + 1)//300000)
+    BITCOIN_POW_FUNC = data.block_header_type.hash256
     BITCOIN_SYMBOL = 'SC'
 
 
@@ -134,7 +145,7 @@ class LitecoinMainnet(object):
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
-    BITCOIN_POW_SCRYPT = True;
+    BITCOIN_POW_FUNC = data.block_header_type.scrypt
     BITCOIN_SYMBOL = 'LTC'
 
 class LitecoinTestnet(object):
@@ -147,5 +158,5 @@ class LitecoinTestnet(object):
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//840000)
-    BITCOIN_POW_SCRYPT = True;
+    BITCOIN_POW_FUNC = data.block_header_type.scrypt
     BITCOIN_SYMBOL = 'tLTC'
