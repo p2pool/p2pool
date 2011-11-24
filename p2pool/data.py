@@ -147,7 +147,12 @@ class Share(object):
             raise ValueError('nonce too long!')
         
         self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
-        self.hash = net.BITCOIN_POW_FUNC(header) # XXX was a bug in litecoin pull
+        
+        if net.BITCOIN_POW_FUNC is bitcoin_data.block_header_type.scrypt:
+            # compatibility hack
+            self.hash = share1a_type.scrypt(self.as_share1a())
+        else:
+            self.hash = share1a_type.hash256(self.as_share1a())
         
         if self.bitcoin_hash > self.target:
             print 'hash %x' % self.bitcoin_hash
