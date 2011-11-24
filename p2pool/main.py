@@ -504,19 +504,19 @@ def main(args):
                 
                 hash_ = bitcoin.data.block_header_type.hash256(header)
                 
-                pow = bitcoin.data.block_header_type.scrypt(header) if getattr(args.net, 'BITCOIN_POW_SCRYPT', False) else hash_
+                pow_hash = args.net.BITCOIN_POW_FUNC(block['header'])
                 
-                if pow <= header['target'] or p2pool_init.DEBUG:
+                if pow_hash <= header['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if pow <= header['target']:
+                    if pow_hash <= header['target']:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
                 
-                if current_work.value['aux_work'] is not None and pow <= current_work.value['aux_work']['target']:
+                if current_work.value['aux_work'] is not None and pow_hash <= current_work.value['aux_work']['target']:
                     try:
                         aux_pow = dict(
                             merkle_tx=dict(
@@ -540,8 +540,8 @@ def main(args):
                         log.err(None, 'Error while processing merged mining POW:')
                 
                 target = new_share_info['target']
-                if pow > target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow, target)
+                if pow_hash > target:
+                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, target)
                     return False
                 if is_new:
                     share = p2pool.NewShare(args.net, header, new_share_info, other_txs=transactions[1:])
