@@ -148,7 +148,7 @@ class Share(object):
         
         self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
         
-        if net.BITCOIN_POW_FUNC is bitcoin_data.block_header_type.scrypt:
+        if net.BITCOIN_POW_FUNC == bitcoin_data.block_header_type.scrypt:
             # compatibility hack
             self.hash = share1a_type.scrypt(self.as_share1a())
         else:
