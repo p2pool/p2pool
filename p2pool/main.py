@@ -282,14 +282,14 @@ def main(args):
         
         @tracker.verified.added.watch
         def _(share):
-            if share.bitcoin_hash <= share.header['target']:
-                print
-                print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool.format_hash(share.hash), share.bitcoin_hash,)
-                print
+            if share.pow_hash <= share.header['target']:
                 if factory.conn.value is not None:
                     factory.conn.value.send_block(block=share.as_block(tracker, args.net))
                 else:
                     print 'No bitcoind connection! Erp!'
+                print
+                print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool.format_hash(share.hash), share.header_hash,)
+                print
         
         def p2p_share_hashes(share_hashes, peer):
             t = time.time()
@@ -443,7 +443,7 @@ def main(args):
             subsidy = current_work2.value['subsidy']
             
             
-            if timestamp > 42e2:
+            if False: # and imestamp > 42e2:
                 timestamp = current_work2.value['time']
                 is_new = True
                 previous_share = tracker.shares[state['best_share_hash']]
@@ -481,14 +481,14 @@ def main(args):
                     net=args.net,
                 )
             
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin.data.target_to_difficulty((new_share_info if is_new else share_info)['target']), (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin.data.target_to_difficulty((new_share_info if is_new else share_info['share_data'])['target']), (generate_tx['tx_outs'][-1]['value']-subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + list(current_work2.value['transactions'])
             merkle_root = bitcoin.data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = is_new, new_share_info if is_new else share_info, transactions
             
-            target2 = (new_share_info if is_new else share_info)['target']
+            target2 = (new_share_info if is_new else share_info['share_data'])['target']
             times[merkle_root] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
@@ -510,7 +510,7 @@ def main(args):
                 
                 hash_ = bitcoin.data.block_header_type.hash256(header)
                 
-                pow_hash = args.net.BITCOIN_POW_FUNC(block['header'])
+                pow_hash = args.net.BITCOIN_POW_FUNC(header)
                 
                 if pow_hash <= header['target'] or p2pool_init.DEBUG:
                     if factory.conn.value is not None:
@@ -545,7 +545,7 @@ def main(args):
                     except:
                         log.err(None, 'Error while processing merged mining POW:')
                 
-                target = new_share_info['target']
+                target = (new_share_info if is_new else share_info['share_data'])['target']
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, target)
                     return False
