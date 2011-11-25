@@ -57,6 +57,7 @@ new_share_data_type = bitcoin_data.ComposedType([
     ('new_script', bitcoin_data.VarStrType()),
     ('subsidy', bitcoin_data.StructType('<Q')),
     ('donation', bitcoin_data.StructType('<H')),
+    ('timestamp', bitcoin_data.StructType('<I')),
 ])
 
 new_share_info_type = bitcoin_data.ComposedType([
@@ -253,13 +254,12 @@ class NewShare(Share):
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
         
-        self.timestamp = self.header['timestamp']
-        
         self.share_data = self.share_info['new_share_data']
         self.target = self.share_info['target']
         
         self.new_script = self.share_data['new_script']
         self.subsidy = self.share_data['subsidy']
+        self.timestamp = self.share_data['timestamp']
         
         if len(self.new_script) > 100:
             raise ValueError('new_script too long!')
@@ -293,13 +293,10 @@ class NewShare(Share):
         self.peer = None
     
     def check(self, tracker, now, net):
-        import time
         if self.previous_share_hash is not None:
-            if self.header['timestamp'] <= math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(self.previous_share_hash), 11)), use_float=False):
-                raise ValueError('share from too far in the past!')
-        
-        if self.header['timestamp'] > now + 2*60*60:
-            raise ValueError('share from too far in the future!')
+            previous_share = tracker.shares[self.previous_share_hash]
+            if not (previous_share.timestamp - 60 <= self.timestamp <= previous_share.timestamp + 60):
+                raise ValueError('share timestamp (%i) too far from previous timestamp (%i)' % (self.timestamp, previous_share.timestamp))
         
         new_share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
         if new_share_info != self.share_info:
@@ -313,7 +310,7 @@ class NewShare(Share):
                 raise ValueError('''gentx doesn't match header via other_txs''')
             
             if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
-                raise ValueError('''block size too large''')
+                raise ValueError('block size too large')
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
     if dist is None:

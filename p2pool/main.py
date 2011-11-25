@@ -174,6 +174,7 @@ def main(args):
                 aux_work=current_work.value['aux_work'] if current_work.value is not None else None,
             ))
             current_work2.set(dict(
+                time=work['time'],
                 transactions=work['transactions'],
                 subsidy=work['subsidy'],
                 clock_offset=time.time() - work['time'],
@@ -441,15 +442,11 @@ def main(args):
                 return 2*struct.pack('<H', int(65535*frac + .5))
             subsidy = current_work2.value['subsidy']
             
-            timestamp = int(time.time() - current_work2.value['clock_offset'])
-            if state['best_share_hash'] is not None:
-                timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
-                if timestamp2 > timestamp:
-                    print 'Toff', timestamp2 - timestamp
-                    timestamp = timestamp2
             
             if timestamp > 42e2:
+                timestamp = current_work2.value['time']
                 is_new = True
+                previous_share = tracker.shares[state['best_share_hash']]
                 new_share_info, generate_tx = p2pool.new_generate_transaction(
                     tracker=tracker,
                     new_share_data=dict(
@@ -459,11 +456,20 @@ def main(args):
                         new_script=payout_script,
                         subsidy=subsidy,
                         donation=math.perfect_round(65535*args.donation_percentage/100),
+                        timestamp=math.clip(int(time.time() - current_work2.value['clock_offset']),
+                            (previous_share.timestamp - 60, previous_share.timestamp + 60),
+                        ),
                     ),
                     block_target=state['target'],
                     net=args.net,
                 )
             else:
+                timestamp = int(time.time() - current_work2.value['clock_offset'])
+                if state['best_share_hash'] is not None:
+                    timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
+                    if timestamp2 > timestamp:
+                        print 'Toff', timestamp2 - timestamp
+                        timestamp = timestamp2
                 is_new = False
                 share_info, generate_tx = p2pool.generate_transaction(
                     tracker=tracker,
