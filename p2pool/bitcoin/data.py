@@ -108,7 +108,7 @@ class Type(object):
     
     def scrypt(self, obj):
         import ltc_scrypt
-        return HashType().unpack(self.ltc_scrypt.getPoWHash(self.pack(obj)))
+        return HashType().unpack(ltc_scrypt.getPoWHash(self.pack(obj)))
 
 class VarIntType(Type):
     # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
