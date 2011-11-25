@@ -119,10 +119,6 @@ class Share(object):
     donation = 0
     
     @classmethod
-    def from_block(cls, block, net):
-        return cls(net, block['header'], gentx_to_share_info(block['txs'][0]), other_txs=block['txs'][1:])
-    
-    @classmethod
     def from_share1a(cls, share1a, net):
         return cls(net, **share1a)
     
@@ -218,7 +214,7 @@ class Share(object):
         gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
         
         if len(gentx['tx_ins'][0]['script']) > 100:
-            raise ValueError('''coinbase too large! %i bytes''' % (len(gentx['tx_ins'][0]['script']),))
+            raise ValueError('coinbase too large! %i bytes' % (len(gentx['tx_ins'][0]['script']),))
         
         if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
@@ -228,7 +224,7 @@ class Share(object):
                 raise ValueError('''gentx doesn't match header via other_txs''')
             
             if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
-                raise ValueError('''block size too large''')
+                raise ValueError('block size too large')
     
     def flag_shared(self):
         self.shared = True
@@ -272,10 +268,10 @@ class NewShare(Share):
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
         
-        if getattr(net, 'BITCOIN_POW_SCRYPT', False):
-            self.bitcoin_hash = bitcoin_data.block_header_type.scrypt(header)
-        else:
-            self.bitcoin_hash = bitcoin_data.block_header_type.hash256(header)
+        if len(self.share_data['coinbase']) > 100:
+            raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
+        
+        self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
         
         self.hash = new_share1a_type.hash256(self.as_share1a())
         
@@ -304,10 +300,7 @@ class NewShare(Share):
         
         new_share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
         if new_share_info != self.share_info:
-            raise ValueError()
-        
-        if len(gentx['tx_ins'][0]['script']) > 100:
-            raise ValueError('''coinbase too large! %i bytes''' % (len(gentx['tx_ins'][0]['script']),))
+            raise ValueError('share difficulty invalid')
         
         if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
