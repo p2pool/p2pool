@@ -207,11 +207,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.node.handle_share_hashes(hashes, self)
     
     message_shares = bitcoin_data.ComposedType([
-        ('share1as', bitcoin_data.ListType(p2pool_data.new_share1a_type)),
-        ('share1bs', bitcoin_data.ListType(p2pool_data.new_share1b_type)),
+        ('shares', bitcoin_data.ListType(p2pool_data.new_share_type)),
     ])
-    def handle_shares(self):
-        xxx
+    def handle_shares(self, shares):
+        self.node.handle_shares([p2pool_data.Share.from_share(x, self.node.net) for x in shares], self)
     
     message_share1as = bitcoin_data.ComposedType([
         ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
@@ -247,21 +246,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         share0s = []
         share1as = []
         share1bs = []
-        new_share1as = []
-        new_share1bs = []
+        new_shares = []
         # XXX doesn't need to send full block when it's not urgent
         # eg. when getting history
         for share in shares:
             if isinstance(share, p2pool_data.NewShare):
-                if share.pow_hash <= share.header['target']:
-                    new_share1bs.append(share.as_share1b())
-                else:
-                    if self.mode == 0 and not full:
-                        share0s.append(share.hash)
-                    elif self.mode == 1 or full:
-                        new_share1as.append(share.as_share1a())
-                    else:
-                        raise ValueError(self.mode)
+                new_shares.append(share.as_share())
             else:
                 if share.pow_hash <= share.header['target']:
                     share1bs.append(share.as_share1b())
@@ -281,7 +271,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if share0s: att(self.send_share0s, hashes=share0s)
         if share1as: att(self.send_share1as, share1as=share1as)
         if share1bs: att(self.send_share1bs, share1bs=share1bs)
-        if new_share1as or new_share1bs: att(self.send_shares, share1as=new_share1as, share1bs=new_share1bs)
+        if new_shares: att(self.send_shares, shares=new_shares)
     
     def connectionLost(self, reason):
         if self.node_var_watch is not None:

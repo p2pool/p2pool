@@ -77,6 +77,15 @@ new_share1b_type = bitcoin_data.ComposedType([
     ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
 ])
 
+# type:
+# 0: new_share1a
+# 1: new_share1b
+
+new_share_type = bitcoin_data.ComposedType([
+    ('type', bitcoin_data.VarIntType()),
+    ('contents', bitcoin_data.VarStrType()),
+])
+
 def calculate_merkle_branch(txs, index):
     hash_list = [(bitcoin_data.tx_type.hash256(tx), i == index, []) for i, tx in enumerate(txs)]
     
@@ -235,6 +244,29 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
 
 class NewShare(Share):
+    @classmethod
+    def from_share(cls, share, net):
+        if share['type'] == 0:
+            res = self.from_share1a(new_share1a_type.unpack(share['contents']), net)
+            if not (res.pow_hash > res.header['target']):
+                raise ValueError('invalid share type')
+            return res
+        elif share['type'] == 1:
+            res = self.from_share1b(new_share1b_type.unpack(share['contents']), net)
+            if not (res.pow_hash <= res.header['target']):
+                raise ValueError('invalid share type')
+            return res
+        else:
+            raise ValueError('unknown share type: %r' % (share['type'],))
+    
+    def as_share(self):
+        if self.pow_hash > self.header['target']: # new_share1a
+            return dict(type=0, contents=new_share1a_type.pack(self.as_share1a()))
+        elif self.pow_hash <= self.header['target']: # new_share1b
+            return dict(type=1, contents=new_share1b_type.pack(self.as_share1b()))
+        else:
+            raise AssertionError()
+    
     def __init__(self, net, header, new_share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
@@ -660,12 +692,8 @@ class ShareStore(object):
                             verified_hash = int(data_hex, 16)
                             yield 'verified_hash', verified_hash
                             verified_hashes.add(verified_hash)
-                        elif type_id == 3:
-                            share = NewShare.from_share1a(new_share1a_type.unpack(data_hex.decode('hex')), self.net)
-                            yield 'share', share
-                            share_hashes.add(share.hash)
-                        elif type_id == 4:
-                            share = NewShare.from_share1b(new_share1b_type.unpack(data_hex.decode('hex')), self.net)
+                        elif type_id == 5:
+                            share = NewShare.from_share(new_share_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         else:
@@ -687,10 +715,8 @@ class ShareStore(object):
         return filename
     
     def add_share(self, share):
-        if isinstance(share, NewShare) and share.pow_hash <= share.header['target']:
-            type_id, data = 4, new_share1b_type.pack(share.as_share1b())
-        elif isinstance(share, NewShare):
-            type_id, data = 3, new_share1a_type.pack(share.as_share1a())
+        if isinstance(share, NewShare):
+            type_id, data = 5, new_share_type.pack(share.as_share())
         elif share.pow_hash <= share.header['target']:
             type_id, data = 1, share1b_type.pack(share.as_share1b())
         else:
