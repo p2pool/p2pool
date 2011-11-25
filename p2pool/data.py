@@ -126,7 +126,7 @@ class Share(object):
     def from_share1b(cls, share1b, net):
         return cls(net, **share1b)
     
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce bitcoin_hash hash time_seen shared stored peer'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen shared stored peer'.split(' ')
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
@@ -163,7 +163,8 @@ class Share(object):
         if len(self.nonce) > 100:
             raise ValueError('nonce too long!')
         
-        self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
+        self.pow_hash = net.BITCOIN_POW_FUNC(header)
+        self.header_hash = bitcoin_data.block_header_type.hash256(header)
         
         if net.BITCOIN_POW_FUNC is bitcoin_data.block_header_type.scrypt:
             # compatibility hack
@@ -171,8 +172,8 @@ class Share(object):
         else:
             self.hash = share1a_type.hash256(self.as_share1a())
         
-        if self.bitcoin_hash > self.target:
-            print 'hash %x' % self.bitcoin_hash
+        if self.pow_hash > self.target:
+            print 'hash %x' % self.pow_hash
             print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
@@ -255,6 +256,8 @@ class NewShare(Share):
         self.timestamp = self.header['timestamp']
         
         self.share_data = self.share_info['new_share_data']
+        self.target = self.share_info['target']
+        
         self.new_script = self.share_data['new_script']
         self.subsidy = self.share_data['subsidy']
         
@@ -262,7 +265,6 @@ class NewShare(Share):
             raise ValueError('new_script too long!')
         
         self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
-        self.target = self.share_info['target']
         self.nonce = self.share_data['nonce']
         
         if len(self.nonce) > 100:
@@ -271,12 +273,13 @@ class NewShare(Share):
         if len(self.share_data['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
-        self.bitcoin_hash = net.BITCOIN_POW_FUNC(header)
+        self.pow_hash = net.BITCOIN_POW_FUNC(header)
+        self.header_hash = bitcoin_data.block_header_type.hash256(header)
         
         self.hash = new_share1a_type.hash256(self.as_share1a())
         
-        if self.bitcoin_hash > self.target:
-            print 'hash %x' % self.bitcoin_hash
+        if self.pow_hash > self.target:
+            print 'hash %x' % self.pow_hash
             print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
@@ -603,7 +606,7 @@ class OkayTracker(bitcoin_data.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.bitcoin_hash != previous_block and best_share.peer is not None:
+            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
@@ -687,11 +690,11 @@ class ShareStore(object):
         return filename
     
     def add_share(self, share):
-        if isinstance(share, NewShare) and share.bitcoin_hash <= share.header['target']:
+        if isinstance(share, NewShare) and share.pow_hash <= share.header['target']:
             type_id, data = 4, new_share1b_type.pack(share.as_share1b())
         elif isinstance(share, NewShare):
             type_id, data = 3, new_share1a_type.pack(share.as_share1a())
-        elif share.bitcoin_hash <= share.header['target']:
+        elif share.pow_hash <= share.header['target']:
             type_id, data = 1, share1b_type.pack(share.as_share1b())
         else:
             type_id, data = 0, share1a_type.pack(share.as_share1a())

@@ -253,7 +253,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         # eg. when getting history
         for share in shares:
             if isinstance(share, p2pool_data.NewShare):
-                if share.bitcoin_hash <= share.header['target']:
+                if share.pow_hash <= share.header['target']:
                     new_share1bs.append(share.as_share1b())
                 else:
                     if self.mode == 0 and not full:
@@ -263,7 +263,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     else:
                         raise ValueError(self.mode)
             else:
-                if share.bitcoin_hash <= share.header['target']:
+                if share.pow_hash <= share.header['target']:
                     share1bs.append(share.as_share1b())
                 else:
                     if self.mode == 0 and not full:
