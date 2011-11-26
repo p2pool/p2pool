@@ -176,7 +176,7 @@ class Share(object):
         self.pow_hash = net.BITCOIN_POW_FUNC(header)
         self.header_hash = bitcoin_data.block_header_type.hash256(header)
         
-        if net.BITCOIN_POW_FUNC is bitcoin_data.block_header_type.scrypt:
+        if net.BITCOIN_POW_FUNC == bitcoin_data.block_header_type.scrypt:
             # compatibility hack
             self.hash = share1a_type.scrypt(self.as_share1a())
         else:
@@ -665,6 +665,8 @@ def format_hash(x):
 class ShareStore(object):
     def __init__(self, prefix, net):
         self.filename = prefix
+        self.dirname = os.path.dirname(os.path.abspath(prefix))
+        self.filename = os.path.basename(os.path.abspath(prefix))
         self.net = net
         self.known = None # will be filename -> set of share hashes, set of verified hashes
     
@@ -731,8 +733,8 @@ class ShareStore(object):
         verified_hashes.add(share_hash)
     
     def get_filenames_and_next(self):
-        suffixes = sorted(int(x[len(self.filename):]) for x in os.listdir('.') if x.startswith(self.filename) and x[len(self.filename):].isdigit())
-        return [self.filename + str(suffix) for suffix in suffixes], self.filename + str(suffixes[-1] + 1) if suffixes else self.filename + str(0)
+        suffixes = sorted(int(x[len(self.filename):]) for x in os.listdir(self.dirname) if x.startswith(self.filename) and x[len(self.filename):].isdigit())
+        return [os.path.join(self.dirname, self.filename + str(suffix)) for suffix in suffixes], os.path.join(self.dirname, self.filename + (str(suffixes[-1] + 1) if suffixes else str(0)))
     
     def forget_share(self, share_hash):
         for filename, (share_hashes, verified_hashes) in self.known.iteritems():

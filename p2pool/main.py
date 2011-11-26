@@ -29,35 +29,15 @@ import p2pool as p2pool_init
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
 def getwork(bitcoind, ht, net):
-    try:
-        work = yield bitcoind.rpc_getmemorypool()
-        defer.returnValue(dict(
-            version=work['version'],
-            previous_block_hash=int(work['previousblockhash'], 16),
-            transactions=[bitcoin.data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
-            subsidy=work['coinbasevalue'],
-            time=work['time'],
-            target=bitcoin.data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin.data.FloatingInteger(work['bits']),
-        ))
-    except jsonrpc.Error, e:
-        if e.code != -32601:
-            raise
-        
-        print "---> Update your bitcoind to support the 'getmemorypool' RPC call. Not including transactions in generated blocks! <---"
-        work = bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork()))
-        try:
-            subsidy = net.BITCOIN_SUBSIDY_FUNC(ht.getHeight(work.previous_block))
-        except ValueError:
-            subsidy = net.BITCOIN_SUBSIDY_FUNC(1000)
-        
-        defer.returnValue(dict(
-            version=work.version,
-            previous_block_hash=work.previous_block,
-            transactions=[],
-            subsidy=subsidy,
-            time=work.timestamp,
-            target=work.block_target,
-        ))
+    work = yield bitcoind.rpc_getmemorypool()
+    defer.returnValue(dict(
+        version=work['version'],
+        previous_block_hash=int(work['previousblockhash'], 16),
+        transactions=[bitcoin.data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
+        subsidy=work['coinbasevalue'],
+        time=work['time'],
+        target=bitcoin.data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin.data.FloatingInteger(work['bits']),
+    ))
 
 @deferral.retry('Error getting payout script from bitcoind:', 1)
 @defer.inlineCallbacks
