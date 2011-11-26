@@ -247,12 +247,12 @@ class NewShare(Share):
     @classmethod
     def from_share(cls, share, net):
         if share['type'] == 0:
-            res = self.from_share1a(new_share1a_type.unpack(share['contents']), net)
+            res = cls.from_share1a(new_share1a_type.unpack(share['contents']), net)
             if not (res.pow_hash > res.header['target']):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 1:
-            res = self.from_share1b(new_share1b_type.unpack(share['contents']), net)
+            res = cls.from_share1b(new_share1b_type.unpack(share['contents']), net)
             if not (res.pow_hash <= res.header['target']):
                 raise ValueError('invalid share type')
             return res
