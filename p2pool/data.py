@@ -268,7 +268,7 @@ class NewShare(Share):
         else:
             raise AssertionError()
     
-    def __init__(self, net, header, new_share_info, merkle_branch=None, other_txs=None):
+    def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -283,7 +283,7 @@ class NewShare(Share):
         
         self.header = header
         self.previous_block = header['previous_block']
-        self.share_info = new_share_info
+        self.share_info = share_info
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
         
@@ -331,8 +331,8 @@ class NewShare(Share):
             if not (previous_share.timestamp - 60 <= self.timestamp <= previous_share.timestamp + 60):
                 raise ValueError('share timestamp (%i) too far from previous timestamp (%i)' % (self.timestamp, previous_share.timestamp))
         
-        new_share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
-        if new_share_info != self.share_info:
+        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
+        if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
         if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
@@ -473,19 +473,19 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
     assert dests[-1] == new_script
     
-    new_share_info = dict(
+    share_info = dict(
         new_share_data=new_share_data,
         target=target,
     )
     
-    return new_share_info, dict(
+    return share_info, dict(
         version=1,
         tx_ins=[dict(
             previous_output=None,
             sequence=None,
             script=new_share_data['coinbase'],
         )],
-        tx_outs=[dict(value=0, script=bitcoin_data.HashType().pack(new_share_info_type.hash256(new_share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script=bitcoin_data.HashType().pack(new_share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 

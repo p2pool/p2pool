@@ -426,7 +426,7 @@ def main(args):
             if False: # and imestamp > 42e2:
                 timestamp = current_work2.value['time']
                 is_new = True
-                previous_share = tracker.shares[state['best_share_hash']]
+                previous_share = tracker.shares[state['best_share_hash']] if state['best_share_hash'] is not None else None
                 new_share_info, generate_tx = p2pool.new_generate_transaction(
                     tracker=tracker,
                     new_share_data=dict(
