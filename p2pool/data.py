@@ -350,6 +350,15 @@ class NewShare(Share):
             
             if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
                 raise ValueError('block size too large')
+    
+    def as_block(self, tracker, net):
+        if self.other_txs is None:
+            raise ValueError('share does not contain all txs')
+        
+        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
+        assert share_info == self.share_info
+        
+        return dict(header=self.header, txs=[gentx] + self.other_txs)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
     if dist is None:

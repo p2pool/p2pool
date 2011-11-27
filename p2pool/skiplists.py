@@ -26,10 +26,10 @@ class WeightsSkipList(skiplist.SkipList):
         return 0, {}, 0, 0
     
     def apply_delta(self, (share_count1, weights1, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2), (max_shares, desired_weight)):
-        if total_weight1 + total_weight2 > desired_weight and len(share_count2) == 1:
+        if total_weight1 + total_weight2 > desired_weight and share_count2 == 1:
             script, = weights2.iterkeys()
             new_weights = dict(weights1)
-            assert desired_weight - total_weight1 % 65535 == 0
+            assert (desired_weight - total_weight1) % 65535 == 0
             new_weights[script] = new_weights.get(script, 0) + (desired_weight - total_weight1)//65535*weights2[script]//(total_weight2//65535)
             return share_count1 + share_count2, new_weights, desired_weight, total_donation_weight1 + (desired_weight - total_weight1)//65535*total_donation_weight2//(total_weight2//65535)
         return share_count1 + share_count2, math.add_dicts([weights1, weights2]), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
