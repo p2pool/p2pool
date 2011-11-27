@@ -423,7 +423,7 @@ def main(args):
             subsidy = current_work2.value['subsidy']
             
             
-            if False: # and imestamp > 42e2:
+            if int(time.time() - current_work2.value['clock_offset']) >= p2pool.TRANSITION_TIME:
                 timestamp = current_work2.value['time']
                 is_new = True
                 previous_share = tracker.shares[state['best_share_hash']] if state['best_share_hash'] is not None else None

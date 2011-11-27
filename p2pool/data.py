@@ -1,5 +1,7 @@
 from __future__ import division
 
+TRANSITION_TIME = 1322638748
+
 import itertools
 import random
 import time
@@ -140,6 +142,8 @@ class Share(object):
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen shared stored peer'.split(' ')
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
+        if header['timestamp'] >= TRANSITION_TIME:
+            raise AssertionError('transitioning...')
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -269,6 +273,8 @@ class NewShare(Share):
             raise AssertionError()
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
+        if header['timestamp'] < TRANSITION_TIME:
+            raise AssertionError('transitioning...')
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
