@@ -58,6 +58,7 @@ new_share_data_type = bitcoin_data.ComposedType([
     ('subsidy', bitcoin_data.StructType('<Q')),
     ('donation', bitcoin_data.StructType('<H')),
     ('timestamp', bitcoin_data.StructType('<I')),
+    ('stale_frac', bitcoin_data.StructType('<B')),
 ])
 
 new_share_info_type = bitcoin_data.ComposedType([

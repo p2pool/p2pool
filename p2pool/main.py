@@ -432,13 +432,16 @@ def main(args):
                     new_share_data=dict(
                         previous_share_hash=state['best_share_hash'],
                         coinbase=aux_str,
-                        nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)) + get_stale_frac(),
+                        nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
                         new_script=payout_script,
                         subsidy=subsidy,
                         donation=math.perfect_round(65535*args.donation_percentage/100),
                         timestamp=math.clip(int(time.time() - current_work2.value['clock_offset']),
                             (previous_share.timestamp - 60, previous_share.timestamp + 60),
-                        ),
+                        ) if previous_share is not None else int(time.time() - current_work2.value['clock_offset']),
+                        stale_frac=(lambda shares, stales:
+                            255 if shares == 0 else math.perfect_round(254*stales/shares)
+                        )(*get_share_counts()),
                     ),
                     block_target=state['target'],
                     net=args.net,
@@ -629,6 +632,8 @@ def main(args):
         
         
         def read_stale_frac(share):
+            if isinstance(share, p2pool.NewShare):
+                return share.share_data['stale_frac']/254 if share.share_data['stale_frac'] != 255 else None
             if len(share.nonce) < 4:
                 return None
             a, b = struct.unpack("<HH", share.nonce[-4:])
