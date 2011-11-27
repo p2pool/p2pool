@@ -452,10 +452,12 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     weights, total_weight, donation_weight = math.add_dicts([{new_script: this_att*(65535-donation)}, other_weights]), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
     assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
     
+    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
+    
     amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in weights.iteritems())
     amounts[new_script] = amounts.get(new_script, 0) + subsidy//200
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*(199*donation_weight)//(200*total_weight)
-    amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
+    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy*(199*donation_weight)//(200*total_weight)
+    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
     
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
