@@ -129,7 +129,7 @@ def share_info_to_gentx(share_info, block_target, tracker, net):
     )[1]
 
 class Share(object):
-    donation = 0
+    donation = int(0.005*65535 + 0.5)
     
     @classmethod
     def from_share1a(cls, share1a, net):
