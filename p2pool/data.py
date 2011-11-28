@@ -343,13 +343,6 @@ class NewShare(Share):
         
         if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
-        
-        if self.other_txs is not None:
-            if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
-                raise ValueError('''gentx doesn't match header via other_txs''')
-            
-            if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
-                raise ValueError('block size too large')
     
     def as_block(self, tracker, net):
         if self.other_txs is None:
