@@ -468,11 +468,6 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
     if any(x < 0 for x in amounts.itervalues()):
-        print amounts
-        import code
-        d = globals()
-        d.update(locals())
-        code.interact(local=d)
         raise ValueError()
     
     pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
