@@ -142,8 +142,6 @@ class Share(object):
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer'.split(' ')
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
-        if header['timestamp'] >= TRANSITION_TIME:
-            raise AssertionError('transitioning...')
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -217,6 +215,8 @@ class Share(object):
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def check(self, tracker, now, net):
+        if self.header['timestamp'] >= TRANSITION_TIME:
+            raise AssertionError('transitioning...')
         import time
         if self.previous_share_hash is not None:
             if self.header['timestamp'] <= math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(self.previous_share_hash), 11)), use_float=False):
@@ -268,8 +268,6 @@ class NewShare(Share):
             raise AssertionError()
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
-        if header['timestamp'] < TRANSITION_TIME:
-            raise AssertionError('transitioning...')
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -325,6 +323,8 @@ class NewShare(Share):
         self.peer = None
     
     def check(self, tracker, now, net):
+        if self.header['timestamp'] < TRANSITION_TIME:
+            raise AssertionError('transitioning...')
         if self.previous_share_hash is not None:
             previous_share = tracker.shares[self.previous_share_hash]
             if not (previous_share.timestamp - 60 <= self.timestamp <= previous_share.timestamp + 60):
