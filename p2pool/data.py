@@ -244,6 +244,8 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
 
 class NewShare(Share):
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation'.split(' ')
+    
     @classmethod
     def from_share(cls, share, net):
         if share['type'] == 0:
@@ -292,6 +294,7 @@ class NewShare(Share):
         self.new_script = self.share_data['new_script']
         self.subsidy = self.share_data['subsidy']
         self.timestamp = self.share_data['timestamp']
+        self.donation = self.share_data['donation']
         
         if len(self.new_script) > 100:
             raise ValueError('new_script too long!')
