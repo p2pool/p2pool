@@ -109,7 +109,6 @@ def main(args):
                 if contents.hash in tracker.shares:
                     continue
                 contents.shared = True
-                contents.stored = True
                 contents.time_seen = 0
                 tracker.add(contents)
                 if len(tracker.shares) % 1000 == 0 and tracker.shares:
