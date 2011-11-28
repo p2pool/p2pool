@@ -101,6 +101,7 @@ def main(args):
         print
         
         tracker = p2pool.OkayTracker(args.net)
+        shared_share_hashes = set()
         ss = p2pool.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), args.net.NAME + '_shares.'), args.net)
         known_verified = set()
         print "Loading shares..."
@@ -108,7 +109,7 @@ def main(args):
             if mode == 'share':
                 if contents.hash in tracker.shares:
                     continue
-                contents.shared = True
+                shared_share_hashes.add(contents.hash)
                 contents.time_seen = 0
                 tracker.add(contents)
                 if len(tracker.shares) % 1000 == 0 and tracker.shares:
@@ -129,6 +130,7 @@ def main(args):
         tracker.verified.added.watch(lambda share: ss.add_verified_hash(share.hash))
         tracker.removed.watch(lambda share: ss.forget_share(share.hash))
         tracker.verified.removed.watch(lambda share: ss.forget_verified_share(share.hash))
+        tracker.removed.watch(lambda share: shared_share_hashes.discard(share.hash))
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         
@@ -232,7 +234,7 @@ def main(args):
                 #if p2pool_init.DEBUG:
                 #    print "Sending share %s to %r" % (p2pool.format_hash(share.hash), peer.addr)
                 peer.sendShares([share])
-            share.flag_shared()
+            shared_share_hashes.add(share.hash)
         
         def p2p_shares(shares, peer=None):
             if len(shares) > 5:
@@ -345,7 +347,7 @@ def main(args):
         def work_changed(new_work):
             #print 'Work changed:', new_work
             for share in tracker.get_chain_known(new_work['best_share_hash']):
-                if share.shared:
+                if share.hash in shared_share_hashes:
                     break
                 share_share(share, share.peer)
         current_work.changed.watch(work_changed)

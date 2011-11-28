@@ -139,7 +139,7 @@ class Share(object):
     def from_share1b(cls, share1b, net):
         return cls(net, **share1b)
     
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen shared peer'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer'.split(' ')
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if header['timestamp'] >= TRANSITION_TIME:
@@ -197,7 +197,6 @@ class Share(object):
         
         # XXX eww
         self.time_seen = time.time()
-        self.shared = False
         self.peer = None
     
     def as_block(self, tracker, net):
@@ -240,9 +239,6 @@ class Share(object):
             
             if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
                 raise ValueError('block size too large')
-    
-    def flag_shared(self):
-        self.shared = True
     
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
@@ -326,7 +322,6 @@ class NewShare(Share):
         
         # XXX eww
         self.time_seen = time.time()
-        self.shared = False
         self.peer = None
     
     def check(self, tracker, now, net):
