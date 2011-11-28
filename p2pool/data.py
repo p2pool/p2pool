@@ -378,6 +378,8 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
     dest_weights, total_weight, donation_weight_total = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total, other_donation_weight_total
     assert total_weight == sum(dest_weights.itervalues()) + donation_weight_total
     
+    total_weight -= donation_weight_total # ignore donation
+    
     if net.SCRIPT:
         amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
@@ -431,6 +433,9 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     subsidy = new_share_data['subsidy']
     donation = new_share_data['donation']
     assert 0 <= donation <= 65535
+    
+    if len(new_share_data['coinbase']) > 100:
+        raise ValueError('coinbase too long!')
     
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
@@ -486,7 +491,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
         tx_ins=[dict(
             previous_output=None,
             sequence=None,
-            script=new_share_data['coinbase'],
+            script=new_share_data['coinbase'].ljust(2, '\x00'),
         )],
         tx_outs=[dict(value=0, script=bitcoin_data.HashType().pack(new_share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
