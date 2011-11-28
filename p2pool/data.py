@@ -470,11 +470,8 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     if any(x < 0 for x in amounts.itervalues()):
         raise ValueError()
     
-    pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
-    pre_dests = pre_dests[-4000:] # block length limit, unlikely to ever be hit
-    
-    dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
-    assert dests[-1] == new_script
+    dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
+    dests = dests[-4000:] # block length limit, unlikely to ever be hit
     
     share_info = dict(
         new_share_data=new_share_data,
