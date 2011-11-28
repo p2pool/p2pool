@@ -493,7 +493,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
             sequence=None,
             script=new_share_data['coinbase'].ljust(2, '\x00'),
         )],
-        tx_outs=[dict(value=0, script=bitcoin_data.HashType().pack(new_share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.HashType().pack(new_share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 
