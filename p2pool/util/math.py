@@ -64,6 +64,14 @@ def format(x):
     s = '' if count == 0 else prefixes[count - 1]
     return '%i' % (x,) + s
 
+def perfect_round(x):
+    a, b = divmod(x, 1)
+    a2 = int(a)
+    if random.random() >= b:
+        return a2
+    else:
+        return a2 + 1
+
 if __name__ == '__main__':
     import random
     a = 1
