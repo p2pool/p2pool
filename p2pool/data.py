@@ -59,13 +59,13 @@ new_share_data_type = bitcoin_data.ComposedType([
     ('new_script', bitcoin_data.VarStrType()),
     ('subsidy', bitcoin_data.StructType('<Q')),
     ('donation', bitcoin_data.StructType('<H')),
-    ('timestamp', bitcoin_data.StructType('<I')),
     ('stale_frac', bitcoin_data.StructType('<B')),
 ])
 
 new_share_info_type = bitcoin_data.ComposedType([
     ('new_share_data', new_share_data_type),
     ('target', bitcoin_data.FloatingIntegerType()),
+    ('timestamp', bitcoin_data.StructType('<I')),
 ])
 
 new_share1a_type = bitcoin_data.ComposedType([
@@ -290,10 +290,10 @@ class NewShare(Share):
         
         self.share_data = self.share_info['new_share_data']
         self.target = self.share_info['target']
+        self.timestamp = self.share_info['timestamp']
         
         self.new_script = self.share_data['new_script']
         self.subsidy = self.share_data['subsidy']
-        self.timestamp = self.share_data['timestamp']
         self.donation = self.share_data['donation']
         
         if len(self.new_script) > 100:
@@ -328,12 +328,8 @@ class NewShare(Share):
     def check(self, tracker, now, net):
         if self.header['timestamp'] < TRANSITION_TIME:
             raise AssertionError('transitioning...')
-        if self.previous_share_hash is not None:
-            previous_share = tracker.shares[self.previous_share_hash]
-            if not (previous_share.timestamp - 60 <= self.timestamp <= previous_share.timestamp + 60):
-                raise ValueError('share timestamp (%i) too far from previous timestamp (%i)' % (self.timestamp, previous_share.timestamp))
         
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
+        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
@@ -344,7 +340,7 @@ class NewShare(Share):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], net)
+        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
         assert share_info == self.share_info
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
@@ -430,7 +426,7 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         lock_time=0,
     )
 
-def new_generate_transaction(tracker, new_share_data, block_target, net):
+def new_generate_transaction(tracker, new_share_data, block_target, desired_timestamp, net):
     previous_share_hash = new_share_data['previous_share_hash']
     new_script = new_share_data['new_script']
     subsidy = new_share_data['subsidy']
@@ -440,13 +436,14 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     if len(new_share_data['coinbase']) > 100:
         raise ValueError('coinbase too long!')
     
+    previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
+    
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
     if height < net.TARGET_LOOKBEHIND:
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
         attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
-        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
@@ -480,6 +477,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     share_info = dict(
         new_share_data=new_share_data,
         target=target,
+        timestamp=math.clip(desired_timestamp, (previous_share.timestamp - 60, previous_share.timestamp + 60)) if previous_share is not None else desired_timestamp,
     )
     
     return share_info, dict(

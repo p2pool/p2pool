@@ -437,14 +437,12 @@ def main(args):
                         new_script=payout_script,
                         subsidy=subsidy,
                         donation=math.perfect_round(65535*args.donation_percentage/100),
-                        timestamp=math.clip(int(time.time() - current_work2.value['clock_offset']),
-                            (previous_share.timestamp - 60, previous_share.timestamp + 60),
-                        ) if previous_share is not None else int(time.time() - current_work2.value['clock_offset']),
                         stale_frac=(lambda shares, stales:
                             255 if shares == 0 else math.perfect_round(254*stales/shares)
                         )(*get_share_counts()),
                     ),
                     block_target=state['target'],
+                    desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
                     net=args.net,
                 )
             else:
