@@ -1,6 +1,6 @@
 from __future__ import division
 
-TRANSITION_TIME = 1322638748
+TRANSITION_TIME = 1322522762
 
 import itertools
 import random
@@ -463,9 +463,10 @@ def new_generate_transaction(tracker, new_share_data, block_target, net):
     
     SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
     
-    amounts = dict((script, subsidy*(199*weight)//(200*total_weight)) for (script, weight) in weights.iteritems())
-    amounts[new_script] = amounts.get(new_script, 0) + subsidy//200
-    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy*(199*donation_weight)//(200*total_weight)
+    # 1 satoshi is always donated so that a list of p2pool generated blocks can be easily found by looking at the donation address
+    amounts = dict((script, (subsidy-1)*(199*weight)//(200*total_weight)) for (script, weight) in weights.iteritems())
+    amounts[new_script] = amounts.get(new_script, 0) + (subsidy-1)//200
+    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + (subsidy-1)*(199*donation_weight)//(200*total_weight)
     amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
     
     if sum(amounts.itervalues()) != subsidy:
