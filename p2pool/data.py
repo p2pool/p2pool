@@ -215,7 +215,7 @@ class Share(object):
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def check(self, tracker, now, net):
-        if self.header['timestamp'] >= TRANSITION_TIME:
+        if self.header['timestamp'] >= TRANSITION_TIME + 3600:
             raise AssertionError('transitioning...')
         import time
         if self.previous_share_hash is not None:
@@ -326,7 +326,7 @@ class NewShare(Share):
         self.peer = None
     
     def check(self, tracker, now, net):
-        if self.header['timestamp'] < TRANSITION_TIME:
+        if self.header['timestamp'] <= TRANSITION_TIME - 3600:
             raise AssertionError('transitioning...')
         
         share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
