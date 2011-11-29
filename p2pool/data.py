@@ -357,6 +357,8 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
     return attempts//time
 
 def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
+    donation = int(0.005*65535 + 0.5)
+    
     height, last = tracker.get_height_and_last(previous_share_hash)
     assert height >= net.CHAIN_LENGTH or last is None
     if height < net.TARGET_LOOKBEHIND:
@@ -370,22 +372,23 @@ def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonc
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
     
     attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
-    max_weight = 65535 * net.SPREAD * attempts_to_block
+    max_att = net.SPREAD * attempts_to_block
     
-    this_weight = 65535 * min(bitcoin_data.target_to_average_attempts(target), max_weight)
-    other_weights, other_weights_total, other_donation_weight_total = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), max(0, max_weight - this_weight))
-    dest_weights, total_weight, donation_weight_total = math.add_dicts([{new_script: this_weight}, other_weights]), this_weight + other_weights_total, other_donation_weight_total
-    assert total_weight == sum(dest_weights.itervalues()) + donation_weight_total
+    this_att = min(bitcoin_data.target_to_average_attempts(target), max_att)
+    other_weights, other_total_weight, other_donation_weight = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), 65535*max(0, max_att - this_att))
+    assert other_total_weight == sum(other_weights.itervalues()) + other_donation_weight, (other_total_weight, sum(other_weights.itervalues()) + other_donation_weight)
+    weights, total_weight, donation_weight = math.add_dicts([{new_script: this_att*(65535-donation)}, other_weights]), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
+    assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
     
-    total_weight -= donation_weight_total # ignore donation
+    total_weight -= donation_weight # ignore donation
     
     if net.SCRIPT:
-        amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
         amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
         amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     else:
-        amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in dest_weights.iteritems())
+        amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in weights.iteritems())
         amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
         amounts[new_script] = amounts.get(new_script, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
     
