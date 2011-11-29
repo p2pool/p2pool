@@ -233,7 +233,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_share1bs(self, share1bs):
         shares = []
         for share1b in share1bs:
-            if not self.node.net.BITCOIN_POW_FUNC(share1a['header']) <= share1b['header']['target']:
+            if not self.node.net.BITCOIN_POW_FUNC(share1b['header']) <= share1b['header']['target']:
                 print 'Dropping peer %s:%i due to invalid share' % self.addr
                 self.transport.loseConnection()
                 return
