@@ -386,7 +386,7 @@ def main(args):
         removed_unstales = set()
         def get_share_counts(doa=False):
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-            matching_in_chain = share_counter(current_work.value['best_share_hash'], max(0, height - 1)) | removed_unstales
+            matching_in_chain = share_counter(current_work.value['best_share_hash'], height) | removed_unstales
             shares_in_chain = my_shares & matching_in_chain
             stale_shares = my_shares - matching_in_chain
             if doa:
