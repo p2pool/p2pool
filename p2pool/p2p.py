@@ -212,8 +212,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_shares(self, shares):
         res = []
         for share in shares:
-            share_obj = p2pool_data.Share.from_share(share, self.node.net)
+            share_obj = p2pool_data.NewShare.from_share(share, self.node.net)
             share_obj.peer = self
+            res.append(share_obj)
         self.node.handle_shares(res)
     
     message_share1as = bitcoin_data.ComposedType([
