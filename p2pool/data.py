@@ -777,7 +777,7 @@ class BitcoinMainnet(networks.BitcoinMainnet):
     NAME = 'bitcoin'
     P2P_PORT = 9333
     MAX_TARGET = 2**256//2**32 - 1
-    PERSIST = False
+    PERSIST = True
     WORKER_PORT = 9332
 
 class BitcoinTestnet(networks.BitcoinTestnet):
