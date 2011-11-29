@@ -1,6 +1,6 @@
 from __future__ import division
 
-TRANSITION_TIME = 1322522762
+TRANSITION_TIME = 1322561023
 
 import itertools
 import random
