@@ -6,6 +6,7 @@ import StringIO
 from PIL import Image
 
 from p2pool.util.vector import v
+from p2pool.bitcoin import data as bitcoin_data
 
 @apply
 class color(object):
@@ -19,7 +20,7 @@ def get_uniform(bound, *data):
     return x % bound
 
 def get_pos(share, t, d):
-    x = 5 + get_uniform(d.get_width() - 10, share.hash, "pos")
+    x = 5 + get_uniform(400 - 10, share.hash, "pos")
     y = d.get_height() - (t - share.time_seen)*10
     if y < -10000: y = -10000
     if y > 10000: y = 10000
@@ -51,9 +52,13 @@ def go(share, tracker, t, d):
         pygame.draw.circle(d, c, pos.rounded, 10, 2)
     for child_hash in tracker.reverse_shares.get(share.hash, set()):
         go(tracker.shares[child_hash], tracker, t, d)
+    d.blit(f.render(bitcoin_data.script2_to_human(share.new_script, tracker.net.PARENT), True, (255, 255, 255)), pos)
+
+pygame.font.init()
+f = pygame.font.SysFont("Monospace", 16)
 
 def get(tracker, best):
-    d = pygame.Surface((400, 600), 32)
+    d = pygame.Surface((600, 600), 32)
     if tracker.get_height(best) >= 100:
         t = time.time()
         start = tracker.get_nth_parent_hash(best, 100)
