@@ -554,7 +554,7 @@ def main(args):
             if current_work.value['best_share_hash'] is not None:
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                 att_s = p2pool.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], args.net, min(height - 1, 720))
-                fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
+                fracs = [share.stale_frac for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if share.stale_frac is not None]
                 return json.dumps(int(att_s / (1. - (math.median(fracs) if fracs else 0))))
             return json.dumps(None)
         
@@ -630,16 +630,6 @@ def main(args):
             task.LoopingCall(signal.alarm, 30).start(1)
         
         
-        def read_stale_frac(share):
-            if isinstance(share, p2pool.NewShare):
-                return share.share_data['stale_frac']/254 if share.share_data['stale_frac'] != 255 else None
-            if len(share.nonce) < 4:
-                return None
-            a, b = struct.unpack("<HH", share.nonce[-4:])
-            if a == 0 or a != b:
-                return None
-            return a/65535
-
         pool_str = None;
         while True:
             yield deferral.sleep(3)
@@ -653,7 +643,7 @@ def main(args):
                         weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
                         shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                         stale_shares = stale_doa_shares + stale_not_doa_shares
-                        fracs = [read_stale_frac(share) for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if read_stale_frac(share) is not None]
+                        fracs = [share.stale_frac for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if share.stale_frac is not None]
                         str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                             math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,

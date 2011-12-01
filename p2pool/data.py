@@ -6,6 +6,7 @@ import itertools
 import random
 import time
 import os
+import struct
 
 from twisted.python import log
 
@@ -139,7 +140,7 @@ class Share(object):
     def from_share1b(cls, share1b, net):
         return cls(net, **share1b)
     
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer stale_frac'.split(' ')
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
@@ -193,6 +194,12 @@ class Share(object):
         if script.get_sigop_count(self.new_script) > 1:
             raise ValueError('too many sigops!')
         
+        self.stale_frac = None
+        if len(self.nonce) >= 4:
+            a, b = struct.unpack("<HH", self.nonce[-4:])
+            if a != 0 or a == b:
+                self.stale_frac = a/65535
+        
         # XXX eww
         self.time_seen = time.time()
         self.peer = None
@@ -244,7 +251,7 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
 
 class NewShare(Share):
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -320,6 +327,8 @@ class NewShare(Share):
         
         if script.get_sigop_count(self.new_script) > 1:
             raise ValueError('too many sigops!')
+        
+        self.stale_frac = self.share_data['stale_frac']/254 if self.share_data['stale_frac'] != 255 else None
         
         # XXX eww
         self.time_seen = time.time()
