@@ -10,22 +10,7 @@ from twisted.python import log
 import p2pool
 from p2pool import data as p2pool_data
 from p2pool.util import jsonrpc, deferred_resource, variable
-from p2pool.bitcoin import data as bitcoin_data
-
-def get_username(request):
-    try:
-        return base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
-    except: # XXX
-        return None
-
-def get_payout_script(request, net):
-    user = get_username(request)
-    if user is None:
-        return None
-    try:
-        return bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(user, net))
-    except: # XXX blah
-        return None
+from p2pool.bitcoin import getwork
 
 def get_memory(request):
     if request.getHeader('X-Miner-Extensions') is not None and 'workidentifier' in request.getHeader('X-Miner-Extensions').split(' '):
@@ -43,6 +28,26 @@ def get_memory(request):
     if 'phoenix' in user_agent2: return 2
     print 'Unknown miner User-Agent:', repr(user_agent)
     return 0
+
+def get_max_target(request): # inclusive
+    if request.getHeader('X-All-Targets') is not None or (request.getHeader('X-Miner-Extensions') is not None and 'alltargets' in request.getHeader('X-Miner-Extensions')):
+        return 2**256-1
+    user_agent = request.getHeader('User-Agent')
+    user_agent2 = '' if user_agent is None else user_agent.lower()
+    if 'java' in user_agent2 or 'diablominer' in user_agent2: return 2**256//2**32-1 # hopefully diablominer...
+    if 'cpuminer' in user_agent2: return 2**256//2**32-1
+    if 'tenebrix miner' in user_agent2: return 2**256-1
+    if 'cgminer' in user_agent2: return 2**256//2**32-1
+    if 'poclbm' in user_agent2: return 2**256//2**32-1
+    if 'phoenix' in user_agent2: return 2**256//2**32-1
+    print 'Unknown miner User-Agent:', repr(user_agent)
+    return 2**256//2**32-1
+
+def get_username(request):
+    try:
+        return base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
+    except: # XXX
+        return None
 
 def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization')
@@ -100,13 +105,12 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     render_POST = render_GET
 
 class WorkerInterface(jsonrpc.Server):
-    def __init__(self, work, compute, response_callback, net):
+    def __init__(self, work, compute, response_callback):
         jsonrpc.Server.__init__(self)
         
         self.work = work
         self.compute = compute
         self.response_callback = response_callback
-        self.net = net
         self.holds = Holds()
         self.last_cache_invalidation = {}
         
@@ -119,7 +123,7 @@ class WorkerInterface(jsonrpc.Server):
         request.setHeader('X-Roll-NTime', 'expire=60')
         
         if data is not None:
-            defer.returnValue(self.response_callback(data, get_username(request)))
+            defer.returnValue(self.response_callback(getwork.decode_data(data), request))
         
         defer.returnValue((yield self.getwork(request)))
     rpc_getwork.takes_request = True
@@ -153,13 +157,12 @@ class WorkerInterface(jsonrpc.Server):
             if p2pool.DEBUG:
                 print 'POLL %i FAKED user=%r' % (id, get_username(request))
             self.holds.set_hold(request_id, .01)
-        res = self.compute(work, get_payout_script(request, self.net))
+        res = self.compute(work, request)
         
         self.last_cache_invalidation[request_id].set((thought_work[-1], work))
         if p2pool.DEBUG:
             print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(work['best_share_hash']), get_username(request))
         
-        if request.getHeader('X-All-Targets') is None and res.share_target > self.net.MAX_TARGET:
-            res = res.update(share_target=self.net.MAX_TARGET)
-
+        res = res.update(share_target=min(res.share_target, get_max_target(request)))
+        
         defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))

@@ -398,8 +398,19 @@ def main(args):
         def _(share):
             if share.hash in my_shares and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_unstales.add(share.hash)
-
-        def compute(state, payout_script):
+        
+        
+        def get_payout_script_from_username(request):
+            user = worker_interface.get_username(request)
+            if user is None:
+                return None
+            try:
+                return bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(user, args.net))
+            except: # XXX blah
+                return None
+        
+        def compute(state, request):
+            payout_script = get_payout_script_from_username(request)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
             if state['best_share_hash'] is None and args.net.PERSIST:
@@ -479,10 +490,10 @@ def main(args):
         doa_shares = set()
         times = {}
         
-        def got_response(data, user):
+        def got_response(header, request):
             try:
+                user = worker_interface.get_username(request)
                 # match up with transactions
-                header = bitcoin.getwork.decode_data(data)
                 xxx = merkle_root_to_transactions.get(header['merkle_root'], None)
                 if xxx is None:
                     print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
@@ -548,7 +559,7 @@ def main(args):
                 log.err(None, 'Error processing data received from worker:')
                 return False
         
-        web_root = worker_interface.WorkerInterface(current_work, compute, got_response, args.net)
+        web_root = worker_interface.WorkerInterface(current_work, compute, got_response)
         
         def get_rate():
             if current_work.value['best_share_hash'] is not None:

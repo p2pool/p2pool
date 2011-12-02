@@ -352,7 +352,7 @@ class FloatingInteger(object):
         elif isinstance(other, (int, long)):
             return cmp(self._value, other)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(other)
     
     def __int__(self):
         return self._value
