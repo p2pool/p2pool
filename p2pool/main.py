@@ -21,8 +21,9 @@ from twisted.python import log
 from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p, bitcoin.getwork, bitcoin.data
+from bitcoin import worker_interface
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, worker_interface, skiplists
+from . import p2p, skiplists
 import p2pool.data as p2pool
 import p2pool as p2pool_init
 
