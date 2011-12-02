@@ -126,7 +126,6 @@ class WorkerInterface(jsonrpc.Server):
             defer.returnValue(self.response_callback(getwork.decode_data(data), request))
         
         defer.returnValue((yield self.getwork(request)))
-    rpc_getwork.takes_request = True
     
     @defer.inlineCallbacks
     def getwork(self, request, long_poll=False):
