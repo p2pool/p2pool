@@ -410,7 +410,8 @@ def main(args):
             except: # XXX blah
                 return None
         
-        def compute(state, request):
+        def compute(request):
+            state = current_work.value
             payout_script = get_payout_script_from_username(request)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
@@ -485,7 +486,7 @@ def main(args):
             target2 = (new_share_info if is_new else share_info['share_data'])['target']
             times[merkle_root] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
-            return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2)
+            return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2), state['best_share_hash']
         
         my_shares = set()
         doa_shares = set()
@@ -560,7 +561,7 @@ def main(args):
                 log.err(None, 'Error processing data received from worker:')
                 return False
         
-        web_root = worker_interface.WorkerInterface(current_work, compute, got_response)
+        web_root = worker_interface.WorkerInterface(compute, got_response, current_work.changed)
         
         def get_rate():
             if current_work.value['best_share_hash'] is not None:

@@ -8,6 +8,7 @@ class Event(object):
         self.observers = {}
         self.id_generator = itertools.count()
         self._once = None
+        self.times = 0
     
     def watch(self, func):
         id = self.id_generator.next()
@@ -34,6 +35,8 @@ class Event(object):
         
         if once is not None:
             once.happened(*event)
+        
+        self.times += 1
     
     def get_deferred(self, timeout=None):
         once = self.once

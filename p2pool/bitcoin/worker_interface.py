@@ -105,14 +105,15 @@ class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     render_POST = render_GET
 
 class WorkerInterface(jsonrpc.Server):
-    def __init__(self, work, compute, response_callback):
+    def __init__(self, compute, response_callback, new_work_event=variable.Event()):
         jsonrpc.Server.__init__(self)
         
-        self.work = work
         self.compute = compute
         self.response_callback = response_callback
+        self.new_work_event = new_work_event
+        
         self.holds = Holds()
-        self.last_cache_invalidation = {}
+        self.worker_views = {}
         
         self.putChild('long-polling', LongPollingWorkerInterface(self))
         self.putChild('', self)
@@ -136,32 +137,31 @@ class WorkerInterface(jsonrpc.Server):
         if p2pool.DEBUG:
             print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), get_username(request))
         
-        if request_id not in self.last_cache_invalidation:
-            self.last_cache_invalidation[request_id] = variable.Variable((None, None))
+        if request_id not in self.worker_views:
+            self.worker_views[request_id] = variable.Variable((0, (None, None))) # times, (previous_block/-1, previous_block/-2)
         
-        yield self.holds.wait_hold(request_id)
-        work = self.work.value
-        thought_work = self.last_cache_invalidation[request_id].value
+        thought_times, thought_work = self.worker_views[request_id].value
         
-        if long_poll and work == thought_work[-1]:
+        if long_poll and thought_times == self.new_work_event.times:
             if p2pool.DEBUG:
                 print 'POLL %i WAITING user=%r' % (id, get_username(request))
-            yield defer.DeferredList([self.work.changed.get_deferred(), self.last_cache_invalidation[request_id].changed.get_deferred()], fireOnOneCallback=True)
-        work = self.work.value
+            yield defer.DeferredList([self.new_work_event.get_deferred(), self.worker_views[request_id].changed.get_deferred()], fireOnOneCallback=True)
         
-        if thought_work[-1] is not None and work != thought_work[-1] and any(x is None or work['previous_block'] == x['previous_block'] for x in thought_work[-memory or len(thought_work):]):
+        yield self.holds.wait_hold(request_id)
+        
+        res, identifier = self.compute(request)
+        
+        if thought_work[-1] is not None and self.new_work_event.times != thought_times and any(x is None or res.previous_block == x for x in thought_work[-memory or len(thought_work):]):
             # clients won't believe the update
-            work = work.copy()
-            work['previous_block'] = random.randrange(2**256)
+            res = res.update(previous_block=random.randrange(2**256))
             if p2pool.DEBUG:
                 print 'POLL %i FAKED user=%r' % (id, get_username(request))
             self.holds.set_hold(request_id, .01)
-        res = self.compute(work, request)
         
-        self.last_cache_invalidation[request_id].set((thought_work[-1], work))
+        self.worker_views[request_id].set((self.new_work_event.times, (thought_work[-1], res.previous_block)))
         if p2pool.DEBUG:
-            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(work['best_share_hash']), get_username(request))
+            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), get_username(request)) # XXX identifier is hack
         
         res = res.update(share_target=min(res.share_target, get_max_target(request)))
         
-        defer.returnValue(res.getwork(identifier=str(work['best_share_hash'])))
+        defer.returnValue(res.getwork(identifier=str(identifier)))
