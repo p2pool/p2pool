@@ -23,7 +23,7 @@ def get_memory(request):
     if 'cpuminer' in user_agent2: return 0
     if 'tenebrix miner' in user_agent2: return 0
     if 'ufasoft' in user_agent2: return 0 # not confirmed
-    if 'cgminer' in user_agent2: return 1
+    if 'cgminer' in user_agent2: return 0
     if 'poclbm' in user_agent2: return 1
     if 'phoenix' in user_agent2: return 2
     print 'Unknown miner User-Agent:', repr(user_agent)
@@ -158,7 +158,7 @@ class WorkerInterface(jsonrpc.Server):
                 print 'POLL %i FAKED user=%r' % (id, get_username(request))
             self.holds.set_hold(request_id, .01)
         
-        self.worker_views[request_id].set((self.new_work_event.times, (thought_work[-1], res.previous_block)))
+        self.worker_views[request_id].set((self.new_work_event.times if long_poll else thought_times, (thought_work[-1], res.previous_block)))
         if p2pool.DEBUG:
             print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), get_username(request)) # XXX identifier is hack
         
