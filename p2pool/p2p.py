@@ -221,7 +221,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             shares.append(share)
         self.node.handle_shares(shares, self)
     
-    def send_shares(self, shares):
+    def sendShares(self, shares):
         share1bs = []
         share1as = []
         # XXX doesn't need to send full block when it's not urgent

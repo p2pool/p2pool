@@ -251,7 +251,7 @@ def main(args):
                     continue
                 #if p2pool_init.DEBUG:
                 #    print "Sending share %s to %r" % (p2pool.format_hash(share.hash), peer.addr)
-                peer.send_shares([share])
+                peer.sendShares([share])
             share.flag_shared()
         
         def p2p_shares(shares, peer=None):
@@ -318,7 +318,7 @@ def main(args):
                         break
                     shares.append(share)
             print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
-            peer.send_shares(shares)
+            peer.sendShares(shares)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
