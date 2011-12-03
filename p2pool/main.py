@@ -299,7 +299,7 @@ def main(args, net):
                         break
                     shares.append(share)
             print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
-            peer.sendShares(shares, full=True)
+            peer.sendShares(shares)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
@@ -333,7 +333,6 @@ def main(args, net):
             port=args.p2pool_port,
             net=net,
             addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), net.NAME),
-            mode=0 if args.low_bandwidth else 1,
             preferred_addrs=set(map(parse, args.p2pool_nodes)) | nodes,
         )
         p2p_node.handle_shares = p2p_shares
@@ -732,9 +731,6 @@ def run():
     p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
         help='connect to existing p2pool node at ADDR listening on TCP port PORT (defaults to 9333 normally, 19333 for testnet), in addition to builtin addresses',
         type=str, action='append', default=[], dest='p2pool_nodes')
-    parser.add_argument('-l', '--low-bandwidth',
-        help='trade lower bandwidth usage for higher latency (reduced efficiency)',
-        action='store_true', default=False, dest='low_bandwidth')
     parser.add_argument('--disable-upnp',
         help='''don't attempt to forward port 9333 (19333 for testnet) from the WAN to this computer using UPnP''',
         action='store_false', default=True, dest='upnp')

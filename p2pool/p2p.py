@@ -12,10 +12,6 @@ from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, variable, dicts
 
-# mode
-#     0: send hash first (high latency, low bandwidth)
-#     1: send entire share (low latency, high bandwidth)
-
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 1
     sub_version = p2pool.__version__
@@ -29,12 +25,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     use_checksum = True
     
     other_version = None
-    node_var_watch = None
     connected2 = False
-    
-    @property
-    def mode(self):
-        return min(self.node.mode_var.value, self.other_mode_var.value)
     
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
@@ -56,11 +47,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ),
             nonce=self.node.nonce,
             sub_version=self.sub_version,
-            mode=self.node.mode_var.value,
+            mode=1,
             best_share_hash=self.node.current_work.value['best_share_hash'],
         )
-        
-        self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_setmode(mode=new_mode))
         
         reactor.callLater(10, self._connect_timeout)
         self.timeout_delayed = reactor.callLater(100, self._timeout)
@@ -100,14 +89,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('addr_from', bitcoin_data.address_type),
         ('nonce', bitcoin_data.StructType('<Q')),
         ('sub_version', bitcoin_data.VarStrType()),
-        ('mode', bitcoin_data.StructType('<I')),
+        ('mode', bitcoin_data.StructType('<I')), # always 1 for legacy compatibility
         ('best_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version
         self.other_sub_version = sub_version[:512]
         self.other_services = services
-        self.other_mode_var = variable.Variable(mode)
         
         if nonce == self.node.nonce:
             #print 'Detected connection to self, disconnecting from %s:%i' % self.addr
@@ -126,14 +114,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._think2()
         
         if best_share_hash is not None:
-            self.handle_share0s(hashes=[best_share_hash])
-    
-    
-    message_setmode = bitcoin_data.ComposedType([
-        ('mode', bitcoin_data.StructType('<I')),
-    ])
-    def handle_setmode(self, mode):
-        self.other_mode_var.set(mode)
+            self.node.handle_share_hashes([best_share_hash], self)
     
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
@@ -200,12 +181,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_getshares(self, hashes, parents, stops):
         self.node.handle_get_shares(hashes, parents, stops, self)
     
-    message_share0s = bitcoin_data.ComposedType([
-        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    def handle_share0s(self, hashes):
-        self.node.handle_share_hashes(hashes, self)
-    
     message_shares = bitcoin_data.ComposedType([
         ('shares', bitcoin_data.ListType(p2pool_data.new_share_type)),
     ])
@@ -218,30 +193,20 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.node.handle_shares(res)
     
     def sendShares(self, shares, full=False):
-        share0s = []
         new_shares = []
         # XXX doesn't need to send full block when it's not urgent
         # eg. when getting history
         for share in shares:
-            if self.mode == 0 and not full and not share.pow_hash <= share.header['target']:
-                share0s.append(share.hash)
-            elif self.mode == 1 or full:
-                new_shares.append(share.as_share())
-            else:
-                raise ValueError(self.mode)
+            new_shares.append(share.as_share())
         def att(f, **kwargs):
             try:
                 f(**kwargs)
             except bitcoin_p2p.TooLong:
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
-        if share0s: att(self.send_share0s, hashes=share0s)
         if new_shares: att(self.send_shares, shares=new_shares)
     
     def connectionLost(self, reason):
-        if self.node_var_watch is not None:
-            self.node.mode_var.changed.unwatch(self.node_var_watch)
-        
         if self.connected2:
             self.node.lost_conn(self)
 
@@ -296,7 +261,7 @@ class AddrStore(dicts.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), mode=0, desired_peers=10, max_attempts=100, preferred_storage=1000):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=100, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
@@ -304,7 +269,6 @@ class Node(object):
         self.net = net
         self.addr_store = AddrStore(addr_store)
         self.preferred_addrs = preferred_addrs
-        self.mode_var = variable.Variable(mode)
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts
         self.current_work = current_work
