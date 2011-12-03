@@ -28,7 +28,7 @@ import p2pool, p2pool.data as p2pool_data
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
-def getwork(bitcoind, ht, net):
+def getwork(bitcoind):
     work = yield bitcoind.rpc_getmemorypool()
     defer.returnValue(dict(
         version=work['version'],
@@ -75,7 +75,7 @@ def main(args):
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
-        temp_work = yield getwork(bitcoind, None, None)
+        temp_work = yield getwork(bitcoind)
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
         print
@@ -145,7 +145,7 @@ def main(args):
         
         @defer.inlineCallbacks
         def set_real_work1():
-            work = yield getwork(bitcoind, ht, args.net)
+            work = yield getwork(bitcoind)
             changed = work['previous_block_hash'] != current_work.value['previous_block'] if current_work.value is not None else True
             current_work.set(dict(
                 version=work['version'],
