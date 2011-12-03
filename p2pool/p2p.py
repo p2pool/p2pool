@@ -114,7 +114,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._think2()
         
         if best_share_hash is not None:
-            self.handle_share0s(hashes=[best_share_hash])
+            self.node.handle_share_hashes([best_share_hash], self)
     
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
@@ -181,12 +181,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_getshares(self, hashes, parents, stops):
         self.node.handle_get_shares(hashes, parents, stops, self)
     
-    message_share0s = bitcoin_data.ComposedType([
-        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    def handle_share0s(self, hashes):
-        self.node.handle_share_hashes(hashes, self)
-    
     message_share1as = bitcoin_data.ComposedType([
         ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
     ])
@@ -229,7 +223,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def send_shares(self, shares):
         share1bs = []
-        share0s = []
         share1as = []
         # XXX doesn't need to send full block when it's not urgent
         # eg. when getting history
@@ -245,7 +238,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
         if share1bs: att(self.send_share1bs, share1bs=share1bs)
-        if share0s: att(self.send_share0s, hashes=share0s)
         if share1as: att(self.send_share1as, share1as=share1as)
     
     def connectionLost(self, reason):
