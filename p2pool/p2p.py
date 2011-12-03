@@ -227,7 +227,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             shares.append(share)
         self.node.handle_shares(shares, self)
     
-    def send_shares(self, shares, full=False):
+    def send_shares(self, shares):
         share1bs = []
         share0s = []
         share1as = []

@@ -318,7 +318,7 @@ def main(args):
                         break
                     shares.append(share)
             print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
-            peer.send_shares(shares, full=True)
+            peer.send_shares(shares)
         
         print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
         
