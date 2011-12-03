@@ -67,7 +67,7 @@ def main(args):
             print "Install Pygame and PIL to enable visualizations! Visualizations disabled."
             print
         
-        # connect to bitcoind over JSON-RPC and do initial getwork
+        # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
@@ -75,9 +75,9 @@ def main(args):
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
-        temp_work = yield deferral.retry('Error while testing getwork:', 1)(defer.inlineCallbacks(lambda: defer.returnValue(bitcoin_getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())))))()
+        temp_work = yield getwork(bitcoind, None, None)
         print '    ...success!'
-        print '    Current block hash: %x' % (temp_work.previous_block,)
+        print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
@@ -753,7 +753,7 @@ def run():
         help='connect to a bitcoind at this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getwork (default: 8332 ixcoin: 8338 i0coin: 7332 litecoin: 9332)',
+        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getmemorypool (default: 8332 ixcoin: 8338 i0coin: 7332 litecoin: 9332)',
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
         help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 namecoin: 8334 ixcoin: 8337 i0coin: 7333 solidcoin: 7555 litecoin: 9333, +10000 for testnets)',
