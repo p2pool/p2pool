@@ -335,16 +335,15 @@ def main(args, net):
         # send share when the chain changes to their chain
         def work_changed(new_work):
             #print 'Work changed:', new_work
+            shares = []
             for share in tracker.get_chain_known(new_work['best_share_hash']):
                 if share.hash in shared_share_hashes:
                     break
-                for peer in p2p_node.peers.itervalues():
-                    if peer is share.peer:
-                        continue
-                    #if p2pool.DEBUG:
-                    #    print "Sending share %s to %r" % (p2pool_data.format_hash(share.hash), peer.addr)
-                    peer.sendShares([share])
                 shared_share_hashes.add(share.hash)
+                shares.append(share)
+            
+            for peer in p2p_node.peers.itervalues():
+                peer.sendShares([share for share in shares if share.peer is not peer])
         
         current_work.changed.watch(work_changed)
         
