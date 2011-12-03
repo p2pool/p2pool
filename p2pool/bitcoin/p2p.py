@@ -113,9 +113,6 @@ class Protocol(BaseProtocol):
     def use_checksum(self):
         return self.version >= 209
     
-    
-    null_order = '\0'*60
-    
     def connectionMade(self):
         BaseProtocol.connectionMade(self)
         
@@ -160,8 +157,6 @@ class Protocol(BaseProtocol):
         self.ready()
     
     def ready(self):
-        self.check_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_checkorder(id=id, order=order))
-        self.submit_order = deferral.GenericDeferrer(2**256, lambda id, order: self.send_submitorder(id=id, order=order))
         self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
         self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getheaders(version=1, have=[], last=hash))
         self.get_tx = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='tx', hash=hash)]))
@@ -250,9 +245,6 @@ class Protocol(BaseProtocol):
         ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
         ('script', bitcoin_data.PossiblyNoneType('', bitcoin_data.VarStrType())),
     ])
-    def handle_reply(self, hash, reply, script):
-        self.check_order.got_response(hash, dict(reply=reply, script=script))
-        self.submit_order.got_response(hash, dict(reply=reply, script=script))
     
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):

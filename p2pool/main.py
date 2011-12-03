@@ -39,21 +39,17 @@ def getwork(bitcoind):
         target=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
     ))
 
-@deferral.retry('Error getting payout script from bitcoind:', 1)
-@defer.inlineCallbacks
-def get_payout_script(factory):
-    res = yield (yield factory.getProtocol()).check_order(order=bitcoin_p2p.Protocol.null_order)
-    if res['reply'] == 'success':
-        defer.returnValue(res['script'])
-    elif res['reply'] == 'denied':
-        defer.returnValue(None)
-    else:
-        raise ValueError('Unexpected reply: %r' % (res,))
-
 @deferral.retry('Error creating payout script:', 10)
 @defer.inlineCallbacks
 def get_payout_script2(bitcoind, net):
-    defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net)))
+    address = yield bitcoind.rpc_getaccountaddress('p2pool')
+    try:
+        pubkey = (yield bitcoind.rpc_validateaddress(address))['pubkey'].decode('hex')
+    except:
+        log.err()
+        defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net)))
+    else:
+        defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
 
 @defer.inlineCallbacks
 def main(args):
@@ -80,16 +76,19 @@ def main(args):
         print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
         print
         
-        # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
+        # connect to bitcoind over bitcoin-p2p
         print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
         factory = bitcoin_p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
-        my_script = yield get_payout_script(factory)
+        yield factory.getProtocol() # waits until handshake is successful
+        print '    ...success!'
+        print
+        
         if args.pubkey_hash is None:
-            if my_script is None:
-                print '    IP transaction denied ... falling back to sending to address.'
-                my_script = yield get_payout_script2(bitcoind, args.net)
+            print 'Getting payout address from bitcoind...'
+            my_script = yield get_payout_script2(bitcoind, args.net)
         else:
+            print 'Computing payout script from provided address....'
             my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
         print '    ...success!'
         print '    Payout script:', bitcoin_data.script2_to_human(my_script, args.net)
