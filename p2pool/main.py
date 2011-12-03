@@ -226,15 +226,6 @@ def main(args, net):
         
         # setup p2p logic and join p2pool network
         
-        def share_share(share, ignore_peer=None):
-            for peer in p2p_node.peers.itervalues():
-                if peer is ignore_peer:
-                    continue
-                #if p2pool.DEBUG:
-                #    print "Sending share %s to %r" % (p2pool_data.format_hash(share.hash), peer.addr)
-                peer.sendShares([share])
-            shared_share_hashes.add(share.hash)
-        
         def p2p_shares(shares, peer=None):
             if len(shares) > 5:
                 print 'Processing %i shares...' % (len(shares),)
@@ -347,7 +338,14 @@ def main(args, net):
             for share in tracker.get_chain_known(new_work['best_share_hash']):
                 if share.hash in shared_share_hashes:
                     break
-                share_share(share, share.peer)
+                for peer in p2p_node.peers.itervalues():
+                    if peer is share.peer:
+                        continue
+                    #if p2pool.DEBUG:
+                    #    print "Sending share %s to %r" % (p2pool_data.format_hash(share.hash), peer.addr)
+                    peer.sendShares([share])
+                shared_share_hashes.add(share.hash)
+        
         current_work.changed.watch(work_changed)
         
         print '    ...success!'
