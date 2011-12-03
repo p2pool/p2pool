@@ -20,7 +20,7 @@ from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
 
-import bitcoin.p2p, bitcoin.getwork, bitcoin.data
+import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
 from . import p2p, skiplists
@@ -33,16 +33,16 @@ def getwork(bitcoind, ht, net):
     defer.returnValue(dict(
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
-        transactions=[bitcoin.data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
+        transactions=[bitcoin_data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
         subsidy=work['coinbasevalue'],
         time=work['time'],
-        target=bitcoin.data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin.data.FloatingInteger(work['bits']),
+        target=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
     ))
 
 @deferral.retry('Error getting payout script from bitcoind:', 1)
 @defer.inlineCallbacks
 def get_payout_script(factory):
-    res = yield (yield factory.getProtocol()).check_order(order=bitcoin.p2p.Protocol.null_order)
+    res = yield (yield factory.getProtocol()).check_order(order=bitcoin_p2p.Protocol.null_order)
     if res['reply'] == 'success':
         defer.returnValue(res['script'])
     elif res['reply'] == 'denied':
@@ -53,7 +53,7 @@ def get_payout_script(factory):
 @deferral.retry('Error creating payout script:', 10)
 @defer.inlineCallbacks
 def get_payout_script2(bitcoind, net):
-    defer.returnValue(bitcoin.data.pubkey_hash_to_script2(bitcoin.data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net)))
+    defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net)))
 
 @defer.inlineCallbacks
 def main(args):
@@ -75,14 +75,14 @@ def main(args):
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
-        temp_work = yield deferral.retry('Error while testing getwork:', 1)(defer.inlineCallbacks(lambda: defer.returnValue(bitcoin.getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())))))()
+        temp_work = yield deferral.retry('Error while testing getwork:', 1)(defer.inlineCallbacks(lambda: defer.returnValue(bitcoin_getwork.BlockAttempt.from_getwork((yield bitcoind.rpc_getwork())))))()
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work.previous_block,)
         print
         
         # connect to bitcoind over bitcoin-p2p and do checkorder to get pubkey to send payouts to
         print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
-        factory = bitcoin.p2p.ClientFactory(args.net)
+        factory = bitcoin_p2p.ClientFactory(args.net)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         my_script = yield get_payout_script(factory)
         if args.pubkey_hash is None:
@@ -90,13 +90,13 @@ def main(args):
                 print '    IP transaction denied ... falling back to sending to address.'
                 my_script = yield get_payout_script2(bitcoind, args.net)
         else:
-            my_script = bitcoin.data.pubkey_hash_to_script2(args.pubkey_hash)
+            my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
         print '    ...success!'
-        print '    Payout script:', bitcoin.data.script2_to_human(my_script, args.net)
+        print '    Payout script:', bitcoin_data.script2_to_human(my_script, args.net)
         print
         
         print 'Loading cached block headers...'
-        ht = bitcoin.p2p.HeightTracker(factory, args.net.NAME + '_headers.dat')
+        ht = bitcoin_p2p.HeightTracker(factory, args.net.NAME + '_headers.dat')
         print '   ...done loading %i cached block headers.' % (len(ht.tracker.shares),)
         print
         
@@ -215,7 +215,7 @@ def main(args):
                 x = dict(current_work.value)
                 x['aux_work'] = dict(
                     hash=int(auxblock['hash'], 16),
-                    target=bitcoin.data.HashType().unpack(auxblock['target'].decode('hex')),
+                    target=bitcoin_data.HashType().unpack(auxblock['target'].decode('hex')),
                     chain_id=auxblock['chainid'],
                 )
                 #print x['aux_work']
@@ -422,7 +422,7 @@ def main(args):
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
             if state['aux_work'] is not None:
-                aux_str = '\xfa\xbemm' + bitcoin.data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)
+                aux_str = '\xfa\xbemm' + bitcoin_data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)
             else:
                 aux_str = ''
             
@@ -456,17 +456,17 @@ def main(args):
                 net=args.net,
             )
             
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin.data.target_to_difficulty(new_share_info['target']), (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) -subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin_data.target_to_difficulty(new_share_info['target']), (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) -subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
             #print 'Target: %x' % (p2pool_data.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + list(current_work2.value['transactions'])
-            merkle_root = bitcoin.data.merkle_hash(transactions)
+            merkle_root = bitcoin_data.merkle_hash(transactions)
             merkle_root_to_transactions[merkle_root] = new_share_info, transactions
             
             target2 = new_share_info['target']
             times[merkle_root] = time.time()
             #print 'SENT', 2**256//p2pool_data.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
-            return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2), state['best_share_hash']
+            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2), state['best_share_hash']
         
         my_shares = set()
         doa_shares = set()
@@ -483,7 +483,7 @@ def main(args):
                 share_info, transactions = xxx
                 new_share_info = share_info
                 
-                hash_ = bitcoin.data.block_header_type.hash256(header)
+                hash_ = bitcoin_data.block_header_type.hash256(header)
                 
                 pow_hash = args.net.BITCOIN_POW_FUNC(header)
                 
@@ -511,7 +511,7 @@ def main(args):
                             parent_block_header=header,
                         )
                         
-                        a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin.data.aux_pow_type.pack(aux_pow).encode('hex')
+                        a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin_data.aux_pow_type.pack(aux_pow).encode('hex')
                         #print a, b
                         merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
                         def _(res):
@@ -553,7 +553,7 @@ def main(args):
             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
             res = {}
             for script in sorted(weights, key=lambda s: weights[s]):
-                res[bitcoin.data.script2_to_human(script, args.net)] = weights[script]/total_weight
+                res[bitcoin_data.script2_to_human(script, args.net)] = weights[script]/total_weight
             return json.dumps(res)
         
         class WebInterface(resource.Resource):
@@ -850,7 +850,7 @@ def run():
     
     if args.address is not None:
         try:
-            args.pubkey_hash = bitcoin.data.address_to_pubkey_hash(args.address, args.net)
+            args.pubkey_hash = bitcoin_data.address_to_pubkey_hash(args.address, args.net)
         except Exception, e:
             parser.error('error parsing address: ' + repr(e))
     else:
