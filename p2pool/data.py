@@ -16,43 +16,6 @@ from p2pool.bitcoin import data as bitcoin_data, script, networks
 from p2pool.util import memoize, expiring_dict, math
 
 
-merkle_branch_type = bitcoin_data.ListType(bitcoin_data.ComposedType([
-    ('side', bitcoin_data.StructType('<B')), # enum?
-    ('hash', bitcoin_data.HashType()),
-]))
-
-
-share_data_type = bitcoin_data.ComposedType([
-    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
-    ('target', bitcoin_data.FloatingIntegerType()),
-    ('nonce', bitcoin_data.VarStrType()),
-])
-
-
-coinbase_type = bitcoin_data.ComposedType([
-    ('identifier', bitcoin_data.FixedStrType(8)),
-    ('share_data', share_data_type),
-])
-
-share_info_type = bitcoin_data.ComposedType([
-    ('share_data', share_data_type),
-    ('new_script', bitcoin_data.VarStrType()),
-    ('subsidy', bitcoin_data.StructType('<Q')),
-])
-
-
-share1a_type = bitcoin_data.ComposedType([
-    ('header', bitcoin_data.block_header_type),
-    ('share_info', share_info_type),
-    ('merkle_branch', merkle_branch_type),
-])
-
-share1b_type = bitcoin_data.ComposedType([
-    ('header', bitcoin_data.block_header_type),
-    ('share_info', share_info_type),
-    ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
-])
-
 new_share_data_type = bitcoin_data.ComposedType([
     ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ('coinbase', bitcoin_data.VarStrType()),
@@ -90,48 +53,7 @@ new_share_type = bitcoin_data.ComposedType([
     ('contents', bitcoin_data.VarStrType()),
 ])
 
-def calculate_merkle_branch(txs, index):
-    hash_list = [(bitcoin_data.tx_type.hash256(tx), i == index, []) for i, tx in enumerate(txs)]
-    
-    while len(hash_list) > 1:
-        hash_list = [
-            (
-                bitcoin_data.merkle_record_type.hash256(dict(left=left, right=right)),
-                left_f or right_f,
-                (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
-            )
-            for (left, left_f, left_l), (right, right_f, right_l) in
-                zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
-        ]
-    
-    assert hash_list[0][1]
-    assert check_merkle_branch(txs[index], hash_list[0][2]) == hash_list[0][0]
-    
-    return hash_list[0][2]
-
-def check_merkle_branch(tx, branch):
-    hash_ = bitcoin_data.tx_type.hash256(tx)
-    for step in branch:
-        if not step['side']:
-            hash_ = bitcoin_data.merkle_record_type.hash256(dict(left=step['hash'], right=hash_))
-        else:
-            hash_ = bitcoin_data.merkle_record_type.hash256(dict(left=hash_, right=step['hash']))
-    return hash_
-
-def share_info_to_gentx(share_info, block_target, tracker, net):
-    return generate_transaction(
-        tracker=tracker,
-        previous_share_hash=share_info['share_data']['previous_share_hash'],
-        new_script=share_info['new_script'],
-        subsidy=share_info['subsidy'],
-        nonce=share_info['share_data']['nonce'],
-        block_target=block_target,
-        net=net,
-    )[1]
-
-class Share(object):
-    donation = int(0.005*65535 + 0.5)
-    
+class NewShare(object):
     @classmethod
     def from_share1a(cls, share1a, net):
         return cls(net, **share1a)
@@ -139,78 +61,6 @@ class Share(object):
     @classmethod
     def from_share1b(cls, share1b, net):
         return cls(net, **share1b)
-    
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer stale_frac'.split(' ')
-    
-    def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
-        if merkle_branch is None and other_txs is None:
-            raise ValueError('need either merkle_branch or other_txs')
-        if other_txs is not None:
-            new_merkle_branch = calculate_merkle_branch([dict(version=0, tx_ins=[], tx_outs=[], lock_time=0)] + other_txs, 0)
-            if merkle_branch is not None:
-                if merke_branch != new_merkle_branch:
-                    raise ValueError('invalid merkle_branch and other_txs')
-            merkle_branch = new_merkle_branch
-        
-        if len(merkle_branch) > 16:
-            raise ValueError('merkle_branch too long!')
-        
-        self.header = header
-        self.previous_block = header['previous_block']
-        self.share_info = share_info
-        self.merkle_branch = merkle_branch
-        self.other_txs = other_txs
-        
-        self.timestamp = self.header['timestamp']
-        
-        self.share_data = self.share_info['share_data']
-        self.new_script = self.share_info['new_script']
-        self.subsidy = self.share_info['subsidy']
-        
-        if len(self.new_script) > 100:
-            raise ValueError('new_script too long!')
-        
-        self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
-        self.target = self.share_data['target']
-        self.nonce = self.share_data['nonce']
-        
-        if len(self.nonce) > 100:
-            raise ValueError('nonce too long!')
-        
-        self.pow_hash = net.BITCOIN_POW_FUNC(header)
-        self.header_hash = bitcoin_data.block_header_type.hash256(header)
-        
-        if net.BITCOIN_POW_FUNC == bitcoin_data.block_header_type.scrypt:
-            # compatibility hack
-            self.hash = share1a_type.scrypt(self.as_share1a())
-        else:
-            self.hash = share1a_type.hash256(self.as_share1a())
-        
-        if self.pow_hash > self.target:
-            print 'hash %x' % self.pow_hash
-            print 'targ %x' % self.target
-            raise ValueError('not enough work!')
-        
-        if script.get_sigop_count(self.new_script) > 1:
-            raise ValueError('too many sigops!')
-        
-        self.stale_frac = None
-        if len(self.nonce) >= 4:
-            a, b = struct.unpack("<HH", self.nonce[-4:])
-            if a != 0 or a == b:
-                self.stale_frac = a/65535
-        
-        # XXX eww
-        self.time_seen = time.time()
-        self.peer = None
-    
-    def as_block(self, tracker, net):
-        if self.other_txs is None:
-            raise ValueError('share does not contain all txs')
-        
-        gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
-        
-        return dict(header=self.header, txs=[gentx] + self.other_txs)
     
     def as_share1a(self):
         return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
@@ -221,36 +71,9 @@ class Share(object):
         
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
-    def check(self, tracker, now, net):
-        if self.header['timestamp'] >= TRANSITION_TIME + 3600:
-            raise AssertionError('transitioning...')
-        import time
-        if self.previous_share_hash is not None:
-            if self.header['timestamp'] <= math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(self.previous_share_hash), 11)), use_float=False):
-                raise ValueError('share from too far in the past!')
-        
-        if self.header['timestamp'] > now + 2*60*60:
-            raise ValueError('share from too far in the future!')
-        
-        gentx = share_info_to_gentx(self.share_info, self.header['target'], tracker, net)
-        
-        if len(gentx['tx_ins'][0]['script']) > 100:
-            raise ValueError('coinbase too large! %i bytes' % (len(gentx['tx_ins'][0]['script']),))
-        
-        if check_merkle_branch(gentx, self.merkle_branch) != self.header['merkle_root']:
-            raise ValueError('''gentx doesn't match header via merkle_branch''')
-        
-        if self.other_txs is not None:
-            if bitcoin_data.merkle_hash([gentx] + self.other_txs) != self.header['merkle_root']:
-                raise ValueError('''gentx doesn't match header via other_txs''')
-            
-            if len(bitcoin_data.block_type.pack(dict(header=self.header, txs=[gentx] + self.other_txs))) > 1000000 - 1000:
-                raise ValueError('block size too large')
-    
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
-
-class NewShare(Share):
+    
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac'.split(' ')
     
     @classmethod
@@ -365,79 +188,6 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
         time = 1
     return attempts//time
 
-def generate_transaction(tracker, previous_share_hash, new_script, subsidy, nonce, block_target, net):
-    donation = int(0.005*65535 + 0.5)
-    
-    height, last = tracker.get_height_and_last(previous_share_hash)
-    assert height >= net.CHAIN_LENGTH or last is None
-    if height < net.TARGET_LOOKBEHIND:
-        target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
-    else:
-        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
-        previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
-        pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
-        pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
-        target = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
-    
-    attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
-    max_att = net.SPREAD * attempts_to_block
-    
-    this_att = min(bitcoin_data.target_to_average_attempts(target), max_att)
-    other_weights, other_total_weight, other_donation_weight = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), 65535*max(0, max_att - this_att))
-    assert other_total_weight == sum(other_weights.itervalues()) + other_donation_weight, (other_total_weight, sum(other_weights.itervalues()) + other_donation_weight)
-    weights, total_weight, donation_weight = math.add_dicts([{new_script: this_att*(65535-donation)}, other_weights]), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
-    assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
-    
-    total_weight -= donation_weight # ignore donation
-    
-    if net.SCRIPT:
-        amounts = dict((script, subsidy*(396*weight)//(400*total_weight)) for (script, weight) in weights.iteritems())
-        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
-        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy*2//400
-        amounts[net.SCRIPT] = amounts.get(net.SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-    else:
-        amounts = dict((script, subsidy*(398*weight)//(400*total_weight)) for (script, weight) in weights.iteritems())
-        amounts[new_script] = amounts.get(new_script, 0) + subsidy*2//400
-        amounts[new_script] = amounts.get(new_script, 0) + subsidy - sum(amounts.itervalues()) # collect any extra
-    
-    if sum(amounts.itervalues()) != subsidy:
-        raise ValueError()
-    if any(x < 0 for x in amounts.itervalues()):
-        raise ValueError()
-    
-    pre_dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
-    pre_dests = pre_dests[-4000:] # block length limit, unlikely to ever be hit
-    
-    dests = sorted(pre_dests, key=lambda script: (script == new_script, script))
-    assert dests[-1] == new_script
-    
-    share_data = dict(
-        previous_share_hash=previous_share_hash,
-        nonce=nonce,
-        target=target,
-    )
-    
-    share_info = dict(
-        share_data=share_data,
-        new_script=new_script,
-        subsidy=subsidy,
-    )
-    
-    return share_info, dict(
-        version=1,
-        tx_ins=[dict(
-            previous_output=None,
-            sequence=None,
-            script=coinbase_type.pack(dict(
-                identifier=net.IDENTIFIER,
-                share_data=share_data,
-            )),
-        )],
-        tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]],
-        lock_time=0,
-    )
-
 def new_generate_transaction(tracker, new_share_data, block_target, desired_timestamp, net):
     previous_share_hash = new_share_data['previous_share_hash']
     new_script = new_share_data['new_script']
@@ -465,7 +215,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, desired_time
     max_att = net.SPREAD * attempts_to_block
     
     this_att = min(bitcoin_data.target_to_average_attempts(target), max_att)
-    other_weights, other_total_weight, other_donation_weight = tracker.get_cumulative_weights(previous_share_hash, min(height, getattr(net, 'CHAIN_LENGTH2', net.CHAIN_LENGTH)), 65535*max(0, max_att - this_att))
+    other_weights, other_total_weight, other_donation_weight = tracker.get_cumulative_weights(previous_share_hash, min(height, net.CHAIN_LENGTH), 65535*max(0, max_att - this_att))
     assert other_total_weight == sum(other_weights.itervalues()) + other_donation_weight, (other_total_weight, sum(other_weights.itervalues()) + other_donation_weight)
     weights, total_weight, donation_weight = math.add_dicts([{new_script: this_att*(65535-donation)}, other_weights]), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
     assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
@@ -698,13 +448,9 @@ class ShareStore(object):
                         type_id_str, data_hex = line.strip().split(' ')
                         type_id = int(type_id_str)
                         if type_id == 0:
-                            share = Share.from_share1a(share1a_type.unpack(data_hex.decode('hex')), self.net)
-                            yield 'share', share
-                            share_hashes.add(share.hash)
+                            pass
                         elif type_id == 1:
-                            share = Share.from_share1b(share1b_type.unpack(data_hex.decode('hex')), self.net)
-                            yield 'share', share
-                            share_hashes.add(share.hash)
+                            pass
                         elif type_id == 2:
                             verified_hash = int(data_hex, 16)
                             yield 'verified_hash', verified_hash
@@ -732,12 +478,7 @@ class ShareStore(object):
         return filename
     
     def add_share(self, share):
-        if isinstance(share, NewShare):
-            type_id, data = 5, new_share_type.pack(share.as_share())
-        elif share.pow_hash <= share.header['target']:
-            type_id, data = 1, share1b_type.pack(share.as_share1b())
-        else:
-            type_id, data = 0, share1a_type.pack(share.as_share1a())
+        type_id, data = 5, new_share_type.pack(share.as_share())
         filename = self._add_line("%i %s" % (type_id, data.encode('hex')))
         share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
         share_hashes.add(share.hash)
@@ -776,11 +517,9 @@ class ShareStore(object):
 
 class BitcoinMainnet(networks.BitcoinMainnet):
     SHARE_PERIOD = 10 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
-    CHAIN_LENGTH2 = 24*60*60//10//2 # shares
+    CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
     IDENTIFIER = 'fc70035c7a81bc6f'.decode('hex')
     PREFIX = '2472ef181efcd37b'.decode('hex')
     NAME = 'bitcoin'
@@ -791,11 +530,9 @@ class BitcoinMainnet(networks.BitcoinMainnet):
 
 class BitcoinTestnet(networks.BitcoinTestnet):
     SHARE_PERIOD = 1 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
-    CHAIN_LENGTH2 = 24*60*60//10//2 # shares
+    CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '5fc2be2d4f0d6bfb'.decode('hex')
     PREFIX = '3f6057a15036f441'.decode('hex')
     NAME = 'bitcoin_testnet'
@@ -809,7 +546,6 @@ class NamecoinMainnet(networks.NamecoinMainnet):
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
     IDENTIFIER = 'd5b1192062c4c454'.decode('hex')
     PREFIX = 'b56f3d0fb24fc982'.decode('hex')
     NAME = 'namecoin'
@@ -823,7 +559,6 @@ class NamecoinTestnet(networks.NamecoinTestnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '8dd303d014a01a60'.decode('hex')
     PREFIX = '4d6581d24f51acbf'.decode('hex')
     NAME = 'namecoin_testnet'
@@ -837,7 +572,6 @@ class IxcoinMainnet(networks.IxcoinMainnet):
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '41043da5beb73f8f18cede1a41b0ed953123f1342b8e0216ab5bf71ed3e024201b4017f472bddb6041f17978d89ed8f8ed84f9e726b0bca80cacf96347c7153e8df0ac'.decode('hex')
     IDENTIFIER = '27b564116e2a2666'.decode('hex')
     PREFIX = '9dd6c4a619401f2f'.decode('hex')
     NAME = 'ixcoin'
@@ -851,7 +585,6 @@ class IxcoinTestnet(networks.IxcoinTestnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '7430cbeb01249e44'.decode('hex')
     PREFIX = '7cfffda946709c1f'.decode('hex')
     NAME = 'ixcoin_testnet'
@@ -865,7 +598,6 @@ class I0coinMainnet(networks.I0coinMainnet):
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = 'b32e3f10c2ff221b'.decode('hex')
     PREFIX = '6155537ed977a3b5'.decode('hex')
     NAME = 'i0coin'
@@ -879,7 +611,6 @@ class I0coinTestnet(networks.I0coinTestnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
-    SCRIPT = '410403ad3dee8ab3d8a9ce5dd2abfbe7364ccd9413df1d279bf1a207849310465b0956e5904b1155ecd17574778f9949589ebfd4fb33ce837c241474a225cf08d85dac'.decode('hex')
     IDENTIFIER = '7712c1a8181b5f2e'.decode('hex')
     PREFIX = '792d2e7d770fbe68'.decode('hex')
     NAME = 'i0coin_testnet'
@@ -893,7 +624,6 @@ class SolidcoinMainnet(networks.SolidcoinMainnet):
     CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
-    SCRIPT = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash('sMKZ1yxHETxPYKh4Z2anWnwZDJZU7ztroy', networks.SolidcoinMainnet))
     IDENTIFIER = '9cc9c421cca258cd'.decode('hex')
     PREFIX = 'c059125b8070f00a'.decode('hex')
     NAME = 'solidcoin'
@@ -904,11 +634,9 @@ class SolidcoinMainnet(networks.SolidcoinMainnet):
 
 class LitecoinMainnet(networks.LitecoinMainnet):
     SHARE_PERIOD = 10 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
-    CHAIN_LENGTH2 = 24*60*60//10//2 # shares
+    CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
-    SCRIPT = None # no fee
     IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
     PREFIX = '7208c1a53ef629b0'.decode('hex')
     NAME = 'litecoin'
@@ -922,7 +650,6 @@ class LitecoinTestnet(networks.LitecoinTestnet):
     CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
-    SCRIPT = None # no fee
     IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
     PREFIX = 'ad9614f6466a39cf'.decode('hex')
     NAME = 'litecoin_testnet'

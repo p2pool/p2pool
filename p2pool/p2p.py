@@ -217,56 +217,18 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             res.append(share_obj)
         self.node.handle_shares(res)
     
-    message_share1as = bitcoin_data.ComposedType([
-        ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
-    ])
-    def handle_share1as(self, share1as):
-        shares = []
-        for share1a in share1as:
-            if self.node.net.BITCOIN_POW_FUNC(share1a['header']) <= share1a['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % self.addr
-                self.transport.loseConnection()
-                return
-            share = p2pool_data.Share.from_share1a(share1a, self.node.net)
-            share.peer = self # XXX
-            shares.append(share)
-        self.node.handle_shares(shares, self)
-    
-    message_share1bs = bitcoin_data.ComposedType([
-        ('share1bs', bitcoin_data.ListType(p2pool_data.share1b_type)),
-    ])
-    def handle_share1bs(self, share1bs):
-        shares = []
-        for share1b in share1bs:
-            if not self.node.net.BITCOIN_POW_FUNC(share1b['header']) <= share1b['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % self.addr
-                self.transport.loseConnection()
-                return
-            share = p2pool_data.Share.from_share1b(share1b, self.node.net)
-            share.peer = self # XXX
-            shares.append(share)
-        self.node.handle_shares(shares, self)
-    
     def sendShares(self, shares, full=False):
         share0s = []
-        share1as = []
-        share1bs = []
         new_shares = []
         # XXX doesn't need to send full block when it's not urgent
         # eg. when getting history
         for share in shares:
-            if isinstance(share, p2pool_data.NewShare):
+            if self.mode == 0 and not full and not share.pow_hash <= share.header['target']:
+                share0s.append(share.hash)
+            elif self.mode == 1 or full:
                 new_shares.append(share.as_share())
             else:
-                if share.pow_hash <= share.header['target']:
-                    share1bs.append(share.as_share1b())
-                else:
-                    if self.mode == 0 and not full:
-                        share0s.append(share.hash)
-                    elif self.mode == 1 or full:
-                        share1as.append(share.as_share1a())
-                    else:
-                        raise ValueError(self.mode)
+                raise ValueError(self.mode)
         def att(f, **kwargs):
             try:
                 f(**kwargs)
@@ -274,8 +236,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
         if share0s: att(self.send_share0s, hashes=share0s)
-        if share1as: att(self.send_share1as, share1as=share1as)
-        if share1bs: att(self.send_share1bs, share1bs=share1bs)
         if new_shares: att(self.send_shares, shares=new_shares)
     
     def connectionLost(self, reason):

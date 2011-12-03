@@ -437,53 +437,34 @@ def main(args):
             subsidy = current_work2.value['subsidy']
             
             
-            if int(time.time() - current_work2.value['clock_offset']) >= p2pool.TRANSITION_TIME:
-                timestamp = current_work2.value['time']
-                is_new = True
-                previous_share = tracker.shares[state['best_share_hash']] if state['best_share_hash'] is not None else None
-                new_share_info, generate_tx = p2pool.new_generate_transaction(
-                    tracker=tracker,
-                    new_share_data=dict(
-                        previous_share_hash=state['best_share_hash'],
-                        coinbase=aux_str,
-                        nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
-                        new_script=payout_script,
-                        subsidy=subsidy,
-                        donation=math.perfect_round(65535*args.donation_percentage/100),
-                        stale_frac=(lambda shares, stales:
-                            255 if shares == 0 else math.perfect_round(254*stales/shares)
-                        )(*get_share_counts()),
-                    ),
-                    block_target=state['target'],
-                    desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                    net=args.net,
-                )
-            else:
-                timestamp = int(time.time() - current_work2.value['clock_offset'])
-                if state['best_share_hash'] is not None:
-                    timestamp2 = math.median((s.timestamp for s in itertools.islice(tracker.get_chain_to_root(state['best_share_hash']), 11)), use_float=False) + 1
-                    if timestamp2 > timestamp:
-                        print 'Toff', timestamp2 - timestamp
-                        timestamp = timestamp2
-                is_new = False
-                share_info, generate_tx = p2pool.generate_transaction(
-                    tracker=tracker,
+            timestamp = current_work2.value['time']
+            previous_share = tracker.shares[state['best_share_hash']] if state['best_share_hash'] is not None else None
+            new_share_info, generate_tx = p2pool.new_generate_transaction(
+                tracker=tracker,
+                new_share_data=dict(
                     previous_share_hash=state['best_share_hash'],
+                    coinbase=aux_str,
+                    nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
                     new_script=payout_script,
                     subsidy=subsidy,
-                    nonce=run_identifier + struct.pack('<H', random.randrange(2**16)) + aux_str + get_stale_frac(),
-                    block_target=state['target'],
-                    net=args.net,
-                )
+                    donation=math.perfect_round(65535*args.donation_percentage/100),
+                    stale_frac=(lambda shares, stales:
+                        255 if shares == 0 else math.perfect_round(254*stales/shares)
+                    )(*get_share_counts()),
+                ),
+                block_target=state['target'],
+                desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
+                net=args.net,
+            )
             
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin.data.target_to_difficulty((new_share_info if is_new else share_info['share_data'])['target']), (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) -subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin.data.target_to_difficulty(new_share_info['target']), (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) -subsidy//200)*1e-8, args.net.BITCOIN_SYMBOL, subsidy*1e-8, args.net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
             #print 'Target: %x' % (p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
             #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
             transactions = [generate_tx] + list(current_work2.value['transactions'])
             merkle_root = bitcoin.data.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = is_new, new_share_info if is_new else share_info, transactions
+            merkle_root_to_transactions[merkle_root] = new_share_info, transactions
             
-            target2 = (new_share_info if is_new else share_info['share_data'])['target']
+            target2 = new_share_info['target']
             times[merkle_root] = time.time()
             #print 'SENT', 2**256//p2pool.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
             return bitcoin.getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2), state['best_share_hash']
@@ -500,7 +481,7 @@ def main(args):
                 if xxx is None:
                     print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                     return False
-                is_new, share_info, transactions = xxx
+                share_info, transactions = xxx
                 new_share_info = share_info
                 
                 hash_ = bitcoin.data.block_header_type.hash256(header)
@@ -540,14 +521,11 @@ def main(args):
                     except:
                         log.err(None, 'Error while processing merged mining POW:')
                 
-                target = (new_share_info if is_new else share_info['share_data'])['target']
+                target = new_share_info['target']
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, target)
                     return False
-                if is_new:
-                    share = p2pool.NewShare(args.net, header, new_share_info, other_txs=transactions[1:])
-                else:
-                    share = p2pool.Share(args.net, header, share_info, other_txs=transactions[1:])
+                share = p2pool.NewShare(args.net, header, new_share_info, other_txs=transactions[1:])
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)
