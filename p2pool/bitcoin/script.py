@@ -8,7 +8,7 @@ def protoPUSH(length):
 def protoPUSHDATA(size_len):
     def _(f):
         length_str, f = bitcoin_data.read(f, size_len)
-        length = bases.string_to_natural(length_str[::-1])
+        length = bases.string_to_natural(length_str[::-1].lstrip(chr(0)))
         data, f = bitcoin_data.read(f, length)
         return data, f
     return _

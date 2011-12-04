@@ -20,4 +20,4 @@ class Test(unittest.TestCase):
                 s = bases.natural_to_string(n, alphabet)
                 n2 = bases.string_to_natural(s, alphabet)
                 #print n, s.encode('hex'), n2
-                assert n == n2
+                self.assertEquals(n, n2)
