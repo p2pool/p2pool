@@ -9,4 +9,3 @@ def base58_encode(bindata):
 def base58_decode(b58data):
     b58data2 = b58data.lstrip(base58_alphabet[0])
     return chr(0)*(len(b58data) - len(b58data2)) + bases.natural_to_string(bases.string_to_natural(b58data2, base58_alphabet))
-

@@ -315,7 +315,7 @@ def main(args, net):
                 nodes.add(((yield reactor.resolve(host)), net.P2P_PORT))
             except:
                 log.err(None, 'Error resolving bootstrap node IP:')
-
+        
         if net.NAME == 'litecoin':
             nodes.add(((yield reactor.resolve('liteco.in')), net.P2P_PORT))
         

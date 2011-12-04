@@ -3,9 +3,7 @@ from __future__ import division
 import hashlib
 import struct
 
-from twisted.internet import defer
-
-from . import base58, skiplists
+from . import base58
 from p2pool.util import bases, math, expiring_dict, memoize, dicts
 import p2pool
 
