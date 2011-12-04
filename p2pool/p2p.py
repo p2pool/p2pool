@@ -193,18 +193,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.node.handle_shares(res)
     
     def sendShares(self, shares, full=False):
-        shares = []
-        # XXX doesn't need to send full block when it's not urgent
-        # eg. when getting history
-        for share in shares:
-            shares.append(share.as_share())
         def att(f, **kwargs):
             try:
                 f(**kwargs)
             except bitcoin_p2p.TooLong:
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
-        if shares: att(self.send_shares, shares=shares)
+        if shares:
+            att(self.send_shares, shares=[share.as_share() for share in shares])
     
     def connectionLost(self, reason):
         if self.connected2:
