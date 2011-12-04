@@ -43,13 +43,12 @@ def getwork(bitcoind):
 @defer.inlineCallbacks
 def get_payout_script2(bitcoind, net):
     address = yield bitcoind.rpc_getaccountaddress('p2pool')
-    try:
-        pubkey = (yield bitcoind.rpc_validateaddress(address))['pubkey'].decode('hex')
-    except:
-        log.err()
+    validate_response = yield bitcoind.rpc_validateaddress(address)
+    if 'pubkey' not in validate_response:
+        print '    Pubkey request failed. Falling back to payout to address.'
         defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net)))
-    else:
-        defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
+    pubkey = validate_response['pubkey'].decode('hex')
+    defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
 
 @defer.inlineCallbacks
 def main(args, net):
