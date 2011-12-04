@@ -79,3 +79,4 @@ class LitecoinTestnet(networks.LitecoinTestnet):
     WORKER_PORT = 19327
 
 nets = dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, NamecoinMainnet, NamecoinTestnet, LitecoinMainnet, LitecoinTestnet]))
+realnets = dict((net.NAME, net) for net in nets.itervalues() if '_testnet' not in net.NAME)

@@ -698,7 +698,7 @@ def run():
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
         help='use specified network (default: bitcoin)',
-        action='store', choices=sorted(x for x in networks.nets if 'testnet' not in x), default='bitcoin', dest='net_name')
+        action='store', choices=sorted(networks.realnets), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
@@ -723,21 +723,21 @@ def run():
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
-        help='use TCP port PORT to listen for connections (default: 9333 normally, 19333 for testnet) (forward this port from your router!)',
+        help='use TCP port PORT to listen for connections (forward this port from your router!) (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='p2pool_port')
     p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
-        help='connect to existing p2pool node at ADDR listening on TCP port PORT (defaults to 9333 normally, 19333 for testnet), in addition to builtin addresses',
+        help='connect to existing p2pool node at ADDR listening on TCP port PORT (defaults to default p2pool P2P port), in addition to builtin addresses',
         type=str, action='append', default=[], dest='p2pool_nodes')
     parser.add_argument('--disable-upnp',
-        help='''don't attempt to forward port 9333 (19333 for testnet) from the WAN to this computer using UPnP''',
+        help='''don't attempt to forward p2pool P2P port from the WAN to this computer using UPnP''',
         action='store_false', default=True, dest='upnp')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default: bitcoin: 9332 namecoin: 9331 ixcoin: 9330 i0coin: 9329 solidcoin: 9328 litecoin: 9327, +10000 for testnets)',
+        help='listen on PORT for RPC connections from miners asking for work and providing responses (default:%s)' % ', '.join('%s:%i' % (n.NAME, n.WORKER_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='worker_port')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
-        help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:9332/fee . default: 0''',
+        help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee . default: 0''',
         type=float, action='store', default=0, dest='worker_fee')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
@@ -745,10 +745,10 @@ def run():
         help='connect to a bitcoind at this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getmemorypool (default: 8332 ixcoin: 8338 i0coin: 7332 litecoin: 9332)',
+        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getmemorypool (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_RPC_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: 8333 namecoin: 8334 ixcoin: 8337 i0coin: 7333 solidcoin: 7555 litecoin: 9333, +10000 for testnets)',
+        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
