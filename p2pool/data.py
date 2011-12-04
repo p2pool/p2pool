@@ -13,7 +13,7 @@ from p2pool.bitcoin import data as bitcoin_data, script
 from p2pool.util import memoize, expiring_dict, math, forest
 
 
-new_share_data_type = bitcoin_data.ComposedType([
+share_data_type = bitcoin_data.ComposedType([
     ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ('coinbase', bitcoin_data.VarStrType()),
     ('nonce', bitcoin_data.VarStrType()),
@@ -23,34 +23,34 @@ new_share_data_type = bitcoin_data.ComposedType([
     ('stale_frac', bitcoin_data.StructType('<B')),
 ])
 
-new_share_info_type = bitcoin_data.ComposedType([
-    ('new_share_data', new_share_data_type),
+share_info_type = bitcoin_data.ComposedType([
+    ('share_data', share_data_type),
     ('target', bitcoin_data.FloatingIntegerType()),
     ('timestamp', bitcoin_data.StructType('<I')),
 ])
 
-new_share1a_type = bitcoin_data.ComposedType([
+share1a_type = bitcoin_data.ComposedType([
     ('header', bitcoin_data.block_header_type),
-    ('share_info', new_share_info_type),
+    ('share_info', share_info_type),
     ('merkle_branch', bitcoin_data.merkle_branch_type),
 ])
 
-new_share1b_type = bitcoin_data.ComposedType([
+share1b_type = bitcoin_data.ComposedType([
     ('header', bitcoin_data.block_header_type),
-    ('share_info', new_share_info_type),
+    ('share_info', share_info_type),
     ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
 ])
 
 # type:
-# 0: new_share1a
-# 1: new_share1b
+# 0: share1a
+# 1: share1b
 
-new_share_type = bitcoin_data.ComposedType([
+share_type = bitcoin_data.ComposedType([
     ('type', bitcoin_data.VarIntType()),
     ('contents', bitcoin_data.VarStrType()),
 ])
 
-class NewShare(object):
+class Share(object):
     @classmethod
     def from_share1a(cls, share1a, net):
         return cls(net, **share1a)
@@ -76,12 +76,12 @@ class NewShare(object):
     @classmethod
     def from_share(cls, share, net):
         if share['type'] == 0:
-            res = cls.from_share1a(new_share1a_type.unpack(share['contents']), net)
+            res = cls.from_share1a(share1a_type.unpack(share['contents']), net)
             if not (res.pow_hash > res.header['target']):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 1:
-            res = cls.from_share1b(new_share1b_type.unpack(share['contents']), net)
+            res = cls.from_share1b(share1b_type.unpack(share['contents']), net)
             if not (res.pow_hash <= res.header['target']):
                 raise ValueError('invalid share type')
             return res
@@ -89,10 +89,10 @@ class NewShare(object):
             raise ValueError('unknown share type: %r' % (share['type'],))
     
     def as_share(self):
-        if self.pow_hash > self.header['target']: # new_share1a
-            return dict(type=0, contents=new_share1a_type.pack(self.as_share1a()))
-        elif self.pow_hash <= self.header['target']: # new_share1b
-            return dict(type=1, contents=new_share1b_type.pack(self.as_share1b()))
+        if self.pow_hash > self.header['target']: # share1a
+            return dict(type=0, contents=share1a_type.pack(self.as_share1a()))
+        elif self.pow_hash <= self.header['target']: # share1b
+            return dict(type=1, contents=share1b_type.pack(self.as_share1b()))
         else:
             raise AssertionError()
     
@@ -115,7 +115,7 @@ class NewShare(object):
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
         
-        self.share_data = self.share_info['new_share_data']
+        self.share_data = self.share_info['share_data']
         self.target = self.share_info['target']
         self.timestamp = self.share_info['timestamp']
         
@@ -138,7 +138,7 @@ class NewShare(object):
         self.pow_hash = net.BITCOIN_POW_FUNC(header)
         self.header_hash = bitcoin_data.block_header_type.hash256(header)
         
-        self.hash = new_share1a_type.hash256(self.as_share1a())
+        self.hash = share1a_type.hash256(self.as_share1a())
         
         if self.pow_hash > self.target:
             print 'hash %x' % self.pow_hash
@@ -155,7 +155,7 @@ class NewShare(object):
         self.peer = None
     
     def check(self, tracker, now, net):
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
@@ -166,7 +166,7 @@ class NewShare(object):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
         assert share_info == self.share_info
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
@@ -182,14 +182,14 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
         time = 1
     return attempts//time
 
-def new_generate_transaction(tracker, new_share_data, block_target, desired_timestamp, net):
-    previous_share_hash = new_share_data['previous_share_hash']
-    new_script = new_share_data['new_script']
-    subsidy = new_share_data['subsidy']
-    donation = new_share_data['donation']
+def generate_transaction(tracker, share_data, block_target, desired_timestamp, net):
+    previous_share_hash = share_data['previous_share_hash']
+    new_script = share_data['new_script']
+    subsidy = share_data['subsidy']
+    donation = share_data['donation']
     assert 0 <= donation <= 65535
     
-    if len(new_share_data['coinbase']) > 100:
+    if len(share_data['coinbase']) > 100:
         raise ValueError('coinbase too long!')
     
     previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
@@ -231,7 +231,7 @@ def new_generate_transaction(tracker, new_share_data, block_target, desired_time
     dests = dests[-4000:] # block length limit, unlikely to ever be hit
     
     share_info = dict(
-        new_share_data=new_share_data,
+        share_data=share_data,
         target=target,
         timestamp=math.clip(desired_timestamp, (previous_share.timestamp - 60, previous_share.timestamp + 60)) if previous_share is not None else desired_timestamp,
     )
@@ -241,9 +241,9 @@ def new_generate_transaction(tracker, new_share_data, block_target, desired_time
         tx_ins=[dict(
             previous_output=None,
             sequence=None,
-            script=new_share_data['coinbase'].ljust(2, '\x00'),
+            script=share_data['coinbase'].ljust(2, '\x00'),
         )],
-        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.HashType().pack(new_share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.HashType().pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 
@@ -450,7 +450,7 @@ class ShareStore(object):
                             yield 'verified_hash', verified_hash
                             verified_hashes.add(verified_hash)
                         elif type_id == 5:
-                            share = NewShare.from_share(new_share_type.unpack(data_hex.decode('hex')), self.net)
+                            share = Share.from_share(share_type.unpack(data_hex.decode('hex')), self.net)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         else:
@@ -472,7 +472,7 @@ class ShareStore(object):
         return filename
     
     def add_share(self, share):
-        type_id, data = 5, new_share_type.pack(share.as_share())
+        type_id, data = 5, share_type.pack(share.as_share())
         filename = self._add_line("%i %s" % (type_id, data.encode('hex')))
         share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
         share_hashes.add(share.hash)
