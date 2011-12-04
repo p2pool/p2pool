@@ -1,7 +1,5 @@
 from __future__ import division
 
-TRANSITION_TIME = 1322804365
-
 import itertools
 import random
 import time
@@ -157,9 +155,6 @@ class NewShare(object):
         self.peer = None
     
     def check(self, tracker, now, net):
-        if self.header['timestamp'] <= TRANSITION_TIME - 3600:
-            raise AssertionError('transitioning...')
-        
         share_info, gentx = new_generate_transaction(tracker, self.share_info['new_share_data'], self.header['target'], self.share_info['timestamp'], net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
