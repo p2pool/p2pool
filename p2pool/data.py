@@ -13,7 +13,7 @@ from twisted.python import log
 import p2pool
 from p2pool import skiplists
 from p2pool.bitcoin import data as bitcoin_data, script, networks
-from p2pool.util import memoize, expiring_dict, math
+from p2pool.util import memoize, expiring_dict, math, forest
 
 
 new_share_data_type = bitcoin_data.ComposedType([
@@ -254,17 +254,17 @@ def new_generate_transaction(tracker, new_share_data, block_target, desired_time
     )
 
 
-class OkayTracker(bitcoin_data.Tracker):
+class OkayTracker(forest.Tracker):
     def __init__(self, net):
-        bitcoin_data.Tracker.__init__(self)
+        forest.Tracker.__init__(self)
         self.net = net
-        self.verified = bitcoin_data.Tracker()
+        self.verified = forest.Tracker()
         self.verified.get_nth_parent_hash = self.get_nth_parent_hash # self is a superset of self.verified
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
     
     def add(self, share, known_verified=False):
-        bitcoin_data.Tracker.add(self, share)
+        forest.Tracker.add(self, share)
         if known_verified:
             self.verified.add(share)
     

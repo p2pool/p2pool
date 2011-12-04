@@ -13,7 +13,7 @@ from twisted.internet import defer, protocol, reactor, task
 from twisted.python import log
 
 from . import data as bitcoin_data
-from p2pool.util import variable, datachunker, deferral
+from p2pool.util import variable, datachunker, deferral, forest
 
 class TooLong(Exception):
     pass
@@ -301,7 +301,7 @@ class HeightTracker(object):
     
     def __init__(self, factory, backing):
         self.factory = factory
-        self.tracker = bitcoin_data.Tracker()
+        self.tracker = forest.Tracker()
         self.backing = backing
         self.most_recent = None
         

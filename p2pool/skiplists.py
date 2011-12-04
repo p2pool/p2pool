@@ -88,8 +88,8 @@ class CountsSkipList(skiplist.SkipList):
 
 if __name__ == '__main__':
     import random
-    from p2pool.bitcoin import data
-    t = data.Tracker()
+    from p2pool.util import forest
+    t = forest.Tracker()
     d = WeightsSkipList(t)
     for i in xrange(2000):
         t.add(data.FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None, new_script=i, target=random.randrange(2**249, 2**250)))
