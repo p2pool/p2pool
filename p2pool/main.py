@@ -23,7 +23,7 @@ from nattraverso import portmapper, ipdiscover
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
 from util import db, expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, skiplists
+from . import p2p, skiplists, networks
 import p2pool, p2pool.data as p2pool_data
 
 @deferral.retry('Error getting work from bitcoind:', 3)
@@ -698,7 +698,7 @@ def run():
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
         help='use specified network (default: bitcoin)',
-        action='store', choices=sorted(x for x in p2pool_data.nets if 'testnet' not in x), default='bitcoin', dest='net_name')
+        action='store', choices=sorted(x for x in networks.nets if 'testnet' not in x), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
@@ -763,7 +763,7 @@ def run():
     if args.debug:
         p2pool.DEBUG = True
     
-    net = p2pool_data.nets[args.net_name + ('_testnet' if args.testnet else '')]
+    net = networks.nets[args.net_name + ('_testnet' if args.testnet else '')]
     
     if args.logfile is None:
         args.logfile = os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '.log')
