@@ -51,26 +51,6 @@ share_type = bitcoin_data.ComposedType([
 ])
 
 class Share(object):
-    @classmethod
-    def from_share1a(cls, share1a, net):
-        return cls(net, **share1a)
-    
-    @classmethod
-    def from_share1b(cls, share1b, net):
-        return cls(net, **share1b)
-    
-    def as_share1a(self):
-        return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
-    
-    def as_share1b(self):
-        if self.other_txs is None:
-            raise ValueError('share does not contain all txs')
-        
-        return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
-    
-    def __repr__(self):
-        return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
-    
     __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac'.split(' ')
     
     @classmethod
@@ -88,13 +68,13 @@ class Share(object):
         else:
             raise ValueError('unknown share type: %r' % (share['type'],))
     
-    def as_share(self):
-        if self.pow_hash > self.header['target']: # share1a
-            return dict(type=0, contents=share1a_type.pack(self.as_share1a()))
-        elif self.pow_hash <= self.header['target']: # share1b
-            return dict(type=1, contents=share1b_type.pack(self.as_share1b()))
-        else:
-            raise AssertionError()
+    @classmethod
+    def from_share1a(cls, share1a, net):
+        return cls(net, **share1a)
+    
+    @classmethod
+    def from_share1b(cls, share1b, net):
+        return cls(net, **share1b)
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
         if merkle_branch is None and other_txs is None:
@@ -154,6 +134,9 @@ class Share(object):
         self.time_seen = time.time()
         self.peer = None
     
+    def __repr__(self):
+        return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
+    
     def check(self, tracker, now, net):
         share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
         if share_info != self.share_info:
@@ -161,6 +144,23 @@ class Share(object):
         
         if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
+    
+    def as_share(self):
+        if self.pow_hash > self.header['target']: # share1a
+            return dict(type=0, contents=share1a_type.pack(self.as_share1a()))
+        elif self.pow_hash <= self.header['target']: # share1b
+            return dict(type=1, contents=share1b_type.pack(self.as_share1b()))
+        else:
+            raise AssertionError()
+    
+    def as_share1a(self):
+        return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
+    
+    def as_share1b(self):
+        if self.other_txs is None:
+            raise ValueError('share does not contain all txs')
+        
+        return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def as_block(self, tracker, net):
         if self.other_txs is None:
