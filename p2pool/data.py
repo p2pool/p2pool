@@ -171,9 +171,7 @@ class Share(object):
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
 
-def get_pool_attempts_per_second(tracker, previous_share_hash, net, dist=None):
-    if dist is None:
-        dist = net.TARGET_LOOKBEHIND
+def get_pool_attempts_per_second(tracker, previous_share_hash, dist):
     near = tracker.shares[previous_share_hash]
     far = tracker.shares[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
     attempts = tracker.get_work(near.hash) - tracker.get_work(far.hash)
@@ -199,7 +197,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
     if height < net.TARGET_LOOKBEHIND:
         target = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
     else:
-        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net)
+        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net.TARGET_LOOKBEHIND)
         pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
         pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
