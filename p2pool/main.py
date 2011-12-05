@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# coding=utf-8
 
 from __future__ import division
 
@@ -644,11 +645,14 @@ def main(args, net):
                             pool_str = str;
                         if fracs:
                             med = math.median(fracs)
-                            print 'Median stale proportion:', med
+                            print 'Pool stales: %i%%' % (int(100*med+.5),),
+                            conf = 0.9
                             if shares:
-                                print '    Own:', stale_shares/shares
+                                print 'Own:', '%i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf))),
                                 if med < .99:
-                                    print '    Own efficiency: %.02f%%' % (100*(1 - stale_shares/shares)/(1 - med),)
+                                    print 'Own efficiency:', '%i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1])),
+                                print '(%i%% confidence)' % (int(100*conf+.5),),
+                            print
             
             
             except:

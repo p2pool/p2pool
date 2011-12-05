@@ -72,6 +72,25 @@ def perfect_round(x):
     else:
         return a2 + 1
 
+def ierf(z, steps=10):
+    guess = 0
+    for i in xrange(steps):
+        d = 2*math.e**(-guess**2)/math.sqrt(math.pi)
+        guess = guess - (math.erf(guess) - z)/d
+    return guess
+
+def binomial_conf_interval(x, n, conf=0.95):
+    # approximate - Wilson score interval
+    z = math.sqrt(2)*ierf(conf)
+    p = x/n
+    topa = p + z**2/2/n
+    topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
+    bottom = 1 + z**2/n
+    return (topa - topb)/bottom, (topa + topb)/bottom
+
+def interval_to_center_radius((low, high)):
+    return (high+low)/2, (high-low)/2
+
 if __name__ == '__main__':
     import random
     a = 1
