@@ -613,8 +613,8 @@ def main(args, net):
             signal.signal(signal.SIGALRM, watchdog_handler)
             task.LoopingCall(signal.alarm, 30).start(1)
         
-        
-        pool_str = None;
+        last_str = None
+        last_time = 0
         while True:
             yield deferral.sleep(3)
             try:
@@ -628,7 +628,7 @@ def main(args, net):
                         shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                         stale_shares = stale_doa_shares + stale_not_doa_shares
                         fracs = [share.stale_frac for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if share.stale_frac is not None]
-                        str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
+                        this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                             math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,
                             len(tracker.verified.shares),
@@ -640,19 +640,19 @@ def main(args, net):
                             stale_doa_shares,
                             len(p2p_node.peers),
                         ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
-                        if (str != pool_str):
-                            print str;
-                            pool_str = str;
                         if fracs:
                             med = math.median(fracs)
-                            print 'Pool stales: %i%%' % (int(100*med+.5),),
+                            this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
                             conf = 0.9
                             if shares:
-                                print 'Own:', '%i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf))),
+                                this_str += ' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
                                 if med < .99:
-                                    print 'Own efficiency:', '%i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1])),
-                                print '(%i%% confidence)' % (int(100*conf+.5),),
-                            print
+                                    this_str += ' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
+                                this_str += ' (%i%% confidence)' % (int(100*conf+.5),)
+                        if this_str != last_str or time.time() > last_time + 15:
+                            print this_str
+                            last_str = this_str
+                            last_time = time.time()
             
             
             except:
