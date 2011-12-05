@@ -409,10 +409,10 @@ def main(args, net):
             payout_script = get_payout_script_from_username(request)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
-            if state['best_share_hash'] is None and net.PERSIST:
-                raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             if len(p2p_node.peers) == 0 and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
+            if state['best_share_hash'] is None and net.PERSIST:
+                raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             if time.time() > current_work2.value['last_update'] + 60:
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
