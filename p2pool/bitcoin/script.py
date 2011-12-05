@@ -49,9 +49,3 @@ def get_sigop_count(script):
         'CHECKMULTISIGVERIFY': 20,
     }
     return sum(weights.get(opcode_name, 0) for opcode_name, opcode_arg in parse(script))
-
-if __name__ == '__main__':
-    script = '76  A9  14 89 AB CD EF AB BA AB BA AB BA AB BA AB BA AB BA AB BA AB BA  88 AC'.replace(' ', '').decode('hex')
-    for l in parse(script):
-        print l
-    print get_sigop_count(script)
