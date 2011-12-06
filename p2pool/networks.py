@@ -9,7 +9,7 @@ from p2pool.bitcoin import networks
 class BitcoinMainnet(networks.BitcoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = 'fc70035c7a81bc6f'.decode('hex')
@@ -23,7 +23,7 @@ class BitcoinMainnet(networks.BitcoinMainnet):
 class BitcoinTestnet(networks.BitcoinTestnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = '5fc2be2d4f0d6bfb'.decode('hex')
@@ -65,7 +65,7 @@ class NamecoinTestnet(networks.NamecoinTestnet):
 class LitecoinMainnet(networks.LitecoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
     IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
@@ -79,7 +79,7 @@ class LitecoinMainnet(networks.LitecoinMainnet):
 class LitecoinTestnet(networks.LitecoinTestnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
     IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
