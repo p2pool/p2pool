@@ -8,7 +8,7 @@ from p2pool.bitcoin import networks
 
 class BitcoinMainnet(networks.BitcoinMainnet):
     SHARE_PERIOD = 10 # seconds
-    CHAIN_LENGTH = 24*60*60//10//2 # shares
+    CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
@@ -64,7 +64,7 @@ class NamecoinTestnet(networks.NamecoinTestnet):
 
 class LitecoinMainnet(networks.LitecoinMainnet):
     SHARE_PERIOD = 10 # seconds
-    CHAIN_LENGTH = 24*60*60//10//2 # shares
+    CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
