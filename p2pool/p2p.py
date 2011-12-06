@@ -170,7 +170,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     port=port,
                 ),
             ) for host, port in
-            random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
+            self.node.get_good_peers(count)
         ])
     
     message_getshares = bitcoin_data.ComposedType([
@@ -257,7 +257,7 @@ class AddrStore(dicts.DictWrapper):
         return v['services'], v['first_seen'], v['last_seen']
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=100, preferred_storage=1000):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=30, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
@@ -294,15 +294,15 @@ class Node(object):
                     if (random.randrange(2) and len(self.preferred_addrs)) or not len(self.addr_store):
                         host, port = random.choice(list(self.preferred_addrs))
                     else:
-                        host, port = random.choice(self.addr_store.keys())
+                        (host, port), = self.get_good_peers(1)
                     
                     if (host, port) not in self.attempts:
                         #print 'Trying to connect to', host, port
-                        reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
+                        reactor.connectTCP(host, port, ClientFactory(self), timeout=5)
             except:
                 log.err()
             
-            yield deferral.sleep(random.expovariate(1/5))
+            yield deferral.sleep(random.expovariate(1/1))
     
     @defer.inlineCallbacks
     def _think2(self):
@@ -374,6 +374,10 @@ class Node(object):
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         print 'handle_get_shares', (hashes, parents, stops, peer)
+    
+    def get_good_peers(self, max_count):
+        t = time.time()
+        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -(last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)
