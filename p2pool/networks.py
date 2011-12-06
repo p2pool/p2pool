@@ -1,8 +1,15 @@
 from p2pool.bitcoin import networks
 
+# CHAIN_LENGTH = number of shares back client keeps
+# REAL_CHAIN_LENGTH = maximum number of shares back client uses to compute payout
+# REAL_CHAIN_LENGTH must always be <= CHAIN_LENGTH
+# REAL_CHAIN_LENGTH must be changed in sync with all other clients
+# changes can be done by changing one, then the other
+
 class BitcoinMainnet(networks.BitcoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = 'fc70035c7a81bc6f'.decode('hex')
@@ -16,6 +23,7 @@ class BitcoinMainnet(networks.BitcoinMainnet):
 class BitcoinTestnet(networks.BitcoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = '5fc2be2d4f0d6bfb'.decode('hex')
@@ -29,6 +37,7 @@ class BitcoinTestnet(networks.BitcoinTestnet):
 class NamecoinMainnet(networks.NamecoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 3600//10 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = 'd5b1192062c4c454'.decode('hex')
@@ -42,6 +51,7 @@ class NamecoinMainnet(networks.NamecoinMainnet):
 class NamecoinTestnet(networks.NamecoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = '8dd303d014a01a60'.decode('hex')
@@ -55,6 +65,7 @@ class NamecoinTestnet(networks.NamecoinTestnet):
 class LitecoinMainnet(networks.LitecoinMainnet):
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10//2 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
     IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
@@ -68,6 +79,7 @@ class LitecoinMainnet(networks.LitecoinMainnet):
 class LitecoinTestnet(networks.LitecoinTestnet):
     SHARE_PERIOD = 1 # seconds
     CHAIN_LENGTH = 24*60*60//5 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//5 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
     IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
