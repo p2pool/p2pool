@@ -21,8 +21,8 @@ class BitcoinMainnet(networks.BitcoinMainnet):
     WORKER_PORT = 9332
 
 class BitcoinTestnet(networks.BitcoinTestnet):
-    SHARE_PERIOD = 1 # seconds
-    CHAIN_LENGTH = 24*60*60//10//2 # shares
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
@@ -49,9 +49,9 @@ class NamecoinMainnet(networks.NamecoinMainnet):
     WORKER_PORT = 9331
 
 class NamecoinTestnet(networks.NamecoinTestnet):
-    SHARE_PERIOD = 1 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//5 # shares
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 3 # blocks
     IDENTIFIER = '8dd303d014a01a60'.decode('hex')
@@ -77,9 +77,9 @@ class LitecoinMainnet(networks.LitecoinMainnet):
     WORKER_PORT = 9327
 
 class LitecoinTestnet(networks.LitecoinTestnet):
-    SHARE_PERIOD = 1 # seconds
-    CHAIN_LENGTH = 24*60*60//5 # shares
-    REAL_CHAIN_LENGTH = 24*60*60//5 # shares
+    SHARE_PERIOD = 10 # seconds
+    CHAIN_LENGTH = 24*60*60//10 # shares
+    REAL_CHAIN_LENGTH = 24*60*60//10//2 # shares
     TARGET_LOOKBEHIND = 200 # shares
     SPREAD = 12 # blocks
     IDENTIFIER = 'cca5e24ec6408b1e'.decode('hex')
