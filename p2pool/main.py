@@ -406,9 +406,11 @@ def main(args, net):
         
         def compute(request):
             state = current_work.value
+            
             payout_script = get_payout_script_from_username(request)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
+            
             if len(p2p_node.peers) == 0 and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
             if state['best_share_hash'] is None and net.PERSIST:
@@ -416,28 +418,13 @@ def main(args, net):
             if time.time() > current_work2.value['last_update'] + 60:
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
-            if state['aux_work'] is not None:
-                aux_str = '\xfa\xbemm' + bitcoin_data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)
-            else:
-                aux_str = ''
-            
-            # XXX assuming generate_tx is smallish here..
-            def get_stale_frac():
-                shares, stale_shares = get_share_counts()
-                if shares == 0:
-                    return ""
-                frac = stale_shares/shares
-                return 2*struct.pack('<H', int(65535*frac + .5))
+            previous_share = None if state['best_share_hash'] is None else tracker.shares[state['best_share_hash']]
             subsidy = current_work2.value['subsidy']
-            
-            
-            timestamp = current_work2.value['time']
-            previous_share = tracker.shares[state['best_share_hash']] if state['best_share_hash'] is not None else None
             share_info, generate_tx = p2pool_data.generate_transaction(
                 tracker=tracker,
                 share_data=dict(
                     previous_share_hash=state['best_share_hash'],
-                    coinbase=aux_str,
+                    coinbase='' if state['aux_work'] is None else '\xfa\xbemm' + bitcoin_data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
                     nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
                     new_script=payout_script,
                     subsidy=subsidy,
@@ -451,21 +438,21 @@ def main(args, net):
                 net=net,
             )
             
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (bitcoin_data.target_to_difficulty(share_info['target']), (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) -subsidy//200)*1e-8, net.BITCOIN_SYMBOL, subsidy*1e-8, net.BITCOIN_SYMBOL, len(current_work2.value['transactions']))
-            #print 'Target: %x' % (p2pool_data.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target'],)
-            #, have', shares.count(my_script) - 2, 'share(s) in the current chain. Fee:', sum(tx.value_in - tx.value_out for tx in extra_txs)/100000000
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+                bitcoin_data.target_to_difficulty(share_info['target']),
+                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.BITCOIN_SYMBOL,
+                subsidy*1e-8, net.BITCOIN_SYMBOL,
+                len(current_work2.value['transactions']),
+            )
+            
             transactions = [generate_tx] + list(current_work2.value['transactions'])
             merkle_root = bitcoin_data.merkle_hash(transactions)
-            merkle_root_to_transactions[merkle_root] = share_info, transactions
+            merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
             
-            target2 = share_info['target']
-            times[merkle_root] = time.time()
-            #print 'SENT', 2**256//p2pool_data.coinbase_type.unpack(generate_tx['tx_ins'][0]['script'])['share_data']['target']
-            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, timestamp, state['target'], target2), state['best_share_hash']
+            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['target'], share_info['target']), state['best_share_hash']
         
         my_shares = set()
         doa_shares = set()
-        times = {}
         
         def got_response(header, request):
             try:
@@ -475,7 +462,7 @@ def main(args, net):
                 if xxx is None:
                     print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                     return False
-                share_info, transactions = xxx
+                share_info, transactions, getwork_time = xxx
                 
                 hash_ = bitcoin_data.block_header_type.hash256(header)
                 
@@ -522,7 +509,7 @@ def main(args, net):
                 my_shares.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
                     doa_shares.add(share.hash)
-                print 'GOT SHARE! %s %s prev %s age %.2fs' % (user, p2pool_data.format_hash(share.hash), p2pool_data.format_hash(share.previous_hash), time.time() - times[header['merkle_root']]) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
+                print 'GOT SHARE! %s %s prev %s age %.2fs' % (user, p2pool_data.format_hash(share.hash), p2pool_data.format_hash(share.previous_hash), time.time() - getwork_time) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
                 p2p_shares([share])
