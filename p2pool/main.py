@@ -133,6 +133,9 @@ def main(args, net):
         
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         
+        pre_current_work = variable.Variable(None)
+        pre_current_work2 = variable.Variable(None)
+        pre_merged_work = variable.Variable(None)
         # information affecting work that should trigger a long-polling update
         current_work = variable.Variable(None)
         # information affecting work that should not trigger a long-polling update
@@ -145,29 +148,26 @@ def main(args, net):
         @defer.inlineCallbacks
         def set_real_work1():
             work = yield getwork(bitcoind)
-            changed = work['previous_block_hash'] != current_work.value['previous_block'] if current_work.value is not None else True
-            current_work.set(dict(
-                version=work['version'],
-                previous_block=work['previous_block_hash'],
-                target=work['target'],
-                best_share_hash=current_work.value['best_share_hash'] if current_work.value is not None else None,
-                aux_work=current_work.value['aux_work'] if current_work.value is not None else None,
-            ))
-            current_work2.set(dict(
+            pre_current_work2.set(dict(
                 time=work['time'],
                 transactions=work['transactions'],
                 subsidy=work['subsidy'],
                 clock_offset=time.time() - work['time'],
                 last_update=time.time(),
+            )) # second set first because everything hooks on the first
+            pre_current_work.set(dict(
+                version=work['version'],
+                previous_block=work['previous_block_hash'],
+                target=work['target'],
             ))
-            if changed:
-                set_real_work2()
         
         def set_real_work2():
-            best, desired = tracker.think(ht, current_work.value['previous_block'], time.time() - current_work2.value['clock_offset'])
+            best, desired = tracker.think(ht, pre_current_work.value['previous_block'], time.time() - pre_current_work2.value['clock_offset'])
             
-            t = dict(current_work.value)
+            current_work2.set(pre_current_work2.value)
+            t = dict(pre_current_work.value)
             t['best_share_hash'] = best
+            t['aux_work'] = pre_merged_work.value
             current_work.set(t)
             
             t = time.time()
@@ -197,10 +197,12 @@ def main(args, net):
                     ))[:100],
                 )
                 requested[share_hash] = t, count + 1
+        pre_current_work.changed.watch(lambda _: set_real_work2())
+        pre_merged_work.changed.watch(lambda _: set_real_work2())
+        ht.updated.watch(set_real_work2)
         
         print 'Initializing work...'
         yield set_real_work1()
-        set_real_work2()
         print '    ...success!'
         print
         
@@ -208,17 +210,14 @@ def main(args, net):
         def set_merged_work():
             if not args.merged_url:
                 return
+            merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
             while True:
-                merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged.rpc_getauxblock)()
-                x = dict(current_work.value)
-                x['aux_work'] = dict(
+                pre_merged_work.set(dict(
                     hash=int(auxblock['hash'], 16),
                     target=bitcoin_data.HashType().unpack(auxblock['target'].decode('hex')),
                     chain_id=auxblock['chainid'],
-                )
-                #print x['aux_work']
-                current_work.set(x)
+                ))
                 yield deferral.sleep(1)
         set_merged_work()
         
@@ -566,8 +565,6 @@ def main(args, net):
         
         print 'Started successfully!'
         print
-        
-        ht.updated.watch(set_real_work2)
         
         @defer.inlineCallbacks
         def work1_thread():
