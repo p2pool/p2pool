@@ -125,8 +125,6 @@ def main(args, net):
             tracker.verified.add(tracker.shares[h])
         print "    ...done loading %i shares!" % (len(tracker.shares),)
         print
-        tracker.added.watch(lambda share: ss.add_share(share))
-        tracker.verified.added.watch(lambda share: ss.add_verified_hash(share.hash))
         tracker.removed.watch(lambda share: ss.forget_share(share.hash))
         tracker.verified.removed.watch(lambda share: ss.forget_verified_share(share.hash))
         tracker.removed.watch(lambda share: shared_share_hashes.discard(share.hash))
@@ -345,6 +343,13 @@ def main(args, net):
                 peer.sendShares([share for share in shares if share.peer is not peer])
         
         current_work.changed.watch(work_changed)
+        
+        def save_shares():
+            for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 2*net.CHAIN_LENGTH):
+                ss.add_share(share)
+                if share.hash in tracker.verified.shares:
+                    ss.add_verified_hash(share.hash)
+        task.LoopingCall(save_shares).start(60)
         
         print '    ...success!'
         print

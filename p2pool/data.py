@@ -425,6 +425,7 @@ class ShareStore(object):
         self.filename = os.path.basename(os.path.abspath(prefix))
         self.net = net
         self.known = None # will be filename -> set of share hashes, set of verified hashes
+        self.known_desired = None
     
     def get_shares(self):
         if self.known is not None:
@@ -455,6 +456,7 @@ class ShareStore(object):
                     except Exception:
                         log.err(None, "Error while reading saved shares, continuing where left off:")
         self.known = known
+        self.known_desired = dict((k, (set(a), set(b))) for k, (a, b) in known.iteritems())
     
     def _add_line(self, line):
         filenames, next = self.get_filenames_and_next()
@@ -469,14 +471,25 @@ class ShareStore(object):
         return filename
     
     def add_share(self, share):
-        type_id, data = 5, share_type.pack(share.as_share())
-        filename = self._add_line("%i %s" % (type_id, data.encode('hex')))
-        share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            if share.hash in share_hashes:
+                break
+        else:
+            filename = self._add_line("%i %s" % (5, share_type.pack(share.as_share()).encode('hex')))
+            share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+            share_hashes.add(share.hash)
+        share_hashes, verified_hashes = self.known_desired.setdefault(filename, (set(), set()))
         share_hashes.add(share.hash)
     
     def add_verified_hash(self, share_hash):
-        filename = self._add_line("%i %x" % (2, share_hash))
-        share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+            if share_hash in verified_hashes:
+                break
+        else:
+            filename = self._add_line("%i %x" % (2, share_hash))
+            share_hashes, verified_hashes = self.known.setdefault(filename, (set(), set()))
+            verified_hashes.add(share_hash)
+        share_hashes, verified_hashes = self.known_desired.setdefault(filename, (set(), set()))
         verified_hashes.add(share_hash)
     
     def get_filenames_and_next(self):
@@ -484,24 +497,25 @@ class ShareStore(object):
         return [os.path.join(self.dirname, self.filename + str(suffix)) for suffix in suffixes], os.path.join(self.dirname, self.filename + (str(suffixes[-1] + 1) if suffixes else str(0)))
     
     def forget_share(self, share_hash):
-        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+        for filename, (share_hashes, verified_hashes) in self.known_desired.iteritems():
             if share_hash in share_hashes:
                 share_hashes.remove(share_hash)
         self.check_remove()
     
     def forget_verified_share(self, share_hash):
-        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+        for filename, (share_hashes, verified_hashes) in self.known_desired.iteritems():
             if share_hash in verified_hashes:
                 verified_hashes.remove(share_hash)
         self.check_remove()
     
     def check_remove(self):
         to_remove = set()
-        for filename, (share_hashes, verified_hashes) in self.known.iteritems():
+        for filename, (share_hashes, verified_hashes) in self.known_desired.iteritems():
             #print filename, len(share_hashes) + len(verified_hashes)
             if not share_hashes and not verified_hashes:
                 to_remove.add(filename)
         for filename in to_remove:
             self.known.pop(filename)
+            self.known_desired.pop(filename)
             os.remove(filename)
             print "REMOVED", filename
