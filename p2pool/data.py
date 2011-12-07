@@ -313,6 +313,10 @@ class OkayTracker(forest.Tracker):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
+        if p2pool.DEBUG:
+            print len(self.verified.tails), "tails:"
+            for x in self.verified.tails:
+                print format_hash(x), self.score(max(self.verified.tails[x], key=self.verified.get_height), ht)
         
         # decide best tree
         best_tail = max(self.verified.tails, key=lambda h: self.score(max(self.verified.tails[h], key=self.verified.get_height), ht)) if self.verified.tails else None
@@ -400,13 +404,11 @@ class OkayTracker(forest.Tracker):
     def score(self, share_hash, ht):
         head_height, last = self.verified.get_height_and_last(share_hash)
         score2 = 0
-        attempts = 0
-        max_height = 0
-        share2_hash = self.verified.get_nth_parent_hash(share_hash, min(self.net.CHAIN_LENGTH//2, head_height//2)) if last is not None else share_hash
-        for share in reversed(list(itertools.islice(self.verified.get_chain_known(share2_hash), self.net.CHAIN_LENGTH))):
-            max_height = max(max_height, ht.get_min_height(share.header['previous_block']))
-            attempts += bitcoin_data.target_to_average_attempts(share.target)
-            this_score = attempts//(ht.get_highest_height() - max_height + 1)
+        block_height = 0
+        max_height = min(self.net.CHAIN_LENGTH, head_height)
+        for share in reversed(list(itertools.islice(self.verified.get_chain_known(self.verified.get_nth_parent_hash(share_hash, max_height//2)), max_height//2))):
+            block_height = max(block_height, ht.get_min_height(share.header['previous_block']))
+            this_score = (self.verified.get_work(share_hash) - self.verified.get_work(share.hash))//(ht.get_highest_height() - block_height + 1)
             if this_score > score2:
                 score2 = this_score
         return min(head_height, self.net.CHAIN_LENGTH), score2
