@@ -25,6 +25,8 @@ class Event(object):
         return res
     
     def happened(self, *event):
+        self.times += 1
+        
         once, self._once = self._once, None
         
         for id, func in sorted(self.observers.iteritems()):
@@ -35,8 +37,6 @@ class Event(object):
         
         if once is not None:
             once.happened(*event)
-        
-        self.times += 1
     
     def get_deferred(self, timeout=None):
         once = self.once
