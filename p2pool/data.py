@@ -93,7 +93,6 @@ class Share(object):
         self.previous_block = header['previous_block']
         self.share_info = share_info
         self.merkle_branch = merkle_branch
-        self.other_txs = other_txs
         
         self.share_data = self.share_info['share_data']
         self.target = self.share_info['target']
@@ -125,10 +124,9 @@ class Share(object):
             print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
-        if script.get_sigop_count(self.new_script) > 1:
-            raise ValueError('too many sigops!')
-        
         self.stale_frac = self.share_data['stale_frac']/254 if self.share_data['stale_frac'] != 255 else None
+        
+        self.other_txs = other_txs if self.pow_hash <= self.header['target'] else None
         
         # XXX eww
         self.time_seen = time.time()
@@ -138,6 +136,9 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
     
     def check(self, tracker, now, net):
+        if script.get_sigop_count(self.new_script) > 1:
+            raise ValueError('too many sigops!')
+        
         share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
