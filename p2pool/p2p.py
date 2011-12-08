@@ -233,29 +233,6 @@ class ClientFactory(protocol.ClientFactory):
     def clientConnectionLost(self, connector, reason):
         self.node.attempt_ended(connector)
 
-addrdb_key = bitcoin_data.ComposedType([
-    ('address', bitcoin_data.IPV6AddressType()),
-    ('port', bitcoin_data.StructType('>H')),
-])
-addrdb_value = bitcoin_data.ComposedType([
-    ('services', bitcoin_data.StructType('<Q')),
-    ('first_seen', bitcoin_data.StructType('<Q')),
-    ('last_seen', bitcoin_data.StructType('<Q')),
-])
-
-class AddrStore(dicts.DictWrapper):
-    def encode_key(self, (address, port)):
-        return addrdb_key.pack(dict(address=address, port=port))
-    def decode_key(self, encoded_key):
-        k = addrdb_key.unpack(encoded_key)
-        return k['address'], k['port']
-    
-    def encode_value(self, (services, first_seen, last_seen)):
-        return addrdb_value.pack(dict(services=services, first_seen=first_seen, last_seen=last_seen))
-    def decode_value(self, encoded_value):
-        v = addrdb_value.unpack(encoded_value)
-        return v['services'], v['first_seen'], v['last_seen']
-
 class Node(object):
     def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=30, preferred_storage=1000):
         if addr_store is None:
@@ -263,7 +240,7 @@ class Node(object):
         
         self.port = port
         self.net = net
-        self.addr_store = AddrStore(addr_store)
+        self.addr_store = addr_store
         self.preferred_addrs = preferred_addrs
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts

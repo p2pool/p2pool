@@ -8,7 +8,6 @@ import datetime
 import itertools
 import os
 import random
-import sqlite3
 import struct
 import sys
 import time
@@ -23,7 +22,7 @@ from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
-from util import db, expiring_dict, jsonrpc, variable, deferral, math
+from util import expiring_dict, jsonrpc, variable, deferral, math
 from . import p2p, skiplists, networks
 import p2pool, p2pool.data as p2pool_data
 
@@ -314,11 +313,21 @@ def main(args, net):
         if net.NAME == 'litecoin':
             nodes.add(((yield reactor.resolve('liteco.in')), net.P2P_PORT))
         
+        addrs = {}
+        try:
+            addrs = dict(eval(x) for x in open(os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '_addrs.txt')))
+        except:
+            print "error reading addrs"
+        
+        def save_addrs():
+            open(os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '_addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
+        task.LoopingCall(save_addrs).start(60)
+        
         p2p_node = p2p.Node(
             current_work=current_work,
             port=args.p2pool_port,
             net=net,
-            addr_store=db.SQLiteDict(sqlite3.connect(os.path.join(os.path.dirname(sys.argv[0]), 'addrs.dat'), isolation_level=None), net.NAME),
+            addr_store=addrs,
             preferred_addrs=set(map(parse, args.p2pool_nodes)) | nodes,
         )
         p2p_node.handle_shares = p2p_shares
