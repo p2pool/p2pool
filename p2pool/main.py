@@ -51,7 +51,7 @@ def get_payout_script2(bitcoind, net):
     defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
 
 @defer.inlineCallbacks
-def main(args, net):
+def main(args, net, datadir_path):
     try:
         print 'p2pool (version %s)' % (p2pool.__version__,)
         print
@@ -97,7 +97,7 @@ def main(args, net):
         
         tracker = p2pool_data.OkayTracker(net)
         shared_share_hashes = set()
-        ss = p2pool_data.ShareStore(os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '_shares.'), net)
+        ss = p2pool_data.ShareStore(os.path.join(datadir_path, 'shares.'), net)
         known_verified = set()
         print "Loading shares..."
         for i, (mode, contents) in enumerate(ss.get_shares()):
@@ -315,12 +315,12 @@ def main(args, net):
         
         addrs = {}
         try:
-            addrs = dict(eval(x) for x in open(os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '_addrs.txt')))
+            addrs = dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt')))
         except:
             print "error reading addrs"
         
         def save_addrs():
-            open(os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '_addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
+            open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
         task.LoopingCall(save_addrs).start(60)
         
         p2p_node = p2p.Node(
@@ -763,8 +763,12 @@ def run():
     
     net = networks.nets[args.net_name + ('_testnet' if args.testnet else '')]
     
+    datadir_path = os.path.join(os.path.dirname(sys.argv[0]), 'data', net.NAME)
+    if not os.path.exists(datadir_path):
+        os.makedirs(datadir_path)
+    
     if args.logfile is None:
-        args.logfile = os.path.join(os.path.dirname(sys.argv[0]), net.NAME + '.log')
+        args.logfile = os.path.join(datadir_path, 'log')
     
     class LogFile(object):
         def __init__(self, filename):
@@ -849,5 +853,5 @@ def run():
     if (args.merged_url is None) ^ (args.merged_userpass is None):
         parser.error('must specify --merged-url and --merged-userpass')
     
-    reactor.callWhenRunning(main, args, net)
+    reactor.callWhenRunning(main, args, net, datadir_path)
     reactor.run()

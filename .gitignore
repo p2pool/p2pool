@@ -1,7 +1,4 @@
 *.pyc
-*.dat
-*.iml
-*.log
-*_shares.*
-.idea
+/data/
+*~
 litecoin_scrypt/build/*
