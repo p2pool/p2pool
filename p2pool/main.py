@@ -193,13 +193,14 @@ def main(args, net):
                 )
                 requested[share_hash] = t, count + 1
         pre_current_work.changed.watch(lambda _: set_real_work2())
-        pre_merged_work.changed.watch(lambda _: set_real_work2())
-        ht.updated.watch(set_real_work2)
         
         print 'Initializing work...'
         yield set_real_work1()
         print '    ...success!'
         print
+        
+        pre_merged_work.changed.watch(lambda _: set_real_work2())
+        ht.updated.watch(set_real_work2)
         
         @defer.inlineCallbacks
         def set_merged_work():
