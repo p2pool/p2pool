@@ -94,7 +94,7 @@ def main(args, net):
         print '    Payout script:', bitcoin_data.script2_to_human(my_script, net)
         print
         
-        ht = bitcoin_p2p.HeightTracker(factory)
+        ht = bitcoin_p2p.HeightTracker(bitcoind, factory)
         
         tracker = p2pool_data.OkayTracker(net)
         shared_share_hashes = set()

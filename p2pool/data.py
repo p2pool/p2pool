@@ -324,7 +324,7 @@ class OkayTracker(forest.Tracker):
         scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
-            ht.get_min_height(self.verified.shares[h].previous_block),
+            ht.get_height_rel_highest(self.verified.shares[h].previous_block),
             -self.verified.shares[h].time_seen
         ))
         
@@ -337,7 +337,7 @@ class OkayTracker(forest.Tracker):
                 print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
                     self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
                     self.verified.shares[h].peer is None,
-                    ht.get_min_height(self.verified.shares[h].previous_block),
+                    ht.get_height_rel_highest(self.verified.shares[h].previous_block),
                     -self.verified.shares[h].time_seen
                 )
         
@@ -393,7 +393,7 @@ class OkayTracker(forest.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_min_height(best_share.header['previous_block']) < ht.get_min_height(previous_block) and best_share.header_hash != previous_block and best_share.peer is not None:
+            if ht.get_height_rel_highest(best_share.header['previous_block']) < ht.get_height_rel_highest(previous_block) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
@@ -407,8 +407,8 @@ class OkayTracker(forest.Tracker):
         block_height = 0
         max_height = min(self.net.CHAIN_LENGTH, head_height)
         for share in reversed(list(itertools.islice(self.verified.get_chain_known(self.verified.get_nth_parent_hash(share_hash, max_height//2)), max_height//2))):
-            block_height = max(block_height, ht.get_min_height(share.header['previous_block']))
-            this_score = (self.verified.get_work(share_hash) - self.verified.get_work(share.hash))//(ht.get_highest_height() - block_height + 1)
+            block_height = max(block_height, ht.get_height_rel_highest(share.header['previous_block']))
+            this_score = (self.verified.get_work(share_hash) - self.verified.get_work(share.hash))//(0 - block_height + 1)
             if this_score > score2:
                 score2 = this_score
         return min(head_height, self.net.CHAIN_LENGTH), score2

@@ -12,7 +12,7 @@ import time
 from twisted.internet import defer, protocol, reactor, task
 from twisted.python import log
 
-from . import data as bitcoin_data
+from . import data as bitcoin_data, getwork
 from p2pool.util import variable, datachunker, deferral, forest
 
 class TooLong(Exception):
@@ -299,104 +299,80 @@ class HeaderWrapper(object):
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, factory):
-        self.factory = factory
-        self.tracker = forest.Tracker()
-        self.most_recent = None
+    def __init__(self, rpc_proxy, factory):
+        self._rpc_proxy = rpc_proxy
+        self._factory = factory
         
-        self._watch1 = self.factory.new_headers.watch(self.heard_headers)
-        self._watch2 = self.factory.new_block.watch(self.heard_block)
+        self._tracker = forest.Tracker()
         
-        self.requested = set()
-        self._clear_task = task.LoopingCall(self.requested.clear)
+        self._watch1 = self._factory.new_headers.watch(self._heard_headers)
+        self._watch2 = self._factory.new_block.watch(self._heard_block)
+        
+        self._requested = set()
+        self._clear_task = task.LoopingCall(self._requested.clear)
         self._clear_task.start(60)
         
-        self.last_notified_size = 0
+        self._last_notified_size = 0
         
         self.updated = variable.Event()
         
-        self.think()
+        self._think_task = task.LoopingCall(self._think).start(15)
+        self._think2_task = task.LoopingCall(self._think2).start(15)
     
-    def think(self):
-        highest_head = max(self.tracker.heads, key=lambda h: self.tracker.get_height_and_last(h)[0]) if self.tracker.heads else None
-        height, last = self.tracker.get_height_and_last(highest_head)
-        cur = highest_head
-        cur_height = height
-        have = []
-        step = 1
-        while cur is not None:
-            have.append(cur)
-            if step > cur_height:
-                break
-            cur = self.tracker.get_nth_parent_hash(cur, step)
-            cur_height -= step
-            if len(have) > 10:
-                step *= 2
-        if height:
-            have.append(self.tracker.get_nth_parent_hash(highest_head, height - 1))
-        if not have:
-            have.append(0)
-        self.request(have, None)
-        
-        for tail in self.tracker.tails:
-            if tail is None:
-                continue
-            self.request([], tail)
-        for head in self.tracker.heads:
-            if head == highest_head:
-                continue
-            self.request([head], None)
+    def _think(self):
+        highest_head = max(self._tracker.heads, key=lambda h: self._tracker.get_height_and_last(h)[0]) if self._tracker.heads else None
+        if highest_head is None:
+            return # wait for think2
+        height, last = self._tracker.get_height_and_last(highest_head)
+        if height < 1000:
+            self._request(last)
     
-    def heard_headers(self, headers):
+    @defer.inlineCallbacks
+    def _think2(self):
+        ba = getwork.BlockAttempt.from_getwork((yield self._rpc_proxy.rpc_getwork()))
+        self._request(ba.previous_block)
+    
+    def _heard_headers(self, headers):
         changed = False
         for header in headers:
             hw = HeaderWrapper.from_header(header)
-            if hw.hash in self.tracker.shares:
+            if hw.hash in self._tracker.shares:
                 continue
             changed = True
-            self.tracker.add(hw)
+            self._tracker.add(hw)
         if changed:
             self.updated.happened()
-        self.think()
+        self._think()
         
-        if len(self.tracker.shares) > self.last_notified_size + 10:
-            print 'Have %i block headers' % len(self.tracker.shares)
-            self.last_notified_size = len(self.tracker.shares)
+        if len(self._tracker.shares) >= self._last_notified_size + 100:
+            print 'Have %i block headers' % len(self._tracker.shares)
+            self._last_notified_size = len(self._tracker.shares)
     
-    def heard_block(self, block_hash):
-        self.request([], block_hash)
+    def _heard_block(self, block_hash):
+        self._request(block_hash)
     
     @defer.inlineCallbacks
-    def request(self, have, last):
-        if (tuple(have), last) in self.requested:
+    def _request(self, last):
+        if last in self._tracker.shares:
             return
-        self.requested.add((tuple(have), last))
-        (yield self.factory.getProtocol()).send_getheaders(version=1, have=have, last=last)
+        if last in self._requested:
+            return
+        self._requested.add(last)
+        (yield self._factory.getProtocol()).send_getheaders(version=1, have=[], last=last)
     
-    def getHeight(self, block_hash):
-        height, last = self.tracker.get_height_and_last(block_hash)
-        if last is not None:
-            #self.request([], last)
-            raise ValueError()
-        return height
-    
-    def get_min_height(self, block_hash):
-        height, last = self.tracker.get_height_and_last(block_hash)
-        #if last is not None:
-        #    self.request([], last)
-        return height
-    
-    def get_dist_below_highest(self, block_hash):
-        pass
-        # 0, 1, 2, 3, 4
-    
-    def get_highest_height(self):
-        return self.tracker.get_highest_height()
-    
+    def get_height_rel_highest(self, block_hash):
+        # callers: highest height can change during yields!
+        height, last = self._tracker.get_height_and_last(block_hash)
+        if last not in self._tracker.tails:
+            return -1e300
+        return height - max(self._tracker.get_height(head_hash) for head_hash in self._tracker.tails[last])
+     
     def stop(self):
-        self.factory.new_headers.unwatch(self._watch1)
-        self.factory.new_block.unwatch(self._watch2)
+        self._factory.new_headers.unwatch(self._watch1)
+        self._factory.new_block.unwatch(self._watch2)
         self._clear_task.stop()
+        self._think_task.stop()
+        self._think2_task.stop()
 
 if __name__ == '__main__':
     factory = ClientFactory(bitcoin_data.BitcoinMainnet)
