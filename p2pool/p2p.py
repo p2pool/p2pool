@@ -13,7 +13,7 @@ from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, dicts
 
 class Protocol(bitcoin_p2p.BaseProtocol):
-    version = 1
+    version = 2
     sub_version = p2pool.__version__
     
     def __init__(self, node):
