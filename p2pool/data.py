@@ -51,7 +51,7 @@ share_type = bitcoin_data.ComposedType([
 ])
 
 class Share(object):
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac net'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -77,6 +77,8 @@ class Share(object):
         return cls(net, **share1b)
     
     def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
+        self.net = net
+        
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
@@ -135,11 +137,11 @@ class Share(object):
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
     
-    def check(self, tracker, now, net):
+    def check(self, tracker):
         if script.get_sigop_count(self.new_script) > 1:
             raise ValueError('too many sigops!')
         
-        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], self.net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
@@ -163,11 +165,11 @@ class Share(object):
         
         return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
-    def as_block(self, tracker, net):
+    def as_block(self, tracker):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['target'], self.share_info['timestamp'], self.net)
         assert share_info == self.share_info
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
@@ -265,7 +267,7 @@ class OkayTracker(forest.Tracker):
         if height < self.net.CHAIN_LENGTH + 1 and last is not None:
             raise AssertionError()
         try:
-            share.check(self, now, self.net)
+            share.check(self)
         except:
             log.err(None, 'Share check failed:')
             return False

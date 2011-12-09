@@ -249,7 +249,7 @@ def main(args, net, datadir_path):
         def _(share):
             if share.pow_hash <= share.header['target']:
                 if factory.conn.value is not None:
-                    factory.conn.value.send_block(block=share.as_block(tracker, net))
+                    factory.conn.value.send_block(block=share.as_block(tracker))
                 else:
                     print 'No bitcoind connection! Erp!'
                 print
