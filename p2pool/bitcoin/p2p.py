@@ -345,7 +345,7 @@ class HeightTracker(object):
         self._think()
         
         if len(self._tracker.shares) >= self._last_notified_size + 100:
-            print 'Have %i block headers' % len(self._tracker.shares)
+            print 'Have %i/1000 block headers' % len(self._tracker.shares)
             self._last_notified_size = len(self._tracker.shares)
     
     def _heard_block(self, block_hash):
