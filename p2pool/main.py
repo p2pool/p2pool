@@ -286,7 +286,7 @@ def main(args, net, datadir_path):
             print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
             peer.sendShares(shares)
         
-        print 'Joining p2pool network using TCP port %i...' % (args.p2pool_port,)
+        print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
         def parse(x):
             if ':' in x:
@@ -701,56 +701,56 @@ def run():
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
     parser.add_argument('--debug',
-        help='debugging mode',
+        help='enable debugging mode',
         action='store_const', const=True, default=False, dest='debug')
     parser.add_argument('-a', '--address',
-        help='generate to this address (defaults to requesting one from bitcoind)',
+        help='generate payouts to this address (default: <address requested from bitcoind>)',
         type=str, action='store', default=None, dest='address')
     parser.add_argument('--logfile',
-        help='''log to specific file (defaults to <network_name>.log in run_p2pool.py's directory)''',
+        help='''log to this file (default: data/<NET>/log)''',
         type=str, action='store', default=None, dest='logfile')
     parser.add_argument('--merged-url',
-        help='call getauxblock on this url to get work for merged mining',
+        help='call getauxblock on this url to get work for merged mining (example: http://127.0.0.1:10332/)',
         type=str, action='store', default=None, dest='merged_url')
     parser.add_argument('--merged-userpass',
-        help='merge daemon user and password, separated by a colon. Example: ncuser:ncpass',
+        help='use this user and password when requesting merged mining work (example: ncuser:ncpass)',
         type=str, action='store', default=None, dest='merged_userpass')
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
-        help='percentage amount to donate to author of p2pool. Default: 0.5',
+        help='donate this percentage of work to author of p2pool (default: 0.5)',
         type=float, action='store', default=0.5, dest='donation_percentage')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
-        help='use TCP port PORT to listen for connections (forward this port from your router!) (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='use port PORT to listen for connections (forward this port from your router!) (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='p2pool_port')
     p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
-        help='connect to existing p2pool node at ADDR listening on TCP port PORT (defaults to default p2pool P2P port), in addition to builtin addresses',
+        help='connect to existing p2pool node at ADDR listening on port PORT (defaults to default p2pool P2P port) in addition to builtin addresses',
         type=str, action='append', default=[], dest='p2pool_nodes')
     parser.add_argument('--disable-upnp',
-        help='''don't attempt to forward p2pool P2P port from the WAN to this computer using UPnP''',
+        help='''don't attempt to use UPnP to forward p2pool's P2P port from the Internet to this computer''',
         action='store_false', default=True, dest='upnp')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners asking for work and providing responses (default:%s)' % ', '.join('%s:%i' % (n.NAME, n.WORKER_PORT) for _, n in sorted(networks.realnets.items())),
+        help='listen on PORT for RPC connections from miners (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.WORKER_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='worker_port')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
-        help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee . default: 0''',
+        help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
-        help='connect to a bitcoind at this address (default: 127.0.0.1)',
+        help='connect to this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='connect to a bitcoind at this port over the RPC interface - used to get the current highest block via getmemorypool (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_RPC_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to JSON-RPC interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_RPC_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='connect to a bitcoind at this port over the p2p interface - used to submit blocks and get the pubkey to generate to via an IP transaction (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to P2P interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
-        help='bitcoind RPC interface username (default: empty)',
+        help='bitcoind RPC interface username (default: <empty>)',
         type=str, action='store', default='', nargs='?', dest='bitcoind_rpc_username')
     bitcoind_group.add_argument(metavar='BITCOIND_RPCPASSWORD',
         help='bitcoind RPC interface password',
