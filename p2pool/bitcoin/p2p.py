@@ -299,9 +299,10 @@ class HeaderWrapper(object):
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, rpc_proxy, factory):
+    def __init__(self, rpc_proxy, factory, backlog_needed=1000):
         self._rpc_proxy = rpc_proxy
         self._factory = factory
+        self._backlog_needed = backlog_needed
         
         self._tracker = forest.Tracker()
         
@@ -324,7 +325,7 @@ class HeightTracker(object):
         if highest_head is None:
             return # wait for think2
         height, last = self._tracker.get_height_and_last(highest_head)
-        if height < 1000:
+        if height < self._backlog_needed:
             self._request(last)
     
     @defer.inlineCallbacks
@@ -345,7 +346,7 @@ class HeightTracker(object):
         self._think()
         
         if len(self._tracker.shares) >= self._last_notified_size + 100:
-            print 'Have %i/1000 block headers' % len(self._tracker.shares)
+            print 'Have %i/%i block headers' % (len(self._tracker.shares), self._backlog_needed)
             self._last_notified_size = len(self._tracker.shares)
     
     def _heard_block(self, block_hash):
