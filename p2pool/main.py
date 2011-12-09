@@ -639,12 +639,11 @@ def main(args, net, datadir_path):
                         if fracs:
                             med = math.median(fracs)
                             this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
-                            conf = 0.9
+                            conf = 0.95
                             if shares:
                                 this_str += ' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
                                 if med < .99:
                                     this_str += ' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
-                                this_str += ' (%i%% confidence)' % (int(100*conf+.5),)
                         if this_str != last_str or time.time() > last_time + 15:
                             print this_str
                             last_str = this_str
