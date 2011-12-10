@@ -321,17 +321,23 @@ class HeightTracker(object):
         self._think2_task = task.LoopingCall(self._think2).start(15)
     
     def _think(self):
-        highest_head = max(self._tracker.heads, key=lambda h: self._tracker.get_height_and_last(h)[0]) if self._tracker.heads else None
-        if highest_head is None:
-            return # wait for think2
-        height, last = self._tracker.get_height_and_last(highest_head)
-        if height < self._backlog_needed:
-            self._request(last)
+        try:
+            highest_head = max(self._tracker.heads, key=lambda h: self._tracker.get_height_and_last(h)[0]) if self._tracker.heads else None
+            if highest_head is None:
+                return # wait for think2
+            height, last = self._tracker.get_height_and_last(highest_head)
+            if height < self._backlog_needed:
+                self._request(last)
+        except:
+            log.err(None, 'Error in HeightTracker._think:')
     
     @defer.inlineCallbacks
     def _think2(self):
-        ba = getwork.BlockAttempt.from_getwork((yield self._rpc_proxy.rpc_getwork()))
-        self._request(ba.previous_block)
+        try:
+            ba = getwork.BlockAttempt.from_getwork((yield self._rpc_proxy.rpc_getwork()))
+            self._request(ba.previous_block)
+        except:
+            log.err(None, 'Error in HeightTracker._think2:')
     
     def _heard_headers(self, headers):
         changed = False
