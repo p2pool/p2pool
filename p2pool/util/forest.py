@@ -43,7 +43,7 @@ class DistanceSkipList(skiplist.SkipList):
 # linked list tracker
 
 class Tracker(object):
-    def __init__(self):
+    def __init__(self, shares=[]):
         self.shares = {} # hash -> share
         #self.ids = {} # hash -> (id, height)
         self.reverse_shares = {} # previous_hash -> set of share_hashes
@@ -62,6 +62,9 @@ class Tracker(object):
         
         self.added = variable.Event()
         self.removed = variable.Event()
+        
+        for share in shares:
+            self.add(share)
     
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
