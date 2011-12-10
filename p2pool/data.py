@@ -407,7 +407,7 @@ class OkayTracker(forest.Tracker):
     def score(self, share_hash, ht):
         head_height, last = self.verified.get_height_and_last(share_hash)
         score2 = 0
-        block_height = 0
+        block_height = -1000000
         max_height = min(self.net.CHAIN_LENGTH, head_height)
         for share in reversed(list(itertools.islice(self.verified.get_chain_known(self.verified.get_nth_parent_hash(share_hash, max_height//2)), max_height//2))):
             block_height = max(block_height, ht.get_height_rel_highest(share.header['previous_block']))
