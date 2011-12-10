@@ -317,8 +317,10 @@ class HeightTracker(object):
         
         self.updated = variable.Event()
         
-        self._think_task = task.LoopingCall(self._think).start(15)
-        self._think2_task = task.LoopingCall(self._think2).start(15)
+        self._think_task = task.LoopingCall(self._think)
+        self._think_task.start(15)
+        self._think2_task = task.LoopingCall(self._think2)
+        self._think2_task.start(15)
     
     def _think(self):
         try:
