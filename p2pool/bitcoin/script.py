@@ -8,7 +8,7 @@ def protoPUSH(length):
 def protoPUSHDATA(size_len):
     def _(f):
         length_str, f = bitcoin_data.read(f, size_len)
-        length = bases.string_to_natural(length_str[::-1])
+        length = bases.string_to_natural(length_str[::-1].lstrip(chr(0)))
         data, f = bitcoin_data.read(f, length)
         return data, f
     return _
@@ -49,9 +49,3 @@ def get_sigop_count(script):
         'CHECKMULTISIGVERIFY': 20,
     }
     return sum(weights.get(opcode_name, 0) for opcode_name, opcode_arg in parse(script))
-
-if __name__ == '__main__':
-    script = '76  A9  14 89 AB CD EF AB BA AB BA AB BA AB BA AB BA AB BA AB BA AB BA  88 AC'.replace(' ', '').decode('hex')
-    for l in parse(script):
-        print l
-    print get_sigop_count(script)

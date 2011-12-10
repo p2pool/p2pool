@@ -85,15 +85,3 @@ class CountsSkipList(skiplist.SkipList):
     
     def finalize(self, (share_count, share_hashes)):
         return share_hashes
-
-if __name__ == '__main__':
-    import random
-    from p2pool.bitcoin import data
-    t = data.Tracker()
-    d = WeightsSkipList(t)
-    for i in xrange(2000):
-        t.add(data.FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None, new_script=i, target=random.randrange(2**249, 2**250)))
-    for i in xrange(2000):
-        #a = random.randrange(2000)
-        a = 1999
-        print d(a, a, 1000000)[1]

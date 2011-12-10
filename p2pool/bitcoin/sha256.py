@@ -87,39 +87,3 @@ class sha256(object):
     
     def hexdigest(self):
         return self.digest().encode('hex')
-
-if __name__ == '__main__':
-    import hashlib
-    import random
-    for test in ['', 'a', 'b', 'abc', 'abc'*50, 'hello world']:
-        print test
-        print sha256(test).hexdigest()
-        print hashlib.sha256(test).hexdigest()
-        print
-    def random_str(l):
-        return ''.join(chr(random.randrange(256)) for i in xrange(l))
-    for length in xrange(1500):
-        test = random_str(length)
-        a = sha256(test).hexdigest()
-        b = hashlib.sha256(test).hexdigest()
-        print length, a, b
-        if a != b:
-            print 'ERROR!'
-            raise ValueError()
-    while True:
-        test = random_str(int(random.expovariate(1/1000)))
-        test2 = random_str(int(random.expovariate(1/1000)))
-        
-        a = sha256(test)
-        a = a.copy()
-        a.update(test2)
-        a = a.hexdigest()
-        
-        b = hashlib.sha256(test)
-        b = b.copy()
-        b.update(test2)
-        b = b.hexdigest()
-        print a, b
-        if a != b:
-            print 'ERROR!'
-            raise ValueError()

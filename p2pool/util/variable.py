@@ -8,6 +8,7 @@ class Event(object):
         self.observers = {}
         self.id_generator = itertools.count()
         self._once = None
+        self.times = 0
     
     def watch(self, func):
         id = self.id_generator.next()
@@ -24,6 +25,8 @@ class Event(object):
         return res
     
     def happened(self, *event):
+        self.times += 1
+        
         once, self._once = self._once, None
         
         for id, func in sorted(self.observers.iteritems()):

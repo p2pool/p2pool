@@ -117,11 +117,8 @@ class Server(deferred_resource.DeferredResource):
                 raise Error(-32601, u'Method not found')
             method_meth = getattr(self, method_name)
             
-            if hasattr(method_meth, 'takes_request'):
-                params = [request] + list(params)
-            
             try:
-                result = yield method_meth(*params)
+                result = yield method_meth(request, *params)
             except Error:
                 raise
             except Exception:

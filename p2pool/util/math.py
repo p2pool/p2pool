@@ -72,6 +72,45 @@ def perfect_round(x):
     else:
         return a2 + 1
 
+def erf(x):
+    # save the sign of x
+    sign = 1
+    if x < 0:
+        sign = -1
+    x = abs(x)
+    
+    # constants
+    a1 =  0.254829592
+    a2 = -0.284496736
+    a3 =  1.421413741
+    a4 = -1.453152027
+    a5 =  1.061405429
+    p  =  0.3275911
+    
+    # A&S formula 7.1.26
+    t = 1.0/(1.0 + p*x)
+    y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
+    return sign*y # erf(-x) = -erf(x)
+
+def ierf(z, steps=10):
+    guess = 0
+    for i in xrange(steps):
+        d = 2*math.e**(-guess**2)/math.sqrt(math.pi)
+        guess = guess - (erf(guess) - z)/d
+    return guess
+
+def binomial_conf_interval(x, n, conf=0.95):
+    # approximate - Wilson score interval
+    z = math.sqrt(2)*ierf(conf)
+    p = x/n
+    topa = p + z**2/2/n
+    topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
+    bottom = 1 + z**2/n
+    return (topa - topb)/bottom, (topa + topb)/bottom
+
+def interval_to_center_radius((low, high)):
+    return (high+low)/2, (high-low)/2
+
 if __name__ == '__main__':
     import random
     a = 1

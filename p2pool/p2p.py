@@ -10,14 +10,10 @@ import p2pool
 from p2pool import data as p2pool_data
 from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral, variable, dicts
-
-# mode
-#     0: send hash first (high latency, low bandwidth)
-#     1: send entire share (low latency, high bandwidth)
+from p2pool.util import deferral
 
 class Protocol(bitcoin_p2p.BaseProtocol):
-    version = 1
+    version = 2
     sub_version = p2pool.__version__
     
     def __init__(self, node):
@@ -29,12 +25,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     use_checksum = True
     
     other_version = None
-    node_var_watch = None
     connected2 = False
-    
-    @property
-    def mode(self):
-        return min(self.node.mode_var.value, self.other_mode_var.value)
     
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
@@ -56,11 +47,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             ),
             nonce=self.node.nonce,
             sub_version=self.sub_version,
-            mode=self.node.mode_var.value,
+            mode=1,
             best_share_hash=self.node.current_work.value['best_share_hash'],
         )
-        
-        self.node_var_watch = self.node.mode_var.changed.watch(lambda new_mode: self.send_setmode(mode=new_mode))
         
         reactor.callLater(10, self._connect_timeout)
         self.timeout_delayed = reactor.callLater(100, self._timeout)
@@ -100,14 +89,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('addr_from', bitcoin_data.address_type),
         ('nonce', bitcoin_data.StructType('<Q')),
         ('sub_version', bitcoin_data.VarStrType()),
-        ('mode', bitcoin_data.StructType('<I')),
+        ('mode', bitcoin_data.StructType('<I')), # always 1 for legacy compatibility
         ('best_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         self.other_version = version
         self.other_sub_version = sub_version[:512]
         self.other_services = services
-        self.other_mode_var = variable.Variable(mode)
         
         if nonce == self.node.nonce:
             #print 'Detected connection to self, disconnecting from %s:%i' % self.addr
@@ -126,14 +114,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self._think2()
         
         if best_share_hash is not None:
-            self.handle_share0s(hashes=[best_share_hash])
-    
-    
-    message_setmode = bitcoin_data.ComposedType([
-        ('mode', bitcoin_data.StructType('<I')),
-    ])
-    def handle_setmode(self, mode):
-        self.other_mode_var.set(mode)
+            self.node.handle_share_hashes([best_share_hash], self)
     
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
@@ -189,7 +170,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     port=port,
                 ),
             ) for host, port in
-            random.sample(self.node.addr_store.keys(), min(count, len(self.node.addr_store)))
+            self.node.get_good_peers(count)
         ])
     
     message_getshares = bitcoin_data.ComposedType([
@@ -200,88 +181,28 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def handle_getshares(self, hashes, parents, stops):
         self.node.handle_get_shares(hashes, parents, stops, self)
     
-    message_share0s = bitcoin_data.ComposedType([
-        ('hashes', bitcoin_data.ListType(bitcoin_data.HashType())),
-    ])
-    def handle_share0s(self, hashes):
-        self.node.handle_share_hashes(hashes, self)
-    
     message_shares = bitcoin_data.ComposedType([
-        ('shares', bitcoin_data.ListType(p2pool_data.new_share_type)),
+        ('shares', bitcoin_data.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
         res = []
         for share in shares:
-            share_obj = p2pool_data.NewShare.from_share(share, self.node.net)
+            share_obj = p2pool_data.Share.from_share(share, self.node.net)
             share_obj.peer = self
             res.append(share_obj)
         self.node.handle_shares(res)
     
-    message_share1as = bitcoin_data.ComposedType([
-        ('share1as', bitcoin_data.ListType(p2pool_data.share1a_type)),
-    ])
-    def handle_share1as(self, share1as):
-        shares = []
-        for share1a in share1as:
-            if self.node.net.BITCOIN_POW_FUNC(share1a['header']) <= share1a['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % self.addr
-                self.transport.loseConnection()
-                return
-            share = p2pool_data.Share.from_share1a(share1a, self.node.net)
-            share.peer = self # XXX
-            shares.append(share)
-        self.node.handle_shares(shares, self)
-    
-    message_share1bs = bitcoin_data.ComposedType([
-        ('share1bs', bitcoin_data.ListType(p2pool_data.share1b_type)),
-    ])
-    def handle_share1bs(self, share1bs):
-        shares = []
-        for share1b in share1bs:
-            if not self.node.net.BITCOIN_POW_FUNC(share1b['header']) <= share1b['header']['target']:
-                print 'Dropping peer %s:%i due to invalid share' % self.addr
-                self.transport.loseConnection()
-                return
-            share = p2pool_data.Share.from_share1b(share1b, self.node.net)
-            share.peer = self # XXX
-            shares.append(share)
-        self.node.handle_shares(shares, self)
-    
     def sendShares(self, shares, full=False):
-        share0s = []
-        share1as = []
-        share1bs = []
-        new_shares = []
-        # XXX doesn't need to send full block when it's not urgent
-        # eg. when getting history
-        for share in shares:
-            if isinstance(share, p2pool_data.NewShare):
-                new_shares.append(share.as_share())
-            else:
-                if share.pow_hash <= share.header['target']:
-                    share1bs.append(share.as_share1b())
-                else:
-                    if self.mode == 0 and not full:
-                        share0s.append(share.hash)
-                    elif self.mode == 1 or full:
-                        share1as.append(share.as_share1a())
-                    else:
-                        raise ValueError(self.mode)
         def att(f, **kwargs):
             try:
                 f(**kwargs)
             except bitcoin_p2p.TooLong:
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
-        if share0s: att(self.send_share0s, hashes=share0s)
-        if share1as: att(self.send_share1as, share1as=share1as)
-        if share1bs: att(self.send_share1bs, share1bs=share1bs)
-        if new_shares: att(self.send_shares, shares=new_shares)
+        if shares:
+            att(self.send_shares, shares=[share.as_share() for share in shares])
     
     def connectionLost(self, reason):
-        if self.node_var_watch is not None:
-            self.node.mode_var.changed.unwatch(self.node_var_watch)
-        
         if self.connected2:
             self.node.lost_conn(self)
 
@@ -312,39 +233,15 @@ class ClientFactory(protocol.ClientFactory):
     def clientConnectionLost(self, connector, reason):
         self.node.attempt_ended(connector)
 
-addrdb_key = bitcoin_data.ComposedType([
-    ('address', bitcoin_data.IPV6AddressType()),
-    ('port', bitcoin_data.StructType('>H')),
-])
-addrdb_value = bitcoin_data.ComposedType([
-    ('services', bitcoin_data.StructType('<Q')),
-    ('first_seen', bitcoin_data.StructType('<Q')),
-    ('last_seen', bitcoin_data.StructType('<Q')),
-])
-
-class AddrStore(dicts.DictWrapper):
-    def encode_key(self, (address, port)):
-        return addrdb_key.pack(dict(address=address, port=port))
-    def decode_key(self, encoded_key):
-        k = addrdb_key.unpack(encoded_key)
-        return k['address'], k['port']
-    
-    def encode_value(self, (services, first_seen, last_seen)):
-        return addrdb_value.pack(dict(services=services, first_seen=first_seen, last_seen=last_seen))
-    def decode_value(self, encoded_value):
-        v = addrdb_value.unpack(encoded_value)
-        return v['services'], v['first_seen'], v['last_seen']
-
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), mode=0, desired_peers=10, max_attempts=100, preferred_storage=1000):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=30, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
         self.port = port
         self.net = net
-        self.addr_store = AddrStore(addr_store)
+        self.addr_store = addr_store
         self.preferred_addrs = preferred_addrs
-        self.mode_var = variable.Variable(mode)
         self.desired_peers = desired_peers
         self.max_attempts = max_attempts
         self.current_work = current_work
@@ -374,15 +271,15 @@ class Node(object):
                     if (random.randrange(2) and len(self.preferred_addrs)) or not len(self.addr_store):
                         host, port = random.choice(list(self.preferred_addrs))
                     else:
-                        host, port = random.choice(self.addr_store.keys())
+                        (host, port), = self.get_good_peers(1)
                     
                     if (host, port) not in self.attempts:
                         #print 'Trying to connect to', host, port
-                        reactor.connectTCP(host, port, ClientFactory(self), timeout=10)
+                        reactor.connectTCP(host, port, ClientFactory(self), timeout=5)
             except:
                 log.err()
             
-            yield deferral.sleep(random.expovariate(1/5))
+            yield deferral.sleep(random.expovariate(1/1))
     
     @defer.inlineCallbacks
     def _think2(self):
@@ -454,6 +351,10 @@ class Node(object):
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         print 'handle_get_shares', (hashes, parents, stops, peer)
+    
+    def get_good_peers(self, max_count):
+        t = time.time()
+        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -(last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)
