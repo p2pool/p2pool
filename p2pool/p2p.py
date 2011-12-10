@@ -10,7 +10,7 @@ import p2pool
 from p2pool import data as p2pool_data
 from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral, dicts
+from p2pool.util import deferral
 
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 2

@@ -77,7 +77,7 @@ class FakeShare(object):
 
 def test_tracker(self):
     t = DumbTracker(self.shares.itervalues())
-
+    
     assert self.shares == t.shares, (self.shares, t.shares)
     assert self.reverse_shares == t.reverse_shares, (self.reverse_shares, t.reverse_shares)
     assert self.heads == t.heads, (self.heads, t.heads)
@@ -104,10 +104,10 @@ def generate_tracker_random(n):
 class Test(unittest.TestCase):
     def test_tracker(self):
         t = generate_tracker_simple(1000)
-
+        
         assert t.heads == {999: None}
         assert t.tails == {None: set([999])}
-
+        
         assert t.get_nth_parent_hash(900, 500) == 900 - 500
         assert t.get_nth_parent_hash(901, 42) == 901 - 42
     

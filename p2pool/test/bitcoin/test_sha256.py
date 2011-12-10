@@ -27,12 +27,12 @@ class Test(unittest.TestCase):
         for i in xrange(100):
             test = random_str(int(random.expovariate(1/100)))
             test2 = random_str(int(random.expovariate(1/100)))
-
+            
             a = sha256.sha256(test)
             a = a.copy()
             a.update(test2)
             a = a.hexdigest()
-
+            
             b = hashlib.sha256(test)
             b = b.copy()
             b.update(test2)

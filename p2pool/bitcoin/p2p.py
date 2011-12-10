@@ -367,7 +367,7 @@ class HeightTracker(object):
         if last not in self._tracker.tails:
             return -1e300
         return height - max(self._tracker.get_height(head_hash) for head_hash in self._tracker.tails[last])
-     
+    
     def stop(self):
         self._factory.new_headers.unwatch(self._watch1)
         self._factory.new_block.unwatch(self._watch2)
