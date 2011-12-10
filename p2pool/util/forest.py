@@ -97,16 +97,6 @@ class Tracker(object):
         
         self.added.happened(share)
     
-    def test(self):
-        t = Tracker()
-        for s in self.shares.itervalues():
-            t.add(s)
-        
-        assert self.shares == t.shares, (self.shares, t.shares)
-        assert self.reverse_shares == t.reverse_shares, (self.reverse_shares, t.reverse_shares)
-        assert self.heads == t.heads, (self.heads, t.heads)
-        assert self.tails == t.tails, (self.tails, t.tails)
-    
     def remove(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
         if share_hash not in self.shares:
@@ -139,28 +129,24 @@ class Tracker(object):
             else:
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
-        elif share.previous_hash in self.tails:
-            heads = self.tails[share.previous_hash]
-            if len(self.reverse_shares[share.previous_hash]) > 1:
-                raise NotImplementedError()
-            else:
-                del self.tails[share.previous_hash]
-                for head in heads:
-                    self.heads[head] = share.hash
-                self.tails[share.hash] = set(heads)
+        elif share.previous_hash in self.tails and len(self.reverse_shares[share.previous_hash]) <= 1:
+            heads = self.tails.pop(share.previous_hash)
+            for head in heads:
+                self.heads[head] = share.hash
+            self.tails[share.hash] = set(heads)
+            
+            # move ref pointing to this up
+            if share.previous_hash in self.reverse_height_refs:
+                assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set()))
+                
+                ref = self.reverse_height_refs[share.previous_hash]
+                cur_height, cur_hash, cur_work = self.height_refs[ref]
+                assert cur_hash == share.previous_hash
+                self.height_refs[ref] = cur_height - 1, share.hash, cur_work - bitcoin_data.target_to_average_attempts(share.target)
+                del self.reverse_height_refs[share.previous_hash]
+                self.reverse_height_refs[share.hash] = ref
         else:
             raise NotImplementedError()
-        
-        # move ref pointing to this up
-        if share.previous_hash in self.reverse_height_refs:
-            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set()))
-            
-            ref = self.reverse_height_refs[share.previous_hash]
-            cur_height, cur_hash, cur_work = self.height_refs[ref]
-            assert cur_hash == share.previous_hash
-            self.height_refs[ref] = cur_height - 1, share.hash, cur_work - bitcoin_data.target_to_average_attempts(share.target)
-            del self.reverse_height_refs[share.previous_hash]
-            self.reverse_height_refs[share.hash] = ref
         
         # delete height entry, and ref if it is empty
         if share.hash in self.heights:
@@ -176,7 +162,6 @@ class Tracker(object):
         if not self.reverse_shares[share.previous_hash]:
             self.reverse_shares.pop(share.previous_hash)
         
-        #assert self.test() is None
         self.removed.happened(share)
     
     def get_height(self, share_hash):
@@ -229,7 +214,6 @@ class Tracker(object):
     
     def get_height_work_and_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
-        orig = share_hash
         height = 0
         work = 0
         updates = []
