@@ -418,6 +418,7 @@ def main(args, net, datadir_path):
         
         def compute(request):
             state = current_work.value
+            user = worker_interface.get_username(request)
             
             payout_script = get_payout_script_from_username(request)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
@@ -450,7 +451,8 @@ def main(args, net, datadir_path):
                 net=net,
             )
             
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+            print 'New work for worker %s! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+                user,
                 bitcoin_data.target_to_difficulty(share_info['target']),
                 (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.BITCOIN_SYMBOL,
                 subsidy*1e-8, net.BITCOIN_SYMBOL,
