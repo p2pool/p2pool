@@ -1,8 +1,12 @@
+'''
+forest data structure
+'''
+
 import itertools
 
 from p2pool.util import skiplist, variable
-
 from p2pool.bitcoin import data as bitcoin_data
+
 
 class DistanceSkipList(skiplist.SkipList):
     def __init__(self, tracker):
@@ -40,12 +44,9 @@ class DistanceSkipList(skiplist.SkipList):
         return hash
 
 
-# linked list tracker
-
 class Tracker(object):
     def __init__(self, shares=[]):
         self.shares = {} # hash -> share
-        #self.ids = {} # hash -> (id, height)
         self.reverse_shares = {} # previous_hash -> set of share_hashes
         
         self.heads = {} # head hash -> tail_hash
@@ -80,10 +81,6 @@ class Tracker(object):
             tail = self.heads.pop(share.previous_hash)
         else:
             tail = self.get_last(share.previous_hash)
-            #tail2 = share.previous_hash
-            #while tail2 in self.shares:
-            #    tail2 = self.shares[tail2].previous_hash
-            #assert tail == tail2
         
         self.shares[share.hash] = share
         self.reverse_shares.setdefault(share.previous_hash, set()).add(share.hash)
@@ -239,30 +236,6 @@ class Tracker(object):
             assert not isinstance(share, long)
             yield share
             item_hash_to_get = share.previous_hash
-    
-    def get_chain_to_root(self, start_hash, root=None):
-        assert isinstance(start_hash, (int, long, type(None)))
-        assert isinstance(root, (int, long, type(None)))
-        '''
-        Chain of hashes starting with share_hash of shares to the root (doesn't include root)
-        Raises an error if one is missing
-        '''
-        share_hash_to_get = start_hash
-        while share_hash_to_get != root:
-            share = self.shares[share_hash_to_get]
-            yield share
-            share_hash_to_get = share.previous_hash
-    
-    def get_best_hash(self):
-        '''
-        Returns hash of item with the most items in its chain
-        '''
-        if not self.heads:
-            return None
-        return max(self.heads, key=self.get_height_and_last)
-    
-    def get_highest_height(self):
-        return max(self.get_height_and_last(head)[0] for head in self.heads) if self.heads else 0
     
     def is_child_of(self, share_hash, possible_child_hash):
         height, last = self.get_height_and_last(share_hash)
