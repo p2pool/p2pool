@@ -770,6 +770,16 @@ def run():
     if args.logfile is None:
         args.logfile = os.path.join(datadir_path, 'log')
     
+    class EncodeReplacerPipe(object):
+        def __init__(self, inner_file):
+            self.inner_file = inner_file
+            self.softspace = 0
+        def write(self, data):
+            if isinstance(data, unicode):
+                data = data.encode(self.inner_file.encoding, 'replace')
+            self.inner_file.write(data)
+        def flush(self):
+            self.inner_file.flush()
     class LogFile(object):
         def __init__(self, filename):
             self.filename = filename
@@ -834,7 +844,7 @@ def run():
         def flush(self):
             self.inner_file.flush()
     logfile = LogFile(args.logfile)
-    sys.stdout = sys.stderr = log.DefaultObserver.stderr = AbortPipe(TimestampingPipe(TeePipe([sys.stderr, logfile])))
+    sys.stdout = sys.stderr = log.DefaultObserver.stderr = AbortPipe(TimestampingPipe(TeePipe([EncodeReplacerPipe(sys.stderr), logfile])))
     if hasattr(signal, "SIGUSR1"):
         def sigusr1(signum, frame):
             print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
