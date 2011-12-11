@@ -4,6 +4,7 @@
 from __future__ import division
 
 import argparse
+import codecs
 import datetime
 import itertools
 import os
@@ -791,7 +792,7 @@ def run():
                 f = open(self.filename, 'wb')
                 f.write(data)
             f.close()
-            self.inner_file = open(self.filename, 'a')
+            self.inner_file = codecs.open(self.filename, 'a', 'utf-8')
         def write(self, data):
             self.inner_file.write(data)
         def flush(self):
