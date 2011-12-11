@@ -9,8 +9,7 @@ class BitcoinMainnet(object):
     BITCOIN_ADDRESS_VERSION = 0
     BITCOIN_RPC_PORT = 8332
     BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
@@ -23,8 +22,7 @@ class BitcoinTestnet(object):
     BITCOIN_ADDRESS_VERSION = 111
     BITCOIN_RPC_PORT = 8332
     BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' not in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
@@ -38,8 +36,7 @@ class NamecoinMainnet(object):
     BITCOIN_ADDRESS_VERSION = 52
     BITCOIN_RPC_PORT = 8332
     BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        'namecoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
@@ -52,8 +49,7 @@ class NamecoinTestnet(object):
     BITCOIN_ADDRESS_VERSION = 111
     BITCOIN_RPC_PORT = 8332
     BITCOIN_RPC_CHECK = staticmethod(defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-        'name_firstupdate' in (yield bitcoind.rpc_help()) and
-        'ixcoinaddress' not in (yield bitcoind.rpc_help()) and
+        'namecoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )))
     BITCOIN_SUBSIDY_FUNC = staticmethod(lambda height: 50*100000000 >> (height + 1)//210000)
