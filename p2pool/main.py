@@ -610,53 +610,52 @@ def main(args, net, datadir_path):
             signal.signal(signal.SIGALRM, watchdog_handler)
             task.LoopingCall(signal.alarm, 30).start(1)
         
-        last_str = None
-        last_time = 0
-        while True:
-            yield deferral.sleep(3)
-            try:
-                if time.time() > current_work2.value['last_update'] + 60:
-                    print '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
-                if current_work.value['best_share_hash'] is not None:
-                    height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-                    if height > 2:
-                        att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
-                        weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
-                        shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
-                        stale_shares = stale_doa_shares + stale_not_doa_shares
-                        fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
-                        this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
-                            math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
-                            height,
-                            len(tracker.verified.shares),
-                            len(tracker.shares),
-                            weights.get(my_script, 0)/total_weight*100,
-                            math.format(int(weights.get(my_script, 0)*att_s//total_weight / (1. - (math.median(fracs) if fracs else 0)))),
-                            shares,
-                            stale_not_doa_shares,
-                            stale_doa_shares,
-                            len(p2p_node.peers),
-                        ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
-                        if fracs:
-                            med = math.median(fracs)
-                            this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
-                            conf = 0.95
-                            if shares:
-                                this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
-                                if med < .99:
-                                    this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
-                        if this_str != last_str or time.time() > last_time + 15:
-                            print this_str
-                            last_str = this_str
-                            last_time = time.time()
-            
-            
-            except:
-                log.err()
+        @defer.inlineCallbacks
+        def status_thread():
+            last_str = None
+            last_time = 0
+            while True:
+                yield deferral.sleep(3)
+                try:
+                    if time.time() > current_work2.value['last_update'] + 60:
+                        print '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
+                    if current_work.value['best_share_hash'] is not None:
+                        height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
+                        if height > 2:
+                            att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
+                            weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
+                            shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
+                            stale_shares = stale_doa_shares + stale_not_doa_shares
+                            fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
+                            this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
+                                math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
+                                height,
+                                len(tracker.verified.shares),
+                                len(tracker.shares),
+                                weights.get(my_script, 0)/total_weight*100,
+                                math.format(int(weights.get(my_script, 0)*att_s//total_weight / (1. - (math.median(fracs) if fracs else 0)))),
+                                shares,
+                                stale_not_doa_shares,
+                                stale_doa_shares,
+                                len(p2p_node.peers),
+                            ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
+                            if fracs:
+                                med = math.median(fracs)
+                                this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
+                                conf = 0.95
+                                if shares:
+                                    this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
+                                    if med < .99:
+                                        this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
+                            if this_str != last_str or time.time() > last_time + 15:
+                                print this_str
+                                last_str = this_str
+                                last_time = time.time()
+                except:
+                    log.err()
+        status_thread()
     except:
         log.err(None, 'Fatal error:')
-    finally:
-        reactor.stop()
 
 def run():
     class FixedArgumentParser(argparse.ArgumentParser):
