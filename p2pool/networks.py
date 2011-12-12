@@ -58,7 +58,7 @@ class NamecoinTestnet(networks.NamecoinTestnet):
     PREFIX = '4d6581d24f51acbf'.decode('hex')
     NAME = 'namecoin_testnet'
     P2P_PORT = 19334
-    MAX_TARGET = 2**256//2**20 - 1
+    MAX_TARGET = 2**256//2**32 - 1
     PERSIST = False
     WORKER_PORT = 19331
 
