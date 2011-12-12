@@ -30,21 +30,6 @@ def get_memory(request):
     print 'Unknown miner User-Agent:', repr(user_agent)
     return 0
 
-def get_max_target(request): # inclusive
-    if request.getHeader('X-All-Targets') is not None or (request.getHeader('X-Miner-Extensions') is not None and 'alltargets' in request.getHeader('X-Miner-Extensions')):
-        return 2**256-1
-    user_agent = request.getHeader('User-Agent')
-    user_agent2 = '' if user_agent is None else user_agent.lower()
-    if 'java' in user_agent2 or 'diablominer' in user_agent2: return 2**256//2**32-1 # hopefully diablominer...
-    if 'cpuminer' in user_agent2: return 2**256-1
-    if 'tenebrix miner' in user_agent2: return 2**256-1
-    if 'jansson' in user_agent2: return 2**256-1 # a version of optimized scrypt miner, once in Wuala. works fine here
-    if 'cgminer' in user_agent2: return 2**256//2**32-1
-    if 'poclbm' in user_agent2: return 2**256//2**32-1
-    if 'phoenix' in user_agent2: return 2**256//2**32-1
-    print 'Unknown miner User-Agent:', repr(user_agent)
-    return 2**256//2**32-1
-
 def get_username(request):
     try:
         return base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
@@ -163,7 +148,5 @@ class WorkerInterface(jsonrpc.Server):
         self.worker_views[request_id].set((self.new_work_event.times if long_poll else thought_times, (thought_work[-1], res.previous_block)))
         if p2pool.DEBUG:
             print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), get_username(request)) # XXX identifier is hack
-        
-        res = res.update(share_target=min(res.share_target, get_max_target(request)))
         
         defer.returnValue(res.getwork(identifier=str(identifier)))
