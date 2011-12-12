@@ -108,7 +108,8 @@ def test_tracker(self):
         assert self.is_child_of(start, other) == t.is_child_of(start, other)
         assert self.is_child_of(other, start) == t.is_child_of(other, start)
         
-        assert list(self.get_chain(start, min(a[0], 10))) == list(t.get_chain(start, min(a[0], 10)))
+        length = random.randrange(a[0])
+        assert list(self.get_chain(start, length)) == list(t.get_chain(start, length))
 
 def generate_tracker_simple(n):
     t = forest.Tracker(math.shuffled(FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None) for i in xrange(n)))
@@ -126,13 +127,13 @@ def generate_tracker_random(n):
 
 class Test(unittest.TestCase):
     def test_tracker(self):
-        t = generate_tracker_simple(1000)
+        t = generate_tracker_simple(100)
         
-        assert t.heads == {999: None}
-        assert t.tails == {None: set([999])}
+        assert t.heads == {99: None}
+        assert t.tails == {None: set([99])}
         
-        assert t.get_nth_parent_hash(900, 500) == 900 - 500
-        assert t.get_nth_parent_hash(901, 42) == 901 - 42
+        assert t.get_nth_parent_hash(90, 50) == 90 - 50
+        assert t.get_nth_parent_hash(91, 42) == 91 - 42
     
     def test_get_nth_parent_hash(self):
         t = generate_tracker_simple(200)
@@ -144,13 +145,62 @@ class Test(unittest.TestCase):
             assert res == a - b, (a, b, res)
     
     def test_tracker2(self):
-        for ii in xrange(50):
+        for ii in xrange(20):
             t = generate_tracker_random(random.randrange(100))
             #print "--start--"
             while t.shares:
-                x = random.choice(list(t.shares))
-                try:
-                    t.remove(x)
-                except NotImplementedError:
-                    pass # print "aborted", x
+                while True:
+                    try:
+                        t.remove(random.choice(list(t.shares)))
+                    except NotImplementedError:
+                        pass # print "aborted", x
+                    else:
+                        break
+                test_tracker(t)
+    
+    def test_tracker3(self):
+        for ii in xrange(10):
+            shares = []
+            for i in xrange(random.randrange(100)):
+                x = random.choice(shares + [FakeShare(hash=None), FakeShare(hash=random.randrange(1000000, 2000000))]).hash
+                shares.append(FakeShare(hash=i, previous_hash=x))
+            
+            t = forest.Tracker()
+            test_tracker(t)
+            
+            for share in math.shuffled(shares):
+                t.add(share)
+                test_tracker(t)
+                if random.randrange(3) == 0:
+                    while True:
+                        try:
+                            t.remove(random.choice(list(t.shares)))
+                        except NotImplementedError:
+                            pass
+                        else:
+                            break
+                    test_tracker(t)
+            
+            for share in math.shuffled(shares):
+                if share.hash not in t.shares:
+                    t.add(share)
+                    test_tracker(t)
+                if random.randrange(3) == 0:
+                    while True:
+                        try:
+                            t.remove(random.choice(list(t.shares)))
+                        except NotImplementedError:
+                            pass
+                        else:
+                            break
+                    test_tracker(t)
+            
+            while t.shares:
+                while True:
+                    try:
+                        t.remove(random.choice(list(t.shares)))
+                    except NotImplementedError:
+                        pass
+                    else:
+                        break
                 test_tracker(t)
