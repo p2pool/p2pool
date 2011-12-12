@@ -405,8 +405,7 @@ def main(args, net, datadir_path):
                 removed_unstales.add(share.hash)
         
         
-        def get_payout_script_from_username(request):
-            user = worker_interface.get_username(request)
+        def get_payout_script_from_username(user):
             if user is None:
                 return None
             try:
@@ -418,7 +417,7 @@ def main(args, net, datadir_path):
             state = current_work.value
             user = worker_interface.get_username(request)
             
-            payout_script = get_payout_script_from_username(request)
+            payout_script = get_payout_script_from_username(user)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
             
