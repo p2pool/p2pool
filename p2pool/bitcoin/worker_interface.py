@@ -38,7 +38,7 @@ def get_max_target(request): # inclusive
     if 'java' in user_agent2 or 'diablominer' in user_agent2: return 2**256//2**32-1 # hopefully diablominer...
     if 'cpuminer' in user_agent2: return 2**256-1
     if 'tenebrix miner' in user_agent2: return 2**256-1
-    if 'jansson' in user_agent2: return 2**256//2**32-1 # a version of optimized scrypt miner, once in Wuala. works fine here
+    if 'jansson' in user_agent2: return 2**256-1 # a version of optimized scrypt miner, once in Wuala. works fine here
     if 'cgminer' in user_agent2: return 2**256//2**32-1
     if 'poclbm' in user_agent2: return 2**256//2**32-1
     if 'phoenix' in user_agent2: return 2**256//2**32-1
