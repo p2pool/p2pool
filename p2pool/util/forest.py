@@ -223,19 +223,11 @@ class Tracker(object):
             self._set_height_jump(update_hash, height - height_then, share_hash, work - work_then)
         return height, work, share_hash
     
-    def get_chain_known(self, start_hash):
-        assert isinstance(start_hash, (int, long, type(None)))
-        '''
-        Chain starting with item of hash I{start_hash} of items that this Tracker contains
-        '''
-        item_hash_to_get = start_hash
-        while True:
-            if item_hash_to_get not in self.shares:
-                break
-            share = self.shares[item_hash_to_get]
-            assert not isinstance(share, long)
-            yield share
-            item_hash_to_get = share.previous_hash
+    def get_chain(self, start_hash, length):
+        assert length <= self.get_height(start_hash)
+        for i in xrange(length):
+            yield self.shares[start_hash]
+            start_hash = self.shares[start_hash].previous_hash
     
     def is_child_of(self, share_hash, possible_child_hash):
         height, last = self.get_height_and_last(share_hash)

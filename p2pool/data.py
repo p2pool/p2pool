@@ -287,7 +287,7 @@ class OkayTracker(forest.Tracker):
         for head in set(self.heads) - set(self.verified.heads):
             head_height, last = self.get_height_and_last(head)
             
-            for share in itertools.islice(self.get_chain_known(head), None if last is None else min(5, max(0, head_height - self.net.CHAIN_LENGTH))):
+            for share in self.get_chain(head, head_height if last is None else min(5, max(0, head_height - self.net.CHAIN_LENGTH))):
                 if self.attempt_verify(share, now):
                     break
                 if share.hash in self.heads:
@@ -311,7 +311,7 @@ class OkayTracker(forest.Tracker):
             can = max(last_height - 1 - self.net.CHAIN_LENGTH, 0) if last_last_hash is not None else last_height
             get = min(want, can)
             #print 'Z', head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
-            for share in itertools.islice(self.get_chain_known(last_hash), get):
+            for share in self.get_chain(last_hash, get):
                 if not self.attempt_verify(share, now):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
@@ -409,7 +409,7 @@ class OkayTracker(forest.Tracker):
         score2 = 0
         block_height = -1000000
         max_height = min(self.net.CHAIN_LENGTH, head_height)
-        for share in reversed(list(itertools.islice(self.verified.get_chain_known(self.verified.get_nth_parent_hash(share_hash, max_height//2)), max_height//2))):
+        for share in math.reversed(self.verified.get_chain(self.verified.get_nth_parent_hash(share_hash, max_height//2), max_height//2)):
             block_height = max(block_height, ht.get_height_rel_highest(share.header['previous_block']))
             this_score = (self.verified.get_work(share_hash) - self.verified.get_work(share.hash))//(0 - block_height + 1)
             if this_score > score2:

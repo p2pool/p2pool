@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 
+import __builtin__
 import math
 import random
 
@@ -110,6 +111,12 @@ def binomial_conf_interval(x, n, conf=0.95):
 
 def interval_to_center_radius((low, high)):
     return (high+low)/2, (high-low)/2
+
+def reversed(x):
+    try:
+        return __builtin__.reversed(x)
+    except TypeError:
+        return reversed(list(x))
 
 if __name__ == '__main__':
     import random

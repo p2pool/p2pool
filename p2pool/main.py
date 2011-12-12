@@ -280,7 +280,7 @@ def main(args, net, datadir_path):
             stops = set(stops)
             shares = []
             for share_hash in share_hashes:
-                for share in itertools.islice(tracker.get_chain_known(share_hash), parents + 1):
+                for share in tracker.get_chain(share_hash, min(parents + 1, tracker.get_height(share_hash))):
                     if share.hash in stops:
                         break
                     shares.append(share)
@@ -341,7 +341,7 @@ def main(args, net, datadir_path):
         def work_changed(new_work):
             #print 'Work changed:', new_work
             shares = []
-            for share in tracker.get_chain_known(new_work['best_share_hash']):
+            for share in tracker.get_chain(new_work['best_share_hash'], tracker.get_height(new_work['best_share_hash'])):
                 if share.hash in shared_share_hashes:
                     break
                 shared_share_hashes.add(share.hash)
@@ -353,7 +353,7 @@ def main(args, net, datadir_path):
         current_work.changed.watch(work_changed)
         
         def save_shares():
-            for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 2*net.CHAIN_LENGTH):
+            for share in tracker.get_chain(current_work.value['best_share_hash'], min(tracker.get_height(current_work.value['best_share_hash']), 2*net.CHAIN_LENGTH)):
                 ss.add_share(share)
                 if share.hash in tracker.verified.shares:
                     ss.add_verified_hash(share.hash)
@@ -539,7 +539,7 @@ def main(args, net, datadir_path):
             if current_work.value['best_share_hash'] is not None:
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                 att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
-                fracs = [share.stale_frac for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if share.stale_frac is not None]
+                fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
                 return json.dumps(int(att_s / (1. - (math.median(fracs) if fracs else 0))))
             return json.dumps(None)
         
@@ -626,7 +626,7 @@ def main(args, net, datadir_path):
                         weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
                         shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                         stale_shares = stale_doa_shares + stale_not_doa_shares
-                        fracs = [share.stale_frac for share in itertools.islice(tracker.get_chain_known(current_work.value['best_share_hash']), 120) if share.stale_frac is not None]
+                        fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
                         this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                             math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
                             height,

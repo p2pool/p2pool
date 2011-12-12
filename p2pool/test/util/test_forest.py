@@ -65,6 +65,13 @@ class DumbTracker(object):
             work += work_inc
         return height, work, share_hash
     
+    def get_chain(self, start_hash, length):
+        # same implementation :/
+        assert length <= self.get_height(start_hash)
+        for i in xrange(length):
+            yield self.shares[start_hash]
+            start_hash = self.shares[start_hash].previous_hash
+    
     def is_child_of(self, share_hash, possible_child_hash):
         if self.get_last(share_hash) != self.get_last(possible_child_hash):
             return None
@@ -100,6 +107,8 @@ def test_tracker(self):
         other = random.choice(self.shares.keys())
         assert self.is_child_of(start, other) == t.is_child_of(start, other)
         assert self.is_child_of(other, start) == t.is_child_of(other, start)
+        
+        assert list(self.get_chain(start, min(a[0], 10))) == list(t.get_chain(start, min(a[0], 10)))
 
 def generate_tracker_simple(n):
     t = forest.Tracker(math.shuffled(FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None) for i in xrange(n)))
