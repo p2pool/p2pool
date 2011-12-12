@@ -305,14 +305,12 @@ def main(args, net, datadir_path):
         for host in [
             'p2pool.forre.st',
             'dabuttonfactory.com',
+            ] + (['liteco.in'] if net.NAME == 'litecoin' else []) + [
         ]:
             try:
                 nodes.add(((yield reactor.resolve(host)), net.P2P_PORT))
             except:
                 log.err(None, 'Error resolving bootstrap node IP:')
-        
-        if net.NAME == 'litecoin':
-            nodes.add(((yield reactor.resolve('liteco.in')), net.P2P_PORT))
         
         addrs = {}
         try:
