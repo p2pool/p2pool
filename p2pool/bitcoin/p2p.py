@@ -385,16 +385,15 @@ class HeightTracker(object):
         self._think2_task.stop()
 
 if __name__ == '__main__':
-    factory = ClientFactory(bitcoin_data.BitcoinMainnet)
+    from . import networks
+    factory = ClientFactory(networks.BitcoinMainnet)
     reactor.connectTCP('127.0.0.1', 8333, factory)
-    h = HeightTracker(factory)
     
     @repr
     @apply
     @defer.inlineCallbacks
     def think():
-        while True:
-            yield deferral.sleep(1)
-            print h.get_min_height(0xa285c3cb2a90ac7194cca034512748289e2526d9d7ae6ee7523)
+        print (yield (yield factory.getProtocol()).get_block(0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175))
+        reactor.stop()
     
     reactor.run()
