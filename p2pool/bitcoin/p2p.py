@@ -291,6 +291,7 @@ class HeaderWrapper(object):
     
     @classmethod
     def from_header(cls, header):
+        assert bitcoin_data.block_header_type.hash256(header) <= header['target']
         return cls(bitcoin_data.block_header_type.hash256(header), header['previous_block'])
     
     def __init__(self, hash, previous_hash):
