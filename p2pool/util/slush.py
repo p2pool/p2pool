@@ -1,12 +1,3 @@
-def update_dict(d, **replace):
-    d = d.copy()
-    for k, v in replace.iteritems():
-        if v is None:
-            del d[k]
-        else:
-            d[k] = v
-    return d
-
 class frozendict(dict):
     __slots__ = ['_hash']
     

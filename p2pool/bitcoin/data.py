@@ -4,7 +4,7 @@ import hashlib
 import struct
 
 from . import base58
-from p2pool.util import bases, math, expiring_dict, memoize, dicts
+from p2pool.util import bases, math, expiring_dict, memoize, slush
 import p2pool
 
 class EarlyEnd(Exception):
@@ -87,7 +87,7 @@ class Type(object):
     unpack = memoize.memoize_with_backing(_backing)(unpack) # doesn't have an inverse
     
     def pack(self, obj):
-        return self.pack2(dicts.immutify(obj))
+        return self.pack2(slush.immutify(obj))
     
     
     def pack_base58(self, obj):
@@ -163,14 +163,14 @@ class FixedStrType(Type):
 class EnumType(Type):
     def __init__(self, inner, values):
         self.inner = inner
-        self.values = dicts.frozendict(values)
+        self.values = slush.frozendict(values)
         
         keys = {}
         for k, v in values.iteritems():
             if v in keys:
                 raise ValueError('duplicate value in values')
             keys[v] = k
-        self.keys = dicts.frozendict(keys)
+        self.keys = slush.frozendict(keys)
     
     def read(self, file):
         data, file = self.inner.read(file)
@@ -421,7 +421,7 @@ address_type = ComposedType([
 tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
-        ('previous_output', PossiblyNoneType(dicts.frozendict(hash=0, index=2**32 - 1), ComposedType([
+        ('previous_output', PossiblyNoneType(slush.frozendict(hash=0, index=2**32 - 1), ComposedType([
             ('hash', HashType()),
             ('index', StructType('<I')),
         ]))),
