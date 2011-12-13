@@ -6,7 +6,6 @@ from __future__ import division
 import argparse
 import codecs
 import datetime
-import itertools
 import os
 import random
 import struct
