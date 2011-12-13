@@ -333,8 +333,10 @@ class FloatingInteger(object):
         bits = struct.unpack('<I', bits2)[0]
         return cls(bits)
     
-    def __init__(self, bits):
+    def __init__(self, bits, value=None):
         self._bits = bits
+        if value is not None and self._value != value:
+            raise ValueError('value does not match')
     
     @property
     def _value(self):
@@ -355,7 +357,7 @@ class FloatingInteger(object):
         return self._value
     
     def __repr__(self):
-        return 'FloatingInteger(bits=%s (%x))' % (hex(self._bits), self)
+        return 'FloatingInteger(bits=%s, value=%s)' % (hex(self._bits), hex(self._value))
     
     def __add__(self, other):
         if isinstance(other, (int, long)):
