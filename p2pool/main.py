@@ -457,7 +457,7 @@ def main(args, net, datadir_path):
             )
             
             transactions = [generate_tx] + list(current_work2.value['transactions'])
-            merkle_root = bitcoin_data.merkle_hash(transactions)
+            merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
             merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
             
             return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['target'], share_info['target']), state['best_share_hash']
@@ -495,7 +495,7 @@ def main(args, net, datadir_path):
                             merkle_tx=dict(
                                 tx=transactions[0],
                                 block_hash=hash_,
-                                merkle_branch=[x['hash'] for x in p2pool_data.calculate_merkle_branch(transactions, 0)],
+                                merkle_branch=[x['hash'] for x in p2pool_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0)],
                                 index=0,
                             ),
                             merkle_branch=[],

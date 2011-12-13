@@ -82,7 +82,7 @@ class Share(object):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
-            new_merkle_branch = bitcoin_data.calculate_merkle_branch([dict(version=0, tx_ins=[], tx_outs=[], lock_time=0)] + other_txs, 0)
+            new_merkle_branch = bitcoin_data.calculate_merkle_branch([0] + map(bitcoin_data.tx_type.hash256, other_txs), 0)
             if merkle_branch is not None:
                 if merke_branch != new_merkle_branch:
                     raise ValueError('invalid merkle_branch and other_txs')
@@ -145,7 +145,7 @@ class Share(object):
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
-        if bitcoin_data.check_merkle_branch(gentx, 0, self.merkle_branch) != self.header['merkle_root']:
+        if bitcoin_data.check_merkle_branch(bitcoin_data.tx_type.hash256(gentx), 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
     
     def as_share(self):
