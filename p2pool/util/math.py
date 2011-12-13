@@ -49,7 +49,7 @@ def geometric(p):
         return 1
     return int(math.log1p(-random.random()) / math.log1p(-p)) + 1
 
-def add_dicts(dicts):
+def add_dicts(*dicts):
     res = {}
     for d in dicts:
         for k, v in d.iteritems():

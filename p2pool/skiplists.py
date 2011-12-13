@@ -19,7 +19,7 @@ class WeightsSkipList(skiplist.SkipList):
         return 1, {share.new_script: att*(65535-share.donation)}, att*65535, att*share.donation
     
     def combine_deltas(self, (share_count1, weights1, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2)):
-        return share_count1 + share_count2, math.add_dicts([weights1, weights2]), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
+        return share_count1 + share_count2, math.add_dicts(weights1, weights2), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
     
     def initial_solution(self, start, (max_shares, desired_weight)):
         assert desired_weight % 65535 == 0, divmod(desired_weight, 65535)
@@ -32,7 +32,7 @@ class WeightsSkipList(skiplist.SkipList):
             assert (desired_weight - total_weight1) % 65535 == 0
             new_weights[script] = new_weights.get(script, 0) + (desired_weight - total_weight1)//65535*weights2[script]//(total_weight2//65535)
             return share_count1 + share_count2, new_weights, desired_weight, total_donation_weight1 + (desired_weight - total_weight1)//65535*total_donation_weight2//(total_weight2//65535)
-        return share_count1 + share_count2, math.add_dicts([weights1, weights2]), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
+        return share_count1 + share_count2, math.add_dicts(weights1, weights2), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
     
     def judge(self, (share_count, weights, total_weight, total_donation_weight), (max_shares, desired_weight)):
         if share_count > max_shares or total_weight > desired_weight:
