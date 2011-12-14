@@ -73,36 +73,22 @@ class Proxy(object):
         raise AttributeError('%r object has no attribute %r' % (self.__class__.__name__, attr))
 
 class Server(deferred_resource.DeferredResource):
-    extra_headers = None
-    
     @defer.inlineCallbacks
     def render_POST(self, request):
         # missing batching, 1.0 notifications
-        request.setHeader('Content-Type', 'application/json')
-        data = request.content.read()
         
-        if self.extra_headers is not None:
-            for name, value in self.extra_headers.iteritems():
-                request.setHeader(name, value)
+        id_ = None
         
         try:
+            data = request.content.read()
+            
             try:
                 req = json.loads(data)
             except Exception:
-                raise RemoteError(-32700, u'Parse error')
-        except Error, e:
-            # id unknown
-            request.write(json.dumps({
-                'jsonrpc': '2.0',
-                'id': None,
-                'result': None,
-                'error': e._to_obj(),
-            }))
-        
-        id_ = req.get('id', None)
-        
-        try:
+                raise Error(-32700, u'Parse error')
+            
             try:
+                id_ = req.get('id', None)
                 method = req['method']
                 if not isinstance(method, basestring):
                     raise ValueError()
@@ -112,32 +98,29 @@ class Server(deferred_resource.DeferredResource):
             except Exception:
                 raise Error(-32600, u'Invalid Request')
             
-            method_name = 'rpc_' + method
-            if not hasattr(self, method_name):
+            method_meth = getattr(self, 'rpc_' + method, None)
+            if method_meth is None:
                 raise Error(-32601, u'Method not found')
-            method_meth = getattr(self, method_name)
             
-            try:
-                result = yield method_meth(request, *params)
-            except Error:
-                raise
-            except Exception:
-                log.err(None, 'Squelched JSON method error:')
-                raise Error(-32099, u'Unknown error')
+            result = yield method_meth(request, *params)
             
             if id_ is None:
                 return
             
-            request.write(json.dumps({
-                'jsonrpc': '2.0',
-                'id': id_,
-                'result': result,
-                'error': None,
-            }))
+            error = None
         except Error, e:
-            request.write(json.dumps({
-                'jsonrpc': '2.0',
-                'id': id_,
-                'result': None,
-                'error': e._to_obj(),
-            }))
+            result = None
+            error = e._to_obj()
+        except Exception:
+            log.err(None, 'Squelched JSON error:')
+            
+            result = None
+            error = Error(-32099, u'Unknown error')._to_obj()
+        
+        request.setHeader('Content-Type', 'application/json')
+        request.write(json.dumps(dict(
+            jsonrpc='2.0',
+            id=id_,
+            result=result,
+            error=error,
+        )))
