@@ -12,6 +12,7 @@ import time
 from twisted.internet import defer, protocol, reactor, task
 from twisted.python import log
 
+import p2pool
 from . import data as bitcoin_data, getwork
 from p2pool.util import variable, datachunker, deferral, forest
 
@@ -49,7 +50,8 @@ class BaseProtocol(protocol.Protocol):
             
             type_ = getattr(self, 'message_' + command, None)
             if type_ is None:
-                print 'no type for', repr(command)
+                if p2pool.DEBUG:
+                    print 'no type for', repr(command)
                 continue
             
             try:
@@ -61,7 +63,8 @@ class BaseProtocol(protocol.Protocol):
             
             handler = getattr(self, 'handle_' + command, None)
             if handler is None:
-                print 'no handler for', repr(command)
+                if p2pool.DEBUG:
+                    print 'no handler for', repr(command)
                 continue
             
             try:
