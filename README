@@ -1,3 +1,23 @@
+Requirements:
+
+* Bitcoin >=0.5.0
+* Python
+* Twisted
+* python-argparse (for Python <=2.6)
+
+Linux:
+    sudo apt-get install python-zope.interface
+    sudo apt-get install python-twisted
+    sudo apt-get install python-twisted-web
+    sudo apt-get install python-argparse (if on Python 2.6 or older)
+
+Windows:
+    Install Python 2.7: http://www.python.org/getit/
+    Install Twisted: http://twistedmatrix.com/trac/wiki/Downloads
+    Install Zope.Interface: http://pypi.python.org/pypi/zope.interface/3.8.0
+        unzip the files into C:\Python27\Lib\site-packages
+
+
 To use p2pool, you must be running your own local bitcoind. p2pool connects to
 this bitcoin over both its p2p interface and its RPC interface. For standard
 configurations, using p2p should be as simple as:
