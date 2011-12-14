@@ -1,7 +1,5 @@
 from __future__ import division
 
-import random
-
 from twisted.internet import defer, reactor
 from twisted.python import failure, log
 
@@ -44,19 +42,19 @@ class ReplyMatcher(object):
     
     def __call__(self, id):
         self.func(id)
-        uniq = random.randrange(2**256)
         df = defer.Deferred()
         def timeout():
-            df, timer = self.map[id].pop(uniq)
-            df.errback(failure.Failure(defer.TimeoutError('in ReplyMatcher')))
+            self.map[id].remove((df, timer))
             if not self.map[id]:
                 del self.map[id]
-        self.map.setdefault(id, {})[uniq] = (df, reactor.callLater(self.timeout, timeout))
+            df.errback(failure.Failure(defer.TimeoutError('in ReplyMatcher')))
+        timer = reactor.callLater(self.timeout, timeout)
+        self.map.setdefault(id, set()).add((df, timer))
         return df
     
     def got_response(self, id, resp):
         if id not in self.map:
             return
-        for df, timer in self.map.pop(id).itervalues():
-            timer.cancel()
+        for df, timer in self.map.pop(id):
             df.callback(resp)
+            timer.cancel()
