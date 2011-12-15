@@ -12,7 +12,6 @@ BitcoinMainnet = math.Object(
         'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
     POW_FUNC=data.block_header_type.hash256,
     SYMBOL='BTC',
 )
@@ -25,7 +24,6 @@ BitcoinTestnet = math.Object(
         'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
     POW_FUNC=data.block_header_type.hash256,
     SYMBOL='tBTC',
 )
@@ -39,7 +37,6 @@ NamecoinMainnet = math.Object(
         'namecoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
     POW_FUNC=data.block_header_type.hash256,
     SYMBOL='NMC',
 )
@@ -52,7 +49,6 @@ NamecoinTestnet = math.Object(
         'namecoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
     POW_FUNC=data.block_header_type.hash256,
     SYMBOL='tNMC',
 )
@@ -66,7 +62,6 @@ LitecoinMainnet = math.Object(
         'litecoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
     POW_FUNC=data.block_header_type.scrypt,
     SYMBOL='LTC',
 )
@@ -79,7 +74,6 @@ LitecoinTestnet = math.Object(
         'litecoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
     POW_FUNC=data.block_header_type.scrypt,
     SYMBOL='tLTC',
 )
