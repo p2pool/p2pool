@@ -624,18 +624,23 @@ def main(args, net, datadir_path):
                             shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
                             stale_shares = stale_doa_shares + stale_not_doa_shares
                             fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
+                            real_att_s = att_s / (1. - (math.median(fracs) if fracs else 0))
+                            my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
                             this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
-                                math.format(int(att_s / (1. - (math.median(fracs) if fracs else 0)))),
+                                math.format(int(real_att_s)),
                                 height,
                                 len(tracker.verified.shares),
                                 len(tracker.shares),
                                 weights.get(my_script, 0)/total_weight*100,
-                                math.format(int(weights.get(my_script, 0)*att_s//total_weight / (1. - (math.median(fracs) if fracs else 0)))),
+                                math.format(int(my_att_s)),
                                 shares,
                                 stale_not_doa_shares,
                                 stale_doa_shares,
                                 len(p2p_node.peers),
                             ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
+                            this_str += '\nAverage time between blocks: %.2f days' % (
+                                2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
+                            )
                             if fracs:
                                 med = math.median(fracs)
                                 this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
