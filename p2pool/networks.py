@@ -6,7 +6,8 @@ from p2pool.bitcoin import networks
 # REAL_CHAIN_LENGTH must be changed in sync with all other clients
 # changes can be done by changing one, then the other
 
-class BitcoinMainnet(networks.BitcoinMainnet):
+class BitcoinMainnet(object):
+    PARENT = networks.BitcoinMainnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
@@ -20,7 +21,8 @@ class BitcoinMainnet(networks.BitcoinMainnet):
     PERSIST = True
     WORKER_PORT = 9332
 
-class BitcoinTestnet(networks.BitcoinTestnet):
+class BitcoinTestnet(object):
+    PARENT = networks.BitcoinTestnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
@@ -34,7 +36,8 @@ class BitcoinTestnet(networks.BitcoinTestnet):
     PERSIST = False
     WORKER_PORT = 19332
 
-class NamecoinMainnet(networks.NamecoinMainnet):
+class NamecoinMainnet(object):
+    PARENT = networks.NamecoinMainnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH = 24*60*60//10 # shares
@@ -48,7 +51,8 @@ class NamecoinMainnet(networks.NamecoinMainnet):
     PERSIST = True
     WORKER_PORT = 9331
 
-class NamecoinTestnet(networks.NamecoinTestnet):
+class NamecoinTestnet(object):
+    PARENT = networks.NamecoinTestnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH = 24*60*60//10 # shares
@@ -62,7 +66,8 @@ class NamecoinTestnet(networks.NamecoinTestnet):
     PERSIST = False
     WORKER_PORT = 19331
 
-class LitecoinMainnet(networks.LitecoinMainnet):
+class LitecoinMainnet(object):
+    PARENT = networks.LitecoinMainnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares
@@ -76,7 +81,8 @@ class LitecoinMainnet(networks.LitecoinMainnet):
     PERSIST = True
     WORKER_PORT = 9327
 
-class LitecoinTestnet(networks.LitecoinTestnet):
+class LitecoinTestnet(object):
+    PARENT = networks.LitecoinTestnet
     SHARE_PERIOD = 10 # seconds
     CHAIN_LENGTH = 24*60*60//10 # shares
     REAL_CHAIN_LENGTH_FUNC = staticmethod(lambda ts: 24*60*60//10 if ts >= 1325805105 else 24*60*60//10//2) # shares

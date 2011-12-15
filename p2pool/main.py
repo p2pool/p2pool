@@ -41,12 +41,12 @@ def getwork(bitcoind):
 
 @deferral.retry('Error creating payout script:', 10)
 @defer.inlineCallbacks
-def get_payout_script2(bitcoind, net):
+def get_payout_script2(bitcoind, net2):
     address = yield bitcoind.rpc_getaccountaddress('p2pool')
     validate_response = yield bitcoind.rpc_validateaddress(address)
     if 'pubkey' not in validate_response:
         print '    Pubkey request failed. Falling back to payout to address.'
-        defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net)))
+        defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net2)))
     pubkey = validate_response['pubkey'].decode('hex')
     defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
 
@@ -66,7 +66,7 @@ def main(args, net, datadir_path):
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
-        good = yield deferral.retry('Error while checking bitcoind identity:', 1)(net.BITCOIN_RPC_CHECK)(bitcoind)
+        good = yield deferral.retry('Error while checking bitcoind identity:', 1)(net.PARENT.RPC_CHECK)(bitcoind)
         if not good:
             print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
@@ -77,7 +77,7 @@ def main(args, net, datadir_path):
         
         # connect to bitcoind over bitcoin-p2p
         print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
-        factory = bitcoin_p2p.ClientFactory(net)
+        factory = bitcoin_p2p.ClientFactory(net.PARENT)
         reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
         yield factory.getProtocol() # waits until handshake is successful
         print '    ...success!'
@@ -85,12 +85,12 @@ def main(args, net, datadir_path):
         
         if args.pubkey_hash is None:
             print 'Getting payout address from bitcoind...'
-            my_script = yield get_payout_script2(bitcoind, net)
+            my_script = yield get_payout_script2(bitcoind, net.PARENT)
         else:
             print 'Computing payout script from provided address....'
             my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
         print '    ...success!'
-        print '    Payout script:', bitcoin_data.script2_to_human(my_script, net)
+        print '    Payout script:', bitcoin_data.script2_to_human(my_script, net.PARENT)
         print
         
         ht = bitcoin_p2p.HeightTracker(bitcoind, factory)
@@ -450,8 +450,8 @@ def main(args, net, datadir_path):
             print 'New work for worker %s! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
                 user,
                 bitcoin_data.target_to_difficulty(share_info['bits'].target),
-                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.BITCOIN_SYMBOL,
-                subsidy*1e-8, net.BITCOIN_SYMBOL,
+                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.PARENT.SYMBOL,
+                subsidy*1e-8, net.PARENT.SYMBOL,
                 len(current_work2.value['transactions']),
             )
             
@@ -476,7 +476,7 @@ def main(args, net, datadir_path):
                 
                 hash_ = bitcoin_data.block_header_type.hash256(header)
                 
-                pow_hash = net.BITCOIN_POW_FUNC(header)
+                pow_hash = net.PARENT.POW_FUNC(header)
                 
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
                     if factory.conn.value is not None:
@@ -739,10 +739,10 @@ def run():
         help='connect to this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='''connect to JSON-RPC interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_RPC_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to JSON-RPC interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.RPC_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='''connect to P2P interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.BITCOIN_P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to P2P interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
@@ -853,10 +853,10 @@ def run():
     task.LoopingCall(logfile.reopen).start(5)
     
     if args.bitcoind_rpc_port is None:
-        args.bitcoind_rpc_port = net.BITCOIN_RPC_PORT
+        args.bitcoind_rpc_port = net.PARENT.RPC_PORT
     
     if args.bitcoind_p2p_port is None:
-        args.bitcoind_p2p_port = net.BITCOIN_P2P_PORT
+        args.bitcoind_p2p_port = net.PARENT.P2P_PORT
     
     if args.p2pool_port is None:
         args.p2pool_port = net.P2P_PORT
@@ -866,7 +866,7 @@ def run():
     
     if args.address is not None:
         try:
-            args.pubkey_hash = bitcoin_data.address_to_pubkey_hash(args.address, net)
+            args.pubkey_hash = bitcoin_data.address_to_pubkey_hash(args.address, net.PARENT)
         except Exception, e:
             parser.error('error parsing address: ' + repr(e))
     else:

@@ -106,7 +106,7 @@ class BaseProtocol(protocol.Protocol):
 
 class Protocol(BaseProtocol):
     def __init__(self, net):
-        self._prefix = net.BITCOIN_P2P_PREFIX
+        self._prefix = net.P2P_PREFIX
     
     version = 0
     

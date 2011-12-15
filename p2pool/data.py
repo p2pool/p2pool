@@ -115,7 +115,7 @@ class Share(object):
         if len(self.share_data['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
-        self.pow_hash = net.BITCOIN_POW_FUNC(header)
+        self.pow_hash = net.PARENT.POW_FUNC(header)
         self.header_hash = bitcoin_data.block_header_type.hash256(header)
         
         self.hash = share1a_type.hash256(self.as_share1a())

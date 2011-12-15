@@ -504,14 +504,14 @@ human_address_type = ChecksummedType(ComposedType([
 pubkey_type = FixedStrType(65)
 
 def pubkey_hash_to_address(pubkey_hash, net):
-    return human_address_type.pack_base58(dict(version=net.BITCOIN_ADDRESS_VERSION, pubkey_hash=pubkey_hash))
+    return human_address_type.pack_base58(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash))
 
 def pubkey_to_address(pubkey, net):
     return pubkey_hash_to_address(pubkey_type.hash160(pubkey), net)
 
 def address_to_pubkey_hash(address, net):
     x = human_address_type.unpack_base58(address)
-    if x['version'] != net.BITCOIN_ADDRESS_VERSION:
+    if x['version'] != net.ADDRESS_VERSION:
         raise ValueError('address not for this net!')
     return x['pubkey_hash']
 
