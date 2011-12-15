@@ -41,7 +41,8 @@ class ReplyMatcher(object):
         self.map = {}
     
     def __call__(self, id):
-        self.func(id)
+        if id not in self.map:
+            self.func(id)
         df = defer.Deferred()
         def timeout():
             self.map[id].remove((df, timer))

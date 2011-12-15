@@ -395,7 +395,10 @@ if __name__ == '__main__':
     @apply
     @defer.inlineCallbacks
     def think():
-        print (yield (yield factory.getProtocol()).get_block(0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175))
+        try:
+            print (yield (yield factory.getProtocol()).get_block(0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175))
+        except defer.TimeoutError:
+            print "timeout"
         reactor.stop()
     
     reactor.run()
