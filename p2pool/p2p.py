@@ -205,6 +205,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def connectionLost(self, reason):
         if self.connected2:
             self.node.lost_conn(self)
+            self.connected2 = False
 
 class ServerFactory(protocol.ServerFactory):
     def __init__(self, node):
