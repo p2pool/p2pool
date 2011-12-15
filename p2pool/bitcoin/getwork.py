@@ -13,11 +13,11 @@ def _swap4(s):
     return ''.join(s[x:x+4][::-1] for x in xrange(0, len(s), 4))
 
 class BlockAttempt(object):
-    def __init__(self, version, previous_block, merkle_root, timestamp, block_target, share_target):
-        self.version, self.previous_block, self.merkle_root, self.timestamp, self.block_target, self.share_target = version, previous_block, merkle_root, timestamp, block_target, share_target
+    def __init__(self, version, previous_block, merkle_root, timestamp, bits, share_target):
+        self.version, self.previous_block, self.merkle_root, self.timestamp, self.bits, self.share_target = version, previous_block, merkle_root, timestamp, bits, share_target
     
     def __hash__(self):
-        return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.block_target, self.share_target))
+        return hash((self.version, self.previous_block, self.merkle_root, self.timestamp, self.bits, self.share_target))
     
     def __eq__(self, other):
         if not isinstance(other, BlockAttempt):
@@ -39,7 +39,7 @@ class BlockAttempt(object):
             previous_block=self.previous_block,
             merkle_root=self.merkle_root,
             timestamp=self.timestamp,
-            target=self.block_target,
+            bits=self.bits,
             nonce=0,
         ))
         
@@ -69,7 +69,7 @@ class BlockAttempt(object):
             previous_block=attrs['previous_block'],
             merkle_root=attrs['merkle_root'],
             timestamp=attrs['timestamp'],
-            block_target=attrs['target'],
+            bits=attrs['bits'],
             share_target=bitcoin_data.HashType().unpack(getwork['target'].decode('hex')),
         )
         

@@ -10,7 +10,7 @@ class Test(unittest.TestCase):
             previous_block=0x000000000000038a2a86b72387f93c51298298a732079b3b686df3603d2f6282,
             merkle_root=0x37a43a3b812e4eb665975f46393b4360008824aab180f27d642de8c28073bc44,
             timestamp=1323752685,
-            target=data.FloatingInteger(437159528),
+            bits=data.FloatingInteger(437159528),
             nonce=3658685446,
         )) == 0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175
     

@@ -36,7 +36,7 @@ def getwork(bitcoind):
         transactions=[bitcoin_data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
         subsidy=work['coinbasevalue'],
         time=work['time'],
-        target=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
+        bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
     ))
 
 @deferral.retry('Error creating payout script:', 10)
@@ -152,7 +152,7 @@ def main(args, net, datadir_path):
             pre_current_work.set(dict(
                 version=work['version'],
                 previous_block=work['previous_block_hash'],
-                target=work['target'],
+                bits=work['bits'],
             ))
         
         def set_real_work2():
@@ -247,7 +247,7 @@ def main(args, net, datadir_path):
         
         @tracker.verified.added.watch
         def _(share):
-            if share.pow_hash <= share.header['target']:
+            if share.pow_hash <= share.header['bits'].target:
                 if factory.conn.value is not None:
                     factory.conn.value.send_block(block=share.as_block(tracker))
                 else:
@@ -442,14 +442,14 @@ def main(args, net, datadir_path):
                         255 if shares == 0 else math.perfect_round(254*stales/shares)
                     )(*get_share_counts()),
                 ),
-                block_target=state['target'],
+                block_target=state['bits'].target,
                 desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
                 net=net,
             )
             
             print 'New work for worker %s! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
                 user,
-                bitcoin_data.target_to_difficulty(share_info['target']),
+                bitcoin_data.target_to_difficulty(share_info['bits'].target),
                 (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.BITCOIN_SYMBOL,
                 subsidy*1e-8, net.BITCOIN_SYMBOL,
                 len(current_work2.value['transactions']),
@@ -459,7 +459,7 @@ def main(args, net, datadir_path):
             merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
             merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
             
-            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['target'], share_info['target']), state['best_share_hash']
+            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['bits'], share_info['bits'].target), state['best_share_hash']
         
         my_shares = set()
         doa_shares = set()
@@ -478,12 +478,12 @@ def main(args, net, datadir_path):
                 
                 pow_hash = net.BITCOIN_POW_FUNC(header)
                 
-                if pow_hash <= header['target'] or p2pool.DEBUG:
+                if pow_hash <= header['bits'].target or p2pool.DEBUG:
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                     else:
                         print 'No bitcoind connection! Erp!'
-                    if pow_hash <= header['target']:
+                    if pow_hash <= header['bits'].target:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
@@ -511,9 +511,8 @@ def main(args, net, datadir_path):
                     except:
                         log.err(None, 'Error while processing merged mining POW:')
                 
-                target = share_info['target']
-                if pow_hash > target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, target)
+                if pow_hash > share_info['bits'].target:
+                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
                     return False
                 share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
                 my_shares.add(share.hash)

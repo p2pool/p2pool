@@ -322,7 +322,7 @@ class ChecksummedType(Type):
         return (file, data), hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
 
 class FloatingInteger(object):
-    __slots__ = ['_bits']
+    __slots__ = ['bits', '_target']
     
     @classmethod
     def from_target_upper_bound(cls, target):
@@ -333,60 +333,33 @@ class FloatingInteger(object):
         bits = struct.unpack('<I', bits2)[0]
         return cls(bits)
     
-    def __init__(self, bits, value=None):
-        self._bits = bits
-        if value is not None and self._value != value:
-            raise ValueError('value does not match')
+    def __init__(self, bits, target=None):
+        self.bits = bits
+        self._target = None
+        if target is not None and self.target != target:
+            raise ValueError('target does not match')
     
     @property
-    def _value(self):
-        return math.shift_left(self._bits & 0x00ffffff, 8 * ((self._bits >> 24) - 3))
+    def target(self):
+        res = self._target
+        if res is None:
+            res = self._target = math.shift_left(self.bits & 0x00ffffff, 8 * ((self.bits >> 24) - 3))
+        return res
     
     def __hash__(self):
-        return hash(self._value)
+        return hash(self.bits)
+    
+    def __eq__(self, other):
+        return self.bits == other.bits
+    
+    def __ne__(self, other):
+        return not (self == other)
     
     def __cmp__(self, other):
-        if isinstance(other, FloatingInteger):
-            return cmp(self._value, other._value)
-        elif isinstance(other, (int, long)):
-            return cmp(self._value, other)
-        else:
-            raise NotImplementedError(other)
-    
-    def __int__(self):
-        return self._value
+        assert False
     
     def __repr__(self):
-        return 'FloatingInteger(bits=%s, value=%s)' % (hex(self._bits), hex(self._value))
-    
-    def __add__(self, other):
-        if isinstance(other, (int, long)):
-            return self._value + other
-        raise NotImplementedError()
-    __radd__ = __add__
-    def __mul__(self, other):
-        if isinstance(other, (int, long)):
-            return self._value * other
-        raise NotImplementedError()
-    __rmul__ = __mul__
-    def __truediv__(self, other):
-        if isinstance(other, (int, long)):
-            return self._value / other
-        raise NotImplementedError()
-    def __floordiv__(self, other):
-        if isinstance(other, (int, long)):
-            return self._value // other
-        raise NotImplementedError()
-    __div__ = __truediv__
-    def __rtruediv__(self, other):
-        if isinstance(other, (int, long)):
-            return other / self._value
-        raise NotImplementedError()
-    def __rfloordiv__(self, other):
-        if isinstance(other, (int, long)):
-            return other // self._value
-        raise NotImplementedError()
-    __rdiv__ = __rtruediv__
+        return 'FloatingInteger(bits=%s, target=%s)' % (hex(self.bits), hex(self.target))
 
 class FloatingIntegerType(Type):
     _inner = StructType('<I')
@@ -396,7 +369,7 @@ class FloatingIntegerType(Type):
         return FloatingInteger(bits), file
     
     def write(self, file, item):
-        return self._inner.write(file, item._bits)
+        return self._inner.write(file, item.bits)
 
 class PossiblyNoneType(Type):
     def __init__(self, none_value, inner):
@@ -449,7 +422,7 @@ block_header_type = ComposedType([
     ('previous_block', PossiblyNoneType(0, HashType())),
     ('merkle_root', HashType()),
     ('timestamp', StructType('<I')),
-    ('target', FloatingIntegerType()),
+    ('bits', FloatingIntegerType()),
     ('nonce', StructType('<I')),
 ])
 
