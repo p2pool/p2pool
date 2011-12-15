@@ -118,6 +118,11 @@ def reversed(x):
     except TypeError:
         return reversed(list(x))
 
+class Object(object):
+    def __init__(self, **kwargs):
+        for k, v in kwargs.iteritems():
+            setattr(self, k, v)
+
 if __name__ == '__main__':
     import random
     a = 1
