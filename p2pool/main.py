@@ -543,7 +543,7 @@ def main(args, net, datadir_path):
             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
             res = {}
             for script in sorted(weights, key=lambda s: weights[s]):
-                res[bitcoin_data.script2_to_human(script, net)] = weights[script]/total_weight
+                res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
             return json.dumps(res)
         
         class WebInterface(resource.Resource):
