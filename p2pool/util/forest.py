@@ -104,15 +104,6 @@ class Tracker(object):
         
         children = self.reverse_shares.get(share.hash, set())
         
-        # move height refs referencing children down to this, so they can be moved up in one step
-        if share.previous_hash in self.reverse_height_refs:
-            if share.previous_hash not in self.tails:
-                for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.previous_hash, object()), set())):
-                    self.get_last(x)
-            for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
-                self.get_last(x)
-            assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
-        
         if share.hash in self.heads and share.previous_hash in self.tails:
             tail = self.heads.pop(share.hash)
             self.tails[tail].remove(share.hash)
@@ -127,6 +118,12 @@ class Tracker(object):
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
         elif share.previous_hash in self.tails and len(self.reverse_shares[share.previous_hash]) <= 1:
+            # move height refs referencing children down to this, so they can be moved up in one step
+            if share.previous_hash in self.reverse_height_refs:
+                for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
+                    self.get_last(x)
+                assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
+            
             heads = self.tails.pop(share.previous_hash)
             for head in heads:
                 self.heads[head] = share.hash
@@ -145,7 +142,7 @@ class Tracker(object):
         else:
             raise NotImplementedError()
         
-        # delete height entry, and ref if it is empty
+        # delete height entry and ref if it is empty
         if share.hash in self.heights:
             _, ref, _ = self.heights.pop(share.hash)
             self.reverse_heights[ref].remove(share.hash)

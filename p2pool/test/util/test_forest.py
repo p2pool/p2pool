@@ -100,6 +100,9 @@ def test_tracker(self):
     assert self.heads == t.heads, (self.heads, t.heads)
     assert self.tails == t.tails, (self.tails, t.tails)
     
+    if random.random() < 0.9:
+        return
+    
     for start in self.shares:
         a, b = self.get_height_work_and_last(start), t.get_height_work_and_last(start)
         assert a == b, (a, b)
