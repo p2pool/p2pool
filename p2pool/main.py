@@ -216,6 +216,10 @@ def main(args, net, datadir_path):
                 yield deferral.sleep(1)
         set_merged_work()
         
+        @pre_merged_work.changed.watch
+        def _(new_merged_work):
+            print "Got new merged mining work! Difficulty: %f" % (bitcoin_data.target_to_difficulty(new_merged_work['target']),)
+        
         start_time = time.time() - current_work2.value['clock_offset']
         
         # setup p2p logic and join p2pool network
