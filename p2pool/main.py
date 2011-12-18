@@ -492,8 +492,8 @@ def main(args, net, datadir_path):
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
                 
-                if current_work.value['aux_work'] is not None and (pow_hash <= current_work.value['aux_work']['target'] or p2pool.DEBUG):
-                    try:
+                try:
+                    if current_work.value['aux_work'] is not None and (pow_hash <= current_work.value['aux_work']['target'] or p2pool.DEBUG):
                         aux_pow = dict(
                             merkle_tx=dict(
                                 tx=transactions[0],
@@ -512,8 +512,8 @@ def main(args, net, datadir_path):
                         def _(res):
                             print "MERGED RESULT:", res
                         merged.rpc_getauxblock(a, b).addBoth(_)
-                    except:
-                        log.err(None, 'Error while processing merged mining POW:')
+                except:
+                    log.err(None, 'Error while processing merged mining POW:')
                 
                 if pow_hash > share_info['bits'].target:
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
