@@ -498,7 +498,7 @@ def main(args, net, datadir_path):
                             merkle_tx=dict(
                                 tx=transactions[0],
                                 block_hash=hash_,
-                                merkle_branch=[x['hash'] for x in p2pool_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0)],
+                                merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
                                 index=0,
                             ),
                             merkle_branch=[],
