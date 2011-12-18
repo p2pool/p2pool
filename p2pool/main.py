@@ -488,7 +488,7 @@ def main(args, net, datadir_path):
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
                         print
                 
-                if current_work.value['aux_work'] is not None and pow_hash <= current_work.value['aux_work']['target']:
+                if current_work.value['aux_work'] is not None and (pow_hash <= current_work.value['aux_work']['target'] or p2pool.DEBUG):
                     try:
                         aux_pow = dict(
                             merkle_tx=dict(
