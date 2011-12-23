@@ -1,6 +1,5 @@
 from __future__ import division
 
-import base64
 import random
 import weakref
 
@@ -10,12 +9,6 @@ import p2pool
 from p2pool import data as p2pool_data
 from p2pool.bitcoin import getwork
 from p2pool.util import jsonrpc, variable
-
-def get_username(request):
-    try:
-        return base64.b64decode(request.getHeader('Authorization').split(' ', 1)[1]).split(':')[0]
-    except: # XXX
-        return None
 
 class _Page(jsonrpc.Server):
     def __init__(self, parent, long_poll):
@@ -52,29 +45,27 @@ class WorkerInterface(object):
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
-            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), get_username(request))
+            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), request.getUser())
         
         if long_poll:
             request_id = request.getClientIP(), request.getHeader('Authorization')
             if self.worker_views.get(request_id, self.new_work_event.times) != self.new_work_event.times:
                 if p2pool.DEBUG:
-                    print 'POLL %i PUSH user=%r' % (id, get_username(request))
+                    print 'POLL %i PUSH user=%r' % (id, request.getUser())
             else:
                 if p2pool.DEBUG:
-                    print 'POLL %i WAITING user=%r' % (id, get_username(request))
+                    print 'POLL %i WAITING user=%r' % (id, request.getUser())
                 yield self.new_work_event.get_deferred()
                 self.worker_views[request_id] = self.new_work_event.times
         
-        username = get_username(request)
-        
-        if username in self.work_cache:
-            res, identifier = self.work_cache[username]
+        if request.getUser() in self.work_cache:
+            res, identifier = self.work_cache[request.getUser()]
         else:
-            res, identifier = self.compute(username)
+            res, identifier = self.compute(request.getUser())
         
-        self.work_cache[username] = res.update(timestamp=res.timestamp + 12), identifier # XXX doesn't bound timestamp
+        self.work_cache[request.getUser()] = res.update(timestamp=res.timestamp + 12), identifier # XXX doesn't bound timestamp
         
         if p2pool.DEBUG:
-            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), get_username(request)) # XXX identifier is hack
+            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), request.getUser()) # XXX identifier is hack
         
         defer.returnValue(res.getwork(identifier=str(identifier)))
