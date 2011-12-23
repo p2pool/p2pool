@@ -56,7 +56,7 @@ class WorkerInterface(object):
                 if p2pool.DEBUG:
                     print 'POLL %i WAITING user=%r' % (id, request.getUser())
                 yield self.new_work_event.get_deferred()
-                self.worker_views[request_id] = self.new_work_event.times
+            self.worker_views[request_id] = self.new_work_event.times
         
         if request.getUser() in self.work_cache:
             res, identifier = self.work_cache[request.getUser()]
