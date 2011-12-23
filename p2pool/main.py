@@ -464,7 +464,7 @@ def main(args, net, datadir_path):
             merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
             merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
             
-            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['bits'], share_info['bits'].target), state['best_share_hash']
+            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['bits'], share_info['bits'].target)
         
         my_shares = set()
         doa_shares = set()

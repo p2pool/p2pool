@@ -27,7 +27,7 @@ class WorkerInterface(object):
         
         self.worker_views = {}
         
-        self.work_cache = {} # username -> (blockattempt, work-identifier-string)
+        self.work_cache = {} # username -> blockattempt
         watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
         self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
     
@@ -59,13 +59,13 @@ class WorkerInterface(object):
             self.worker_views[request_id] = self.new_work_event.times
         
         if request.getUser() in self.work_cache:
-            res, identifier = self.work_cache[request.getUser()]
+            res = self.work_cache[request.getUser()]
         else:
-            res, identifier = self.compute(request.getUser())
+            res = self.compute(request.getUser())
         
-        self.work_cache[request.getUser()] = res.update(timestamp=res.timestamp + 12), identifier # XXX doesn't bound timestamp
+        self.work_cache[request.getUser()] = res.update(timestamp=res.timestamp + 12) # XXX doesn't bound timestamp
         
         if p2pool.DEBUG:
-            print 'POLL %i END %s user=%r' % (id, p2pool_data.format_hash(identifier), request.getUser()) # XXX identifier is hack
+            print 'POLL %i END identifier=%i user=%r' % (id, self.new_work_event.times, request.getUser())
         
-        defer.returnValue(res.getwork(identifier=str(identifier)))
+        defer.returnValue(res.getwork(identifier=str(self.new_work_event.times)))
