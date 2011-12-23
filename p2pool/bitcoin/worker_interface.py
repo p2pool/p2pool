@@ -4,7 +4,7 @@ import base64
 import json
 import random
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.python import log
 
 import p2pool
@@ -38,27 +38,6 @@ def get_username(request):
 
 def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization')
-
-class Holds(object):
-    def __init__(self):
-        self.holds = {}
-    
-    @defer.inlineCallbacks
-    def wait_hold(self, request_id):
-        while request_id in self.holds:
-            yield self.holds[request_id].get_deferred()
-    
-    def set_hold(self, request_id, dt):
-        if request_id in self.holds:
-            raise ValueError('hold already present!')
-        self.holds[request_id] = variable.Event()
-        self.holds[request_id].status = 0
-        def cb():
-            if self.holds[request_id].status != 0:
-                raise AssertionError()
-            self.holds[request_id].status = 1
-            self.holds.pop(request_id).happened()
-        reactor.callLater(dt, cb)
 
 class LongPollingWorkerInterface(deferred_resource.DeferredResource):
     def __init__(self, parent):
@@ -99,7 +78,6 @@ class WorkerInterface(jsonrpc.Server):
         self.response_callback = response_callback
         self.new_work_event = new_work_event
         
-        self.holds = Holds()
         self.worker_views = {}
         
         self.putChild('long-polling', LongPollingWorkerInterface(self))
@@ -134,8 +112,6 @@ class WorkerInterface(jsonrpc.Server):
                 print 'POLL %i WAITING user=%r' % (id, get_username(request))
             yield defer.DeferredList([self.new_work_event.get_deferred(), self.worker_views[request_id].changed.get_deferred()], fireOnOneCallback=True)
         
-        yield self.holds.wait_hold(request_id)
-        
         res, identifier = self.compute(request)
         
         if thought_work[-1] is not None and self.new_work_event.times != thought_times and any(x is None or res.previous_block == x for x in thought_work[-memory or len(thought_work):]):
@@ -143,7 +119,6 @@ class WorkerInterface(jsonrpc.Server):
             res = res.update(previous_block=random.randrange(2**256))
             if p2pool.DEBUG:
                 print 'POLL %i FAKED user=%r' % (id, get_username(request))
-            self.holds.set_hold(request_id, .01)
         
         self.worker_views[request_id].set((self.new_work_event.times if long_poll else thought_times, (thought_work[-1], res.previous_block)))
         if p2pool.DEBUG:
