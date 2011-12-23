@@ -8,8 +8,8 @@ from twisted.internet import defer
 
 import p2pool
 from p2pool import data as p2pool_data
-from p2pool.util import jsonrpc, variable
 from p2pool.bitcoin import getwork
+from p2pool.util import jsonrpc, variable
 
 def get_username(request):
     try:
@@ -39,8 +39,8 @@ class WorkerInterface(jsonrpc.Server):
         watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
         self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
         
-        self.putChild('long-polling', LongPollingWorkerInterface(self))
         self.putChild('', self)
+        self.putChild('long-polling', LongPollingWorkerInterface(self))
     
     def rpc_getwork(self, request, data=None):
         return self.getwork(request, data, long_poll=False)
