@@ -98,8 +98,8 @@ class WorkerInterface(jsonrpc.Server):
         request_id = get_id(request)
         memory = get_memory(request)
         
-        id = random.randrange(10000)
         if p2pool.DEBUG:
+            id = random.randrange(1000, 10000)
             print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), get_username(request))
         
         if request_id not in self.worker_views:
