@@ -17,18 +17,17 @@ def get_username(request):
     except: # XXX
         return None
 
-class LongPollingWorkerInterface(jsonrpc.Server):
-    def __init__(self, parent):
+class _Page(jsonrpc.Server):
+    def __init__(self, parent, long_poll):
         jsonrpc.Server.__init__(self)
         self.parent = parent
+        self.long_poll = long_poll
     
     def rpc_getwork(self, request, data=None):
-        return self.parent.getwork(request, data, long_poll=True)
+        return self.parent._getwork(request, data, long_poll=self.long_poll)
 
-class WorkerInterface(jsonrpc.Server):
+class WorkerInterface(object):
     def __init__(self, compute, response_callback, new_work_event=variable.Event()):
-        jsonrpc.Server.__init__(self)
-        
         self.compute = compute
         self.response_callback = response_callback
         self.new_work_event = new_work_event
@@ -38,15 +37,13 @@ class WorkerInterface(jsonrpc.Server):
         self.work_cache = {} # username -> (blockattempt, work-identifier-string)
         watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
         self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
-        
-        self.putChild('', self)
-        self.putChild('long-polling', LongPollingWorkerInterface(self))
     
-    def rpc_getwork(self, request, data=None):
-        return self.getwork(request, data, long_poll=False)
+    def attach_to(self, res):
+        res.putChild('', _Page(self, long_poll=False))
+        res.putChild('long-polling', _Page(self, long_poll=True))
     
     @defer.inlineCallbacks
-    def getwork(self, request, data, long_poll):
+    def _getwork(self, request, data, long_poll):
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('X-Roll-NTime', 'expire=10')
         

@@ -533,7 +533,8 @@ def main(args, net, datadir_path):
                 log.err(None, 'Error processing data received from worker:')
                 return False
         
-        web_root = worker_interface.WorkerInterface(compute, got_response, current_work.changed)
+        web_root = resource.Resource()
+        worker_interface.WorkerInterface(compute, got_response, current_work.changed).attach_to(web_root)
         
         def get_rate():
             if current_work.value['best_share_hash'] is not None:
