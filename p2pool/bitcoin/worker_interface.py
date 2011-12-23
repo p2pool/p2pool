@@ -1,15 +1,13 @@
 from __future__ import division
 
 import base64
-import json
 import random
 
 from twisted.internet import defer
-from twisted.python import log
 
 import p2pool
 from p2pool import data as p2pool_data
-from p2pool.util import jsonrpc, deferred_resource, variable
+from p2pool.util import jsonrpc, variable
 from p2pool.bitcoin import getwork
 
 def get_memory(request):
@@ -39,36 +37,13 @@ def get_username(request):
 def get_id(request):
     return request.getClientIP(), request.getHeader('Authorization')
 
-class LongPollingWorkerInterface(deferred_resource.DeferredResource):
+class LongPollingWorkerInterface(jsonrpc.Server):
     def __init__(self, parent):
+        jsonrpc.Server.__init__(self)
         self.parent = parent
     
-    @defer.inlineCallbacks
-    def render_GET(self, request):
-        request.setHeader('Content-Type', 'application/json')
-        request.setHeader('X-Long-Polling', '/long-polling')
-        request.setHeader('X-Roll-NTime', 'expire=60')
-        try:
-            try:
-                request.write(json.dumps({
-                    'jsonrpc': '2.0',
-                    'id': 0,
-                    'result': (yield self.parent.getwork(request, long_poll=True)),
-                    'error': None,
-                }))
-            except jsonrpc.Error:
-                raise
-            except Exception:
-                log.err(None, 'Squelched long polling error:')
-                raise jsonrpc.Error(-32099, u'Unknown error')
-        except jsonrpc.Error, e:
-            request.write(json.dumps({
-                'jsonrpc': '2.0',
-                'id': 0,
-                'result': None,
-                'error': e._to_obj(),
-            }))
-    render_POST = render_GET
+    def rpc_getwork(self, request, data=None):
+        return self.parent.getwork(request, data, long_poll=True)
 
 class WorkerInterface(jsonrpc.Server):
     def __init__(self, compute, response_callback, new_work_event=variable.Event()):
@@ -83,18 +58,17 @@ class WorkerInterface(jsonrpc.Server):
         self.putChild('long-polling', LongPollingWorkerInterface(self))
         self.putChild('', self)
     
-    @defer.inlineCallbacks
     def rpc_getwork(self, request, data=None):
+        return self.getwork(request, data, long_poll=False)
+    
+    @defer.inlineCallbacks
+    def getwork(self, request, data, long_poll):
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('X-Roll-NTime', 'expire=60')
         
         if data is not None:
             defer.returnValue(self.response_callback(getwork.decode_data(data), request))
         
-        defer.returnValue((yield self.getwork(request)))
-    
-    @defer.inlineCallbacks
-    def getwork(self, request, long_poll=False):
         request_id = get_id(request)
         memory = get_memory(request)
         
