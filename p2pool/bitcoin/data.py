@@ -108,10 +108,10 @@ class Type(object):
     
     
     def pack_base58(self, obj):
-        return base58.base58_encode(self.pack(obj))
+        return base58.encode(self.pack(obj))
     
     def unpack_base58(self, base58_data):
-        return self.unpack(base58.base58_decode(base58_data))
+        return self.unpack(base58.decode(base58_data))
     
     
     def hash160(self, obj):
