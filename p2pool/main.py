@@ -62,6 +62,8 @@ def main(args, net, datadir_path):
             print "Install Pygame and PIL to enable visualizations! Visualizations disabled."
             print
         
+        bitcoin_data.Type.enable_caching()
+        
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)

@@ -103,7 +103,11 @@ class ExpiringDict(object):
         
         self.expiry_deque = LinkedList()
         self.d = dict() # key -> node, value
-        task.LoopingCall(self.expire).start(1) # XXX use inlinecallbacks and stop expiring at some point
+        self._expire_loop = task.LoopingCall(self.expire)
+        self._expire_loop.start(1) # XXX use inlinecallbacks and stop expiring at some point
+    
+    def stop(self):
+        self._expire_loop.stop()
     
     def __repr__(self):
         return 'ExpiringDict' + repr(self.__dict__)

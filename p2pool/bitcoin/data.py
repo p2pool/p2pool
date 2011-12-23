@@ -82,9 +82,26 @@ class Type(object):
         
         return data
     
-    _backing = expiring_dict.ExpiringDict(100)
-    pack2 = memoize.memoize_with_backing(_backing, [unpack])(pack2)
-    unpack = memoize.memoize_with_backing(_backing)(unpack) # doesn't have an inverse
+    _backing = None
+    
+    @classmethod
+    def enable_caching(cls):
+        assert cls._backing is None
+        cls._backing = expiring_dict.ExpiringDict(100)
+        cls._pre_pack2 = cls.pack2
+        cls.pack2 = memoize.memoize_with_backing(cls._backing, [cls.unpack])(cls.pack2)
+        cls._pre_unpack = cls.unpack
+        cls.unpack = memoize.memoize_with_backing(cls._backing)(cls.unpack) # doesn't have an inverse
+    
+    @classmethod
+    def disable_caching(cls):
+        assert cls._backing is not None
+        cls._backing.stop()
+        cls._backing = None
+        cls.pack2 = cls._pre_pack2
+        del cls._pre_pack2
+        cls.unpack = cls._pre_unpack
+        del cls._pre_unpack
     
     def pack(self, obj):
         return self.pack2(slush.immutify(obj))
