@@ -3,19 +3,25 @@ forest data structure
 '''
 
 import itertools
+import weakref
 
 from p2pool.util import skiplist, variable
 from p2pool.bitcoin import data as bitcoin_data
 
 
-class DistanceSkipList(skiplist.SkipList):
+class TrackerSkipList(skiplist.SkipList):
     def __init__(self, tracker):
         skiplist.SkipList.__init__(self)
         self.tracker = tracker
+        
+        self_ref = weakref.ref(self, lambda _: tracker.removed.unwatch(watch_id))
+        watch_id = self.tracker.removed.watch(lambda share: self_ref().forget_item(share.hash))
     
     def previous(self, element):
         return self.tracker.shares[element].previous_hash
-    
+
+
+class DistanceSkipList(TrackerSkipList):
     def get_delta(self, element):
         return element, 1, self.tracker.shares[element].previous_hash
     
@@ -59,10 +65,10 @@ class Tracker(object):
         self.height_refs = {} # ref -> height, share_hash, work_inc
         self.reverse_height_refs = {} # share_hash -> ref
         
-        self.get_nth_parent_hash = DistanceSkipList(self)
-        
         self.added = variable.Event()
         self.removed = variable.Event()
+        
+        self.get_nth_parent_hash = DistanceSkipList(self)
         
         for share in shares:
             self.add(share)

@@ -1,14 +1,7 @@
-from p2pool.util import math, skiplist
+from p2pool.util import forest, math
 
-class WeightsSkipList(skiplist.SkipList):
+class WeightsSkipList(forest.TrackerSkipList):
     # share_count, weights, total_weight
-    
-    def __init__(self, tracker):
-        skiplist.SkipList.__init__(self)
-        self.tracker = tracker
-    
-    def previous(self, element):
-        return self.tracker.shares[element].previous_hash
     
     def get_delta(self, element):
         from p2pool.bitcoin import data as bitcoin_data
@@ -45,16 +38,12 @@ class WeightsSkipList(skiplist.SkipList):
     def finalize(self, (share_count, weights, total_weight, total_donation_weight)):
         return weights, total_weight, total_donation_weight
 
-class CountsSkipList(skiplist.SkipList):
+class CountsSkipList(forest.TrackerSkipList):
     # share_count, counts, total_count
     
     def __init__(self, tracker, run_identifier):
-        skiplist.SkipList.__init__(self)
-        self.tracker = tracker
+        forest.TrackerSkipList.__init__(self, tracker)
         self.run_identifier = run_identifier
-    
-    def previous(self, element):
-        return self.tracker.shares[element].previous_hash
     
     def get_delta(self, element):
         if element is None:
