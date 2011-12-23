@@ -137,8 +137,6 @@ def main(args, net, datadir_path):
         # information affecting work that should not trigger a long-polling update
         current_work2 = variable.Variable(None)
         
-        work_updated = variable.Event()
-        
         requested = expiring_dict.ExpiringDict(300)
         
         @defer.inlineCallbacks
@@ -574,17 +572,13 @@ def main(args, net, datadir_path):
         
         # do new getwork when a block is heard on the p2p interface
         
-        def new_block(block_hash):
-            work_updated.happened()
-        factory.new_block.watch(new_block)
-        
         print 'Started successfully!'
         print
         
         @defer.inlineCallbacks
         def work1_thread():
             while True:
-                flag = work_updated.get_deferred()
+                flag = factory.new_block.get_deferred()
                 try:
                     yield set_real_work1()
                 except:
