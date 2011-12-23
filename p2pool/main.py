@@ -418,9 +418,8 @@ def main(args, net, datadir_path):
             except: # XXX blah
                 return None
         
-        def compute(request):
+        def compute(user):
             state = current_work.value
-            user = worker_interface.get_username(request)
             
             payout_script = get_payout_script_from_username(user)
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:

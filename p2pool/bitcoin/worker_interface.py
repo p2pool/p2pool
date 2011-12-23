@@ -2,6 +2,7 @@ from __future__ import division
 
 import base64
 import random
+import weakref
 
 from twisted.internet import defer
 
@@ -37,6 +38,10 @@ class WorkerInterface(jsonrpc.Server):
         
         self.worker_views = {}
         
+        self.work_cache = {} # username -> (blockattempt, work-identifier-string)
+        watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
+        self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
+        
         self.putChild('long-polling', LongPollingWorkerInterface(self))
         self.putChild('', self)
     
@@ -46,7 +51,7 @@ class WorkerInterface(jsonrpc.Server):
     @defer.inlineCallbacks
     def getwork(self, request, data, long_poll):
         request.setHeader('X-Long-Polling', '/long-polling')
-        request.setHeader('X-Roll-NTime', 'expire=60')
+        request.setHeader('X-Roll-NTime', 'expire=10')
         
         if data is not None:
             defer.returnValue(self.response_callback(getwork.decode_data(data), request))
@@ -65,7 +70,14 @@ class WorkerInterface(jsonrpc.Server):
                 print 'POLL %i WAITING user=%r' % (id, get_username(request))
             yield self.new_work_event.get_deferred()
         
-        res, identifier = self.compute(request)
+        username = get_username(request)
+        
+        if username in self.work_cache:
+            res, identifier = self.work_cache[username]
+        else:
+            res, identifier = self.compute(username)
+        
+        self.work_cache[username] = res.update(timestamp=res.timestamp + 12), identifier # XXX doesn't bound timestamp
         
         if long_poll:
             self.worker_views[request_id].set(self.new_work_event.times)
