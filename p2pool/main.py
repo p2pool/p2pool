@@ -390,17 +390,17 @@ def main(args, net, datadir_path):
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
-        removed_unstales = set()
+        removed_unstales_var = variable.Variable(0)
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                removed_unstales.add(share.hash)
+                removed_unstales.set(removed_unstales.value + 1)
         
-        removed_doa_unstales = set()
+        removed_doa_unstales_var = variable.Variable(0)
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                removed_doa_unstales.add(share.hash)
+                removed_doa_unstales.set(removed_doa_unstales.value + 1)
         
         stale_counter = skiplists.SumSkipList(tracker, lambda share: (
             1 if share.hash in my_share_hashes else 0,
@@ -414,8 +414,8 @@ def main(args, net, datadir_path):
                 current_work.value['best_share_hash'],
                 tracker.verified.get_height(current_work.value['best_share_hash']),
             )
-            my_shares_in_chain += len(removed_unstales)
-            my_doa_shares_in_chain += len(removed_doa_unstales)
+            my_shares_in_chain += removed_unstales_var.value
+            my_doa_shares_in_chain += removed_doa_unstales_var.value
             my_shares_not_in_chain = my_shares - my_shares_in_chain
             my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
             
