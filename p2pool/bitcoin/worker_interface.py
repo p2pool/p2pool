@@ -6,7 +6,6 @@ import weakref
 from twisted.internet import defer
 
 import p2pool
-from p2pool import data as p2pool_data
 from p2pool.bitcoin import getwork
 from p2pool.util import jsonrpc, variable
 
