@@ -425,9 +425,10 @@ def main(args, net, datadir_path):
             if user is None:
                 return None
             try:
-                return bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(user, net.PARENT))
+                pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
             except: # XXX blah
                 return None
+            return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
         
         def compute(user):
             state = current_work.value
