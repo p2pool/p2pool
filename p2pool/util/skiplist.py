@@ -9,12 +9,12 @@ class SkipList(object):
     def forget_item(self, item):
         self.skips.pop(item, None)
     
-    def __call__(self, start, *args, **kwargs):
+    def __call__(self, start, *args):
         updates = {}
         pos = start
         sol = self.initial_solution(start, args)
         if self.judge(sol, args) == 0:
-            return self.finalize(sol)
+            return self.finalize(sol, args)
         while True:
             if pos not in self.skips:
                 self.skips[pos] = math.geometric(self.p), [(self.previous(pos), self.get_delta(pos))]
@@ -40,7 +40,7 @@ class SkipList(object):
                 decision = self.judge(sol_if, args)
                 #print pos, sol, jump, delta, sol_if, decision
                 if decision == 0:
-                    return self.finalize(sol_if)
+                    return self.finalize(sol_if, args)
                 elif decision < 0:
                     sol = sol_if
                     break

@@ -37,7 +37,9 @@ class WeightsSkipList(forest.TrackerSkipList):
         else:
             return -1
     
-    def finalize(self, (share_count, weights, total_weight, total_donation_weight)):
+    def finalize(self, (share_count, weights, total_weight, total_donation_weight), (max_shares, desired_weight)):
+        assert share_count <= max_shares and total_weight <= desired_weight
+        assert share_count == max_shares or total_weight == desired_weight
         return weights, total_weight, total_donation_weight
 
 class SumSkipList(forest.TrackerSkipList):
@@ -64,5 +66,6 @@ class SumSkipList(forest.TrackerSkipList):
     def judge(self, (result, count), (desired_count,)):
         return cmp(count, desired_count)
     
-    def finalize(self, (result, count)):
+    def finalize(self, (result, count), (desired_count,)):
+        assert count == desired_count
         return result

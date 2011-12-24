@@ -46,7 +46,8 @@ class DistanceSkipList(TrackerSkipList):
         else:
             return -1
     
-    def finalize(self, (dist, hash)):
+    def finalize(self, (dist, hash), (n,)):
+        assert dist == n
         return hash
 
 
