@@ -130,6 +130,11 @@ def add_tuples(res, *tuples):
         res = tuple(a + b for a, b in zip(res, t))
     return res
 
+def flatten_linked_list(x):
+    while x is not None:
+        x, cur = x
+        yield cur
+
 if __name__ == '__main__':
     import random
     a = 1
