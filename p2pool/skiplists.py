@@ -1,3 +1,5 @@
+import operator
+
 from p2pool.util import forest, math
 
 class WeightsSkipList(forest.TrackerSkipList):
@@ -38,39 +40,29 @@ class WeightsSkipList(forest.TrackerSkipList):
     def finalize(self, (share_count, weights, total_weight, total_donation_weight)):
         return weights, total_weight, total_donation_weight
 
-class CountsSkipList(forest.TrackerSkipList):
-    # share_count, counts, total_count
-    
-    def __init__(self, tracker, run_identifier):
+class SumSkipList(forest.TrackerSkipList):
+    def __init__(self, tracker, value_func, identity_value=0, add_func=operator.add):
         forest.TrackerSkipList.__init__(self, tracker)
-        self.run_identifier = run_identifier
+        self.value_func = value_func
+        self.identity_value = identity_value
+        self.add_func = add_func
+    
     
     def get_delta(self, element):
-        if element is None:
-            raise AssertionError()
-        share = self.tracker.shares[element]
-        return 1, set([share.hash]) if share.nonce.startswith(self.run_identifier) else set()
+        return self.value_func(self.tracker.shares[element]), 1
     
-    def combine_deltas(self, (share_count1, share_hashes1), (share_count2, share_hashes2)):
-        if share_hashes1 & share_hashes2:
-            raise AssertionError()
-        return share_count1 + share_count2, share_hashes1 | share_hashes2
+    def combine_deltas(self, (result1, count1), (result2, count2)):
+        return self.add_func(result1, result2), count1 + count2
     
-    def initial_solution(self, start, (desired_shares,)):
-        return 0, set()
     
-    def apply_delta(self, (share_count1, share_hashes1), (share_count2, share_hashes2), (desired_shares,)):
-        if share_hashes1 & share_hashes2:
-            raise AssertionError()
-        return share_count1 + share_count2, share_hashes1 | share_hashes2
+    def initial_solution(self, start_hash, (desired_count,)):
+        return self.identity_value, 0
     
-    def judge(self, (share_count, share_hashes), (desired_shares,)):
-        if share_count > desired_shares:
-            return 1
-        elif share_count == desired_shares:
-            return 0
-        else:
-            return -1
+    def apply_delta(self, (result, count), (d_result, d_count), (desired_count,)):
+        return self.add_func(result, d_result), count + d_count
     
-    def finalize(self, (share_count, share_hashes)):
-        return share_hashes
+    def judge(self, (result, count), (desired_count,)):
+        return cmp(count, desired_count)
+    
+    def finalize(self, (result, count)):
+        return result

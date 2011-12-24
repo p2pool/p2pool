@@ -388,24 +388,37 @@ def main(args, net, datadir_path):
         # setup worker logic
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
-        run_identifier = struct.pack('<I', random.randrange(2**32))
         
-        share_counter = skiplists.CountsSkipList(tracker, run_identifier)
         removed_unstales = set()
-        def get_share_counts(doa=False):
-            height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-            matching_in_chain = share_counter(current_work.value['best_share_hash'], height) | removed_unstales
-            shares_in_chain = my_shares & matching_in_chain
-            stale_shares = my_shares - matching_in_chain
-            if doa:
-                stale_doa_shares = stale_shares & doa_shares
-                stale_not_doa_shares = stale_shares - stale_doa_shares
-                return len(shares_in_chain) + len(stale_shares), len(stale_doa_shares), len(stale_not_doa_shares)
-            return len(shares_in_chain) + len(stale_shares), len(stale_shares)
         @tracker.verified.removed.watch
         def _(share):
-            if share.hash in my_shares and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
+            if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_unstales.add(share.hash)
+        
+        removed_doa_unstales = set()
+        @tracker.verified.removed.watch
+        def _(share):
+            if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
+                removed_doa_unstales.add(share.hash)
+        
+        stale_counter = skiplists.SumSkipList(tracker, lambda share: (
+            1 if share.hash in my_share_hashes else 0,
+            1 if share.hash in my_doa_share_hashes else 0,
+        ), (0, 0), math.add_tuples)
+        def get_stale_counts():
+            '''Returns (orphans, doas), total'''
+            my_shares = len(my_share_hashes)
+            my_doa_shares = len(my_doa_share_hashes)
+            my_shares_in_chain, my_doa_shares_in_chain = stale_counter(
+                current_work.value['best_share_hash'],
+                tracker.verified.get_height(current_work.value['best_share_hash']),
+            )
+            my_shares_in_chain += len(removed_unstales)
+            my_doa_shares_in_chain += len(removed_doa_unstales)
+            my_shares_not_in_chain = my_shares - my_shares_in_chain
+            my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
+            
+            return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares
         
         
         def get_payout_script_from_username(user):
@@ -437,13 +450,13 @@ def main(args, net, datadir_path):
                 share_data=dict(
                     previous_share_hash=state['best_share_hash'],
                     coinbase='' if state['aux_work'] is None else '\xfa\xbemm' + bitcoin_data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
-                    nonce=run_identifier + struct.pack('<Q', random.randrange(2**64)),
+                    nonce=struct.pack('<Q', random.randrange(2**64)),
                     new_script=payout_script,
                     subsidy=subsidy,
                     donation=math.perfect_round(65535*args.donation_percentage/100),
-                    stale_frac=(lambda shares, stales:
-                        255 if shares == 0 else math.perfect_round(254*stales/shares)
-                    )(*get_share_counts()),
+                    stale_frac=(lambda (orphans, doas), total:
+                        255 if total == 0 else math.perfect_round(254*(orphans + doas)/total)
+                    )(*get_stale_counts()),
                 ),
                 block_target=state['bits'].target,
                 desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
@@ -464,8 +477,8 @@ def main(args, net, datadir_path):
             
             return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['bits'], share_info['bits'].target)
         
-        my_shares = set()
-        doa_shares = set()
+        my_share_hashes = set()
+        my_doa_share_hashes = set()
         
         def got_response(header, request):
             try:
@@ -517,9 +530,9 @@ def main(args, net, datadir_path):
                     print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
                     return False
                 share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
-                my_shares.add(share.hash)
+                my_share_hashes.add(share.hash)
                 if share.previous_hash != current_work.value['best_share_hash']:
-                    doa_shares.add(share.hash)
+                    my_doa_share_hashes.add(share.hash)
                 print 'GOT SHARE! %s %s prev %s age %.2fs' % (request.getUser(), p2pool_data.format_hash(share.hash), p2pool_data.format_hash(share.previous_hash), time.time() - getwork_time) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
                 good = share.previous_hash == current_work.value['best_share_hash']
                 # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
@@ -620,8 +633,7 @@ def main(args, net, datadir_path):
                         if height > 2:
                             att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
                             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
-                            shares, stale_doa_shares, stale_not_doa_shares = get_share_counts(True)
-                            stale_shares = stale_doa_shares + stale_not_doa_shares
+                            (stale_orphan_shares, stale_doa_shares), shares = get_stale_counts()
                             fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
                             real_att_s = att_s / (1. - (math.median(fracs) if fracs else 0))
                             my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
@@ -633,7 +645,7 @@ def main(args, net, datadir_path):
                                 weights.get(my_script, 0)/total_weight*100,
                                 math.format(int(my_att_s)),
                                 shares,
-                                stale_not_doa_shares,
+                                stale_orphan_shares,
                                 stale_doa_shares,
                                 len(p2p_node.peers),
                             ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
@@ -645,6 +657,7 @@ def main(args, net, datadir_path):
                                 this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
                                 conf = 0.95
                                 if shares:
+                                    stale_shares = stale_orphan_shares + stale_doa_shares
                                     this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
                                     if med < .99:
                                         this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))

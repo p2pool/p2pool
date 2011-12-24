@@ -123,6 +123,13 @@ class Object(object):
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
 
+def add_tuples(res, *tuples):
+    for t in tuples:
+        if len(t) != len(res):
+            print 'tuples must all be the same length'
+        res = tuple(a + b for a, b in zip(res, t))
+    return res
+
 if __name__ == '__main__':
     import random
     a = 1
