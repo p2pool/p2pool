@@ -259,7 +259,7 @@ class OkayTracker(forest.Tracker):
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
     
-    def attempt_verify(self, share, now):
+    def attempt_verify(self, share):
         if share.hash in self.verified.shares:
             return True
         height, last = self.get_height_and_last(share.hash)
@@ -274,7 +274,7 @@ class OkayTracker(forest.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, ht, previous_block, now):
+    def think(self, ht, previous_block):
         desired = set()
         
         # O(len(self.heads))
@@ -287,7 +287,7 @@ class OkayTracker(forest.Tracker):
             head_height, last = self.get_height_and_last(head)
             
             for share in self.get_chain(head, head_height if last is None else min(5, max(0, head_height - self.net.CHAIN_LENGTH))):
-                if self.attempt_verify(share, now):
+                if self.attempt_verify(share):
                     break
                 if share.hash in self.heads:
                     bads.add(share.hash)
@@ -311,7 +311,7 @@ class OkayTracker(forest.Tracker):
             get = min(want, can)
             #print 'Z', head_height, last_hash is None, last_height, last_last_hash is None, want, can, get
             for share in self.get_chain(last_hash, get):
-                if not self.attempt_verify(share, now):
+                if not self.attempt_verify(share):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))

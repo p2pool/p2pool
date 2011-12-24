@@ -154,9 +154,10 @@ def main(args, net, datadir_path):
                 previous_block=work['previous_block_hash'],
                 bits=work['bits'],
             ))
+        factory.new_block.watch(lambda block_hash: set_real_work1())
         
         def set_real_work2():
-            best, desired = tracker.think(ht, pre_current_work.value['previous_block'], time.time() - pre_current_work2.value['clock_offset'])
+            best, desired = tracker.think(ht, pre_current_work.value['previous_block'])
             
             current_work2.set(pre_current_work2.value)
             t = dict(pre_current_work.value)
@@ -582,34 +583,14 @@ def main(args, net, datadir_path):
         print '    ...success!'
         print
         
+        
+        # call getmemorypool every 15 seconds to check that bitcoind is alive
+        task.LoopingCall(set_real_work1).start(15)
+        
+        
         # done!
-        
-        # do new getwork when a block is heard on the p2p interface
-        
         print 'Started successfully!'
         print
-        
-        @defer.inlineCallbacks
-        def work1_thread():
-            while True:
-                flag = factory.new_block.get_deferred()
-                try:
-                    yield set_real_work1()
-                except:
-                    log.err()
-                yield defer.DeferredList([flag, deferral.sleep(random.uniform(1, 10))], fireOnOneCallback=True)
-        
-        @defer.inlineCallbacks
-        def work2_thread():
-            while True:
-                try:
-                    set_real_work2()
-                except:
-                    log.err()
-                yield deferral.sleep(random.expovariate(1/20))
-        
-        work1_thread()
-        work2_thread()
         
         
         if hasattr(signal, 'SIGALRM'):
