@@ -1,5 +1,7 @@
 from __future__ import division
 
+import StringIO
+import json
 import random
 import weakref
 
@@ -17,6 +19,10 @@ class _Page(jsonrpc.Server):
     
     def rpc_getwork(self, request, data=None):
         return self.parent._getwork(request, data, long_poll=self.long_poll)
+    
+    def render_GET(self, request):
+        request.content = StringIO.StringIO(json.dumps(dict(id=0, method='getwork')))
+        return self.render_POST(request)
 
 class WorkerInterface(object):
     def __init__(self, compute, response_callback, new_work_event=variable.Event()):
