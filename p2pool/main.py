@@ -48,6 +48,7 @@ def get_payout_script2(bitcoind, net2):
         print '    Pubkey request failed. Falling back to payout to address.'
         defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net2)))
     pubkey = validate_response['pubkey'].decode('hex')
+    assert bitcoin_data.pubkey_to_address(pubkey, net2) == address
     defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
 
 @defer.inlineCallbacks
