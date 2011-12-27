@@ -17,6 +17,14 @@ def median(x, use_float=True):
     else:
         return sum//2
 
+def mean(x):
+    total = 0
+    count = 0
+    for y in x:
+        total += y
+        count += 1
+    return total/count
+
 def shuffled(x):
     x = list(x)
     random.shuffle(x)

@@ -553,7 +553,7 @@ def main(args, net, datadir_path):
                 height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                 att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
                 fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
-                return json.dumps(int(att_s / (1. - (math.median(fracs) if fracs else 0))))
+                return json.dumps(int(att_s / (1. - (math.mean(fracs) if fracs else 0))))
             return json.dumps(None)
         
         def get_users():
@@ -617,7 +617,7 @@ def main(args, net, datadir_path):
                             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
                             (stale_orphan_shares, stale_doa_shares), shares = get_stale_counts()
                             fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
-                            real_att_s = att_s / (1. - (math.median(fracs) if fracs else 0))
+                            real_att_s = att_s / (1. - (math.mean(fracs) if fracs else 0))
                             my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
                             this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                                 math.format(int(real_att_s)),
@@ -635,7 +635,7 @@ def main(args, net, datadir_path):
                                 2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
                             )
                             if fracs:
-                                med = math.median(fracs)
+                                med = math.mean(fracs)
                                 this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
                                 conf = 0.95
                                 if shares:
