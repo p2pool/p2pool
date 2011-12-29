@@ -51,16 +51,16 @@ class WorkerInterface(object):
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
-            print 'POLL %i START long_poll=%r user_agent=%r x-work-identifier=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getHeader('X-Work-Identifier'), request.getUser())
+            print 'POLL %i START is_long_poll=%r user_agent=%r user=%r' % (id, long_poll, request.getHeader('User-Agent'), request.getUser())
         
         if long_poll:
             request_id = request.getClientIP(), request.getHeader('Authorization')
             if self.worker_views.get(request_id, self.new_work_event.times) != self.new_work_event.times:
                 if p2pool.DEBUG:
-                    print 'POLL %i PUSH user=%r' % (id, request.getUser())
+                    print 'POLL %i PUSH' % (id,)
             else:
                 if p2pool.DEBUG:
-                    print 'POLL %i WAITING user=%r' % (id, request.getUser())
+                    print 'POLL %i WAITING' % (id,)
                 yield self.new_work_event.get_deferred()
             self.worker_views[request_id] = self.new_work_event.times
         
@@ -74,6 +74,6 @@ class WorkerInterface(object):
         self.work_cache[key] = res.update(timestamp=res.timestamp + 12) # XXX doesn't bound timestamp
         
         if p2pool.DEBUG:
-            print 'POLL %i END identifier=%i user=%r' % (id, self.new_work_event.times, request.getUser())
+            print 'POLL %i END identifier=%i' % (id, self.new_work_event.times)
         
         defer.returnValue(res.getwork(identifier=str(self.new_work_event.times)))
