@@ -432,12 +432,14 @@ def main(args, net, datadir_path):
                 return None
             return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
         
-        def compute(user):
-            state = current_work.value
-            
-            payout_script = get_payout_script_from_username(user)
+        def precompute(request):
+            payout_script = get_payout_script_from_username(request.getUser())
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
+            return payout_script,
+
+        def compute(payout_script):
+            state = current_work.value
             
             if len(p2p_node.peers) == 0 and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
@@ -466,8 +468,7 @@ def main(args, net, datadir_path):
                 net=net,
             )
             
-            print 'New work for worker %s! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
-                user,
+            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
                 bitcoin_data.target_to_difficulty(share_info['bits'].target),
                 (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.PARENT.SYMBOL,
                 subsidy*1e-8, net.PARENT.SYMBOL,
@@ -547,7 +548,7 @@ def main(args, net, datadir_path):
                 return False
         
         web_root = resource.Resource()
-        worker_interface.WorkerInterface(compute, got_response, current_work.changed).attach_to(web_root)
+        worker_interface.WorkerInterface(compute, got_response, current_work.changed, precompute).attach_to(web_root)
         
         def get_rate():
             if current_work.value['best_share_hash'] is not None:

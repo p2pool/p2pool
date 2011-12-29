@@ -25,14 +25,15 @@ class _Page(jsonrpc.Server):
         return self.render_POST(request)
 
 class WorkerInterface(object):
-    def __init__(self, compute, response_callback, new_work_event=variable.Event()):
+    def __init__(self, compute, response_callback, new_work_event=variable.Event(), request_process_func=lambda request: (request,)):
         self.compute = compute
         self.response_callback = response_callback
         self.new_work_event = new_work_event
+        self.request_process_func = request_process_func
         
         self.worker_views = {}
         
-        self.work_cache = {} # username -> blockattempt
+        self.work_cache = {} # request_process_func(request) -> blockattempt
         watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
         self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
     
@@ -63,12 +64,14 @@ class WorkerInterface(object):
                 yield self.new_work_event.get_deferred()
             self.worker_views[request_id] = self.new_work_event.times
         
-        if request.getUser() in self.work_cache:
-            res = self.work_cache[request.getUser()]
-        else:
-            res = self.compute(request.getUser())
+        key = self.request_process_func(request)
         
-        self.work_cache[request.getUser()] = res.update(timestamp=res.timestamp + 12) # XXX doesn't bound timestamp
+        if key in self.work_cache:
+            res = self.work_cache[key]
+        else:
+            res = self.compute(*key)
+        
+        self.work_cache[key] = res.update(timestamp=res.timestamp + 12) # XXX doesn't bound timestamp
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i user=%r' % (id, self.new_work_event.times, request.getUser())
