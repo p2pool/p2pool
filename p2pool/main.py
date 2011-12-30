@@ -131,7 +131,6 @@ def main(args, net, datadir_path):
         peer_heads = expiring_dict.ExpiringDict(300) # hash -> peers that know of it
         
         pre_current_work = variable.Variable(None)
-        pre_current_work2 = variable.Variable(None)
         pre_merged_work = variable.Variable(None)
         # information affecting work that should trigger a long-polling update
         current_work = variable.Variable(None)
@@ -143,7 +142,7 @@ def main(args, net, datadir_path):
         @defer.inlineCallbacks
         def set_real_work1():
             work = yield getwork(bitcoind)
-            pre_current_work2.set(dict(
+            current_work2.set(dict(
                 time=work['time'],
                 transactions=work['transactions'],
                 subsidy=work['subsidy'],
@@ -160,7 +159,6 @@ def main(args, net, datadir_path):
         def set_real_work2():
             best, desired = tracker.think(ht, pre_current_work.value['previous_block'])
             
-            current_work2.set(pre_current_work2.value)
             t = dict(pre_current_work.value)
             t['best_share_hash'] = best
             t['aux_work'] = pre_merged_work.value
