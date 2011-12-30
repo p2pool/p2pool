@@ -389,11 +389,16 @@ def main(args, net, datadir_path):
         
         merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
         
-        removed_unstales_var = variable.Variable(0)
+        removed_unstales_var = variable.Variable((0, 0, 0))
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                removed_unstales.set(removed_unstales.value + 1)
+                assert share.share_data['stale_frac'] in [0, 253, 254] # we made these shares in this instance
+                removed_unstales_var.set((
+                    removed_unstales_var.value[0] + 1,
+                    removed_unstales_var.value[1] + (1 if share.share_data['stale_frac'] == 253 else 0),
+                    removed_unstales_var.value[2] + (1 if share.share_data['stale_frac'] == 254 else 0),
+                ))
         
         removed_doa_unstales_var = variable.Variable(0)
         @tracker.verified.removed.watch
@@ -404,21 +409,26 @@ def main(args, net, datadir_path):
         stale_counter = skiplists.SumSkipList(tracker, lambda share: (
             1 if share.hash in my_share_hashes else 0,
             1 if share.hash in my_doa_share_hashes else 0,
-        ), (0, 0), math.add_tuples)
+            1 if share.hash in my_share_hashes and share.share_data['stale_frac'] == 253 else 0,
+            1 if share.hash in my_share_hashes and share.share_data['stale_frac'] == 254 else 0,
+        ), (0, 0, 0, 0), math.add_tuples)
         def get_stale_counts():
-            '''Returns (orphans, doas), total'''
+            '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''
             my_shares = len(my_share_hashes)
             my_doa_shares = len(my_doa_share_hashes)
-            my_shares_in_chain, my_doa_shares_in_chain = stale_counter(
+            my_shares_in_chain, my_doa_shares_in_chain, orphans_recorded_in_chain, doas_recorded_in_chain = stale_counter(
                 current_work.value['best_share_hash'],
                 tracker.verified.get_height(current_work.value['best_share_hash']),
             )
-            my_shares_in_chain += removed_unstales_var.value
+            my_shares_in_chain += removed_unstales_var.value[0]
             my_doa_shares_in_chain += removed_doa_unstales_var.value
+            orphans_recorded_in_chain += removed_unstales_var.value[1]
+            doas_recorded_in_chain += removed_unstales_var.value[2]
+            
             my_shares_not_in_chain = my_shares - my_shares_in_chain
             my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
             
-            return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares
+            return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
         
         
         def get_payout_script_from_username(user):
@@ -457,8 +467,10 @@ def main(args, net, datadir_path):
                     new_script=payout_script,
                     subsidy=subsidy,
                     donation=math.perfect_round(65535*args.donation_percentage/100),
-                    stale_frac=(lambda (orphans, doas), total:
-                        255 if total == 0 else math.perfect_round(254*(orphans + doas)/total)
+                    stale_frac=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
+                        253 if orphans > orphans_recorded_in_chain else
+                        254 if doas > doas_recorded_in_chain else
+                        0
                     )(*get_stale_counts()),
                 ),
                 block_target=state['bits'].target,
@@ -615,7 +627,7 @@ def main(args, net, datadir_path):
                         if height > 2:
                             att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
                             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
-                            (stale_orphan_shares, stale_doa_shares), shares = get_stale_counts()
+                            (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
                             fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
                             real_att_s = att_s / (1. - (math.mean(fracs) if fracs else 0))
                             my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
