@@ -67,11 +67,13 @@ class WorkerInterface(object):
         key = self.request_process_func(request)
         
         if key in self.work_cache:
-            res = self.work_cache[key]
+            res, orig_timestamp = self.work_cache.pop(key)
         else:
             res = self.compute(*key)
+            orig_timestamp = res.timestamp
         
-        self.work_cache[key] = res.update(timestamp=res.timestamp + 12) # XXX doesn't bound timestamp
+        if res.timestamp + 12 < orig_timestamp + 600:
+            self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.new_work_event.times)
