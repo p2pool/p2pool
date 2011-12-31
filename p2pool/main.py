@@ -447,25 +447,22 @@ def main(args, net, datadir_path):
             return payout_script,
 
         def compute(payout_script):
-            state = current_work.value
-            
             if len(p2p_node.peers) == 0 and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
-            if state['best_share_hash'] is None and net.PERSIST:
+            if current_work.value['best_share_hash'] is None and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
             if time.time() > current_work2.value['last_update'] + 60:
                 raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
             
-            previous_share = None if state['best_share_hash'] is None else tracker.shares[state['best_share_hash']]
-            subsidy = current_work2.value['subsidy']
             share_info, generate_tx = p2pool_data.generate_transaction(
                 tracker=tracker,
                 share_data=dict(
-                    previous_share_hash=state['best_share_hash'],
-                    coinbase='' if state['aux_work'] is None else '\xfa\xbemm' + bitcoin_data.HashType().pack(state['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
+                    previous_share_hash=current_work.value['best_share_hash'],
+                    coinbase='' if current_work.value['aux_work'] is None else
+                        '\xfa\xbemm' + bitcoin_data.HashType().pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
                     nonce=struct.pack('<Q', random.randrange(2**64)),
                     new_script=payout_script,
-                    subsidy=subsidy,
+                    subsidy=current_work2.value['subsidy'],
                     donation=math.perfect_round(65535*args.donation_percentage/100),
                     stale_frac=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
                         253 if orphans > orphans_recorded_in_chain else
@@ -473,15 +470,15 @@ def main(args, net, datadir_path):
                         0
                     )(*get_stale_counts()),
                 ),
-                block_target=state['bits'].target,
+                block_target=current_work.value['bits'].target,
                 desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
                 net=net,
             )
             
             print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
                 bitcoin_data.target_to_difficulty(share_info['bits'].target),
-                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - subsidy//200)*1e-8, net.PARENT.SYMBOL,
-                subsidy*1e-8, net.PARENT.SYMBOL,
+                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
+                current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
                 len(current_work2.value['transactions']),
             )
             
@@ -489,7 +486,14 @@ def main(args, net, datadir_path):
             merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
             merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
             
-            return bitcoin_getwork.BlockAttempt(state['version'], state['previous_block'], merkle_root, current_work2.value['time'], state['bits'], share_info['bits'].target)
+            return bitcoin_getwork.BlockAttempt(
+                version=current_work.value['version'],
+                previous_block=current_work.value['previous_block'],
+                merkle_root=merkle_root,
+                timestamp=current_work2.value['time'],
+                bits=current_work.value['bits'],
+                share_target=share_info['bits'].target,
+            )
         
         my_share_hashes = set()
         my_doa_share_hashes = set()
