@@ -19,7 +19,7 @@ share_data_type = bitcoin_data.ComposedType([
     ('new_script', bitcoin_data.VarStrType()),
     ('subsidy', bitcoin_data.StructType('<Q')),
     ('donation', bitcoin_data.StructType('<H')),
-    ('stale_frac', bitcoin_data.StructType('<B')),
+    ('stale_info', bitcoin_data.StructType('<B')), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
 ])
 
 share_info_type = bitcoin_data.ComposedType([
@@ -50,7 +50,7 @@ share_type = bitcoin_data.ComposedType([
 ])
 
 class Share(object):
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation stale_frac net'.split(' ')
+    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation net'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -125,8 +125,6 @@ class Share(object):
             print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
-        self.stale_frac = self.share_data['stale_frac']/254 if self.share_data['stale_frac'] != 255 else None
-        
         self.other_txs = other_txs if self.pow_hash <= self.header['bits'].target else None
         
         # XXX eww
@@ -181,6 +179,22 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, dist):
     if time == 0:
         time = 1
     return attempts//time
+
+def get_average_stale_prop(tracker, share_hash, lookbehind):
+    def stales_per_share(share):
+        if share.share_data['stale_info'] == 253: # orphan
+            return 1
+        elif share.share_data['stale_info'] == 254: # doa
+            return 1
+        elif share.share_data['stale_info'] == 0:
+            return 0
+        elif share.share_data['stale_info'] == 255: # temporary hack until everyone uses new-style stale data
+            return 0
+        else:
+            return 1/(254/share.share_data['stale_info'] - 1) # converts stales/shares to stales/nonstales
+            # 0 and 254 case are taken care of above and this will soon be removed anyway
+    stales = sum(stales_per_share(share) for share in tracker.get_chain(share_hash, lookbehind))
+    return stales/(lookbehind + stales)
 
 def generate_transaction(tracker, share_data, block_target, desired_timestamp, net):
     previous_share_hash = share_data['previous_share_hash']

@@ -393,11 +393,11 @@ def main(args, net, datadir_path):
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                assert share.share_data['stale_frac'] in [0, 253, 254] # we made these shares in this instance
+                assert share.share_data['stale_info'] in [0, 253, 254] # we made these shares in this instance
                 removed_unstales_var.set((
                     removed_unstales_var.value[0] + 1,
-                    removed_unstales_var.value[1] + (1 if share.share_data['stale_frac'] == 253 else 0),
-                    removed_unstales_var.value[2] + (1 if share.share_data['stale_frac'] == 254 else 0),
+                    removed_unstales_var.value[1] + (1 if share.share_data['stale_info'] == 253 else 0),
+                    removed_unstales_var.value[2] + (1 if share.share_data['stale_info'] == 254 else 0),
                 ))
         
         removed_doa_unstales_var = variable.Variable(0)
@@ -409,8 +409,8 @@ def main(args, net, datadir_path):
         stale_counter = skiplists.SumSkipList(tracker, lambda share: (
             1 if share.hash in my_share_hashes else 0,
             1 if share.hash in my_doa_share_hashes else 0,
-            1 if share.hash in my_share_hashes and share.share_data['stale_frac'] == 253 else 0,
-            1 if share.hash in my_share_hashes and share.share_data['stale_frac'] == 254 else 0,
+            1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,
+            1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 254 else 0,
         ), (0, 0, 0, 0), math.add_tuples)
         def get_stale_counts():
             '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''
@@ -464,7 +464,7 @@ def main(args, net, datadir_path):
                     new_script=payout_script,
                     subsidy=current_work2.value['subsidy'],
                     donation=math.perfect_round(65535*args.donation_percentage/100),
-                    stale_frac=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
+                    stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
                         253 if orphans > orphans_recorded_in_chain else
                         254 if doas > doas_recorded_in_chain else
                         0
@@ -565,12 +565,10 @@ def main(args, net, datadir_path):
         worker_interface.WorkerInterface(compute, got_response, current_work.changed, precompute).attach_to(web_root)
         
         def get_rate():
-            if current_work.value['best_share_hash'] is not None:
-                height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-                att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
-                fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
-                return json.dumps(int(att_s / (1. - (math.mean(fracs) if fracs else 0))))
-            return json.dumps(None)
+            if tracker.get_height(current_work.value['best_share_hash']) < 720:
+                return json.dumps(None)
+            return json.dumps(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
+                / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720)))
         
         def get_users():
             height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
@@ -632,8 +630,8 @@ def main(args, net, datadir_path):
                             att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720))
                             weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
                             (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
-                            fracs = [share.stale_frac for share in tracker.get_chain(current_work.value['best_share_hash'], min(120, height)) if share.stale_frac is not None]
-                            real_att_s = att_s / (1. - (math.mean(fracs) if fracs else 0))
+                            stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], min(720, height))
+                            real_att_s = att_s / (1 - stale_prop)
                             my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
                             this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
                                 math.format(int(real_att_s)),
@@ -650,15 +648,13 @@ def main(args, net, datadir_path):
                             this_str += '\nAverage time between blocks: %.2f days' % (
                                 2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
                             )
-                            if fracs:
-                                med = math.mean(fracs)
-                                this_str += '\nPool stales: %i%%' % (int(100*med+.5),)
-                                conf = 0.95
-                                if shares:
-                                    stale_shares = stale_orphan_shares + stale_doa_shares
-                                    this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
-                                    if med < .99:
-                                        this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - med) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
+                            this_str += '\nPool stales: %i%%' % (int(100*stale_prop+.5),)
+                            conf = 0.95
+                            if shares:
+                                stale_shares = stale_orphan_shares + stale_doa_shares
+                                this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
+                                if stale_prop < .99:
+                                    this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - stale_prop) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
                             if this_str != last_str or time.time() > last_time + 15:
                                 print this_str
                                 last_str = this_str
