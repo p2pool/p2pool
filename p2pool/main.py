@@ -578,6 +578,62 @@ def main(args, net, datadir_path):
                 res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
             return json.dumps(res)
         
+        def get_global_stats():
+            # averaged over last hour
+            lookbehind = 3600//net.SHARE_PERIOD
+            if tracker.get_height(current_work.value['best_share_hash']) < lookbehind:
+                return None
+            
+            nonstale_hash_rate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], lookbehind)
+            stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], lookbehind)
+            return json.dumps(dict(
+                pool_nonstale_hash_rate=nonstale_hash_rate,
+                pool_hash_rate=nonstale_hash_rate/(1 - stale_prop),
+                pool_stale_prop=stale_prop,
+            ))
+        
+        def get_local_stats():
+            lookbehind = 3600//net.SHARE_PERIOD
+            if tracker.get_height(current_work.value['best_share_hash']) < lookbehind:
+                return None
+            
+            global_stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], lookbehind)
+            
+            my_unstale_count = sum(1 for share in tracker.get_chain(current_work.value['best_share_hash'], lookbehind) if share.hash in my_share_hashes)
+            my_orphan_count = sum(1 for share in tracker.get_chain(current_work.value['best_share_hash'], lookbehind) if share.hash in my_share_hashes and share.share_data['stale_info'] == 253)
+            my_doa_count = sum(1 for share in tracker.get_chain(current_work.value['best_share_hash'], lookbehind) if share.hash in my_share_hashes and share.share_data['stale_info'] == 254)
+            my_share_count = my_unstale_count + my_orphan_count + my_doa_count
+            my_stale_count = my_orphan_count + my_doa_count
+            
+            my_stale_prop = my_stale_count/my_share_count if my_share_count != 0 else None
+            
+            my_work = sum(bitcoin_data.target_to_average_attempts(share.target)
+                for share in tracker.get_chain(current_work.value['best_share_hash'], lookbehind - 1)
+                if share.hash in my_share_hashes)
+            actual_time = (tracker.shares[current_work.value['best_share_hash']].timestamp -
+                tracker.shares[tracker.get_nth_parent_hash(current_work.value['best_share_hash'], lookbehind - 1)].timestamp)
+            share_att_s = my_work / actual_time
+            
+            return json.dumps(dict(
+                my_hash_rates_in_last_hour=dict(
+                    nonstale=share_att_s,
+                    rewarded=share_att_s/(1 - global_stale_prop),
+                    actual=share_att_s/(1 - my_stale_prop) if my_stale_prop is not None else 0, # 0 because we don't have any shares anyway
+                ),
+                my_share_counts_in_last_hour=dict(
+                    shares=my_share_count,
+                    unstale_shares=my_unstale_count,
+                    stale_shares=my_stale_count,
+                    orphan_stale_shares=my_orphan_count,
+                    doa_stale_shares=my_doa_count,
+                ),
+                my_stale_proportions_in_last_hour=dict(
+                    stale=my_stale_prop,
+                    orphan_stale=my_orphan_count/my_share_count if my_share_count != 0 else None,
+                    dead_stale=my_doa_count/my_share_count if my_share_count != 0 else None,
+                ),
+            ))
+        
         class WebInterface(resource.Resource):
             def __init__(self, func, mime_type):
                 self.func, self.mime_type = func, mime_type
@@ -589,6 +645,8 @@ def main(args, net, datadir_path):
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
         web_root.putChild('fee', WebInterface(lambda: json.dumps(args.worker_fee), 'application/json'))
+        web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
+        web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
