@@ -172,11 +172,12 @@ class Share(object):
         return dict(header=self.header, txs=[gentx] + self.other_txs)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, dist):
+    assert dist >= 2
     near = tracker.shares[previous_share_hash]
     far = tracker.shares[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
     attempts = tracker.get_work(near.hash) - tracker.get_work(far.hash)
     time = near.timestamp - far.timestamp
-    if time == 0:
+    if time <= 0:
         time = 1
     return attempts//time
 
