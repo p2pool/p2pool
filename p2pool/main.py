@@ -71,7 +71,7 @@ def main(args, net, datadir_path):
         bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
         good = yield deferral.retry('Error while checking bitcoind identity:', 1)(net.PARENT.RPC_CHECK)(bitcoind)
         if not good:
-            print "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
+            print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
             return
         temp_work = yield getwork(bitcoind)
         print '    ...success!'
@@ -255,7 +255,7 @@ def main(args, net, datadir_path):
                 if factory.conn.value is not None:
                     factory.conn.value.send_block(block=share.as_block(tracker))
                 else:
-                    print 'No bitcoind connection! Erp!'
+                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
                 print
                 print 'GOT BLOCK! Passing to bitcoind! %s bitcoin: %x' % (p2pool_data.format_hash(share.hash), share.header_hash,)
                 print
@@ -319,7 +319,7 @@ def main(args, net, datadir_path):
         try:
             addrs = dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt')))
         except:
-            print "error reading addrs"
+            print >>sys.stderr, "error reading addrs"
         
         def save_addrs():
             open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
@@ -503,7 +503,7 @@ def main(args, net, datadir_path):
                 # match up with transactions
                 xxx = merkle_root_to_transactions.get(header['merkle_root'], None)
                 if xxx is None:
-                    print '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
+                    print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                     return False
                 share_info, transactions, getwork_time = xxx
                 
@@ -515,7 +515,7 @@ def main(args, net, datadir_path):
                     if factory.conn.value is not None:
                         factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                     else:
-                        print 'No bitcoind connection! Erp!'
+                        print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
                     if pow_hash <= header['bits'].target:
                         print
                         print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
@@ -545,7 +545,7 @@ def main(args, net, datadir_path):
                     log.err(None, 'Error while processing merged mining POW:')
                 
                 if pow_hash > share_info['bits'].target:
-                    print 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
+                    print >>sys.stderr, 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
                     return False
                 share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
                 my_share_hashes.add(share.hash)
@@ -680,7 +680,7 @@ def main(args, net, datadir_path):
                 yield deferral.sleep(3)
                 try:
                     if time.time() > current_work2.value['last_update'] + 60:
-                        print '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
+                        print >>sys.stderr, '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
                     if current_work.value['best_share_hash'] is not None:
                         height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
                         if height > 2:
@@ -910,8 +910,25 @@ def run():
                 raise
         def flush(self):
             self.inner_file.flush()
+    class PrefixPipe(object):
+        def __init__(self, inner_file, prefix):
+            self.inner_file = inner_file
+            self.prefix = prefix
+            self.buf = ''
+            self.softspace = 0
+        def write(self, data):
+            buf = self.buf + data
+            lines = buf.split('\n')
+            for line in lines[:-1]:
+                self.inner_file.write(self.prefix + line + '\n')
+                self.inner_file.flush()
+            self.buf = lines[-1]
+        def flush(self):
+            pass
     logfile = LogFile(args.logfile)
-    sys.stdout = sys.stderr = log.DefaultObserver.stderr = AbortPipe(TimestampingPipe(TeePipe([EncodeReplacerPipe(sys.stderr), logfile])))
+    pipe = TimestampingPipe(TeePipe([EncodeReplacerPipe(sys.stderr), logfile]))
+    sys.stdout = AbortPipe(pipe)
+    sys.stderr = log.DefaultObserver.stderr = AbortPipe(PrefixPipe(pipe, '> '))
     if hasattr(signal, "SIGUSR1"):
         def sigusr1(signum, frame):
             print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
