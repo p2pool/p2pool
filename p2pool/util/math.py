@@ -134,7 +134,7 @@ class Object(object):
 def add_tuples(res, *tuples):
     for t in tuples:
         if len(t) != len(res):
-            print 'tuples must all be the same length'
+            raise ValueError('tuples must all be the same length')
         res = tuple(a + b for a, b in zip(res, t))
     return res
 
