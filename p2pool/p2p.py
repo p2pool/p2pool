@@ -50,7 +50,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             nonce=self.node.nonce,
             sub_version=self.sub_version,
             mode=1,
-            best_share_hash=self.node.current_work.value['best_share_hash'],
+            best_share_hash=self.node.best_share_hash_func(),
         )
         
         reactor.callLater(10, self._connect_timeout)
@@ -240,10 +240,11 @@ class ClientFactory(protocol.ClientFactory):
         self.node.attempt_ended(connector)
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_conns=50, max_attempts=30, preferred_storage=1000):
+    def __init__(self, best_share_hash_func, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_conns=50, max_attempts=30, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
+        self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
         self.addr_store = addr_store
@@ -251,7 +252,6 @@ class Node(object):
         self.desired_peers = desired_peers
         self.max_conns = max_conns
         self.max_attempts = max_attempts
-        self.current_work = current_work
         self.preferred_storage = preferred_storage
         
         self.nonce = random.randrange(2**64)

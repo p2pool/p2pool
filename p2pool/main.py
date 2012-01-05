@@ -311,7 +311,7 @@ def main(args, net, datadir_path):
         task.LoopingCall(save_addrs).start(60)
         
         p2p_node = p2p.Node(
-            current_work=current_work,
+            best_share_hash_func=lambda: current_work.value['best_share_hash'],
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
