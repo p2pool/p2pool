@@ -30,6 +30,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     def connectionMade(self):
         bitcoin_p2p.BaseProtocol.connectionMade(self)
         
+        self.node.conns.add(self)
+        
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
@@ -203,6 +205,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             att(self.send_shares, shares=[share.as_share() for share in shares])
     
     def connectionLost(self, reason):
+        self.node.conns.remove(self)
         if self.connected2:
             self.node.lost_conn(self)
             self.connected2 = False
@@ -212,6 +215,8 @@ class ServerFactory(protocol.ServerFactory):
         self.node = node
     
     def buildProtocol(self, addr):
+        if len(self.node.conns) >= self.node.max_conns:
+            return None
         p = Protocol(self.node)
         p.factory = self
         return p
@@ -235,7 +240,7 @@ class ClientFactory(protocol.ClientFactory):
         self.node.attempt_ended(connector)
 
 class Node(object):
-    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_attempts=30, preferred_storage=1000):
+    def __init__(self, current_work, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_conns=50, max_attempts=30, preferred_storage=1000):
         if addr_store is None:
             addr_store = {}
         
@@ -244,11 +249,13 @@ class Node(object):
         self.addr_store = addr_store
         self.preferred_addrs = preferred_addrs
         self.desired_peers = desired_peers
+        self.max_conns = max_conns
         self.max_attempts = max_attempts
         self.current_work = current_work
         self.preferred_storage = preferred_storage
         
         self.nonce = random.randrange(2**64)
+        self.conns = set()
         self.attempts = {}
         self.peers = {}
         self.running = False
