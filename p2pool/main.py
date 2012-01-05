@@ -299,27 +299,12 @@ def main(args, net, datadir_path):
             else:
                 return x, net.P2P_PORT
         
-        nodes = set([
-            ('72.14.191.28', net.P2P_PORT),
-            ('62.204.197.159', net.P2P_PORT),
-            ('142.58.248.28', net.P2P_PORT),
-            ('94.23.34.145', net.P2P_PORT),
-        ])
-        for host in [
-            'p2pool.forre.st',
-            'dabuttonfactory.com',
-            ] + (['liteco.in'] if net.NAME == 'litecoin' else []) + [
-        ]:
+        addrs = dict((parse(addr), (0, 0, 0)) for addr in net.BOOTSTRAP_ADDRS)
+        if os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
             try:
-                nodes.add(((yield reactor.resolve(host)), net.P2P_PORT))
+                addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
             except:
-                log.err(None, 'Error resolving bootstrap node IP:')
-        
-        addrs = {}
-        try:
-            addrs = dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt')))
-        except:
-            print >>sys.stderr, "error reading addrs"
+                print >>sys.stderr, "error reading addrs"
         
         def save_addrs():
             open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
@@ -330,7 +315,7 @@ def main(args, net, datadir_path):
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
-            preferred_addrs=set(map(parse, args.p2pool_nodes)) | nodes,
+            preferred_addrs=set(map(parse, args.p2pool_nodes)),
         )
         p2p_node.handle_shares = p2p_shares
         p2p_node.handle_share_hashes = p2p_share_hashes
