@@ -87,7 +87,7 @@ LitecoinMainnet = math.Object(
     MAX_TARGET=2**256//2**20 - 1,
     PERSIST=True,
     WORKER_PORT=9327,
-    BOOTSTRAP_ADDRS='72.14.191.28 176.31.249.89'.split(' ')
+    BOOTSTRAP_ADDRS='76.26.53.101 124.205.120.178 190.195.79.161 173.167.113.73 82.161.65.210 67.83.108.0 78.101.67.239 78.100.161.252 87.58.117.233 78.100.162.223 216.239.45.4 78.101.131.221 72.14.191.28 97.81.163.217 69.126.183.240 219.84.64.174 78.101.119.27 89.211.228.244 178.152.122.30 172.16.0.3 76.26.53.101:51319'.split(' '),
 )
 LitecoinTestnet = math.Object(
     PARENT=networks.LitecoinTestnet,
@@ -103,7 +103,7 @@ LitecoinTestnet = math.Object(
     MAX_TARGET=2**256//2**17 - 1,
     PERSIST=False,
     WORKER_PORT=19327,
-    BOOTSTRAP_ADDRS='72.14.191.28 176.31.249.89'.split(' ')
+    BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
 )
 
 nets=dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, NamecoinMainnet, NamecoinTestnet, LitecoinMainnet, LitecoinTestnet]))
