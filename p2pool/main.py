@@ -620,7 +620,7 @@ def main(args, net, datadir_path):
             ))
         
         def get_peer_addresses():
-            return ' '.join(peer.transport.getPeer().host + ':' + str(peer.transport.getPeer().port) for peer in p2p_node.peers.itervalues())
+            return ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues())
         
         class WebInterface(resource.Resource):
             def __init__(self, func, mime_type):
