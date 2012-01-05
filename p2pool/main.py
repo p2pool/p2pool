@@ -892,7 +892,7 @@ def run():
             buf = self.buf + data
             lines = buf.split('\n')
             for line in lines[:-1]:
-                self.inner_file.write('%s %s\n' % (datetime.datetime.now().strftime("%H:%M:%S.%f"), line))
+                self.inner_file.write('%s %s\n' % (datetime.datetime.now(), line))
                 self.inner_file.flush()
             self.buf = lines[-1]
         def flush(self):
