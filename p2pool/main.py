@@ -299,7 +299,7 @@ def main(args, net, datadir_path):
             else:
                 return x, net.P2P_PORT
         
-        addrs = dict((parse(addr), (0, 0, 0)) for addr in net.BOOTSTRAP_ADDRS)
+        addrs = {}
         if os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
             try:
                 addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
@@ -315,7 +315,7 @@ def main(args, net, datadir_path):
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
-            preferred_addrs=set(map(parse, args.p2pool_nodes)),
+            preferred_addrs=set(map(parse, args.p2pool_nodes)) | set(map(parse, net.BOOTSTRAP_ADDRS)),
         )
         p2p_node.handle_shares = p2p_shares
         p2p_node.handle_share_hashes = p2p_share_hashes
