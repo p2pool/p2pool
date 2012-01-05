@@ -666,11 +666,10 @@ def main(args, net, datadir_path):
         
         
         if hasattr(signal, 'SIGALRM'):
-            def watchdog_handler(signum, frame):
-                print 'Watchdog timer went off at:'
-                traceback.print_stack()
-            
-            signal.signal(signal.SIGALRM, watchdog_handler)
+            signal.signal(signal.SIGALRM, lambda signum, frame: reactor.callFromThread(
+                lambda: sys.stdout.write('Watchdog timer went off at:\n' + ''.join(traceback.format_stack()))
+            ))
+            signal.siginterrupt(signal.SIGALRM, False)
             task.LoopingCall(signal.alarm, 30).start(1)
         
         @defer.inlineCallbacks
