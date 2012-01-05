@@ -634,6 +634,9 @@ def main(args, net, datadir_path):
                 ),
             ))
         
+        def get_peer_addresses():
+            return ' '.join(peer.transport.getPeer().host + ':' + str(peer.transport.getPeer().port) for peer in p2p_node.peers.itervalues())
+        
         class WebInterface(resource.Resource):
             def __init__(self, func, mime_type):
                 self.func, self.mime_type = func, mime_type
@@ -647,6 +650,7 @@ def main(args, net, datadir_path):
         web_root.putChild('fee', WebInterface(lambda: json.dumps(args.worker_fee), 'application/json'))
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
+        web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
