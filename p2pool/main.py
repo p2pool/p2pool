@@ -593,20 +593,16 @@ def main(args, net, datadir_path):
             total_without_tag = sum(out['value'] for out in outputs if out['script'] != tmp_tag)
             return dict((out['script'], out['value']*total/total_without_tag/1e8) for out in outputs if out['script'] != tmp_tag and out['value'])
         
+        def get_current_normalized_txouts():
+            txouts = get_current_txouts()
+            total = sum(txouts.itervalues())
+            return dict((script, value/total) for script, value in txouts.iteritems())
+        
         def get_current_payouts():
             return json.dumps(dict((bitcoin_data.script2_to_human(script, net.PARENT), value) for script, value in get_current_txouts().iteritems()))
         
-        def get_patron_uri():
-            res = []
-            res.append("Use one of these addresses to fairly donate to everyone using P2Pool:\n")
-            txouts = get_current_txouts()
-            total = sum(txouts.itervalues())
-            normalized_txouts = dict((script, value/total) for script, value in txouts.iteritems())
-            for this in [1, 2, 5, 10, 20, 50]:
-                res.append('URI for a total of %s %s: ' % (this, net.PARENT.SYMBOL))
-                res.append('x-btc' + ''.join(':addr=%s;value=%s;send' % (bitcoin_data.script2_to_address(script, net.PARENT), this*value) for script, value in normalized_txouts.iteritems() if bitcoin_data.script2_to_address(script, net.PARENT) is not None))
-                res.append('\n')
-            return ''.join(res)
+        def get_patron_sendmany(this=1):
+            return json.dumps(dict((bitcoin_data.script2_to_address(script, net.PARENT), float(this)*value) for script, value in get_current_normalized_txouts().iteritems() if bitcoin_data.script2_to_address(script, net.PARENT) is not None))
          
         def get_global_stats():
             # averaged over last hour
@@ -668,19 +664,19 @@ def main(args, net, datadir_path):
             return ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues())
         
         class WebInterface(resource.Resource):
-            def __init__(self, func, mime_type):
-                self.func, self.mime_type = func, mime_type
+            def __init__(self, func, mime_type, *fields):
+                self.func, self.mime_type, self.fields = func, mime_type, fields
             
             def render_GET(self, request):
                 request.setHeader('Content-Type', self.mime_type)
                 request.setHeader('Access-Control-Allow-Origin', '*')
-                return self.func()
+                return self.func(*(request.args[field][0] for field in self.fields))
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
         web_root.putChild('fee', WebInterface(lambda: json.dumps(args.worker_fee), 'application/json'))
         web_root.putChild('current_payouts', WebInterface(get_current_payouts, 'application/json'))
-        web_root.putChild('patron_uri', WebInterface(get_patron_uri, 'text/plain'))
+        web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain', 'total'))
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
