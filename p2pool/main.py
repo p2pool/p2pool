@@ -582,6 +582,14 @@ def main(args, net, datadir_path):
                 res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
             return json.dumps(res)
         
+        def get_current_payouts():
+            wb = WorkerBridge()
+            tmp_tag = str(random.randrange(2**64))
+            outputs = wb.merkle_root_to_transactions[wb.get_work(tmp_tag).merkle_root][1][0]['tx_outs']
+            total = sum(out['value'] for out in outputs)
+            total_without_tag = sum(out['value'] for out in outputs if out['script'] != tmp_tag)
+            return json.dumps(dict((bitcoin_data.script2_to_human(out['script'], net.PARENT), out['value']*total/total_without_tag/1e8) for out in outputs if out['script'] != tmp_tag))
+        
         def get_global_stats():
             # averaged over last hour
             lookbehind = 3600//net.SHARE_PERIOD
@@ -652,6 +660,7 @@ def main(args, net, datadir_path):
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
         web_root.putChild('users', WebInterface(get_users, 'application/json'))
         web_root.putChild('fee', WebInterface(lambda: json.dumps(args.worker_fee), 'application/json'))
+        web_root.putChild('current_payouts', WebInterface(get_current_payouts, 'application/json'))
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
