@@ -414,141 +414,141 @@ def main(args, net, datadir_path):
             my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
             
             return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
-            
+        
         my_share_hashes = set()
         my_doa_share_hashes = set()
         
         class WorkerBridge(worker_interface.WorkerBridge):
-          def __init__(self):
-            worker_interface.WorkerBridge.__init__(self)
-            self.new_work_event = current_work.changed
-        
-          def _get_payout_script_from_username(self, user):
-            if user is None:
-                return None
-            try:
-                pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
-            except: # XXX blah
-                return None
-            return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
-        
-          def preprocess_request(self, request):
-            payout_script = self._get_payout_script_from_username(request.getUser())
-            if payout_script is None or random.uniform(0, 100) < args.worker_fee:
-                payout_script = my_script
-            return payout_script,
-
-          def get_work(self, payout_script):
-            if len(p2p_node.peers) == 0 and net.PERSIST:
-                raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
-            if current_work.value['best_share_hash'] is None and net.PERSIST:
-                raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
-            if time.time() > current_work2.value['last_update'] + 60:
-                raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
+            def __init__(self):
+                worker_interface.WorkerBridge.__init__(self)
+                self.new_work_event = current_work.changed
             
-            share_info, generate_tx = p2pool_data.generate_transaction(
-                tracker=tracker,
-                share_data=dict(
-                    previous_share_hash=current_work.value['best_share_hash'],
-                    coinbase='' if current_work.value['aux_work'] is None else
-                        '\xfa\xbemm' + bitcoin_data.HashType().pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
-                    nonce=struct.pack('<Q', random.randrange(2**64)),
-                    new_script=payout_script,
-                    subsidy=current_work2.value['subsidy'],
-                    donation=math.perfect_round(65535*args.donation_percentage/100),
-                    stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
-                        253 if orphans > orphans_recorded_in_chain else
-                        254 if doas > doas_recorded_in_chain else
-                        0
-                    )(*get_stale_counts()),
-                ),
-                block_target=current_work.value['bits'].target,
-                desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                net=net,
-            )
-            
-            print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
-                bitcoin_data.target_to_difficulty(share_info['bits'].target),
-                (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
-                current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
-                len(current_work2.value['transactions']),
-            )
-            
-            transactions = [generate_tx] + list(current_work2.value['transactions'])
-            merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
-            merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
-            
-            return bitcoin_getwork.BlockAttempt(
-                version=current_work.value['version'],
-                previous_block=current_work.value['previous_block'],
-                merkle_root=merkle_root,
-                timestamp=current_work2.value['time'],
-                bits=current_work.value['bits'],
-                share_target=share_info['bits'].target,
-            )
-        
-          def got_response(self, header, request):
-            try:
-                # match up with transactions
-                xxx = merkle_root_to_transactions.get(header['merkle_root'], None)
-                if xxx is None:
-                    print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
-                    return False
-                share_info, transactions, getwork_time = xxx
-                
-                hash_ = bitcoin_data.block_header_type.hash256(header)
-                
-                pow_hash = net.PARENT.POW_FUNC(header)
-                
-                if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                    if factory.conn.value is not None:
-                        factory.conn.value.send_block(block=dict(header=header, txs=transactions))
-                    else:
-                        print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
-                    if pow_hash <= header['bits'].target:
-                        print
-                        print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
-                        print
-                
+            def _get_payout_script_from_username(self, user):
+                if user is None:
+                    return None
                 try:
-                    if current_work.value['aux_work'] is not None and (pow_hash <= current_work.value['aux_work']['target'] or p2pool.DEBUG):
-                        aux_pow = dict(
-                            merkle_tx=dict(
-                                tx=transactions[0],
-                                block_hash=hash_,
-                                merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
-                                index=0,
-                            ),
-                            merkle_branch=[],
-                            index=0,
-                            parent_block_header=header,
-                        )
-                        
-                        a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin_data.aux_pow_type.pack(aux_pow).encode('hex')
-                        #print a, b
-                        merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
-                        def _(res):
-                            print "MERGED RESULT:", res
-                        merged.rpc_getauxblock(a, b).addBoth(_)
-                except:
-                    log.err(None, 'Error while processing merged mining POW:')
+                    pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
+                except: # XXX blah
+                    return None
+                return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
+            
+            def preprocess_request(self, request):
+                payout_script = self._get_payout_script_from_username(request.getUser())
+                if payout_script is None or random.uniform(0, 100) < args.worker_fee:
+                    payout_script = my_script
+                return payout_script,
+            
+            def get_work(self, payout_script):
+                if len(p2p_node.peers) == 0 and net.PERSIST:
+                    raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
+                if current_work.value['best_share_hash'] is None and net.PERSIST:
+                    raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
+                if time.time() > current_work2.value['last_update'] + 60:
+                    raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
                 
-                if pow_hash > share_info['bits'].target:
-                    print >>sys.stderr, 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
+                share_info, generate_tx = p2pool_data.generate_transaction(
+                    tracker=tracker,
+                    share_data=dict(
+                        previous_share_hash=current_work.value['best_share_hash'],
+                        coinbase='' if current_work.value['aux_work'] is None else
+                            '\xfa\xbemm' + bitcoin_data.HashType().pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
+                        nonce=struct.pack('<Q', random.randrange(2**64)),
+                        new_script=payout_script,
+                        subsidy=current_work2.value['subsidy'],
+                        donation=math.perfect_round(65535*args.donation_percentage/100),
+                        stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
+                            253 if orphans > orphans_recorded_in_chain else
+                            254 if doas > doas_recorded_in_chain else
+                            0
+                        )(*get_stale_counts()),
+                    ),
+                    block_target=current_work.value['bits'].target,
+                    desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
+                    net=net,
+                )
+                
+                print 'New work for worker! Difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+                    bitcoin_data.target_to_difficulty(share_info['bits'].target),
+                    (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
+                    current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
+                    len(current_work2.value['transactions']),
+                )
+                
+                transactions = [generate_tx] + list(current_work2.value['transactions'])
+                merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
+                merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time()
+                
+                return bitcoin_getwork.BlockAttempt(
+                    version=current_work.value['version'],
+                    previous_block=current_work.value['previous_block'],
+                    merkle_root=merkle_root,
+                    timestamp=current_work2.value['time'],
+                    bits=current_work.value['bits'],
+                    share_target=share_info['bits'].target,
+                )
+            
+            def got_response(self, header, request):
+                try:
+                    # match up with transactions
+                    xxx = merkle_root_to_transactions.get(header['merkle_root'], None)
+                    if xxx is None:
+                        print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
+                        return False
+                    share_info, transactions, getwork_time = xxx
+                    
+                    hash_ = bitcoin_data.block_header_type.hash256(header)
+                    
+                    pow_hash = net.PARENT.POW_FUNC(header)
+                    
+                    if pow_hash <= header['bits'].target or p2pool.DEBUG:
+                        if factory.conn.value is not None:
+                            factory.conn.value.send_block(block=dict(header=header, txs=transactions))
+                        else:
+                            print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
+                        if pow_hash <= header['bits'].target:
+                            print
+                            print 'GOT BLOCK! Passing to bitcoind! bitcoin: %x' % (hash_,)
+                            print
+                    
+                    try:
+                        if current_work.value['aux_work'] is not None and (pow_hash <= current_work.value['aux_work']['target'] or p2pool.DEBUG):
+                            aux_pow = dict(
+                                merkle_tx=dict(
+                                    tx=transactions[0],
+                                    block_hash=hash_,
+                                    merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
+                                    index=0,
+                                ),
+                                merkle_branch=[],
+                                index=0,
+                                parent_block_header=header,
+                            )
+                            
+                            a, b = transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex'), bitcoin_data.aux_pow_type.pack(aux_pow).encode('hex')
+                            #print a, b
+                            merged = jsonrpc.Proxy(args.merged_url, (args.merged_userpass,))
+                            def _(res):
+                                print "MERGED RESULT:", res
+                            merged.rpc_getauxblock(a, b).addBoth(_)
+                    except:
+                        log.err(None, 'Error while processing merged mining POW:')
+                    
+                    if pow_hash > share_info['bits'].target:
+                        print >>sys.stderr, 'Worker submitted share with hash > target:\nhash  : %x\ntarget: %x' % (pow_hash, share_info['bits'].target)
+                        return False
+                    share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
+                    my_share_hashes.add(share.hash)
+                    if share.previous_hash != current_work.value['best_share_hash']:
+                        my_doa_share_hashes.add(share.hash)
+                    print 'GOT SHARE! %s %s prev %s age %.2fs' % (request.getUser(), p2pool_data.format_hash(share.hash), p2pool_data.format_hash(share.previous_hash), time.time() - getwork_time) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
+                    good = share.previous_hash == current_work.value['best_share_hash']
+                    # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
+                    p2p_shares([share])
+                    # eg. good = share.hash == current_work.value['best_share_hash'] here
+                    return good
+                except:
+                    log.err(None, 'Error processing data received from worker:')
                     return False
-                share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
-                my_share_hashes.add(share.hash)
-                if share.previous_hash != current_work.value['best_share_hash']:
-                    my_doa_share_hashes.add(share.hash)
-                print 'GOT SHARE! %s %s prev %s age %.2fs' % (request.getUser(), p2pool_data.format_hash(share.hash), p2pool_data.format_hash(share.previous_hash), time.time() - getwork_time) + (' DEAD ON ARRIVAL' if share.previous_hash != current_work.value['best_share_hash'] else '')
-                good = share.previous_hash == current_work.value['best_share_hash']
-                # maybe revert back to tracker being non-blocking so 'good' can be more accurate?
-                p2p_shares([share])
-                # eg. good = share.hash == current_work.value['best_share_hash'] here
-                return good
-            except:
-                log.err(None, 'Error processing data received from worker:')
-                return False
         
         web_root = resource.Resource()
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
