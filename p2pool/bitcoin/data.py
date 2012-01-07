@@ -540,6 +540,25 @@ def pubkey_to_script2(pubkey):
 def pubkey_hash_to_script2(pubkey_hash):
     return '\x76\xa9' + ('\x14' + ShortHashType().pack(pubkey_hash)) + '\x88\xac'
 
+def script2_to_address(script2, net):
+    try:
+        pubkey = script2[1:-1]
+        script2_test = pubkey_to_script2(pubkey)
+    except:
+        pass
+    else:
+        if script2_test == script2:
+            return pubkey_to_address(pubkey, net)
+    
+    try:
+        pubkey_hash = ShortHashType().unpack(script2[3:-2])
+        script2_test2 = pubkey_hash_to_script2(pubkey_hash)
+    except:
+        pass
+    else:
+        if script2_test2 == script2:
+            return pubkey_hash_to_address(pubkey_hash, net)
+
 def script2_to_human(script2, net):
     try:
         pubkey = script2[1:-1]
