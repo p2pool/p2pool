@@ -124,12 +124,17 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
-        pass
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
     
     message_addrme = bitcoin_data.ComposedType([
         ('port', bitcoin_data.StructType('<H')),
     ])
     def handle_addrme(self, port):
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
         host = self.transport.getPeer().host
         #print 'addrme from', host, port
         if host == '127.0.0.1':
@@ -156,6 +161,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ]))),
     ])
     def handle_addrs(self, addrs):
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
         for addr_record in addrs:
             self.node.got_addr((addr_record['address']['address'], addr_record['address']['port']), addr_record['address']['services'], min(int(time.time()), addr_record['timestamp']))
             if random.random() < .8 and self.node.peers:
@@ -165,6 +173,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('count', bitcoin_data.StructType('<I')),
     ])
     def handle_getaddrs(self, count):
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
         if count > 100:
             count = 100
         self.send_addrs(addrs=[
@@ -185,12 +196,18 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('stops', bitcoin_data.ListType(bitcoin_data.HashType())),
     ])
     def handle_getshares(self, hashes, parents, stops):
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
         self.node.handle_get_shares(hashes, parents, stops, self)
     
     message_shares = bitcoin_data.ComposedType([
         ('shares', bitcoin_data.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
+        if not self.connected2:
+            self.transport.loseConnection()
+            return
         res = []
         for share in shares:
             share_obj = p2pool_data.Share.from_share(share, self.node.net)
