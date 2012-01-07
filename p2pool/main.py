@@ -655,6 +655,7 @@ def main(args, net, datadir_path):
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
+        web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.script2_to_human(my_script, net.PARENT)), 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
