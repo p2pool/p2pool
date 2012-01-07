@@ -496,7 +496,7 @@ def main(args, net, datadir_path):
                 # match up with transactions
                 if header['merkle_root'] not in self.merkle_root_to_transactions:
                     print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
-                    raise jsonrpc.Error(-12345, u'merkle root could not be linked with transactions')
+                    return False
                 share_info, transactions, getwork_time, aux_work, target = self.merkle_root_to_transactions[header['merkle_root']]
                 
                 pow_hash = net.PARENT.POW_FUNC(header)
