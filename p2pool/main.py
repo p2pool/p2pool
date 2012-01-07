@@ -675,7 +675,7 @@ def main(args, net, datadir_path):
         
         if hasattr(signal, 'SIGALRM'):
             signal.signal(signal.SIGALRM, lambda signum, frame: reactor.callFromThread(
-                lambda: sys.stdout.write('Watchdog timer went off at:\n' + ''.join(traceback.format_stack()))
+                sys.stderr.write, 'Watchdog timer went off at:\n' + ''.join(traceback.format_stack())
             ))
             signal.siginterrupt(signal.SIGALRM, False)
             task.LoopingCall(signal.alarm, 30).start(1)
