@@ -650,6 +650,7 @@ def main(args, net, datadir_path):
             
             def render_GET(self, request):
                 request.setHeader('Content-Type', self.mime_type)
+                request.setHeader('Access-Control-Allow-Origin', '*')
                 return self.func()
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
