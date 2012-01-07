@@ -518,7 +518,7 @@ def main(args, net, datadir_path):
                 try:
                     if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
                         assert bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
-                        df = merged_proxy.rpc_getauxblock(
+                        df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(merged_proxy.rpc_getauxblock)(
                             bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
@@ -532,12 +532,15 @@ def main(args, net, datadir_path):
                                 parent_block_header=header,
                             )).encode('hex'),
                         )
-                        @df.addBoth
+                        @df.addCallback
                         def _(result):
                             if result != (pow_hash <= aux_work['target']):
                                 print >>sys.stderr, 'Merged block submittal result: %s Expected: %s' % (result, pow_hash <= aux_work['target'])
                             else:
                                 print 'Merged block submittal result: %s' % (result,)
+                        @df.addErrback
+                        def _(err):
+                            log.err(err, 'Error submitting merged block:')
                 except:
                     log.err(None, 'Error while processing merged mining POW:')
                 

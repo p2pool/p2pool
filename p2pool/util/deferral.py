@@ -1,5 +1,7 @@
 from __future__ import division
 
+import itertools
+
 from twisted.internet import defer, reactor
 from twisted.python import failure, log
 
@@ -8,7 +10,7 @@ def sleep(t):
     reactor.callLater(t, d.callback, None)
     return d
 
-def retry(message, delay):
+def retry(message, delay, max_retries=None):
     '''
     @retry('Error getting block:', 1)
     @defer.inlineCallbacks
@@ -19,10 +21,12 @@ def retry(message, delay):
     def retry2(func):
         @defer.inlineCallbacks
         def f(*args, **kwargs):
-            while True:
+            for i in itertools.count():
                 try:
                     result = yield func(*args, **kwargs)
                 except:
+                    if i == max_retries:
+                        raise
                     log.err(None, message)
                     yield sleep(delay)
                 else:
