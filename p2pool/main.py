@@ -414,9 +414,16 @@ def main(args, net, datadir_path):
             my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
             
             return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
+            
+        my_share_hashes = set()
+        my_doa_share_hashes = set()
         
+        class WorkerBridge(worker_interface.WorkerBridge):
+          def __init__(self):
+            worker_interface.WorkerBridge.__init__(self)
+            self.new_work_event = current_work.changed
         
-        def get_payout_script_from_username(user):
+          def _get_payout_script_from_username(self, user):
             if user is None:
                 return None
             try:
@@ -425,13 +432,13 @@ def main(args, net, datadir_path):
                 return None
             return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
         
-        def precompute(request):
-            payout_script = get_payout_script_from_username(request.getUser())
+          def preprocess_request(self, request):
+            payout_script = self._get_payout_script_from_username(request.getUser())
             if payout_script is None or random.uniform(0, 100) < args.worker_fee:
                 payout_script = my_script
             return payout_script,
 
-        def compute(payout_script):
+          def get_work(self, payout_script):
             if len(p2p_node.peers) == 0 and net.PERSIST:
                 raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
             if current_work.value['best_share_hash'] is None and net.PERSIST:
@@ -480,10 +487,7 @@ def main(args, net, datadir_path):
                 share_target=share_info['bits'].target,
             )
         
-        my_share_hashes = set()
-        my_doa_share_hashes = set()
-        
-        def got_response(header, request):
+          def got_response(self, header, request):
             try:
                 # match up with transactions
                 xxx = merkle_root_to_transactions.get(header['merkle_root'], None)
@@ -547,7 +551,7 @@ def main(args, net, datadir_path):
                 return False
         
         web_root = resource.Resource()
-        worker_interface.WorkerInterface(compute, got_response, current_work.changed, precompute).attach_to(web_root)
+        worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
         
         def get_rate():
             if tracker.get_height(current_work.value['best_share_hash']) < 720:

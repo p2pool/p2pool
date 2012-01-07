@@ -24,16 +24,28 @@ class _Page(jsonrpc.Server):
         request.content = StringIO.StringIO(json.dumps(dict(id=0, method='getwork')))
         return self.render_POST(request)
 
+class WorkerBridge(object):
+    def __init__(self):
+        self.new_work_event = variable.Event()
+    
+    def preprocess_request(self, request):
+        return request, # *args to self.compute
+    
+    def get_work(self, request):
+        raise NotImplementedError()
+    
+    def got_response(self, block_header):
+        print self.got_response, "called with", block_header
+
 class WorkerInterface(object):
-    def __init__(self, compute, response_callback, new_work_event=variable.Event(), request_process_func=lambda request: (request,)):
-        self.compute = compute
-        self.response_callback = response_callback
-        self.new_work_event = new_work_event
-        self.request_process_func = request_process_func
+    def __init__(self, worker_bridge):
+        self.worker_bridge = worker_bridge
         
         self.worker_views = {}
         
         self.work_cache = {} # request_process_func(request) -> blockattempt
+        
+        new_work_event = self.worker_bridge.new_work_event
         watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
         self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
     
@@ -47,7 +59,7 @@ class WorkerInterface(object):
         request.setHeader('X-Roll-NTime', 'expire=10')
         
         if data is not None:
-            defer.returnValue(self.response_callback(getwork.decode_data(data), request))
+            defer.returnValue(self.worker_bridge.got_response(getwork.decode_data(data), request))
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
@@ -55,27 +67,27 @@ class WorkerInterface(object):
         
         if long_poll:
             request_id = request.getClientIP(), request.getHeader('Authorization')
-            if self.worker_views.get(request_id, self.new_work_event.times) != self.new_work_event.times:
+            if self.worker_views.get(request_id, self.worker_bridge.new_work_event.times) != self.worker_bridge.new_work_event.times:
                 if p2pool.DEBUG:
                     print 'POLL %i PUSH' % (id,)
             else:
                 if p2pool.DEBUG:
                     print 'POLL %i WAITING' % (id,)
-                yield self.new_work_event.get_deferred()
-            self.worker_views[request_id] = self.new_work_event.times
+                yield self.worker_bridge.new_work_event.get_deferred()
+            self.worker_views[request_id] = self.worker_bridge.new_work_event.times
         
-        key = self.request_process_func(request)
+        key = self.worker_bridge.preprocess_request(request)
         
         if key in self.work_cache:
             res, orig_timestamp = self.work_cache.pop(key)
         else:
-            res = self.compute(*key)
+            res = self.worker_bridge.get_work(*key)
             orig_timestamp = res.timestamp
         
         if res.timestamp + 12 < orig_timestamp + 600:
             self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp
         
         if p2pool.DEBUG:
-            print 'POLL %i END identifier=%i' % (id, self.new_work_event.times)
+            print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
         
-        defer.returnValue(res.getwork(identifier=str(self.new_work_event.times)))
+        defer.returnValue(res.getwork(identifier=str(self.worker_bridge.new_work_event.times)))
