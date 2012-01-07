@@ -493,74 +493,74 @@ def main(args, net, datadir_path):
                 )
             
             def got_response(self, header, request):
-                    # match up with transactions
-                    if header['merkle_root'] not in self.merkle_root_to_transactions:
-                        print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
-                        raise jsonrpc.Error(-12345, u'merkle root could not be linked with transactions')
-                    share_info, transactions, getwork_time, aux_work, target = self.merkle_root_to_transactions[header['merkle_root']]
-                    
-                    pow_hash = net.PARENT.POW_FUNC(header)
-                    on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
-                    
-                    try:
-                        if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                            if factory.conn.value is not None:
-                                factory.conn.value.send_block(block=dict(header=header, txs=transactions))
-                            else:
-                                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
-                            if pow_hash <= header['bits'].target:
-                                print
-                                print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.block_header_type.hash256(header),)
-                                print
-                    except:
-                        log.err(None, 'Error while processing potential block:')
-                    
-                    try:
-                        if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
-                            assert bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
-                            df = merged_proxy.rpc_getauxblock(
-                                bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex'),
-                                bitcoin_data.aux_pow_type.pack(dict(
-                                    merkle_tx=dict(
-                                        tx=transactions[0],
-                                        block_hash=bitcoin_data.block_header_type.hash256(header),
-                                        merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
-                                        index=0,
-                                    ),
-                                    merkle_branch=[],
+                # match up with transactions
+                if header['merkle_root'] not in self.merkle_root_to_transactions:
+                    print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
+                    raise jsonrpc.Error(-12345, u'merkle root could not be linked with transactions')
+                share_info, transactions, getwork_time, aux_work, target = self.merkle_root_to_transactions[header['merkle_root']]
+                
+                pow_hash = net.PARENT.POW_FUNC(header)
+                on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
+                
+                try:
+                    if pow_hash <= header['bits'].target or p2pool.DEBUG:
+                        if factory.conn.value is not None:
+                            factory.conn.value.send_block(block=dict(header=header, txs=transactions))
+                        else:
+                            print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
+                        if pow_hash <= header['bits'].target:
+                            print
+                            print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.block_header_type.hash256(header),)
+                            print
+                except:
+                    log.err(None, 'Error while processing potential block:')
+                
+                try:
+                    if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
+                        assert bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
+                        df = merged_proxy.rpc_getauxblock(
+                            bitcoin_data.HashType().pack(aux_work['hash'])[::-1].encode('hex'),
+                            bitcoin_data.aux_pow_type.pack(dict(
+                                merkle_tx=dict(
+                                    tx=transactions[0],
+                                    block_hash=bitcoin_data.block_header_type.hash256(header),
+                                    merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
                                     index=0,
-                                    parent_block_header=header,
-                                )).encode('hex'),
-                            )
-                            @df.addBoth
-                            def _(result):
-                                if result != (pow_hash <= aux_work['target']):
-                                    print >>sys.stderr, 'Merged block submittal result: %s Expected: %s' % (result, pow_hash <= aux_work['target'])
-                                else:
-                                    print 'Merged block submittal result: %s' % (result,)
-                    except:
-                        log.err(None, 'Error while processing merged mining POW:')
-                    
-                    if pow_hash <= share_info['bits'].target:
-                        share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
-                        print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
-                            request.getUser(),
-                            p2pool_data.format_hash(share.hash),
-                            p2pool_data.format_hash(share.previous_hash),
-                            time.time() - getwork_time,
-                            ' DEAD ON ARRIVAL' if not on_time else '',
+                                ),
+                                merkle_branch=[],
+                                index=0,
+                                parent_block_header=header,
+                            )).encode('hex'),
                         )
-                        my_share_hashes.add(share.hash)
-                        if not on_time:
-                            my_doa_share_hashes.add(share.hash)
-                        p2p_shares([share])
-                    
-                    if pow_hash > target:
-                        print 'Worker submitted share with hash > target:'
-                        print '    Hash:   %56x' % (pow_hash,)
-                        print '    Target: %56x' % (target,)
-                    
-                    return on_time
+                        @df.addBoth
+                        def _(result):
+                            if result != (pow_hash <= aux_work['target']):
+                                print >>sys.stderr, 'Merged block submittal result: %s Expected: %s' % (result, pow_hash <= aux_work['target'])
+                            else:
+                                print 'Merged block submittal result: %s' % (result,)
+                except:
+                    log.err(None, 'Error while processing merged mining POW:')
+                
+                if pow_hash <= share_info['bits'].target:
+                    share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
+                    print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
+                        request.getUser(),
+                        p2pool_data.format_hash(share.hash),
+                        p2pool_data.format_hash(share.previous_hash),
+                        time.time() - getwork_time,
+                        ' DEAD ON ARRIVAL' if not on_time else '',
+                    )
+                    my_share_hashes.add(share.hash)
+                    if not on_time:
+                        my_doa_share_hashes.add(share.hash)
+                    p2p_shares([share])
+                
+                if pow_hash > target:
+                    print 'Worker submitted share with hash > target:'
+                    print '    Hash:   %56x' % (pow_hash,)
+                    print '    Target: %56x' % (target,)
+                
+                return on_time
         
         web_root = resource.Resource()
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
