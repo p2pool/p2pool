@@ -102,6 +102,7 @@ def main(args, net, datadir_path):
         shared_share_hashes = set()
         ss = p2pool_data.ShareStore(os.path.join(datadir_path, 'shares.'), net)
         known_verified = set()
+        recent_blocks = []
         print "Loading shares..."
         for i, (mode, contents) in enumerate(ss.get_shares()):
             if mode == 'share':
@@ -259,6 +260,7 @@ def main(args, net, datadir_path):
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %x' % (p2pool_data.format_hash(share.hash), share.header_hash)
                 print
+                recent_blocks.append({ 'ts': share.timestamp, 'hash': '%x' % (share.header_hash) })
         
         def p2p_share_hashes(share_hashes, peer):
             t = time.time()
@@ -512,6 +514,7 @@ def main(args, net, datadir_path):
                             print
                             print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.block_header_type.hash256(header),)
                             print
+                            recent_blocks.append({ 'ts': time.time(), 'hash': '%x' % (bitcoin_data.block_header_type.hash256(header),) })
                 except:
                     log.err(None, 'Error while processing potential block:')
                 
@@ -670,6 +673,7 @@ def main(args, net, datadir_path):
             
             def render_GET(self, request):
                 request.setHeader('Content-Type', self.mime_type)
+                request.setHeader('Access-Control-Allow-Origin', '*')
                 return self.func()
         
         web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
@@ -680,6 +684,8 @@ def main(args, net, datadir_path):
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
+        web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.script2_to_human(my_script, net.PARENT)), 'application/json'))
+        web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
