@@ -95,6 +95,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('best_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
+        if self.other_version is not None or version < 2:
+            self.transport.loseConnection()
+            return
+        
         self.other_version = version
         self.other_sub_version = sub_version[:512]
         self.other_services = services
