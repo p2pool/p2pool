@@ -585,24 +585,58 @@ def main(args, net, datadir_path):
                 res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
             return json.dumps(res)
         
-        def get_current_txouts():
+        def get_current_txouts(scale=1e8):
             wb = WorkerBridge()
             tmp_tag = str(random.randrange(2**64))
             outputs = wb.merkle_root_to_transactions[wb.get_work(tmp_tag).merkle_root][1][0]['tx_outs']
             total = sum(out['value'] for out in outputs)
             total_without_tag = sum(out['value'] for out in outputs if out['script'] != tmp_tag)
-            return dict((out['script'], out['value']*total/total_without_tag/1e8) for out in outputs if out['script'] != tmp_tag and out['value'])
+            total_diff = total-total_without_tag
+            return dict((out['script'], (out['value']+math.perfect_round(out['value']*total_diff/total))/scale) for out in outputs if out['script'] != tmp_tag and out['value'])
         
-        def get_current_normalized_txouts():
-            txouts = get_current_txouts()
+        def get_current_scaled_txouts(scale=1e8,trunc=0):
+            txouts = get_current_txouts(scale=1)
             total = sum(txouts.itervalues())
-            return dict((script, value/total) for script, value in txouts.iteritems())
-        
+            results = dict((script, int(scale*value/total)) for script, value in txouts.iteritems())
+            if trunc>0:
+                total_random=0
+                random_set=set()
+                for s in sorted(results, key=results.__getitem__):
+                    value=results[s]
+                    total_random += value
+                    random_set.add(s)
+                    if total_random>=trunc and value>=trunc:
+                        break
+                target = random.randrange(0,total_random)
+                for s in random_set:
+                    if target<results[s]:
+                        break
+                    target = target - results[s]
+                results = dict((script,value) for script, value in results.iteritems() if script not in random_set)
+                results[s]=total_random
+            total = sum(results.itervalues())
+            total_diff = int(scale)-total
+            if total_diff>0:
+                target = random.randrange(0,total)
+                for s in results.keys():
+                    if target<results[s]:
+                        break
+                    target = target - results[s]
+                results[s] += total_diff
+            return results
+
         def get_current_payouts():
             return json.dumps(dict((bitcoin_data.script2_to_human(script, net.PARENT), value) for script, value in get_current_txouts().iteritems()))
         
-        def get_patron_sendmany(this=1):
-            return json.dumps(dict((bitcoin_data.script2_to_address(script, net.PARENT), float(this)*value) for script, value in get_current_normalized_txouts().iteritems() if bitcoin_data.script2_to_address(script, net.PARENT) is not None))
+        def get_patron_sendmany(this='1'):
+            try:
+                if '/' in this:
+                    this,trunc = this.split('/',1)
+                else:
+                    trunc = 0.01
+                return json.dumps(dict((bitcoin_data.script2_to_address(script, net.PARENT), value/1e8) for script, value in get_current_scaled_txouts(scale=int(float(this)*1e8),trunc=int(float(trunc)*1e8)).iteritems() if bitcoin_data.script2_to_address(script, net.PARENT) is not None))
+            except:
+                return json.dumps(dict())
          
         def get_global_stats():
             # averaged over last hour
