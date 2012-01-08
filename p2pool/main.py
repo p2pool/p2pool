@@ -23,7 +23,7 @@ from nattraverso import portmapper, ipdiscover
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
 from util import expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, skiplists, networks
+from . import p2p, skiplists, networks, graphs
 import p2pool, p2pool.data as p2pool_data
 
 @deferral.retry('Error getting work from bitcoind:', 3)
@@ -684,6 +684,15 @@ def main(args, net, datadir_path):
         web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
+        
+        grapher = graphs.Grapher(os.path.join(datadir_path, 'rrd'))
+        web_root.putChild('graphs', grapher.get_resource())
+        def add_point():
+            if tracker.get_height(current_work.value['best_share_hash']) < 720:
+                return
+            grapher.add_point(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
+                / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720)))
+        task.LoopingCall(add_point).start(100)
         
         reactor.listenTCP(args.worker_port, server.Site(web_root))
         
