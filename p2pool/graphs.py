@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 from twisted.web import resource
 
@@ -24,16 +25,17 @@ except ImportError:
         def get_resource(self): return Resource()
 else:
     class Renderer(resource.Resource):
-        def __init__(self, path):
-            self.path = path
+        def __init__(self, *args):
+            self.args = args
+        
         def render_GET(self, request):
-            request.setHeader('Content-Type', 'image/png')
-            rrdtool.graph(self.path + '.png', '--imgformat', 'PNG',
-                '--lower-limit', '0',
-                'DEF:A=%s:poolrate:AVERAGE' % (self.path,),
-                'LINE1:A#0000FF:Pool hash rate',
-            )
-            return open(self.path + '.png', 'rb').read()
+            handle, filename = tempfile.mkstemp()
+            os.close(handle)
+            
+            rrdtool.graph(filename, '--imgformat', 'PNG', *self.args)
+            
+	    request.setHeader('Content-Type', 'image/png')
+            return open(filename, 'rb').read()
     
     class Resource(resource.Resource):
         def __init__(self, grapher):
@@ -41,14 +43,22 @@ else:
             self.grapher = grapher
             
             self.putChild('', self)
-            self.putChild('poolrate', Renderer(self.grapher.path + '.poolrate'))
+            self.putChild('poolrate_day', Renderer('--lower-limit', '0', '--start', '-1d',
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
+            self.putChild('poolrate_week', Renderer('--lower-limit', '0', '--start', '-1w',
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
+            self.putChild('poolrate_month', Renderer('--lower-limit', '0', '--start', '-1m',
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
         
         def render_GET(self, request):
             if not request.path.endswith('/'):
                 request.redirect(request.path + '/')
                 return ''
             request.setHeader('Content-Type', 'text/html')
-            return '<html><head><title>P2Pool Graphs</title></head><body><h1>P2Pool Graphs</h1><h2>Pool hash rate:</h2><img src="poolrate"/></body></html>'
+            return '''<html><head><title>P2Pool Graphs</title></head><body><h1>P2Pool Graphs</h1>
+                <h2>Pool hash rate:</h2>
+                <p><img style="display:inline" src="poolrate_day"/><img style="display:inline" src="poolrate_week"/><img style="display:inline" src="poolrate_month"/></p>
+            </body></html>'''
     
     class Grapher(object):
         def __init__(self, path):
