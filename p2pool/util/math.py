@@ -143,6 +143,15 @@ def flatten_linked_list(x):
         x, cur = x
         yield cur
 
+def weighted_choice(choices):
+    choices = list((item, weight) for item, weight in choices)
+    target = random.randrange(sum(weight for item, weight in choices))
+    for item, weight in choices:
+        if weight > target:
+            return item
+        target -= weight
+    raise AssertionError()
+
 if __name__ == '__main__':
     import random
     a = 1
