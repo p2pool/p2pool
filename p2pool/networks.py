@@ -40,39 +40,6 @@ BitcoinTestnet = math.Object(
     BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
 )
 
-NamecoinMainnet = math.Object(
-    PARENT=networks.NamecoinMainnet,
-    SHARE_PERIOD=10, # seconds
-    CHAIN_LENGTH=24*60*60//10, # shares
-    REAL_CHAIN_LENGTH=24*60*60//10, # shares
-    TARGET_LOOKBEHIND=3600//10, # shares
-    SPREAD=3, # blocks
-    IDENTIFIER='d5b1192062c4c454'.decode('hex'),
-    PREFIX='b56f3d0fb24fc982'.decode('hex'),
-    NAME='namecoin',
-    P2P_PORT=9334,
-    MAX_TARGET=2**256//2**32 - 1,
-    PERSIST=True,
-    WORKER_PORT=9331,
-    BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
-)
-NamecoinTestnet = math.Object(
-    PARENT=networks.NamecoinTestnet,
-    SHARE_PERIOD=10, # seconds
-    CHAIN_LENGTH=24*60*60//10, # shares
-    REAL_CHAIN_LENGTH=24*60*60//10, # shares
-    TARGET_LOOKBEHIND=200, # shares
-    SPREAD=3, # blocks
-    IDENTIFIER='8dd303d014a01a60'.decode('hex'),
-    PREFIX='4d6581d24f51acbf'.decode('hex'),
-    NAME='namecoin_testnet',
-    P2P_PORT=19334,
-    MAX_TARGET=2**256//2**32 - 1,
-    PERSIST=False,
-    WORKER_PORT=19331,
-    BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
-)
-
 LitecoinMainnet = math.Object(
     PARENT=networks.LitecoinMainnet,
     SHARE_PERIOD=10, # seconds
@@ -106,5 +73,5 @@ LitecoinTestnet = math.Object(
     BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
 )
 
-nets=dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, NamecoinMainnet, NamecoinTestnet, LitecoinMainnet, LitecoinTestnet]))
+nets=dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, LitecoinMainnet, LitecoinTestnet]))
 realnets=dict((net.NAME, net) for net in nets.itervalues() if '_testnet' not in net.NAME)
