@@ -21,7 +21,8 @@ except ImportError:
     
     class Grapher(object):
         def __init__(self, *args): pass
-        def add_point(self, *args): pass
+        def add_poolrate_point(self, *args): pass
+        def add_localrate_point(self, *args): pass
         def get_resource(self): return Resource()
 else:
     class Renderer(resource.Resource):
@@ -44,11 +45,17 @@ else:
             
             self.putChild('', self)
             self.putChild('poolrate_day', Renderer('--lower-limit', '0', '--start', '-1d',
-                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate (last day)'))
             self.putChild('poolrate_week', Renderer('--lower-limit', '0', '--start', '-1w',
-                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate (last week)'))
             self.putChild('poolrate_month', Renderer('--lower-limit', '0', '--start', '-1m',
-                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate'))
+                'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Pool hash rate (last month)'))
+            self.putChild('localrate_day', Renderer('--lower-limit', '0', '--start', '-1d',
+                'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Local hash rate (last day)'))
+            self.putChild('localrate_week', Renderer('--lower-limit', '0', '--start', '-1w',
+                'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Local hash rate (last week)'))
+            self.putChild('localrate_month', Renderer('--lower-limit', '0', '--start', '-1m',
+                'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Local hash rate (last month)'))
         
         def render_GET(self, request):
             if not request.path.endswith('/'):
@@ -57,7 +64,9 @@ else:
             request.setHeader('Content-Type', 'text/html')
             return '''<html><head><title>P2Pool Graphs</title></head><body><h1>P2Pool Graphs</h1>
                 <h2>Pool hash rate:</h2>
-                <p><img style="display:inline" src="poolrate_day"/><img style="display:inline" src="poolrate_week"/><img style="display:inline" src="poolrate_month"/></p>
+                <p><img style="display:inline" src="poolrate_day"/> <img style="display:inline" src="poolrate_week"/> <img style="display:inline" src="poolrate_month"/></p>
+                <h2>Local hash rate:</h2>
+                <p><img style="display:inline" src="localrate_day"/> <img style="display:inline" src="localrate_week"/> <img style="display:inline" src="localrate_month"/></p>
             </body></html>'''
     
     class Grapher(object):
@@ -71,9 +80,19 @@ else:
                     'RRA:AVERAGE:0.5:7:288', # last week
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
+            if not os.path.exists(self.path + '.localrate'):
+                rrdtool.create(self.path + '.localrate', '--step', '300', '--no-overwrite',
+                    'DS:localrate:ABSOLUTE:43200:U:U',
+                    'RRA:AVERAGE:0.5:1:288', # last day
+                    'RRA:AVERAGE:0.5:7:288', # last week
+                    'RRA:AVERAGE:0.5:30:288', # last month
+                )
         
-        def add_point(self, poolrate):
+        def add_poolrate_point(self, poolrate):
             rrdtool.update(self.path + '.poolrate', '-t', 'poolrate', 'N:%f' % (poolrate,))
+        
+        def add_localrate_point(self, hashes):
+            rrdtool.update(self.path + '.localrate', '-t', 'localrate', 'N:%f' % (hashes,))
         
         def get_resource(self):
             return Resource(self)

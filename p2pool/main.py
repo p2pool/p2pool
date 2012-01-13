@@ -561,6 +561,9 @@ def main(args, net, datadir_path):
                         my_doa_share_hashes.add(share.hash)
                     p2p_shares([share])
                 
+                if pow_hash <= target:
+                    reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target))
+                
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:'
                     print '    Hash:   %56x' % (pow_hash,)
@@ -717,7 +720,7 @@ def main(args, net, datadir_path):
         def add_point():
             if tracker.get_height(current_work.value['best_share_hash']) < 720:
                 return
-            grapher.add_point(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
+            grapher.add_poolrate_point(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
                 / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720)))
         task.LoopingCall(add_point).start(100)
         
