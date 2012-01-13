@@ -51,25 +51,47 @@ class DistanceSkipList(TrackerSkipList):
         return hash
 
 
+class AttributeDelta(object):
+    __slots__ = 'height work'.split(' ')
+    
+    @classmethod
+    def get_none(cls):
+        return cls(0, 0)
+    
+    @classmethod
+    def from_element(cls, share):
+        return cls(1, bitcoin_data.target_to_average_attempts(share.target))
+    
+    def __init__(self, height, work):
+        self.height, self.work = height, work
+    
+    def __add__(self, other):
+        return AttributeDelta(self.height + other.height, self.work + other.work)
+    
+    def __sub__(self, other):
+        return AttributeDelta(self.height - other.height, self.work - other.work)
+
 class Tracker(object):
-    def __init__(self, shares=[]):
+    def __init__(self, shares=[], delta_type=AttributeDelta):
         self.shares = {} # hash -> share
         self.reverse_shares = {} # previous_hash -> set of share_hashes
         
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
         
-        self.heights = {} # share_hash -> height_to, ref, work_inc
-        self.reverse_heights = {} # ref -> set of share_hashes
+        self.deltas = {} # share_hash -> delta, ref
+        self.reverse_deltas = {} # ref -> set of share_hashes
         
         self.ref_generator = itertools.count()
-        self.height_refs = {} # ref -> height, share_hash, work_inc
-        self.reverse_height_refs = {} # share_hash -> ref
+        self.delta_refs = {} # ref -> delta, share_hash
+        self.reverse_delta_refs = {} # share_hash -> ref
         
         self.added = variable.Event()
         self.removed = variable.Event()
         
         self.get_nth_parent_hash = DistanceSkipList(self)
+        
+        self.delta_type = delta_type
         
         for share in shares:
             self.add(share)
@@ -125,11 +147,11 @@ class Tracker(object):
                 self.tails[tail].add(share.previous_hash)
                 self.heads[share.previous_hash] = tail
         elif share.previous_hash in self.tails and len(self.reverse_shares[share.previous_hash]) <= 1:
-            # move height refs referencing children down to this, so they can be moved up in one step
-            if share.previous_hash in self.reverse_height_refs:
-                for x in list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set())):
+            # move delta refs referencing children down to this, so they can be moved up in one step
+            if share.previous_hash in self.reverse_delta_refs:
+                for x in list(self.reverse_deltas.get(self.reverse_delta_refs.get(share.hash, object()), set())):
                     self.get_last(x)
-                assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, None), set()))
+                assert share.hash not in self.reverse_delta_refs, list(self.reverse_deltas.get(self.reverse_delta_refs.get(share.hash, None), set()))
             
             heads = self.tails.pop(share.previous_hash)
             for head in heads:
@@ -137,26 +159,26 @@ class Tracker(object):
             self.tails[share.hash] = set(heads)
             
             # move ref pointing to this up
-            if share.previous_hash in self.reverse_height_refs:
-                assert share.hash not in self.reverse_height_refs, list(self.reverse_heights.get(self.reverse_height_refs.get(share.hash, object()), set()))
+            if share.previous_hash in self.reverse_delta_refs:
+                assert share.hash not in self.reverse_delta_refs, list(self.reverse_deltas.get(self.reverse_delta_refs.get(share.hash, object()), set()))
                 
-                ref = self.reverse_height_refs[share.previous_hash]
-                cur_height, cur_hash, cur_work = self.height_refs[ref]
+                ref = self.reverse_delta_refs[share.previous_hash]
+                cur_delta, cur_hash = self.delta_refs[ref]
                 assert cur_hash == share.previous_hash
-                self.height_refs[ref] = cur_height - 1, share.hash, cur_work - bitcoin_data.target_to_average_attempts(share.target)
-                del self.reverse_height_refs[share.previous_hash]
-                self.reverse_height_refs[share.hash] = ref
+                self.delta_refs[ref] = cur_delta - self.delta_type.from_element(share), share.hash
+                del self.reverse_delta_refs[share.previous_hash]
+                self.reverse_delta_refs[share.hash] = ref
         else:
             raise NotImplementedError()
         
-        # delete height entry and ref if it is empty
-        if share.hash in self.heights:
-            _, ref, _ = self.heights.pop(share.hash)
-            self.reverse_heights[ref].remove(share.hash)
-            if not self.reverse_heights[ref]:
-                del self.reverse_heights[ref]
-                _, ref_hash, _ = self.height_refs.pop(ref)
-                del self.reverse_height_refs[ref_hash]
+        # delete delta entry and ref if it is empty
+        if share.hash in self.deltas:
+            delta1, ref = self.deltas.pop(share.hash)
+            self.reverse_deltas[ref].remove(share.hash)
+            if not self.reverse_deltas[ref]:
+                del self.reverse_deltas[ref]
+                delta2, ref_hash = self.delta_refs.pop(ref)
+                del self.reverse_delta_refs[ref_hash]
         
         self.shares.pop(share.hash)
         self.reverse_shares[share.previous_hash].remove(share.hash)
@@ -166,66 +188,66 @@ class Tracker(object):
         self.removed.happened(share)
     
     def get_height(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return height
+        delta, last = self.get_delta(share_hash)
+        return delta.height
     
     def get_work(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return work
+        delta, last = self.get_delta(share_hash)
+        return delta.work
     
     def get_last(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
+        delta, last = self.get_delta(share_hash)
         return last
     
     def get_height_and_last(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return height, last
-    
-    def _get_height_jump(self, share_hash):
-        if share_hash in self.heights:
-            height_to1, ref, work_inc1 = self.heights[share_hash]
-            height_to2, share_hash, work_inc2 = self.height_refs[ref]
-            height_inc = height_to1 + height_to2
-            work_inc = work_inc1 + work_inc2
-        else:
-            height_inc, share_hash, work_inc = 1, self.shares[share_hash].previous_hash, bitcoin_data.target_to_average_attempts(self.shares[share_hash].target)
-        return height_inc, share_hash, work_inc
-    
-    def _set_height_jump(self, share_hash, height_inc, other_share_hash, work_inc):
-        if other_share_hash not in self.reverse_height_refs:
-            ref = self.ref_generator.next()
-            assert ref not in self.height_refs
-            self.height_refs[ref] = 0, other_share_hash, 0
-            self.reverse_height_refs[other_share_hash] = ref
-            del ref
-        
-        ref = self.reverse_height_refs[other_share_hash]
-        ref_height_to, ref_share_hash, ref_work_inc = self.height_refs[ref]
-        assert ref_share_hash == other_share_hash
-        
-        if share_hash in self.heights:
-            prev_ref = self.heights[share_hash][1]
-            self.reverse_heights[prev_ref].remove(share_hash)
-            if not self.reverse_heights[prev_ref] and prev_ref != ref:
-                self.reverse_heights.pop(prev_ref)
-                _, x, _ = self.height_refs.pop(prev_ref)
-                self.reverse_height_refs.pop(x)
-        self.heights[share_hash] = height_inc - ref_height_to, ref, work_inc - ref_work_inc
-        self.reverse_heights.setdefault(ref, set()).add(share_hash)
+        delta, last = self.get_delta(share_hash)
+        return delta.height, last
     
     def get_height_work_and_last(self, share_hash):
+        delta, last = self.get_delta(share_hash)
+        return delta.height, delta.work, last
+    
+    def _get_delta(self, share_hash):
+        if share_hash in self.deltas:
+            delta1, ref = self.deltas[share_hash]
+            delta2, share_hash = self.delta_refs[ref]
+            return delta1 + delta2, share_hash
+        else:
+            return self.delta_type.from_element(self.shares[share_hash]), self.shares[share_hash].previous_hash
+    
+    def _set_delta(self, share_hash, delta, other_share_hash):
+        if other_share_hash not in self.reverse_delta_refs:
+            ref = self.ref_generator.next()
+            assert ref not in self.delta_refs
+            self.delta_refs[ref] = self.delta_type.get_none(), other_share_hash
+            self.reverse_delta_refs[other_share_hash] = ref
+            del ref
+        
+        ref = self.reverse_delta_refs[other_share_hash]
+        ref_delta, ref_share_hash = self.delta_refs[ref]
+        assert ref_share_hash == other_share_hash
+        
+        if share_hash in self.deltas:
+            prev_ref = self.deltas[share_hash][1]
+            self.reverse_deltas[prev_ref].remove(share_hash)
+            if not self.reverse_deltas[prev_ref] and prev_ref != ref:
+                self.reverse_deltas.pop(prev_ref)
+                _, x = self.delta_refs.pop(prev_ref)
+                self.reverse_delta_refs.pop(x)
+        self.deltas[share_hash] = delta - ref_delta, ref
+        self.reverse_deltas.setdefault(ref, set()).add(share_hash)
+    
+    def get_delta(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
-        height = 0
-        work = 0
+        delta = self.delta_type.get_none()
         updates = []
         while share_hash in self.shares:
-            updates.append((share_hash, height, work))
-            height_inc, share_hash, work_inc = self._get_height_jump(share_hash)
-            height += height_inc
-            work += work_inc
-        for update_hash, height_then, work_then in updates:
-            self._set_height_jump(update_hash, height - height_then, share_hash, work - work_then)
-        return height, work, share_hash
+            updates.append((share_hash, delta))
+            this_delta, share_hash = self._get_delta(share_hash)
+            delta += this_delta
+        for update_hash, delta_then in updates:
+            self._set_delta(update_hash, delta - delta_then, share_hash)
+        return delta, share_hash
     
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
