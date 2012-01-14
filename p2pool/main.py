@@ -562,7 +562,7 @@ def main(args, net, datadir_path):
                     p2p_shares([share])
                 
                 if pow_hash <= target:
-                    reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target))
+                    reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
                 
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:'
