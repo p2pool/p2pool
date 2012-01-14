@@ -1,17 +1,24 @@
+//#include "stdint.h"
+
+typedef char uint8_t;
+
 #include <Python.h>
 
 //#include "scrypt.h"
 
 static PyObject *scrypt_getpowhash(PyObject *self, PyObject *args)
 {
+    uint8_t *output;
+    PyObject *value;
     PyStringObject *input;
     if (!PyArg_ParseTuple(args, "S", &input))
         return NULL;
     Py_INCREF(input);
-    uint8_t *output = PyMem_Malloc(32);
+    output = PyMem_Malloc(32);
+
     scrypt_1024_1_1_256((uint8_t *)PyString_AsString((PyObject*) input), output);
     Py_DECREF(input);
-    PyObject *value = Py_BuildValue("s#", output, 32);
+    value = Py_BuildValue("s#", output, 32);
     PyMem_Free(output);
     return value;
 }

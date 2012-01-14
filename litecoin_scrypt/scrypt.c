@@ -32,7 +32,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static inline uint32_t
+static __inline uint32_t
 be32dec(const void *pp)
 {
 	const uint8_t *p = (uint8_t const *)pp;
@@ -41,7 +41,7 @@ be32dec(const void *pp)
 	    ((uint32_t)(p[1]) << 16) + ((uint32_t)(p[0]) << 24));
 }
 
-static inline void
+static __inline void
 be32enc(void *pp, uint32_t x)
 {
 	uint8_t * p = (uint8_t *)pp;
@@ -52,7 +52,7 @@ be32enc(void *pp, uint32_t x)
 	p[0] = (x >> 24) & 0xff;
 }
 
-static inline uint32_t
+static __inline uint32_t
 le32dec(const void *pp)
 {
 	const uint8_t *p = (uint8_t const *)pp;
@@ -61,7 +61,7 @@ le32dec(const void *pp)
 	    ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
 }
 
-static inline void
+static __inline void
 le32enc(void *pp, uint32_t x)
 {
 	uint8_t * p = (uint8_t *)pp;
@@ -675,7 +675,7 @@ void scrypt_1024_1_1_256_sp(const char* input, char* output, char* scratchpad)
 
 void scrypt_1024_1_1_256(const char* input, char* output)
 {
-	char scratchpad[scrypt_scratchpad_size];
+	char scratchpad[131583];
 	scrypt_1024_1_1_256_sp(input, output, scratchpad);
 }
 
