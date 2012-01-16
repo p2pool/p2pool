@@ -57,6 +57,7 @@ class WorkerInterface(object):
     def _getwork(self, request, data, long_poll):
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('X-Roll-NTime', 'expire=10')
+        request.setHeader('X-Is-P2Pool', 'true')
         
         if data is not None:
             defer.returnValue(self.worker_bridge.got_response(getwork.decode_data(data), request))
