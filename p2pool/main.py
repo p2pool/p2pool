@@ -155,7 +155,6 @@ def main(args, net, datadir_path):
                 previous_block=work['previous_block_hash'],
                 bits=work['bits'],
             ))
-        factory.new_block.watch(lambda block_hash: set_real_work1())
         
         def set_real_work2():
             best, desired = tracker.think(ht, pre_current_work.value['previous_block'])
@@ -730,8 +729,16 @@ def main(args, net, datadir_path):
         print
         
         
-        # call getmemorypool every 15 seconds to check that bitcoind is alive
-        task.LoopingCall(set_real_work1).start(15)
+        @defer.inlineCallbacks
+        def work_poller():
+            while True:
+                flag = factory.new_block.get_deferred()
+                try:
+                    yield set_real_work1()
+                except:
+                    log.err()
+                yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
+        work_poller()
         
         
         # done!
