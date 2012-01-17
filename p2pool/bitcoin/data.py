@@ -165,18 +165,6 @@ class VarStrType(Type):
     def write(self, file, item):
         return self._inner_size.write(file, len(item)), item
 
-class FixedStrType(Type):
-    def __init__(self, length):
-        self.length = length
-    
-    def read(self, file):
-        return read(file, self.length)
-    
-    def write(self, file, item):
-        if len(item) != self.length:
-            raise ValueError('incorrect length item!')
-        return file, item
-
 class PassthruType(Type):
     def read(self, file):
         return read(file, size(file))

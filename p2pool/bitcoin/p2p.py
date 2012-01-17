@@ -201,14 +201,6 @@ class Protocol(BaseProtocol):
         ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
     ])
     message_getaddr = bitcoin_data.ComposedType([])
-    message_checkorder = bitcoin_data.ComposedType([
-        ('id', bitcoin_data.HashType()),
-        ('order', bitcoin_data.FixedStrType(60)), # XXX
-    ])
-    message_submitorder = bitcoin_data.ComposedType([
-        ('id', bitcoin_data.HashType()),
-        ('order', bitcoin_data.FixedStrType(60)), # XXX
-    ])
     
     message_addr = bitcoin_data.ComposedType([
         ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
