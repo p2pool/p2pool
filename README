@@ -6,10 +6,8 @@ Requirements:
 * python-argparse (for Python <=2.6)
 
 Linux:
-    sudo apt-get install python-zope.interface
-    sudo apt-get install python-twisted
-    sudo apt-get install python-twisted-web
-    sudo apt-get install python-argparse (if on Python 2.6 or older)
+    sudo apt-get install python-zope.interface python-twisted python-twisted-web
+    sudo apt-get install python-argparse # if on Python 2.6 or older
 
 Windows:
     Install Python 2.7: http://www.python.org/getit/
