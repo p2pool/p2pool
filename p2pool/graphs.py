@@ -35,7 +35,7 @@ else:
             
             rrdtool.graph(filename, '--imgformat', 'PNG', *self.args)
             
-	    request.setHeader('Content-Type', 'image/png')
+            request.setHeader('Content-Type', 'image/png')
             return open(filename, 'rb').read()
     
     class Resource(resource.Resource):

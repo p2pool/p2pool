@@ -615,7 +615,7 @@ def main(args, net, datadir_path):
             if sum(results.itervalues()) < int(scale):
                 results[math.weighted_choice(results.iteritems())] += int(scale) - sum(results.itervalues())
             return results
-
+        
         def get_current_payouts():
             return json.dumps(dict((bitcoin_data.script2_to_human(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems()))
         
@@ -632,7 +632,7 @@ def main(args, net, datadir_path):
                 ))
             except:
                 return json.dumps(None)
-         
+        
         def get_global_stats():
             # averaged over last hour
             lookbehind = 3600//net.SHARE_PERIOD
