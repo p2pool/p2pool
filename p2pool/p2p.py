@@ -261,14 +261,11 @@ class ClientFactory(protocol.ClientFactory):
         self.node.attempt_ended(connector)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store=None, preferred_addrs=set(), desired_peers=10, max_conns=50, max_attempts=30, preferred_storage=1000):
-        if addr_store is None:
-            addr_store = {}
-        
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, preferred_addrs=set(), desired_outgoing=10, max_outgoing_attempts=30, max_incomming=50, preferred_storage=1000):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
-        self.addr_store = addr_store
+        self.addr_store = dict(addr_store)
         self.preferred_addrs = preferred_addrs
         self.desired_peers = desired_peers
         self.max_conns = max_conns

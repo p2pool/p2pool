@@ -307,10 +307,6 @@ def main(args, net, datadir_path):
             except:
                 print >>sys.stderr, "error reading addrs"
         
-        def save_addrs():
-            open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in addrs.iteritems())
-        task.LoopingCall(save_addrs).start(60)
-        
         p2p_node = p2p.Node(
             best_share_hash_func=lambda: current_work.value['best_share_hash'],
             port=args.p2pool_port,
@@ -323,6 +319,10 @@ def main(args, net, datadir_path):
         p2p_node.handle_get_shares = p2p_get_shares
         
         p2p_node.start()
+        
+        def save_addrs():
+            open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in p2p_node.addr_store.iteritems())
+        task.LoopingCall(save_addrs).start(60)
         
         # send share when the chain changes to their chain
         def work_changed(new_work):
