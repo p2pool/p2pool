@@ -177,6 +177,13 @@ class FixedStrType(Type):
             raise ValueError('incorrect length item!')
         return file, item
 
+class PassthruType(Type):
+    def read(self, file):
+        return read(file, size(file))
+    
+    def write(self, file, item):
+        return file, item
+
 class EnumType(Type):
     def __init__(self, inner, values):
         self.inner = inner
@@ -518,7 +525,7 @@ human_address_type = ChecksummedType(ComposedType([
     ('pubkey_hash', ShortHashType()),
 ]))
 
-pubkey_type = FixedStrType(65)
+pubkey_type = PassthruType()
 
 def pubkey_hash_to_address(pubkey_hash, net):
     return human_address_type.pack_base58(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash))
