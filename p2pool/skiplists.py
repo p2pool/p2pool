@@ -7,8 +7,6 @@ class WeightsSkipList(forest.TrackerSkipList):
     
     def get_delta(self, element):
         from p2pool.bitcoin import data as bitcoin_data
-        if element is None:
-            return (2**256, {}, 0, 0) # XXX
         share = self.tracker.shares[element]
         att = bitcoin_data.target_to_average_attempts(share.target)
         return 1, {share.new_script: att*(65535-share.donation)}, att*65535, att*share.donation
