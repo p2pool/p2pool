@@ -16,8 +16,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     version = 2
     sub_version = p2pool.__version__
     
-    def __init__(self, node):
+    def __init__(self, node, incoming):
         self.node = node
+        self.incoming = incoming
         
         self._prefix = self.node.net.PREFIX
     
@@ -242,7 +243,7 @@ class ServerFactory(protocol.ServerFactory):
     def buildProtocol(self, addr):
         if len(self.conns) >= self.max_conns:
             return None
-        p = Protocol(self.node)
+        p = Protocol(self.node, True)
         p.factory = self
         return p
     
@@ -279,7 +280,7 @@ class ClientFactory(protocol.ClientFactory):
         self.running = False
     
     def buildProtocol(self, addr):
-        p = Protocol(self.node)
+        p = Protocol(self.node, False)
         p.factory = self
         return p
     
@@ -388,7 +389,7 @@ class Node(object):
             raise ValueError('already have peer')
         self.peers[conn.nonce] = conn
         
-        print 'Connected to peer %s:%i. p2pool version: %i %r' % (conn.addr[0], conn.addr[1], conn.other_version, conn.other_sub_version)
+        print '%s connection to peer %s:%i established. p2pool version: %i %r' % ('Incoming' if conn.incoming else 'Outgoing', conn.addr[0], conn.addr[1], conn.other_version, conn.other_sub_version)
     
     def lost_conn(self, conn):
         if conn.nonce not in self.peers:

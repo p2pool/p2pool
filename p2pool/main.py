@@ -771,7 +771,7 @@ def main(args, net, datadir_path):
                             stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], min(720, height))
                             real_att_s = att_s / (1 - stale_prop)
                             my_att_s = real_att_s*weights.get(my_script, 0)/total_weight
-                            this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i' % (
+                            this_str = 'Pool: %sH/s in %i shares (%i/%i verified) Recent: %.02f%% >%sH/s Shares: %i (%i orphan, %i dead) Peers: %i (%i incoming)' % (
                                 math.format(int(real_att_s)),
                                 height,
                                 len(tracker.verified.shares),
@@ -782,6 +782,7 @@ def main(args, net, datadir_path):
                                 stale_orphan_shares,
                                 stale_doa_shares,
                                 len(p2p_node.peers),
+                                sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
                             ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
                             this_str += '\nAverage time between blocks: %.2f days' % (
                                 2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
