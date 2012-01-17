@@ -224,30 +224,61 @@ def main(args, net, datadir_path):
         
         # setup p2p logic and join p2pool network
         
-        def p2p_shares(shares, peer=None):
-            if len(shares) > 5:
-                print 'Processing %i shares...' % (len(shares),)
-            
-            new_count = 0
-            for share in shares:
-                if share.hash in tracker.shares:
-                    #print 'Got duplicate share, ignoring. Hash: %s' % (p2pool_data.format_hash(share.hash),)
-                    continue
+        class Node(p2p.Node):
+            def handle_shares(self, shares, peer):
+                if len(shares) > 5:
+                    print 'Processing %i shares...' % (len(shares),)
                 
-                new_count += 1
+                new_count = 0
+                for share in shares:
+                    if share.hash in tracker.shares:
+                        #print 'Got duplicate share, ignoring. Hash: %s' % (p2pool_data.format_hash(share.hash),)
+                        continue
+                    
+                    new_count += 1
+                    
+                    #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
+                    
+                    tracker.add(share)
                 
-                #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
+                if shares and peer is not None:
+                    peer_heads.setdefault(shares[0].hash, set()).add(peer)
                 
-                tracker.add(share)
+                if new_count:
+                    set_real_work2()
+                
+                if len(shares) > 5:
+                    print '... done processing %i shares. New: %i Have: %i/~%i' % (len(shares), new_count, len(tracker.shares), 2*net.CHAIN_LENGTH)
             
-            if shares and peer is not None:
-                peer_heads.setdefault(shares[0].hash, set()).add(peer)
+            def handle_share_hashes(self, hashes, peer):
+                t = time.time()
+                get_hashes = []
+                for share_hash in hashes:
+                    if share_hash in tracker.shares:
+                        continue
+                    last_request_time, count = requested.get(share_hash, (None, 0))
+                    if last_request_time is not None and last_request_time - 5 < t < last_request_time + 10 * 1.5**count:
+                        continue
+                    print 'Got share hash, requesting! Hash: %s' % (p2pool_data.format_hash(share_hash),)
+                    get_hashes.append(share_hash)
+                    requested[share_hash] = t, count + 1
+                
+                if hashes and peer is not None:
+                    peer_heads.setdefault(hashes[0], set()).add(peer)
+                if get_hashes:
+                    peer.send_getshares(hashes=get_hashes, parents=0, stops=[])
             
-            if new_count:
-                set_real_work2()
-            
-            if len(shares) > 5:
-                print '... done processing %i shares. New: %i Have: %i/~%i' % (len(shares), new_count, len(tracker.shares), 2*net.CHAIN_LENGTH)
+            def handle_get_shares(self, hashes, parents, stops, peer):
+                parents = min(parents, 1000//len(hashes))
+                stops = set(stops)
+                shares = []
+                for share_hash in hashes:
+                    for share in tracker.get_chain(share_hash, min(parents + 1, tracker.get_height(share_hash))):
+                        if share.hash in stops:
+                            break
+                        shares.append(share)
+                print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
+                peer.sendShares(shares)
         
         @tracker.verified.added.watch
         def _(share):
@@ -260,36 +291,6 @@ def main(args, net, datadir_path):
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %x' % (p2pool_data.format_hash(share.hash), share.header_hash)
                 print
                 recent_blocks.append({ 'ts': share.timestamp, 'hash': '%x' % (share.header_hash) })
-        
-        def p2p_share_hashes(share_hashes, peer):
-            t = time.time()
-            get_hashes = []
-            for share_hash in share_hashes:
-                if share_hash in tracker.shares:
-                    continue
-                last_request_time, count = requested.get(share_hash, (None, 0))
-                if last_request_time is not None and last_request_time - 5 < t < last_request_time + 10 * 1.5**count:
-                    continue
-                print 'Got share hash, requesting! Hash: %s' % (p2pool_data.format_hash(share_hash),)
-                get_hashes.append(share_hash)
-                requested[share_hash] = t, count + 1
-            
-            if share_hashes and peer is not None:
-                peer_heads.setdefault(share_hashes[0], set()).add(peer)
-            if get_hashes:
-                peer.send_getshares(hashes=get_hashes, parents=0, stops=[])
-        
-        def p2p_get_shares(share_hashes, parents, stops, peer):
-            parents = min(parents, 1000//len(share_hashes))
-            stops = set(stops)
-            shares = []
-            for share_hash in share_hashes:
-                for share in tracker.get_chain(share_hash, min(parents + 1, tracker.get_height(share_hash))):
-                    if share.hash in stops:
-                        break
-                    shares.append(share)
-            print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
-            peer.sendShares(shares)
         
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
@@ -307,17 +308,13 @@ def main(args, net, datadir_path):
             except:
                 print >>sys.stderr, "error reading addrs"
         
-        p2p_node = p2p.Node(
+        p2p_node = Node(
             best_share_hash_func=lambda: current_work.value['best_share_hash'],
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
             preferred_addrs=set(map(parse, args.p2pool_nodes)) | set(map(parse, net.BOOTSTRAP_ADDRS)),
         )
-        p2p_node.handle_shares = p2p_shares
-        p2p_node.handle_share_hashes = p2p_share_hashes
-        p2p_node.handle_get_shares = p2p_get_shares
-        
         p2p_node.start()
         
         def save_addrs():
@@ -558,7 +555,7 @@ def main(args, net, datadir_path):
                     my_share_hashes.add(share.hash)
                     if not on_time:
                         my_doa_share_hashes.add(share.hash)
-                    p2p_shares([share])
+                    p2p_node.handle_shares([share], None)
                 
                 if pow_hash <= target:
                     reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
