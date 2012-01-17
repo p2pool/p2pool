@@ -214,7 +214,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             share_obj = p2pool_data.Share.from_share(share, self.node.net)
             share_obj.peer = self
             res.append(share_obj)
-        self.node.handle_shares(res)
+        self.node.handle_shares(res, self)
     
     def sendShares(self, shares, full=False):
         def att(f, **kwargs):
