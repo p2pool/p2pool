@@ -61,23 +61,20 @@ class BaseProtocol(protocol.Protocol):
                 log.err(None, 'Error parsing message: (see RECV line)')
                 continue
             
-            handler = getattr(self, 'handle_' + command, None)
-            if handler is None:
-                if p2pool.DEBUG:
-                    print 'no handler for', repr(command)
-                continue
-            
-            try:
-                handler(**payload2)
-            except:
-                print 'RECV', command, repr(payload2)[:100]
-                log.err(None, 'Error handling message: (see RECV line)')
-                continue
-            
-            self.gotPacket()
+            self.packetReceived(command, payload2)
     
-    def gotPacket(self):
-        pass
+    def packetReceived(self, command, payload2):
+        handler = getattr(self, 'handle_' + command, None)
+        if handler is None:
+            if p2pool.DEBUG:
+                print 'no handler for', repr(command)
+            return
+        
+        try:
+            handler(**payload2)
+        except:
+            print 'RECV', command, repr(payload2)[:100]
+            log.err(None, 'Error handling message: (see RECV line)')
     
     def sendPacket(self, command, payload2):
         if len(command) >= 12:
