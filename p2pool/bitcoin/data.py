@@ -4,7 +4,7 @@ import hashlib
 import struct
 
 from . import base58
-from p2pool.util import bases, math, expiring_dict, memoize, slush
+from p2pool.util import bases, math
 import p2pool
 
 class EarlyEnd(Exception):
@@ -73,7 +73,7 @@ class Type(object):
         
         return obj
     
-    def pack2(self, obj):
+    def pack(self, obj):
         data = self._pack(obj)
         
         if p2pool.DEBUG:
@@ -81,30 +81,6 @@ class Type(object):
                 raise AssertionError((self._unpack(data), obj))
         
         return data
-    
-    _backing = None
-    
-    @classmethod
-    def enable_caching(cls):
-        assert cls._backing is None
-        cls._backing = expiring_dict.ExpiringDict(100)
-        cls._pre_pack2 = cls.pack2
-        cls.pack2 = memoize.memoize_with_backing(cls._backing, [cls.unpack])(cls.pack2)
-        cls._pre_unpack = cls.unpack
-        cls.unpack = memoize.memoize_with_backing(cls._backing)(cls.unpack) # doesn't have an inverse
-    
-    @classmethod
-    def disable_caching(cls):
-        assert cls._backing is not None
-        cls._backing.stop()
-        cls._backing = None
-        cls.pack2 = cls._pre_pack2
-        del cls._pre_pack2
-        cls.unpack = cls._pre_unpack
-        del cls._pre_unpack
-    
-    def pack(self, obj):
-        return self.pack2(slush.immutify(obj))
     
     
     def pack_base58(self, obj):
@@ -175,14 +151,14 @@ class PassthruType(Type):
 class EnumType(Type):
     def __init__(self, inner, values):
         self.inner = inner
-        self.values = slush.frozendict(values)
+        self.values = values
         
         keys = {}
         for k, v in values.iteritems():
             if v in keys:
                 raise ValueError('duplicate value in values')
             keys[v] = k
-        self.keys = slush.frozendict(keys)
+        self.keys = keys
     
     def read(self, file):
         data, file = self.inner.read(file)
@@ -406,7 +382,7 @@ address_type = ComposedType([
 tx_type = ComposedType([
     ('version', StructType('<I')),
     ('tx_ins', ListType(ComposedType([
-        ('previous_output', PossiblyNoneType(slush.frozendict(hash=0, index=2**32 - 1), ComposedType([
+        ('previous_output', PossiblyNoneType(dict(hash=0, index=2**32 - 1), ComposedType([
             ('hash', HashType()),
             ('index', StructType('<I')),
         ]))),

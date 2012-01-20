@@ -9,7 +9,7 @@ from twisted.python import log
 import p2pool
 from p2pool import skiplists
 from p2pool.bitcoin import data as bitcoin_data, script
-from p2pool.util import memoize, expiring_dict, math, forest
+from p2pool.util import math, forest
 
 
 share_data_type = bitcoin_data.ComposedType([
@@ -417,7 +417,6 @@ class OkayTracker(forest.Tracker):
         
         return best, desired
     
-    @memoize.memoize_with_backing(expiring_dict.ExpiringDict(5, get_touches=False))
     def score(self, share_hash, ht):
         head_height, last = self.verified.get_height_and_last(share_hash)
         score2 = 0
