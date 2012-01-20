@@ -418,16 +418,16 @@ class OkayTracker(forest.Tracker):
         return best, desired
     
     def score(self, share_hash, ht):
-        head_height, last = self.verified.get_height_and_last(share_hash)
-        score2 = 0
-        block_height = -1000000
-        max_height = min(self.net.CHAIN_LENGTH, head_height)
-        for share in math.reversed(self.verified.get_chain(self.verified.get_nth_parent_hash(share_hash, max_height//2), max_height//2)):
-            block_height = max(block_height, ht.get_height_rel_highest(share.header['previous_block']))
-            this_score = (self.verified.get_work(share_hash) - self.verified.get_work(share.hash))//(0 - block_height + 1)
-            if this_score > score2:
-                score2 = this_score
-        return min(head_height, self.net.CHAIN_LENGTH), score2
+        head_height = self.verified.get_height(share_hash)
+        if head_height < self.net.CHAIN_LENGTH:
+            return head_height, None
+        
+        end_point = self.verified.get_nth_parent_hash(share_hash, self.net.CHAIN_LENGTH*15//16)
+        
+        block_height = max(ht.get_height_rel_highest(share.header['previous_block']) for share in
+            self.verified.get_chain(end_point, self.net.CHAIN_LENGTH//16))
+        
+        return self.net.CHAIN_LENGTH, (self.verified.get_work(share_hash) - self.verified.get_work(end_point))//(0 - block_height + 1)
 
 def format_hash(x):
     if x is None:

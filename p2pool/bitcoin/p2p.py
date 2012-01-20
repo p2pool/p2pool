@@ -365,7 +365,7 @@ class HeightTracker(object):
         # callers: highest height can change during yields!
         height, last = self._tracker.get_height_and_last(block_hash)
         if last not in self._tracker.tails:
-            return -1e300
+            return -1000000000 # XXX hack
         return height - max(self._tracker.get_height(head_hash) for head_hash in self._tracker.tails[last])
     
     def stop(self):
