@@ -295,13 +295,16 @@ def main(args, net, datadir_path):
                 addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
             except:
                 print >>sys.stderr, "error reading addrs"
+        for addr in map(parse, net.BOOTSTRAP_ADDRS):
+            if addr not in addrs:
+                addrs[addr] = (0, time.time(), time.time())
         
         p2p_node = Node(
             best_share_hash_func=lambda: current_work.value['best_share_hash'],
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
-            preferred_addrs=set(map(parse, args.p2pool_nodes)) | set(map(parse, net.BOOTSTRAP_ADDRS)),
+            connect_addrs=set(map(parse, args.p2pool_nodes)),
         )
         p2p_node.start()
         

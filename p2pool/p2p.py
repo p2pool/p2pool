@@ -258,11 +258,10 @@ class ServerFactory(protocol.ServerFactory):
         self.listen_port.stopListening()
 
 class ClientFactory(protocol.ClientFactory):
-    def __init__(self, node, desired_conns, max_attempts, preferred_addrs):
+    def __init__(self, node, desired_conns, max_attempts):
         self.node = node
         self.desired_conns = desired_conns
         self.max_attempts = max_attempts
-        self.preferred_addrs = preferred_addrs
         
         self.attempts = {}
         self.conns = set()
@@ -314,11 +313,8 @@ class ClientFactory(protocol.ClientFactory):
     def _think(self):
         while self.running:
             try:
-                if len(self.conns) < self.desired_conns and len(self.attempts) < self.max_attempts and (len(self.preferred_addrs) or len(self.node.addr_store)):
-                    if (random.randrange(2) and len(self.preferred_addrs)) or not len(self.node.addr_store):
-                        host, port = random.choice(list(self.preferred_addrs))
-                    else:
-                        (host, port), = self.node.get_good_peers(1)
+                if len(self.conns) < self.desired_conns and len(self.attempts) < self.max_attempts and self.node.addr_store:
+                    (host, port), = self.node.get_good_peers(1)
                     
                     if (host, port) not in self.attempts:
                         #print 'Trying to connect to', host, port
@@ -328,17 +324,38 @@ class ClientFactory(protocol.ClientFactory):
             
             yield deferral.sleep(random.expovariate(1/1))
 
+class SingleClientFactory(protocol.ReconnectingClientFactory):
+    def __init__(self, node):
+        self.node = node
+    
+    def buildProtocol(self, addr):
+        p = Protocol(self.node, incoming=False)
+        p.factory = self
+        return p
+    
+    def proto_made_connection(self, proto):
+        pass
+    def proto_lost_connection(self, proto):
+        pass
+    
+    def proto_connected(self, proto):
+        self.resetDelay()
+        self.node.got_conn(proto)
+    def proto_disconnected(self, proto):
+        self.node.lost_conn(proto)
+
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, preferred_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
         self.addr_store = dict(addr_store)
+        self.connect_addrs = connect_addrs
         self.preferred_storage = preferred_storage
         
         self.nonce = random.randrange(2**64)
         self.peers = {}
-        self.clientfactory = ClientFactory(self, desired_outgoing_conns, max_outgoing_attempts, preferred_addrs)
+        self.clientfactory = ClientFactory(self, desired_outgoing_conns, max_outgoing_attempts)
         self.serverfactory = ServerFactory(self, max_incoming_conns)
         self.running = False
     
@@ -348,6 +365,7 @@ class Node(object):
         
         self.clientfactory.start()
         self.serverfactory.start()
+        self.singleclientconnectors = [reactor.connectTCP(addr, port, SingleClientFactory(self)) for addr, port in self.connect_addrs]
         
         self.running = True
         
@@ -372,6 +390,9 @@ class Node(object):
         
         self.clientfactory.stop()
         self.serverfactory.stop()
+        for singleclientconnector in self.singleclientconnectors:
+            singleclientconnector.factory.stopTrying() # XXX will this disconnect a current connection?
+        del self.singleclientconnectors
     
     def got_conn(self, conn):
         if conn.nonce in self.peers:
