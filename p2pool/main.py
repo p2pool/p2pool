@@ -39,18 +39,6 @@ def getwork(bitcoind):
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
     ))
 
-@deferral.retry('Error creating payout script:', 10)
-@defer.inlineCallbacks
-def get_payout_script2(bitcoind, net2):
-    address = yield bitcoind.rpc_getaccountaddress('p2pool')
-    validate_response = yield bitcoind.rpc_validateaddress(address)
-    if 'pubkey' not in validate_response:
-        print '    Pubkey request failed. Falling back to payout to address.'
-        defer.returnValue(bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net2)))
-    pubkey = validate_response['pubkey'].decode('hex')
-    assert bitcoin_data.pubkey_to_address(pubkey, net2) == address
-    defer.returnValue(bitcoin_data.pubkey_to_script2(pubkey))
-
 @defer.inlineCallbacks
 def main(args, net, datadir_path):
     try:
@@ -88,7 +76,9 @@ def main(args, net, datadir_path):
         
         if args.pubkey_hash is None:
             print 'Getting payout address from bitcoind...'
-            my_script = yield get_payout_script2(bitcoind, net.PARENT)
+            my_script = yield deferral.retry('Error getting payout address from bitcoind:', 5)(defer.inlineCallbacks(lambda: defer.returnValue(
+                bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net.PARENT)))
+            ))()
         else:
             print 'Computing payout script from provided address....'
             my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
