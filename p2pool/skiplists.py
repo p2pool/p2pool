@@ -38,31 +38,3 @@ class WeightsSkipList(forest.TrackerSkipList):
         assert share_count <= max_shares and total_weight <= desired_weight
         assert share_count == max_shares or total_weight == desired_weight
         return math.add_dicts(*math.flatten_linked_list(weights_list)), total_weight, total_donation_weight
-
-class SumSkipList(forest.TrackerSkipList):
-    def __init__(self, tracker, value_func, identity_value=0, add_func=operator.add):
-        forest.TrackerSkipList.__init__(self, tracker)
-        self.value_func = value_func
-        self.identity_value = identity_value
-        self.add_func = add_func
-    
-    
-    def get_delta(self, element):
-        return self.value_func(self.tracker.shares[element]), 1
-    
-    def combine_deltas(self, (result1, count1), (result2, count2)):
-        return self.add_func(result1, result2), count1 + count2
-    
-    
-    def initial_solution(self, start_hash, (desired_count,)):
-        return self.identity_value, 0
-    
-    def apply_delta(self, (result, count), (d_result, d_count), (desired_count,)):
-        return self.add_func(result, d_result), count + d_count
-    
-    def judge(self, (result, count), (desired_count,)):
-        return cmp(count, desired_count)
-    
-    def finalize(self, (result, count), (desired_count,)):
-        assert count == desired_count
-        return result

@@ -23,7 +23,7 @@ from nattraverso import portmapper, ipdiscover
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
 from util import expiring_dict, jsonrpc, variable, deferral, math
-from . import p2p, skiplists, networks, graphs
+from . import p2p, networks, graphs
 import p2pool, p2pool.data as p2pool_data
 
 @deferral.retry('Error getting work from bitcoind:', 3)
@@ -42,6 +42,11 @@ def getwork(bitcoind):
 @defer.inlineCallbacks
 def main(args, net, datadir_path):
     try:
+        my_share_hashes = set()
+        my_doa_share_hashes = set()
+        p2pool_data.OkayTrackerDelta.my_share_hashes = my_share_hashes
+        p2pool_data.OkayTrackerDelta.my_doa_share_hashes = my_doa_share_hashes
+        
         print 'p2pool (version %s)' % (p2pool.__version__,)
         print
         try:
@@ -378,32 +383,20 @@ def main(args, net, datadir_path):
             if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_doa_unstales.set(removed_doa_unstales.value + 1)
         
-        stale_counter = skiplists.SumSkipList(tracker, lambda share: (
-            1 if share.hash in my_share_hashes else 0,
-            1 if share.hash in my_doa_share_hashes else 0,
-            1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,
-            1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 254 else 0,
-        ), (0, 0, 0, 0), math.add_tuples)
         def get_stale_counts():
             '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''
             my_shares = len(my_share_hashes)
             my_doa_shares = len(my_doa_share_hashes)
-            my_shares_in_chain, my_doa_shares_in_chain, orphans_recorded_in_chain, doas_recorded_in_chain = stale_counter(
-                current_work.value['best_share_hash'],
-                tracker.verified.get_height(current_work.value['best_share_hash']),
-            )
-            my_shares_in_chain += removed_unstales_var.value[0]
-            my_doa_shares_in_chain += removed_doa_unstales_var.value
-            orphans_recorded_in_chain += removed_unstales_var.value[1]
-            doas_recorded_in_chain += removed_unstales_var.value[2]
+            delta = tracker.verified.get_delta(current_work.value['best_share_hash'])
+            my_shares_in_chain = delta.my_count + removed_unstales_var.value[0]
+            my_doa_shares_in_chain = delta.my_doa_count + removed_doa_unstales_var.value
+            orphans_recorded_in_chain = delta.my_orphan_announce_count + removed_unstales_var.value[1]
+            doas_recorded_in_chain = delta.my_dead_announce_count + removed_unstales_var.value[2]
             
             my_shares_not_in_chain = my_shares - my_shares_in_chain
             my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
             
             return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
-        
-        my_share_hashes = set()
-        my_doa_share_hashes = set()
         
         class WorkerBridge(worker_interface.WorkerBridge):
             def __init__(self):
