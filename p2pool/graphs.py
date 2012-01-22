@@ -25,14 +25,14 @@ except ImportError:
         def __getattr__(self, name): return lambda *args, **kwargs: None
 else:
     class Renderer(resource.Resource):
-        def __init__(self, *args):
-            self.args = args
+        def __init__(self, arg_func):
+            self.arg_func = arg_func
         
         def render_GET(self, request):
             handle, filename = tempfile.mkstemp()
             os.close(handle)
             
-            rrdtool.graph(filename, '--imgformat', 'PNG', *self.args)
+            rrdtool.graph(filename, '--imgformat', 'PNG', *self.arg_func())
             
             request.setHeader('Content-Type', 'image/png')
             return open(filename, 'rb').read()
@@ -44,25 +44,25 @@ else:
             
             self.putChild('', self)
             
-            self.putChild('poolrate_day', Renderer('--lower-limit', '0', '--start', '-1d',
+            self.putChild('poolrate_day', Renderer(lambda: ['--lower-limit', '0', '--start', '-1d',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last day)',
-                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last day)'))
-            self.putChild('poolrate_week', Renderer('--lower-limit', '0', '--start', '-1w',
+                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last day)']))
+            self.putChild('poolrate_week', Renderer(lambda: ['--lower-limit', '0', '--start', '-1w',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last week)',
-                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last week)'))
-            self.putChild('poolrate_month', Renderer('--lower-limit', '0', '--start', '-1m',
+                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last week)']))
+            self.putChild('poolrate_month', Renderer(lambda: ['--lower-limit', '0', '--start', '-1m',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last month)',
-                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last month)'))
+                'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last month)']))
             
-            self.putChild('localrate_day', Renderer('--lower-limit', '0', '--start', '-1d',
+            self.putChild('localrate_day', Renderer(lambda: ['--lower-limit', '0', '--start', '-1d',
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last day)',
-                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last day)'))
-            self.putChild('localrate_week', Renderer('--lower-limit', '0', '--start', '-1w',
+                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last day)']))
+            self.putChild('localrate_week', Renderer(lambda: ['--lower-limit', '0', '--start', '-1w',
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last week)',
-                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last week)'))
-            self.putChild('localrate_month', Renderer('--lower-limit', '0', '--start', '-1m',
+                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last week)']))
+            self.putChild('localrate_month', Renderer(lambda: ['--lower-limit', '0', '--start', '-1m',
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last month)',
-                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last month)'))
+                'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last month)']))
         
         def render_GET(self, request):
             if not request.path.endswith('/'):
