@@ -364,6 +364,15 @@ def main(args, net, datadir_path):
         
         print 'Listening for workers on port %i...' % (args.worker_port,)
         
+        if os.path.exists(os.path.join(datadir_path, 'vip_pass')):
+            with open(os.path.join(datadir_path, 'vip_pass'), 'rb') as f:
+                vip_pass = f.read().strip('\r\n')
+        else:
+            vip_pass = '%016x' % (random.randrange(2**64),)
+            with open(os.path.join(datadir_path, 'vip_pass'), 'wb') as f:
+                f.write(vip_pass)
+        print "    Worker password: ", vip_pass, " (only required for generating graphs)"
+        
         # setup worker logic
         
         removed_unstales_var = variable.Variable((0, 0, 0))
@@ -543,6 +552,8 @@ def main(args, net, datadir_path):
                 
                 if pow_hash <= target:
                     reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
+                    if request.getPassword() == vip_pass:
+                        reactor.callLater(1, grapher.add_localminer_point, request.getUser(), bitcoin_data.target_to_average_attempts(target), not on_time)
                 
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:'
