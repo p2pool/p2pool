@@ -37,6 +37,7 @@ def getwork(bitcoind):
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
+        coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
     ))
 
 @defer.inlineCallbacks
@@ -147,6 +148,7 @@ def main(args, net, datadir_path):
                 version=work['version'],
                 previous_block=work['previous_block_hash'],
                 bits=work['bits'],
+                coinbaseflags=work['coinbaseflags'],
             ))
         
         def set_real_work2():
@@ -441,8 +443,8 @@ def main(args, net, datadir_path):
                     tracker=tracker,
                     share_data=dict(
                         previous_share_hash=current_work.value['best_share_hash'],
-                        coinbase='' if current_work.value['aux_work'] is None else
-                            '\xfa\xbemm' + bitcoin_data.HashType().pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0),
+                        coinbase=(('' if current_work.value['aux_work'] is None else
+                            '\xfa\xbemm' + bitcoin_data.HashType().pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)) + current_work.value['coinbaseflags'])[:100],
                         nonce=struct.pack('<Q', random.randrange(2**64)),
                         new_script=payout_script,
                         subsidy=current_work2.value['subsidy'],
