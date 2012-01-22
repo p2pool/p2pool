@@ -371,7 +371,7 @@ def main(args, net, datadir_path):
             vip_pass = '%016x' % (random.randrange(2**64),)
             with open(os.path.join(datadir_path, 'vip_pass'), 'wb') as f:
                 f.write(vip_pass)
-        print "    Worker password: ", vip_pass, " (only required for generating graphs)"
+        print '    Worker password:', vip_pass, '(only required for generating graphs)'
         
         # setup worker logic
         
