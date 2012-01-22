@@ -45,13 +45,13 @@ else:
             
             self.putChild('', self)
             
-            self.putChild('poolrate_day', Renderer(lambda: ['--lower-limit', '0', '--start', '-1d',
+            self.putChild('poolrate_day', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1d',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last day)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last day)']))
-            self.putChild('poolrate_week', Renderer(lambda: ['--lower-limit', '0', '--start', '-1w',
+            self.putChild('poolrate_week', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1w',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last week)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last week)']))
-            self.putChild('poolrate_month', Renderer(lambda: ['--lower-limit', '0', '--start', '-1m',
+            self.putChild('poolrate_month', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1m',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last month)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last month)']))
             
@@ -68,13 +68,13 @@ else:
                     ])
                 return res
             
-            self.putChild('localrate_day', Renderer(lambda: ['--lower-limit', '0', '--start', '-1d'] + get_lines() + [
+            self.putChild('localrate_day', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1d'] + get_lines() + [
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last day)',
                 'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last day)']))
-            self.putChild('localrate_week', Renderer(lambda: ['--lower-limit', '0', '--start', '-1w'] + get_lines() + [
+            self.putChild('localrate_week', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1w'] + get_lines() + [
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last week)',
                 'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last week)']))
-            self.putChild('localrate_month', Renderer(lambda: ['--lower-limit', '0', '--start', '-1m'] + get_lines() + [
+            self.putChild('localrate_month', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1m'] + get_lines() + [
                 'DEF:A=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last month)',
                 'DEF:B=%s.localdeadrate:localdeadrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#FF0000:Dead (last month)']))
         
