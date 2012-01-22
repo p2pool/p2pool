@@ -21,9 +21,8 @@ except ImportError:
     
     class Grapher(object):
         def __init__(self, *args): pass
-        def add_poolrate_point(self, *args): pass
-        def add_localrate_point(self, *args): pass
         def get_resource(self): return Resource()
+        def __getattr__(self, name): return lambda *args, **kwargs: None
 else:
     class Renderer(resource.Resource):
         def __init__(self, *args):
