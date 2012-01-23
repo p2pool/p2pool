@@ -13,19 +13,19 @@ from p2pool.util import math, forest
 
 
 share_data_type = bitcoin_data.ComposedType([
-    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
+    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
     ('coinbase', bitcoin_data.VarStrType()),
     ('nonce', bitcoin_data.VarStrType()),
     ('new_script', bitcoin_data.VarStrType()),
-    ('subsidy', bitcoin_data.StructType('<Q')),
-    ('donation', bitcoin_data.StructType('<H')),
-    ('stale_info', bitcoin_data.StructType('<B')), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
+    ('subsidy', bitcoin_data.IntType(64)),
+    ('donation', bitcoin_data.IntType(16)),
+    ('stale_info', bitcoin_data.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
 ])
 
 share_info_type = bitcoin_data.ComposedType([
     ('share_data', share_data_type),
     ('bits', bitcoin_data.FloatingIntegerType()),
-    ('timestamp', bitcoin_data.StructType('<I')),
+    ('timestamp', bitcoin_data.IntType(32)),
 ])
 
 share1a_type = bitcoin_data.ComposedType([
@@ -260,7 +260,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
             sequence=None,
             script=share_data['coinbase'].ljust(2, '\x00'),
         )],
-        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.HashType().pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.IntType(256).pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 

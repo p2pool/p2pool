@@ -136,14 +136,14 @@ class Protocol(BaseProtocol):
         )
     
     message_version = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.StructType('<I')),
-        ('services', bitcoin_data.StructType('<Q')),
-        ('time', bitcoin_data.StructType('<Q')),
+        ('version', bitcoin_data.IntType(32)),
+        ('services', bitcoin_data.IntType(64)),
+        ('time', bitcoin_data.IntType(64)),
         ('addr_to', bitcoin_data.address_type),
         ('addr_from', bitcoin_data.address_type),
-        ('nonce', bitcoin_data.StructType('<Q')),
+        ('nonce', bitcoin_data.IntType(64)),
         ('sub_version_num', bitcoin_data.VarStrType()),
-        ('start_height', bitcoin_data.StructType('<I')),
+        ('start_height', bitcoin_data.IntType(32)),
     ])
     def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
         #print 'VERSION', locals()
@@ -168,8 +168,8 @@ class Protocol(BaseProtocol):
     
     message_inv = bitcoin_data.ComposedType([
         ('invs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('type', bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'tx': 1, 'block': 2})),
-            ('hash', bitcoin_data.HashType()),
+            ('type', bitcoin_data.EnumType(bitcoin_data.IntType(32), {'tx': 1, 'block': 2})),
+            ('hash', bitcoin_data.IntType(256)),
         ]))),
     ])
     def handle_inv(self, invs):
@@ -183,25 +183,25 @@ class Protocol(BaseProtocol):
     
     message_getdata = bitcoin_data.ComposedType([
         ('requests', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('type', bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'tx': 1, 'block': 2})),
-            ('hash', bitcoin_data.HashType()),
+            ('type', bitcoin_data.EnumType(bitcoin_data.IntType(32), {'tx': 1, 'block': 2})),
+            ('hash', bitcoin_data.IntType(256)),
         ]))),
     ])
     message_getblocks = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.StructType('<I')),
-        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
+        ('version', bitcoin_data.IntType(32)),
+        ('have', bitcoin_data.ListType(bitcoin_data.IntType(256))),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
     ])
     message_getheaders = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.StructType('<I')),
-        ('have', bitcoin_data.ListType(bitcoin_data.HashType())),
-        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.HashType())),
+        ('version', bitcoin_data.IntType(32)),
+        ('have', bitcoin_data.ListType(bitcoin_data.IntType(256))),
+        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
     ])
     message_getaddr = bitcoin_data.ComposedType([])
     
     message_addr = bitcoin_data.ComposedType([
         ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('timestamp', bitcoin_data.StructType('<I')),
+            ('timestamp', bitcoin_data.IntType(32)),
             ('address', bitcoin_data.address_type),
         ]))),
     ])
@@ -233,8 +233,8 @@ class Protocol(BaseProtocol):
         self.factory.new_headers.happened([header['header'] for header in headers])
     
     message_reply = bitcoin_data.ComposedType([
-        ('hash', bitcoin_data.HashType()),
-        ('reply',  bitcoin_data.EnumType(bitcoin_data.StructType('<I'), {'success': 0, 'failure': 1, 'denied': 2})),
+        ('hash', bitcoin_data.IntType(256)),
+        ('reply',  bitcoin_data.EnumType(bitcoin_data.IntType(32), {'success': 0, 'failure': 1, 'denied': 2})),
         ('script', bitcoin_data.PossiblyNoneType('', bitcoin_data.VarStrType())),
     ])
     

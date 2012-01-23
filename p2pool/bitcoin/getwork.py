@@ -46,7 +46,7 @@ class BlockAttempt(object):
         getwork = {
             'data': _swap4(block_data).encode('hex') + '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
             'hash1': '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
-            'target': bitcoin_data.HashType().pack(self.share_target).encode('hex'),
+            'target': bitcoin_data.IntType(256).pack(self.share_target).encode('hex'),
             'midstate': _swap4(sha256.process(block_data[:64])).encode('hex'),
         }
         
@@ -70,7 +70,7 @@ class BlockAttempt(object):
             merkle_root=attrs['merkle_root'],
             timestamp=attrs['timestamp'],
             bits=attrs['bits'],
-            share_target=bitcoin_data.HashType().unpack(getwork['target'].decode('hex')),
+            share_target=bitcoin_data.IntType(256).unpack(getwork['target'].decode('hex')),
         )
         
         if _check:

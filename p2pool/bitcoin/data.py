@@ -91,14 +91,14 @@ class Type(object):
     
     
     def hash160(self, obj):
-        return ShortHashType().unpack(hashlib.new('ripemd160', hashlib.sha256(self.pack(obj)).digest()).digest())
+        return IntType(160).unpack(hashlib.new('ripemd160', hashlib.sha256(self.pack(obj)).digest()).digest())
     
     def hash256(self, obj):
-        return HashType().unpack(hashlib.sha256(hashlib.sha256(self.pack(obj)).digest()).digest())
+        return IntType(256).unpack(hashlib.sha256(hashlib.sha256(self.pack(obj)).digest()).digest())
     
     def scrypt(self, obj):
         import ltc_scrypt
-        return HashType().unpack(ltc_scrypt.getPoWHash(self.pack(obj)))
+        return IntType(256).unpack(ltc_scrypt.getPoWHash(self.pack(obj)))
 
 class VarIntType(Type):
     # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
@@ -171,28 +171,6 @@ class EnumType(Type):
             raise ValueError('enum item (%r) not in values (%r)' % (item, self.values))
         return self.inner.write(file, self.values[item])
 
-class HashType(Type):
-    def read(self, file):
-        data, file = read(file, 256//8)
-        return int(data[::-1].encode('hex'), 16), file
-    
-    def write(self, file, item):
-        if not 0 <= item < 2**256:
-            raise ValueError('invalid hash value - %r' % (item,))
-        if item != 0 and item < 2**160:
-            print 'Very low hash value - maybe you meant to use ShortHashType? %x' % (item,)
-        return file, ('%064x' % (item,)).decode('hex')[::-1]
-
-class ShortHashType(Type):
-    def read(self, file):
-        data, file = read(file, 160//8)
-        return int(data[::-1].encode('hex'), 16), file
-    
-    def write(self, file, item):
-        if not 0 <= item < 2**160:
-            raise ValueError('invalid hash value - %r' % (item,))
-        return file, ('%040x' % (item,)).decode('hex')[::-1]
-
 class ListType(Type):
     _inner_size = VarIntType()
     
@@ -220,15 +198,34 @@ class StructType(Type):
     
     def read(self, file):
         data, file = read(file, self.length)
-        res, = struct.unpack(self.desc, data)
-        return res, file
+        return struct.unpack(self.desc, data)[0], file
     
     def write(self, file, item):
-        data = struct.pack(self.desc, item)
-        if struct.unpack(self.desc, data)[0] != item:
-            # special test because struct doesn't error on some overflows
-            raise ValueError('''item didn't survive pack cycle (%r)''' % (item,))
-        return file, data
+        return file, struct.pack(self.desc, item)
+
+class IntType(Type):
+    def __new__(cls, bits, endianness='little'):
+        assert bits % 8 == 0
+        assert endianness in ['little', 'big']
+        if bits in [8, 16, 32, 64]:
+            return StructType(('<' if endianness == 'little' else '>') + {8: 'B', 16: 'H', 32: 'I', 64: 'Q'}[bits])
+        else:
+            return object.__new__(cls, bits, endianness)
+    
+    def __init__(self, bits, endianness='little'):
+        assert bits % 8 == 0
+        assert endianness in ['little', 'big']
+        self.bytes = bits//8
+        self.step = -1 if endianness == 'little' else 1
+    
+    def read(self, file):
+        data, file = read(file, self.bytes)
+        return int(data[::self.step].encode('hex'), 16), file
+    
+    def write(self, file, item):
+        if not 0 <= item < 2**(8*self.bytes):
+            raise ValueError('invalid int value - %r' % (item,))
+        return file, ('%x' % (item,)).zfill(2*self.bytes).decode('hex')[::self.step]
 
 class IPV6AddressType(Type):
     def read(self, file):
@@ -350,7 +347,7 @@ class FloatingInteger(object):
         return 'FloatingInteger(bits=%s, target=%s)' % (hex(self.bits), hex(self.target))
 
 class FloatingIntegerType(Type):
-    _inner = StructType('<I')
+    _inner = IntType(32)
     
     def read(self, file):
         bits, file = self._inner.read(file)
@@ -374,44 +371,44 @@ class PossiblyNoneType(Type):
         return self.inner.write(file, self.none_value if item is None else item)
 
 address_type = ComposedType([
-    ('services', StructType('<Q')),
+    ('services', IntType(64)),
     ('address', IPV6AddressType()),
-    ('port', StructType('>H')),
+    ('port', IntType(16, 'big')),
 ])
 
 tx_type = ComposedType([
-    ('version', StructType('<I')),
+    ('version', IntType(32)),
     ('tx_ins', ListType(ComposedType([
         ('previous_output', PossiblyNoneType(dict(hash=0, index=2**32 - 1), ComposedType([
-            ('hash', HashType()),
-            ('index', StructType('<I')),
+            ('hash', IntType(256)),
+            ('index', IntType(32)),
         ]))),
         ('script', VarStrType()),
-        ('sequence', PossiblyNoneType(2**32 - 1, StructType('<I'))),
+        ('sequence', PossiblyNoneType(2**32 - 1, IntType(32))),
     ]))),
     ('tx_outs', ListType(ComposedType([
-        ('value', StructType('<Q')),
+        ('value', IntType(64)),
         ('script', VarStrType()),
     ]))),
-    ('lock_time', StructType('<I')),
+    ('lock_time', IntType(32)),
 ])
 
-merkle_branch_type = ListType(HashType())
+merkle_branch_type = ListType(IntType(256))
 
 merkle_tx_type = ComposedType([
     ('tx', tx_type),
-    ('block_hash', HashType()),
+    ('block_hash', IntType(256)),
     ('merkle_branch', merkle_branch_type),
-    ('index', StructType('<i')),
+    ('index', IntType(32)),
 ])
 
 block_header_type = ComposedType([
-    ('version', StructType('<I')),
-    ('previous_block', PossiblyNoneType(0, HashType())),
-    ('merkle_root', HashType()),
-    ('timestamp', StructType('<I')),
+    ('version', IntType(32)),
+    ('previous_block', PossiblyNoneType(0, IntType(256))),
+    ('merkle_root', IntType(256)),
+    ('timestamp', IntType(32)),
     ('bits', FloatingIntegerType()),
-    ('nonce', StructType('<I')),
+    ('nonce', IntType(32)),
 ])
 
 block_type = ComposedType([
@@ -422,14 +419,14 @@ block_type = ComposedType([
 aux_pow_type = ComposedType([
     ('merkle_tx', merkle_tx_type),
     ('merkle_branch', merkle_branch_type),
-    ('index', StructType('<i')),
+    ('index', IntType(32)),
     ('parent_block_header', block_header_type),
 ])
 
 
 merkle_record_type = ComposedType([
-    ('left', HashType()),
-    ('right', HashType()),
+    ('left', IntType(256)),
+    ('right', IntType(256)),
 ])
 
 def merkle_hash(hashes):
@@ -485,8 +482,8 @@ def tx_get_sigop_count(tx):
 # human addresses
 
 human_address_type = ChecksummedType(ComposedType([
-    ('version', StructType('<B')),
-    ('pubkey_hash', ShortHashType()),
+    ('version', IntType(8)),
+    ('pubkey_hash', IntType(160)),
 ]))
 
 pubkey_type = PassthruType()
@@ -509,7 +506,7 @@ def pubkey_to_script2(pubkey):
     return ('\x41' + pubkey_type.pack(pubkey)) + '\xac'
 
 def pubkey_hash_to_script2(pubkey_hash):
-    return '\x76\xa9' + ('\x14' + ShortHashType().pack(pubkey_hash)) + '\x88\xac'
+    return '\x76\xa9' + ('\x14' + IntType(160).pack(pubkey_hash)) + '\x88\xac'
 
 def script2_to_address(script2, net):
     try:
@@ -522,7 +519,7 @@ def script2_to_address(script2, net):
             return pubkey_to_address(pubkey, net)
     
     try:
-        pubkey_hash = ShortHashType().unpack(script2[3:-2])
+        pubkey_hash = IntType(160).unpack(script2[3:-2])
         script2_test2 = pubkey_hash_to_script2(pubkey_hash)
     except:
         pass
@@ -541,7 +538,7 @@ def script2_to_human(script2, net):
             return 'Pubkey. Address: %s' % (pubkey_to_address(pubkey, net),)
     
     try:
-        pubkey_hash = ShortHashType().unpack(script2[3:-2])
+        pubkey_hash = IntType(160).unpack(script2[3:-2])
         script2_test2 = pubkey_hash_to_script2(pubkey_hash)
     except:
         pass
