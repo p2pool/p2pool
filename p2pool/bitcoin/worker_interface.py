@@ -3,7 +3,6 @@ from __future__ import division
 import StringIO
 import json
 import random
-import weakref
 
 from twisted.internet import defer
 
@@ -44,10 +43,7 @@ class WorkerInterface(object):
         self.worker_views = {}
         
         self.work_cache = {} # request_process_func(request) -> blockattempt
-        
-        new_work_event = self.worker_bridge.new_work_event
-        watch_id = new_work_event.watch(lambda *args: self_ref().work_cache.clear())
-        self_ref = weakref.ref(self, lambda _: new_work_event.unwatch(watch_id))
+        self.work_cache_times = self.worker_bridge.new_work_event.times
     
     def attach_to(self, res):
         res.putChild('', _Page(self, long_poll=False))
@@ -78,6 +74,10 @@ class WorkerInterface(object):
             self.worker_views[request_id] = self.worker_bridge.new_work_event.times
         
         key = self.worker_bridge.preprocess_request(request)
+        
+        if self.work_cache_times != self.worker_bridge.new_work_event.times:
+            self.work_cache = {}
+            self.work_cache_times = self.worker_bridge.new_work_event.times
         
         if key in self.work_cache:
             res, orig_timestamp = self.work_cache.pop(key)
