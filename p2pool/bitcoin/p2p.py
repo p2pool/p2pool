@@ -232,12 +232,6 @@ class Protocol(BaseProtocol):
             self.get_block_header.got_response(bitcoin_data.block_header_type.hash256(header), header)
         self.factory.new_headers.happened([header['header'] for header in headers])
     
-    message_reply = bitcoin_data.ComposedType([
-        ('hash', bitcoin_data.IntType(256)),
-        ('reply',  bitcoin_data.EnumType(bitcoin_data.IntType(32), {'success': 0, 'failure': 1, 'denied': 2})),
-        ('script', bitcoin_data.PossiblyNoneType('', bitcoin_data.VarStrType())),
-    ])
-    
     message_ping = bitcoin_data.ComposedType([])
     def handle_ping(self):
         pass
