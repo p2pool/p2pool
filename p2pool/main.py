@@ -790,15 +790,9 @@ def main(args, net, datadir_path):
                                 2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
                             )
                             this_str += '\nPool stales: %i%%' % (int(100*stale_prop+.5),)
-                            conf = 0.95
-                            if shares:
-                                stale_shares = stale_orphan_shares + stale_doa_shares
-                                stale_center, stale_radius = math.binomial_conf_center_radius(stale_shares, shares, conf)
-                                this_str += u' Own: %i±%i%%' % (int(100*stale_center+.5), int(100*stale_radius+.5))
-                                if stale_prop < .99:
-                                    eff_center = (1 - stale_center)/(1 - stale_prop)
-                                    eff_radius = stale_radius/(1 - stale_prop)
-                                    this_str += u' Own efficiency: %i±%i%%' % (int(100*eff_center+.5), int(100*eff_radius+.5))
+                            stale_center, stale_radius = math.binomial_conf_center_radius(stale_orphan_shares + stale_doa_shares, shares, 0.95)
+                            this_str += u' Own: %i±%i%%' % (int(100*stale_center+.5), int(100*stale_radius+.5))
+                            this_str += u' Own efficiency: %i±%i%%' % (int(100*(1 - stale_center)/(1 - stale_prop)+.5), int(100*stale_radius/(1 - stale_prop)+.5))
                             if this_str != last_str or time.time() > last_time + 15:
                                 print this_str
                                 last_str = this_str
