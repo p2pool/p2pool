@@ -215,8 +215,6 @@ def main(args, net, datadir_path):
         def _(new_merged_work):
             print "Got new merged mining work! Difficulty: %f" % (bitcoin_data.target_to_difficulty(new_merged_work['target']),)
         
-        start_time = time.time() - current_work2.value['clock_offset']
-        
         # setup p2p logic and join p2pool network
         
         class Node(p2p.Node):
