@@ -785,9 +785,12 @@ def main(args, net, datadir_path):
                             conf = 0.95
                             if shares:
                                 stale_shares = stale_orphan_shares + stale_doa_shares
-                                this_str += u' Own: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius(math.binomial_conf_interval(stale_shares, shares, conf)))
+                                stale_center, stale_radius = math.binomial_conf_center_radius(stale_shares, shares, conf)
+                                this_str += u' Own: %i±%i%%' % (int(100*stale_center+.5), int(100*stale_radius+.5))
                                 if stale_prop < .99:
-                                    this_str += u' Own efficiency: %i±%i%%' % tuple(int(100*x+.5) for x in math.interval_to_center_radius((1 - y)/(1 - stale_prop) for y in math.binomial_conf_interval(stale_shares, shares, conf)[::-1]))
+                                    eff_center = (1 - stale_center)/(1 - stale_prop)
+                                    eff_radius = stale_radius/(1 - stale_prop)
+                                    this_str += u' Own efficiency: %i±%i%%' % (int(100*eff_center+.5), int(100*eff_radius+.5))
                             if this_str != last_str or time.time() > last_time + 15:
                                 print this_str
                                 last_str = this_str

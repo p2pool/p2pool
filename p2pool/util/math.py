@@ -117,8 +117,11 @@ def binomial_conf_interval(x, n, conf=0.95):
     bottom = 1 + z**2/n
     return (topa - topb)/bottom, (topa + topb)/bottom
 
-def interval_to_center_radius((low, high)):
-    return (high+low)/2, (high-low)/2
+
+def binomial_conf_center_radius(x, n, conf=0.95):
+    p = x/n
+    left, right = binomial_conf_interval(x, n, conf)
+    return p, max(p - left, right - p)
 
 def reversed(x):
     try:
