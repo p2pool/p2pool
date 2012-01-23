@@ -1,5 +1,6 @@
 from __future__ import division
 
+import binascii
 import hashlib
 import struct
 
@@ -23,6 +24,8 @@ def size((data, pos)):
     return len(data) - pos
 
 class Type(object):
+    __slots__ = []
+    
     # the same data can have only one unpacked representation, but multiple packed binary representations
     
     def __hash__(self):
@@ -192,6 +195,8 @@ class ListType(Type):
         return file
 
 class StructType(Type):
+    __slots__ = 'desc length'.split(' ')
+    
     def __init__(self, desc):
         self.desc = desc
         self.length = struct.calcsize(self.desc)
@@ -204,6 +209,8 @@ class StructType(Type):
         return file, struct.pack(self.desc, item)
 
 class IntType(Type):
+    __slots__ = 'bytes step format_str max'.split(' ')
+    
     def __new__(cls, bits, endianness='little'):
         assert bits % 8 == 0
         assert endianness in ['little', 'big']
@@ -217,15 +224,17 @@ class IntType(Type):
         assert endianness in ['little', 'big']
         self.bytes = bits//8
         self.step = -1 if endianness == 'little' else 1
+        self.format_str = '%%0%ix' % (2*self.bytes)
+        self.max = 2**bits
     
-    def read(self, file):
+    def read(self, file, b2a_hex=binascii.b2a_hex):
         data, file = read(file, self.bytes)
-        return int(data[::self.step].encode('hex'), 16), file
+        return int(b2a_hex(data[::self.step]), 16), file
     
-    def write(self, file, item):
-        if not 0 <= item < 2**(8*self.bytes):
+    def write(self, file, item, a2b_hex=binascii.a2b_hex):
+        if not 0 <= item < self.max:
             raise ValueError('invalid int value - %r' % (item,))
-        return file, ('%x' % (item,)).zfill(2*self.bytes).decode('hex')[::self.step]
+        return file, a2b_hex(self.format_str % (item,))[::self.step]
 
 class IPV6AddressType(Type):
     def read(self, file):
