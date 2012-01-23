@@ -445,7 +445,7 @@ def main(args, net, datadir_path):
                     share_data=dict(
                         previous_share_hash=current_work.value['best_share_hash'],
                         coinbase=(('' if current_work.value['aux_work'] is None else
-                            '\xfa\xbemm' + bitcoin_data.IntType(256).pack(current_work.value['aux_work']['hash'])[::-1] + struct.pack('<ii', 1, 0)) + current_work.value['coinbaseflags'])[:100],
+                            '\xfa\xbemm' + bitcoin_data.IntType(256, 'big').pack(current_work.value['aux_work']['hash']) + struct.pack('<ii', 1, 0)) + current_work.value['coinbaseflags'])[:100],
                         nonce=struct.pack('<Q', random.randrange(2**64)),
                         new_script=payout_script,
                         subsidy=current_work2.value['subsidy'],
@@ -516,9 +516,9 @@ def main(args, net, datadir_path):
                 
                 try:
                     if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
-                        assert bitcoin_data.IntType(256).pack(aux_work['hash'])[::-1].encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
+                        assert bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
                         df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(merged_proxy.rpc_getauxblock)(
-                            bitcoin_data.IntType(256).pack(aux_work['hash'])[::-1].encode('hex'),
+                            bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
                                     tx=transactions[0],
