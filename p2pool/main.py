@@ -516,7 +516,7 @@ def main(args, net, datadir_path):
                 
                 try:
                     if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
-                        assert bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][-32-8:-8].encode('hex')
+                        assert bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][4:4+32].encode('hex')
                         df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(merged_proxy.rpc_getauxblock)(
                             bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
