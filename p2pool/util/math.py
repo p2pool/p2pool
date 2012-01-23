@@ -108,19 +108,29 @@ def ierf(z, steps=10):
         guess = guess - (erf(guess) - z)/d
     return guess
 
-def binomial_conf_interval(x, n, conf=0.95):
-    # approximate - Wilson score interval
-    z = math.sqrt(2)*ierf(conf)
-    p = x/n
-    topa = p + z**2/2/n
-    topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
-    bottom = 1 + z**2/n
-    return (topa - topb)/bottom, (topa + topb)/bottom
-
+try:
+    from scipy import special
+except ImportError:
+    print 'Install SciPy for more accurate confidence intervals!'
+    def binomial_conf_interval(x, n, conf=0.95):
+        if n == 0:
+            return (1-conf)/2, 1-(1-conf)/2
+        # approximate - Wilson score interval
+        z = math.sqrt(2)*ierf(conf)
+        p = x/n
+        topa = p + z**2/2/n
+        topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
+        bottom = 1 + z**2/n
+        return (topa - topb)/bottom, (topa + topb)/bottom
+else:
+    def binomial_conf_interval(x, n, conf=0.95):
+        return special.betaincinv(x+1, n-x+1, (1-conf)/2), special.betaincinv(x+1, n-x+1, 1-(1-conf)/2)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
-    p = x/n
     left, right = binomial_conf_interval(x, n, conf)
+    if n == 0:
+        return (left+right)/2, (right-left)/2
+    p = x/n
     return p, max(p - left, right - p)
 
 def reversed(x):
