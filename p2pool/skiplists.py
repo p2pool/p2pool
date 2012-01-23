@@ -1,5 +1,3 @@
-import operator
-
 from p2pool.util import forest, math
 
 class WeightsSkipList(forest.TrackerSkipList):
