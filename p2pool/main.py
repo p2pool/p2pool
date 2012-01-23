@@ -415,6 +415,7 @@ def main(args, net, datadir_path):
                 self.new_work_event = current_work.changed
                 
                 self.merkle_root_to_transactions = expiring_dict.ExpiringDict(300)
+                self.recent_shares_ts_work = []
             
             def _get_payout_script_from_username(self, user):
                 if user is None:
@@ -460,14 +461,10 @@ def main(args, net, datadir_path):
                     net=net,
                 )
                 
-                print 'New work for worker! Share difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
-                    bitcoin_data.target_to_difficulty(share_info['bits'].target),
-                    (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
-                    current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
-                    len(current_work2.value['transactions']),
-                )
-                
-                target = 2**256//2**32//8 - 1
+                target = 2**256//2**32 - 1
+                if len(self.recent_shares_ts_work) == 50:
+                    hash_rate = sum(work for ts, work in self.recent_shares_ts_work)//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
+                    target = min(target, 2**256//(hash_rate * 5))
                 target = max(target, share_info['bits'].target)
                 if current_work.value['aux_work']:
                     target = max(target, current_work.value['aux_work']['target'])
@@ -475,6 +472,14 @@ def main(args, net, datadir_path):
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
                 merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
                 self.merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time(), current_work.value['aux_work'], target
+                
+                print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+                    bitcoin_data.target_to_difficulty(target),
+                    bitcoin_data.target_to_difficulty(share_info['bits'].target),
+                    (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
+                    current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
+                    len(current_work2.value['transactions']),
+                )
                 
                 return bitcoin_getwork.BlockAttempt(
                     version=current_work.value['version'],
@@ -556,6 +561,9 @@ def main(args, net, datadir_path):
                     reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
                     if request.getPassword() == vip_pass:
                         reactor.callLater(1, grapher.add_localminer_point, request.getUser(), bitcoin_data.target_to_average_attempts(target), not on_time)
+                    self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
+                    while len(self.recent_shares_ts_work) > 50:
+                        self.recent_shares_ts_work.pop(0)
                 
                 if pow_hash > target:
                     print 'Worker submitted share with hash > target:'
