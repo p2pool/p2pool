@@ -104,7 +104,7 @@ def find_root(y_over_dy, start, steps=10, bounds=(None, None)):
     return guess
 
 def ierf(z):
-    return find_root(lambda x: (erf(x) - z)/(2*math.e**(-guess**2)/math.sqrt(math.pi)), 0)
+    return find_root(lambda x: (erf(x) - z)/(2*math.e**(-x**2)/math.sqrt(math.pi)), 0)
 
 try:
     from scipy import special
