@@ -125,18 +125,16 @@ else:
         if n == 0:
             left = random.random()*(1 - conf)
             return left, left + conf
-        pdf = lambda p: p**x * (1-p)**(n-x) /special.beta(x+1, n-x+1)
-        dpdf = lambda p: ((x*p**(x-1) * (1-p)**(n-x) - p**x * (n-x)*(1-p)**(n-x-1))/special.beta(x+1, n-x+1) \
-            if p != 0 else {0: -n, 1: 1}.get(x, 0)) \
-            if p != 1 else {n-1: -1, n: n}.get(x, 0)
+        kpdf = lambda p: p**x * (1-p)**(n-x)
+        dkpdf = lambda p: ((x*p**(x-1) * (1-p)**(n-x) - p**x * (n-x)*(1-p)**(n-x-1)) \
+            if p != 0 else {0: -n, 1: 1}.get(x, 0)*special.beta(x+1, n-x+1)) \
+            if p != 1 else {n-1: -1, n: n}.get(x, 0)*special.beta(x+1, n-x+1)
         cdf = lambda p: special.betainc(x+1, n-x+1, p)
-        dcdf = pdf
         invcdf = lambda i: special.betaincinv(x+1, n-x+1, i)
-        dinvcdf = lambda i: 1/pdf(invcdf(i))
         left_to_right = lambda left: invcdf(cdf(left) + conf)
-        dleft_to_right = lambda left: dinvcdf(cdf(left) + conf)*dcdf(left)
-        f = lambda left: pdf(left_to_right(left)) - pdf(left)
-        df = lambda left: dpdf(left_to_right(left))*dleft_to_right(left) - dpdf(left)
+        dleft_to_right = lambda left: kpdf(left)/kpdf(invcdf(cdf(left) + conf))
+        f = lambda left: kpdf(left_to_right(left)) - kpdf(left)
+        df = lambda left: dkpdf(left_to_right(left))*dleft_to_right(left) - dkpdf(left)
         left = find_root(f, df, invcdf((1-conf)/2), 8, (0,  invcdf(1-conf)))
         return left, left_to_right(left)
 
