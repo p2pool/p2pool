@@ -95,12 +95,15 @@ def erf(x):
     y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
     return sign*y # erf(-x) = -erf(x)
 
-def ierf(z, steps=10):
+def find_root(f, fp, start, steps=10):
     guess = 0
     for i in xrange(steps):
-        d = 2*math.e**(-guess**2)/math.sqrt(math.pi)
-        guess = guess - (erf(guess) - z)/d
+        d = fp(guess)
+        guess = guess - f(guess)/d
     return guess
+
+def ierf(z):
+    return find_root(lambda x: erf(x) - z, lambda guess: 2*math.e**(-guess**2)/math.sqrt(math.pi), 0)
 
 try:
     from scipy import special
