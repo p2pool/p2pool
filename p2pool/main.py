@@ -15,7 +15,7 @@ import json
 import signal
 import traceback
 
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, reactor, protocol, task
 from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -753,6 +753,29 @@ def main(args, net, datadir_path):
             signal.siginterrupt(signal.SIGALRM, False)
             task.LoopingCall(signal.alarm, 30).start(1)
         
+        if args.irc_announce:
+            from twisted.words.protocols import irc
+            class IRCClient(irc.IRCClient):
+                nickname = 'p2pool'
+                def lineReceived(self, line):
+                    print line
+                    irc.IRCClient.lineReceived(self, line)
+                def signedOn(self):
+                    irc.IRCClient.signedOn(self)
+                    self.factory.resetDelay()
+                    self.join('#p2pool')
+                    self.watch_id = current_work.changed.watch(self._work_changed)
+                    self.announced_hashes = set()
+                def _work_changed(self, new_work):
+                    share = tracker.shares[new_work['best_share_hash']]
+                    if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
+                        self.privmsg('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + bitcoin_data.IntType(256, 'big').pack(share.header_hash).encode('hex'))
+                def connectionLost(self, reason):
+                    current_work.changed.unwatch(watch_id)
+            class IRCClientFactory(protocol.ReconnectingClientFactory):
+                protocol = IRCClient
+            reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory())
+        
         @defer.inlineCallbacks
         def status_thread():
             last_str = None
@@ -861,6 +884,9 @@ def run():
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
         help='donate this percentage of work to author of p2pool (default: 0.5)',
         type=float, action='store', default=0.5, dest='donation_percentage')
+    parser.add_argument('--irc-announce',
+        help='announce any blocks found on irc://irc.freenode.net/#p2pool',
+        action='store_true', default=False, dest='irc_announce')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
