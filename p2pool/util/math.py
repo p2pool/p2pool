@@ -95,16 +95,16 @@ def erf(x):
     y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
     return sign*y # erf(-x) = -erf(x)
 
-def find_root(f, fp, start, steps=10, bounds=(None, None)):
+def find_root(y_over_dy, start, steps=10, bounds=(None, None)):
     guess = start
     for i in xrange(steps):
-        guess = guess - f(guess)/fp(guess)
+        guess = guess - y_over_dy(guess)
         if bounds[0] is not None and guess < bounds[0]: guess = bounds[0]
         if bounds[1] is not None and guess > bounds[1]: guess = bounds[1]
     return guess
 
 def ierf(z):
-    return find_root(lambda x: erf(x) - z, lambda guess: 2*math.e**(-guess**2)/math.sqrt(math.pi), 0)
+    return find_root(lambda x: (erf(x) - z)/(2*math.e**(-guess**2)/math.sqrt(math.pi)), 0)
 
 try:
     from scipy import special
@@ -125,18 +125,16 @@ else:
         if n == 0:
             left = random.random()*(1 - conf)
             return left, left + conf
-        kpdf = lambda p: p**x * (1-p)**(n-x)
         dkpdf = lambda p: ((x*p**(x-1) * (1-p)**(n-x) - p**x * (n-x)*(1-p)**(n-x-1)) \
             if p != 0 else {0: -n, 1: 1}.get(x, 0)*special.beta(x+1, n-x+1)) \
             if p != 1 else {n-1: -1, n: n}.get(x, 0)*special.beta(x+1, n-x+1)
-        cdf = lambda p: special.betainc(x+1, n-x+1, p)
-        invcdf = lambda i: special.betaincinv(x+1, n-x+1, i)
-        left_to_right = lambda left: invcdf(cdf(left) + conf)
-        dleft_to_right = lambda left: kpdf(left)/kpdf(invcdf(cdf(left) + conf))
-        f = lambda left: kpdf(left_to_right(left)) - kpdf(left)
-        df = lambda left: dkpdf(left_to_right(left))*dleft_to_right(left) - dkpdf(left)
-        left = find_root(f, df, invcdf((1-conf)/2), 8, (0,  invcdf(1-conf)))
-        return left, left_to_right(left)
+        def f(left):
+            right = special.betaincinv(x+1, n-x+1, special.betainc(x+1, n-x+1, left) + conf)
+            l_pdf, r_pdf = left**x*(1-left)**(n-x), right**x*(1-right)**(n-x)
+            return (r_pdf - l_pdf)*r_pdf/(dkpdf(right)*l_pdf - dkpdf(left)*r_pdf)
+        left_max = special.betaincinv(x+1, n-x+1, 1 - conf)
+        left = find_root(f, left_max/2, 8, (0, left_max))
+        return left, special.betaincinv(x+1, n-x+1, special.betainc(x+1, n-x+1, left) + conf)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
     left, right = binomial_conf_interval(x, n, conf)
