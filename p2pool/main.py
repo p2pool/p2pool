@@ -758,7 +758,7 @@ def main(args, net, datadir_path):
             class IRCClient(irc.IRCClient):
                 nickname = 'p2pool'
                 def lineReceived(self, line):
-                    print line
+                    print repr(line)
                     irc.IRCClient.lineReceived(self, line)
                 def signedOn(self):
                     irc.IRCClient.signedOn(self)
@@ -771,7 +771,7 @@ def main(args, net, datadir_path):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
                         self.privmsg('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + bitcoin_data.IntType(256, 'big').pack(share.header_hash).encode('hex'))
                 def connectionLost(self, reason):
-                    current_work.changed.unwatch(watch_id)
+                    current_work.changed.unwatch(self.watch_id)
             class IRCClientFactory(protocol.ReconnectingClientFactory):
                 protocol = IRCClient
             reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory())
