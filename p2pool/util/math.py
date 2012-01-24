@@ -95,11 +95,12 @@ def erf(x):
     y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
     return sign*y # erf(-x) = -erf(x)
 
-def find_root(f, fp, start, steps=10):
-    guess = 0
+def find_root(f, fp, start, steps=10, bounds=(None, None)):
+    guess = start
     for i in xrange(steps):
-        d = fp(guess)
-        guess = guess - f(guess)/d
+        guess = guess - f(guess)/fp(guess)
+        if bounds[0] is not None and guess < bounds[0]: guess = bounds[0]
+        if bounds[1] is not None and guess > bounds[1]: guess = bounds[1]
     return guess
 
 def ierf(z):
@@ -120,18 +121,24 @@ except ImportError:
         bottom = 1 + z**2/n
         return (topa - topb)/bottom, (topa + topb)/bottom
 else:
-    def binomial_conf_interval(x, n, conf=0.95, steps=11):
-        a = 1 - conf
+    def binomial_conf_interval(x, n, conf=0.95):
         if n == 0:
-            left = random.random()*a
+            left = random.random()*(1 - conf)
             return left, left + conf
-        res = None
-        for left_a_i in xrange(steps):
-            left_a = a * left_a_i / (steps - 1)
-            this_left, this_right = special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, 1 - (a - left_a))
-            if res is None or this_right - this_left < res[1] - res[0]:
-                res = this_left, this_right
-        return res
+        pdf = lambda p: p**x * (1-p)**(n-x) /special.beta(x+1, n-x+1)
+        dpdf = lambda p: ((x*p**(x-1) * (1-p)**(n-x) - p**x * (n-x)*(1-p)**(n-x-1))/special.beta(x+1, n-x+1) \
+            if p != 0 else {0: -n, 1: 1}.get(x, 0)) \
+            if p != 1 else {n-1: -1, n: n}.get(x, 0)
+        cdf = lambda p: special.betainc(x+1, n-x+1, p)
+        dcdf = pdf
+        invcdf = lambda i: special.betaincinv(x+1, n-x+1, i)
+        dinvcdf = lambda i: 1/pdf(invcdf(i))
+        left_to_right = lambda left: invcdf(cdf(left) + conf)
+        dleft_to_right = lambda left: dinvcdf(cdf(left) + conf)*dcdf(left)
+        f = lambda left: pdf(left_to_right(left)) - pdf(left)
+        df = lambda left: dpdf(left_to_right(left))*dleft_to_right(left) - dpdf(left)
+        left = find_root(f, df, invcdf((1-conf)/2), 8, (0,  invcdf(1-conf)))
+        return left, left_to_right(left)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
     left, right = binomial_conf_interval(x, n, conf)
