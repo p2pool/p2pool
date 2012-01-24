@@ -120,8 +120,18 @@ except ImportError:
         bottom = 1 + z**2/n
         return (topa - topb)/bottom, (topa + topb)/bottom
 else:
-    def binomial_conf_interval(x, n, conf=0.95):
-        return special.betaincinv(x+1, n-x+1, (1-conf)/2), special.betaincinv(x+1, n-x+1, 1-(1-conf)/2)
+    def binomial_conf_interval(x, n, conf=0.95, steps=11):
+        a = 1 - conf
+        if n == 0:
+            left = random.random()*a
+            return left, left + conf
+        res = None
+        for left_a_i in xrange(steps):
+            left_a = a * left_a_i / (steps - 1)
+            this_left, this_right = special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, 1 - (a - left_a))
+            if res is None or this_right - this_left < res[1] - res[0]:
+                res = this_left, this_right
+        return res
 
 def binomial_conf_center_radius(x, n, conf=0.95):
     left, right = binomial_conf_interval(x, n, conf)
