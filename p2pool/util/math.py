@@ -133,7 +133,7 @@ else:
             l_pdf, r_pdf = left**x*(1-left)**(n-x), right**x*(1-right)**(n-x)
             return (r_pdf - l_pdf)*r_pdf/(dkpdf(right)*l_pdf - dkpdf(left)*r_pdf)
         left_max = special.betaincinv(x+1, n-x+1, 1 - conf)
-        left = find_root(f, left_max/2, 8, (0, left_max))
+        left = find_root(f, special.betaincinv(x+1, n-x+1, (1 - conf)/2), 8, (0, special.betaincinv(x+1, n-x+1, 1 - conf)))
         return left, special.betaincinv(x+1, n-x+1, special.betainc(x+1, n-x+1, left) + conf)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
