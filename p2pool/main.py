@@ -287,12 +287,13 @@ def main(args, net, datadir_path):
         
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
+        @defer.inlineCallbacks
         def parse(x):
             if ':' in x:
                 ip, port = x.split(':')
-                return ip, int(port)
+                defer.returnValue(((yield reactor.resolve(ip)), int(port)))
             else:
-                return x, net.P2P_PORT
+                defer.returnValue(((yield reactor.resolve(x)), net.P2P_PORT))
         
         addrs = {}
         if os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
@@ -300,16 +301,27 @@ def main(args, net, datadir_path):
                 addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
             except:
                 print >>sys.stderr, "error reading addrs"
-        for addr in map(parse, net.BOOTSTRAP_ADDRS):
-            if addr not in addrs:
-                addrs[addr] = (0, time.time(), time.time())
+        for addr_df in map(parse, net.BOOTSTRAP_ADDRS):
+            try:
+                addr = yield addr_df
+                if addr not in addrs:
+                    addrs[addr] = (0, time.time(), time.time())
+            except:
+                log.err()
+        
+        connect_addrs = set()
+        for addr_df in map(parse, args.p2pool_nodes):
+            try:
+                connect_addrs.add((yield addr_df))
+            except:
+                log.err()
         
         p2p_node = Node(
             best_share_hash_func=lambda: current_work.value['best_share_hash'],
             port=args.p2pool_port,
             net=net,
             addr_store=addrs,
-            connect_addrs=set(map(parse, args.p2pool_nodes)),
+            connect_addrs=connect_addrs,
         )
         p2p_node.start()
         
