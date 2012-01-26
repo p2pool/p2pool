@@ -950,10 +950,10 @@ def run():
         conf_path = net.CONF_FILE_FUNC()
         if not os.path.exists(conf_path):
             parser.error('''Bitcoin configuration file not found. Manually enter your RPC password.\r\n'''
-                '''If you actually haven't created a configuration file, you should create\r\n'''
-                '''one at %s with the text:\r\n'''
-                '''|    server=true\r\n'''
-                '''|    rpcpassword=<A LONG RANDOM PASSWORD THAT YOU DON'T HAVE TO REMEMBER>''' % (net.CONF_FILE_FUNC(),))
+                '''If you actually haven't created a configuration file, you should create one at %s with the text:\r\n'''
+                '''\r\n'''
+                '''server=true\r\n'''
+                '''rpcpassword=%x # (randomly generated for your convenience)''' % (conf_path, random.randrange(2**128)))
         with open(conf_path, 'rb') as f:
             cp = ConfigParser.RawConfigParser()
             cp.readfp(StringIO.StringIO('[x]\r\n' + f.read()))
