@@ -6,8 +6,6 @@ from __future__ import division
 import ConfigParser
 import StringIO
 import argparse
-import codecs
-import datetime
 import os
 import random
 import struct
@@ -24,7 +22,7 @@ from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
-from util import expiring_dict, jsonrpc, variable, deferral, math
+from util import expiring_dict, jsonrpc, variable, deferral, math, logging
 from . import p2p, networks, graphs
 import p2pool, p2pool.data as p2pool_data
 
@@ -942,112 +940,6 @@ def run():
     if not os.path.exists(datadir_path):
         os.makedirs(datadir_path)
     
-    if args.logfile is None:
-        args.logfile = os.path.join(datadir_path, 'log')
-    
-    class EncodeReplacerPipe(object):
-        def __init__(self, inner_file):
-            self.inner_file = inner_file
-            self.softspace = 0
-        def write(self, data):
-            if isinstance(data, unicode):
-                try:
-                    data = data.encode(self.inner_file.encoding, 'replace')
-                except:
-                    data = data.encode('ascii', 'replace')
-            self.inner_file.write(data)
-        def flush(self):
-            self.inner_file.flush()
-    class LogFile(object):
-        def __init__(self, filename):
-            self.filename = filename
-            self.inner_file = None
-            self.reopen()
-        def reopen(self):
-            if self.inner_file is not None:
-                self.inner_file.close()
-            open(self.filename, 'a').close()
-            f = open(self.filename, 'rb')
-            f.seek(0, os.SEEK_END)
-            length = f.tell()
-            if length > 100*1000*1000:
-                f.seek(-1000*1000, os.SEEK_END)
-                while True:
-                    if f.read(1) in ('', '\n'):
-                        break
-                data = f.read()
-                f.close()
-                f = open(self.filename, 'wb')
-                f.write(data)
-            f.close()
-            self.inner_file = codecs.open(self.filename, 'a', 'utf-8')
-        def write(self, data):
-            self.inner_file.write(data)
-        def flush(self):
-            self.inner_file.flush()
-    class TeePipe(object):
-        def __init__(self, outputs):
-            self.outputs = outputs
-        def write(self, data):
-            for output in self.outputs:
-                output.write(data)
-        def flush(self):
-            for output in self.outputs:
-                output.flush()
-    class TimestampingPipe(object):
-        def __init__(self, inner_file):
-            self.inner_file = inner_file
-            self.buf = ''
-            self.softspace = 0
-        def write(self, data):
-            buf = self.buf + data
-            lines = buf.split('\n')
-            for line in lines[:-1]:
-                self.inner_file.write('%s %s\n' % (datetime.datetime.now(), line))
-                self.inner_file.flush()
-            self.buf = lines[-1]
-        def flush(self):
-            pass
-    class AbortPipe(object):
-        def __init__(self, inner_file):
-            self.inner_file = inner_file
-            self.softspace = 0
-        def write(self, data):
-            try:
-                self.inner_file.write(data)
-            except:
-                sys.stdout = sys.__stdout__
-                log.DefaultObserver.stderr = sys.stderr = sys.__stderr__
-                raise
-        def flush(self):
-            self.inner_file.flush()
-    class PrefixPipe(object):
-        def __init__(self, inner_file, prefix):
-            self.inner_file = inner_file
-            self.prefix = prefix
-            self.buf = ''
-            self.softspace = 0
-        def write(self, data):
-            buf = self.buf + data
-            lines = buf.split('\n')
-            for line in lines[:-1]:
-                self.inner_file.write(self.prefix + line + '\n')
-                self.inner_file.flush()
-            self.buf = lines[-1]
-        def flush(self):
-            pass
-    logfile = LogFile(args.logfile)
-    pipe = TimestampingPipe(TeePipe([EncodeReplacerPipe(sys.stderr), logfile]))
-    sys.stdout = AbortPipe(pipe)
-    sys.stderr = log.DefaultObserver.stderr = AbortPipe(PrefixPipe(pipe, '> '))
-    if hasattr(signal, "SIGUSR1"):
-        def sigusr1(signum, frame):
-            print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
-            logfile.reopen()
-            print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
-        signal.signal(signal.SIGUSR1, sigusr1)
-    task.LoopingCall(logfile.reopen).start(5)
-    
     if len(args.bitcoind_rpc_userpass) > 2:
         parser.error('a maximum of two arguments are allowed')
     args.bitcoind_rpc_username, args.bitcoind_rpc_password = ([None, None] + args.bitcoind_rpc_userpass)[-2:]
@@ -1099,6 +991,22 @@ def run():
     
     if (args.merged_url is None) ^ (args.merged_userpass is None):
         parser.error('must specify --merged-url and --merged-userpass')
+    
+    
+    if args.logfile is None:
+        args.logfile = os.path.join(datadir_path, 'log')
+    
+    logfile = logging.LogFile(args.logfile)
+    pipe = logging.TimestampingPipe(logging.TeePipe([logging.EncodeReplacerPipe(sys.stderr), logfile]))
+    sys.stdout = logging.AbortPipe(pipe)
+    sys.stderr = log.DefaultObserver.stderr = logging.AbortPipe(logging.PrefixPipe(pipe, '> '))
+    if hasattr(signal, "SIGUSR1"):
+        def sigusr1(signum, frame):
+            print 'Caught SIGUSR1, closing %r...' % (args.logfile,)
+            logfile.reopen()
+            print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
+        signal.signal(signal.SIGUSR1, sigusr1)
+    task.LoopingCall(logfile.reopen).start(5)
     
     reactor.callWhenRunning(main, args, net, datadir_path)
     reactor.run()
