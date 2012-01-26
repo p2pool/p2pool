@@ -3,6 +3,8 @@
 
 from __future__ import division
 
+import ConfigParser
+import StringIO
 import argparse
 import codecs
 import datetime
@@ -919,18 +921,15 @@ def run():
         help='connect to this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='''connect to JSON-RPC interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.RPC_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to JSON-RPC interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.RPC_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='''connect to P2P interface at this port (default: %s)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to P2P interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.P2P_PORT) for _, n in sorted(networks.realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
-    bitcoind_group.add_argument(metavar='BITCOIND_RPCUSER',
-        help='bitcoind RPC interface username (default: <empty>)',
-        type=str, action='store', default='', nargs='?', dest='bitcoind_rpc_username')
-    bitcoind_group.add_argument(metavar='BITCOIND_RPCPASSWORD',
-        help='bitcoind RPC interface password',
-        type=str, action='store', dest='bitcoind_rpc_password')
+    bitcoind_group.add_argument(metavar='BITCOIND_RPCUSERPASS',
+        help='bitcoind RPC interface username, then password, space-separated (only one being provided will cause the username to default to being empty, and none will cause P2Pool to read them from bitcoin.conf)',
+        type=str, action='store', default=[], nargs='*', dest='bitcoind_rpc_userpass')
     
     args = parser.parse_args()
     
@@ -1048,6 +1047,35 @@ def run():
             print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
         signal.signal(signal.SIGUSR1, sigusr1)
     task.LoopingCall(logfile.reopen).start(5)
+    
+    if len(args.bitcoind_rpc_userpass) > 2:
+        parser.error('a maximum of two arguments are allowed')
+    args.bitcoind_rpc_username, args.bitcoind_rpc_password = ([None, None] + args.bitcoind_rpc_userpass)[-2:]
+    
+    if args.bitcoind_rpc_password is None:
+        if not hasattr(net, 'CONF_FILE_FUNC'):
+            parser.error('This network has no configuration file function. Manually enter your RPC password.')
+        conf_path = net.CONF_FILE_FUNC()
+        if not os.path.exists(conf_path):
+            parser.error('''Bitcoin configuration file not found. Manually enter your RPC password.\r\n'''
+                '''If you actually haven't created a configuration file, you should create\r\n'''
+                '''one at %s with the text:\r\n'''
+                '''|    server=true\r\n'''
+                '''|    rpcpassword=<A LONG RANDOM PASSWORD THAT YOU DON'T HAVE TO REMEMBER>''' % (net.CONF_FILE_FUNC(),))
+        with open(conf_path, 'rb') as f:
+            cp = ConfigParser.RawConfigParser()
+            cp.readfp(StringIO.StringIO('[x]\r\n' + open('/home/forrest/.bitcoin/bitcoin.conf', 'rb').read()))
+            for conf_name, var_name, var_type in [
+                ('rpcuser', 'bitcoind_rpc_username', str),
+                ('rpcpassword', 'bitcoind_rpc_password', str),
+                ('rpcport', 'bitcoind_rpc_port', int),
+                ('port', 'bitcoind_p2p_port', int),
+            ]:
+                if getattr(args, var_name) is None and cp.has_option('x', conf_name):
+                    setattr(args, var_name, var_type(cp.get('x', conf_name)))
+    
+    if args.bitcoind_rpc_username is None:
+        args.bitcoind_rpc_username = ''
     
     if args.bitcoind_rpc_port is None:
         args.bitcoind_rpc_port = net.PARENT.RPC_PORT

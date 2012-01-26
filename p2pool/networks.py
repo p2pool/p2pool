@@ -1,3 +1,6 @@
+import os
+import platform
+
 from p2pool.bitcoin import networks
 from p2pool.util import math
 
@@ -22,6 +25,7 @@ BitcoinMainnet = math.Object(
     PERSIST=True,
     WORKER_PORT=9332,
     BOOTSTRAP_ADDRS='74.220.242.6:9334 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 89.78.212.44 94.23.34.145 168.7.116.243 72.14.191.28 94.174.40.189:9344'.split(' '),
+    CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
 )
 BitcoinTestnet = math.Object(
     PARENT=networks.BitcoinTestnet,
