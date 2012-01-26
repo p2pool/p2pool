@@ -554,6 +554,13 @@ def main(args, net, datadir_path):
                     if not on_time:
                         my_doa_share_hashes.add(share.hash)
                     p2p_node.handle_shares([share], None)
+                    try:
+                        if pow_hash <= header['bits'].target:
+                            for peer in p2p_node.peers.itervalues():
+                                peer.sendShares([share])
+                            shared_share_hashes.add(share.hash)
+                    except:
+                        log.err(None, 'Error forwarding block solution:')
                 
                 if pow_hash <= target:
                     reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
