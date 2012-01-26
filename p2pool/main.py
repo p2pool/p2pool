@@ -1064,7 +1064,7 @@ def run():
                 '''|    rpcpassword=<A LONG RANDOM PASSWORD THAT YOU DON'T HAVE TO REMEMBER>''' % (net.CONF_FILE_FUNC(),))
         with open(conf_path, 'rb') as f:
             cp = ConfigParser.RawConfigParser()
-            cp.readfp(StringIO.StringIO('[x]\r\n' + open('/home/forrest/.bitcoin/bitcoin.conf', 'rb').read()))
+            cp.readfp(StringIO.StringIO('[x]\r\n' + f.read()))
             for conf_name, var_name, var_type in [
                 ('rpcuser', 'bitcoind_rpc_username', str),
                 ('rpcpassword', 'bitcoind_rpc_password', str),
