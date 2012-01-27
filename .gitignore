@@ -1,4 +1,5 @@
 *.pyc
+*.pyo
 /data/
 *~
 litecoin_scrypt/build/*
