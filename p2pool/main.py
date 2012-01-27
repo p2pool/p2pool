@@ -788,7 +788,7 @@ def main(args, net, datadir_path):
                 def _work_changed(self, new_work):
                     share = tracker.shares[new_work['best_share_hash']]
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
-                        self.privmsg('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + bitcoin_data.IntType(256, 'big').pack(share.header_hash).encode('hex'))
+                        self.say('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + bitcoin_data.IntType(256, 'big').pack(share.header_hash).encode('hex'))
                 def connectionLost(self, reason):
                     current_work.changed.unwatch(self.watch_id)
             class IRCClientFactory(protocol.ReconnectingClientFactory):
