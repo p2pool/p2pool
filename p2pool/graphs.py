@@ -47,12 +47,15 @@ else:
             
             self.putChild('poolrate_day', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1d',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last day)',
+                'DEF:C=%s.stalerate:stalerate:AVERAGE' % (self.grapher.path,), 'LINE1:C#FF0000:Total stale (last day)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last day)']))
             self.putChild('poolrate_week', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1w',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last week)',
+                'DEF:C=%s.stalerate:stalerate:AVERAGE' % (self.grapher.path,), 'LINE1:C#FF0000:Total stale (last week)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last week)']))
             self.putChild('poolrate_month', Renderer(lambda: ['--lower-limit', '0', '-M', '-E', '--start', '-1m',
                 'DEF:A=%s.poolrate:poolrate:AVERAGE' % (self.grapher.path,), 'LINE1:A#0000FF:Total (last month)',
+                'DEF:C=%s.stalerate:stalerate:AVERAGE' % (self.grapher.path,), 'LINE1:C#FF0000:Total stale (last month)',
                 'DEF:B=%s.localrate:localrate:AVERAGE' % (self.grapher.path,), 'LINE1:B#0000FF:Local (last month)']))
             
             def get_lines():
@@ -101,6 +104,13 @@ else:
                     'RRA:AVERAGE:0.5:7:288', # last week
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
+            if not os.path.exists(self.path + '.stalerate'):
+                rrdtool.create(self.path + '.stalerate', '--step', '300',
+                    'DS:stalerate:GAUGE:600:U:U',
+                    'RRA:AVERAGE:0.5:1:288', # last day
+                    'RRA:AVERAGE:0.5:7:288', # last week
+                    'RRA:AVERAGE:0.5:30:288', # last month
+                )
             if not os.path.exists(self.path + '.localrate'):
                 rrdtool.create(self.path + '.localrate', '--step', '300',
                     'DS:localrate:ABSOLUTE:43200:U:U',
@@ -116,8 +126,9 @@ else:
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
         
-        def add_poolrate_point(self, poolrate):
+        def add_poolrate_point(self, poolrate, stalerate):
             rrdtool.update(self.path + '.poolrate', '-t', 'poolrate', 'N:%f' % (poolrate,))
+            rrdtool.update(self.path + '.stalerate', '-t', 'stalerate', 'N:%f' % (stalerate,))
         
         def add_localrate_point(self, hashes, dead):
             rrdtool.update(self.path + '.localrate', '-t', 'localrate', 'N:%f' % (hashes,))

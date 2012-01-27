@@ -738,8 +738,9 @@ def main(args, net, datadir_path):
         def add_point():
             if tracker.get_height(current_work.value['best_share_hash']) < 720:
                 return
-            grapher.add_poolrate_point(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
-                / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720)))
+            nonstalerate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
+            poolrate = nonstalerate / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))
+            grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
         task.LoopingCall(add_point).start(100)
         
         reactor.listenTCP(args.worker_port, server.Site(web_root))
