@@ -125,16 +125,14 @@ else:
         if n == 0:
             left = random.random()*(1 - conf)
             return left, left + conf
-        dkpdf = lambda p: ((x*p**(x-1) * (1-p)**(n-x) - p**x * (n-x)*(1-p)**(n-x-1)) \
-            if p != 0 else {0: -n, 1: 1}.get(x, 0)*special.beta(x+1, n-x+1)) \
-            if p != 1 else {n-1: -1, n: n}.get(x, 0)*special.beta(x+1, n-x+1)
-        def f(left):
-            right = special.betaincinv(x+1, n-x+1, special.betainc(x+1, n-x+1, left) + conf)
-            l_pdf, r_pdf = left**x*(1-left)**(n-x), right**x*(1-right)**(n-x)
-            return (r_pdf - l_pdf)*r_pdf/(dkpdf(right)*l_pdf - dkpdf(left)*r_pdf)
-        left_max = special.betaincinv(x+1, n-x+1, 1 - conf)
-        left = find_root(f, special.betaincinv(x+1, n-x+1, (1 - conf)/2), 8, (0, special.betaincinv(x+1, n-x+1, 1 - conf)))
-        return left, special.betaincinv(x+1, n-x+1, special.betainc(x+1, n-x+1, left) + conf)
+        b = special.beta(x+1, n-x+1)
+        def f(left_a):
+            left, right = max(1e-8, special.betaincinv(x+1, n-x+1, left_a)), min(1-1e-8, special.betaincinv(x+1, n-x+1, left_a + conf))
+            top = right**(x+1) * (1-right)**(n-x+1) * left*(1-left) - left**(x+1) * (1-left)**(n-x+1) * right * (1-right)
+            bottom = (x - n*right)*left*(1-left) - (x - n*left)*right*(1-right)
+            return top/bottom/b
+        left_a = find_root(f, (1-conf)/2, 12, (0, 1-conf))
+        return special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, left_a + conf)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
     left, right = binomial_conf_interval(x, n, conf)
