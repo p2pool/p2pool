@@ -14,7 +14,7 @@ from twisted.python import log
 
 import p2pool
 from . import data as bitcoin_data, getwork
-from p2pool.util import variable, datachunker, deferral, forest
+from p2pool.util import variable, datachunker, deferral, forest, pack
 
 class TooLong(Exception):
     pass
@@ -135,22 +135,22 @@ class Protocol(BaseProtocol):
             start_height=0,
         )
     
-    message_version = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.IntType(32)),
-        ('services', bitcoin_data.IntType(64)),
-        ('time', bitcoin_data.IntType(64)),
+    message_version = pack.ComposedType([
+        ('version', pack.IntType(32)),
+        ('services', pack.IntType(64)),
+        ('time', pack.IntType(64)),
         ('addr_to', bitcoin_data.address_type),
         ('addr_from', bitcoin_data.address_type),
-        ('nonce', bitcoin_data.IntType(64)),
-        ('sub_version_num', bitcoin_data.VarStrType()),
-        ('start_height', bitcoin_data.IntType(32)),
+        ('nonce', pack.IntType(64)),
+        ('sub_version_num', pack.VarStrType()),
+        ('start_height', pack.IntType(32)),
     ])
     def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
         #print 'VERSION', locals()
         self.version_after = version
         self.send_verack()
     
-    message_verack = bitcoin_data.ComposedType([])
+    message_verack = pack.ComposedType([])
     def handle_verack(self):
         self.version = self.version_after
         
@@ -166,10 +166,10 @@ class Protocol(BaseProtocol):
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(self)
     
-    message_inv = bitcoin_data.ComposedType([
-        ('invs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('type', bitcoin_data.EnumType(bitcoin_data.IntType(32), {'tx': 1, 'block': 2})),
-            ('hash', bitcoin_data.IntType(256)),
+    message_inv = pack.ComposedType([
+        ('invs', pack.ListType(pack.ComposedType([
+            ('type', pack.EnumType(pack.IntType(32), {'tx': 1, 'block': 2})),
+            ('hash', pack.IntType(256)),
         ]))),
     ])
     def handle_inv(self, invs):
@@ -181,27 +181,27 @@ class Protocol(BaseProtocol):
             else:
                 print 'Unknown inv type', item
     
-    message_getdata = bitcoin_data.ComposedType([
-        ('requests', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('type', bitcoin_data.EnumType(bitcoin_data.IntType(32), {'tx': 1, 'block': 2})),
-            ('hash', bitcoin_data.IntType(256)),
+    message_getdata = pack.ComposedType([
+        ('requests', pack.ListType(pack.ComposedType([
+            ('type', pack.EnumType(pack.IntType(32), {'tx': 1, 'block': 2})),
+            ('hash', pack.IntType(256)),
         ]))),
     ])
-    message_getblocks = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.IntType(32)),
-        ('have', bitcoin_data.ListType(bitcoin_data.IntType(256))),
-        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
+    message_getblocks = pack.ComposedType([
+        ('version', pack.IntType(32)),
+        ('have', pack.ListType(pack.IntType(256))),
+        ('last', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
-    message_getheaders = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.IntType(32)),
-        ('have', bitcoin_data.ListType(bitcoin_data.IntType(256))),
-        ('last', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
+    message_getheaders = pack.ComposedType([
+        ('version', pack.IntType(32)),
+        ('have', pack.ListType(pack.IntType(256))),
+        ('last', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
-    message_getaddr = bitcoin_data.ComposedType([])
+    message_getaddr = pack.ComposedType([])
     
-    message_addr = bitcoin_data.ComposedType([
-        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('timestamp', bitcoin_data.IntType(32)),
+    message_addr = pack.ComposedType([
+        ('addrs', pack.ListType(pack.ComposedType([
+            ('timestamp', pack.IntType(32)),
             ('address', bitcoin_data.address_type),
         ]))),
     ])
@@ -209,13 +209,13 @@ class Protocol(BaseProtocol):
         for addr in addrs:
             pass
     
-    message_tx = bitcoin_data.ComposedType([
+    message_tx = pack.ComposedType([
         ('tx', bitcoin_data.tx_type),
     ])
     def handle_tx(self, tx):
         self.get_tx.got_response(bitcoin_data.tx_type.hash256(tx), tx)
     
-    message_block = bitcoin_data.ComposedType([
+    message_block = pack.ComposedType([
         ('block', bitcoin_data.block_type),
     ])
     def handle_block(self, block):
@@ -223,8 +223,8 @@ class Protocol(BaseProtocol):
         self.get_block.got_response(block_hash, block)
         self.get_block_header.got_response(block_hash, block['header'])
     
-    message_headers = bitcoin_data.ComposedType([
-        ('headers', bitcoin_data.ListType(bitcoin_data.block_type)),
+    message_headers = pack.ComposedType([
+        ('headers', pack.ListType(bitcoin_data.block_type)),
     ])
     def handle_headers(self, headers):
         for header in headers:
@@ -232,13 +232,13 @@ class Protocol(BaseProtocol):
             self.get_block_header.got_response(bitcoin_data.block_header_type.hash256(header), header)
         self.factory.new_headers.happened([header['header'] for header in headers])
     
-    message_ping = bitcoin_data.ComposedType([])
+    message_ping = pack.ComposedType([])
     def handle_ping(self):
         pass
     
-    message_alert = bitcoin_data.ComposedType([
-        ('message', bitcoin_data.VarStrType()),
-        ('signature', bitcoin_data.VarStrType()),
+    message_alert = pack.ComposedType([
+        ('message', pack.VarStrType()),
+        ('signature', pack.VarStrType()),
     ])
     def handle_alert(self, message, signature):
         print 'ALERT:', (message, signature)

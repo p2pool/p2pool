@@ -9,44 +9,44 @@ from twisted.python import log
 import p2pool
 from p2pool import skiplists
 from p2pool.bitcoin import data as bitcoin_data, script
-from p2pool.util import math, forest
+from p2pool.util import math, forest, pack
 
 
-share_data_type = bitcoin_data.ComposedType([
-    ('previous_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
-    ('coinbase', bitcoin_data.VarStrType()),
-    ('nonce', bitcoin_data.VarStrType()),
-    ('new_script', bitcoin_data.VarStrType()),
-    ('subsidy', bitcoin_data.IntType(64)),
-    ('donation', bitcoin_data.IntType(16)),
-    ('stale_info', bitcoin_data.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
+share_data_type = pack.ComposedType([
+    ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
+    ('coinbase', pack.VarStrType()),
+    ('nonce', pack.VarStrType()),
+    ('new_script', pack.VarStrType()),
+    ('subsidy', pack.IntType(64)),
+    ('donation', pack.IntType(16)),
+    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
 ])
 
-share_info_type = bitcoin_data.ComposedType([
+share_info_type = pack.ComposedType([
     ('share_data', share_data_type),
     ('bits', bitcoin_data.FloatingIntegerType()),
-    ('timestamp', bitcoin_data.IntType(32)),
+    ('timestamp', pack.IntType(32)),
 ])
 
-share1a_type = bitcoin_data.ComposedType([
+share1a_type = pack.ComposedType([
     ('header', bitcoin_data.block_header_type),
     ('share_info', share_info_type),
     ('merkle_branch', bitcoin_data.merkle_branch_type),
 ])
 
-share1b_type = bitcoin_data.ComposedType([
+share1b_type = pack.ComposedType([
     ('header', bitcoin_data.block_header_type),
     ('share_info', share_info_type),
-    ('other_txs', bitcoin_data.ListType(bitcoin_data.tx_type)),
+    ('other_txs', pack.ListType(bitcoin_data.tx_type)),
 ])
 
 # type:
 # 0: share1a
 # 1: share1b
 
-share_type = bitcoin_data.ComposedType([
-    ('type', bitcoin_data.VarIntType()),
-    ('contents', bitcoin_data.VarStrType()),
+share_type = pack.ComposedType([
+    ('type', pack.VarIntType()),
+    ('contents', pack.VarStrType()),
 ])
 
 class Share(object):
@@ -260,7 +260,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
             sequence=None,
             script=share_data['coinbase'].ljust(2, '\x00'),
         )],
-        tx_outs=[dict(value=0, script='\x20' + bitcoin_data.IntType(256).pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script='\x20' + pack.IntType(256).pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 

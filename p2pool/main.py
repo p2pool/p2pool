@@ -22,7 +22,7 @@ from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface
-from util import expiring_dict, jsonrpc, variable, deferral, math, logging
+from util import expiring_dict, jsonrpc, variable, deferral, math, logging, pack
 from . import p2p, networks, graphs
 import p2pool, p2pool.data as p2pool_data
 
@@ -202,7 +202,7 @@ def main(args, net, datadir_path):
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged_proxy.rpc_getauxblock)()
                 pre_merged_work.set(dict(
                     hash=int(auxblock['hash'], 16),
-                    target=bitcoin_data.IntType(256).unpack(auxblock['target'].decode('hex')),
+                    target=pack.IntType(256).unpack(auxblock['target'].decode('hex')),
                     chain_id=auxblock['chainid'],
                 ))
                 yield deferral.sleep(1)
@@ -453,7 +453,7 @@ def main(args, net, datadir_path):
                     share_data=dict(
                         previous_share_hash=current_work.value['best_share_hash'],
                         coinbase=(('' if current_work.value['aux_work'] is None else
-                            '\xfa\xbemm' + bitcoin_data.IntType(256, 'big').pack(current_work.value['aux_work']['hash']) + struct.pack('<ii', 1, 0)) + current_work.value['coinbaseflags'])[:100],
+                            '\xfa\xbemm' + pack.IntType(256, 'big').pack(current_work.value['aux_work']['hash']) + struct.pack('<ii', 1, 0)) + current_work.value['coinbaseflags'])[:100],
                         nonce=struct.pack('<Q', random.randrange(2**64)),
                         new_script=payout_script,
                         subsidy=current_work2.value['subsidy'],
@@ -524,9 +524,9 @@ def main(args, net, datadir_path):
                 
                 try:
                     if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
-                        assert bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][4:4+32].encode('hex')
+                        assert pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][4:4+32].encode('hex')
                         df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(merged_proxy.rpc_getauxblock)(
-                            bitcoin_data.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
+                            pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
                                     tx=transactions[0],
@@ -787,7 +787,7 @@ def main(args, net, datadir_path):
                 def _work_changed(self, new_work):
                     share = tracker.shares[new_work['best_share_hash']]
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
-                        self.say('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + bitcoin_data.IntType(256, 'big').pack(share.header_hash).encode('hex'))
+                        self.say('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + pack.IntType(256, 'big').pack(share.header_hash).encode('hex'))
                 def connectionLost(self, reason):
                     current_work.changed.unwatch(self.watch_id)
             class IRCClientFactory(protocol.ReconnectingClientFactory):

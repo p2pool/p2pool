@@ -1,15 +1,14 @@
-from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import bases
+from p2pool.util import bases, pack
 
 def reads_nothing(f):
     return '', f
 def protoPUSH(length):
-    return lambda f: bitcoin_data.read(f, length)
+    return lambda f: pack.read(f, length)
 def protoPUSHDATA(size_len):
     def _(f):
-        length_str, f = bitcoin_data.read(f, size_len)
+        length_str, f = pack.read(f, size_len)
         length = bases.string_to_natural(length_str[::-1].lstrip(chr(0)))
-        data, f = bitcoin_data.read(f, length)
+        data, f = pack.read(f, length)
         return data, f
     return _
 
@@ -34,8 +33,8 @@ opcodes[175] = 'CHECKMULTISIGVERIFY', reads_nothing
 
 def parse(script):
     f = script, 0
-    while bitcoin_data.size(f):
-        opcode_str, f = bitcoin_data.read(f, 1)
+    while pack.size(f):
+        opcode_str, f = pack.read(f, 1)
         opcode = ord(opcode_str)
         opcode_name, read_func = opcodes[opcode]
         opcode_arg, f = read_func(f)

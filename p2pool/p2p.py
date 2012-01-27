@@ -10,7 +10,7 @@ import p2pool
 from p2pool import data as p2pool_data
 from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral
+from p2pool.util import deferral, pack
 
 class Protocol(bitcoin_p2p.BaseProtocol):
     version = 2
@@ -91,15 +91,15 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             #print 'sending addrme'
             yield deferral.sleep(random.expovariate(1/(100*len(self.node.peers) + 1)))
     
-    message_version = bitcoin_data.ComposedType([
-        ('version', bitcoin_data.IntType(32)),
-        ('services', bitcoin_data.IntType(64)),
+    message_version = pack.ComposedType([
+        ('version', pack.IntType(32)),
+        ('services', pack.IntType(64)),
         ('addr_to', bitcoin_data.address_type),
         ('addr_from', bitcoin_data.address_type),
-        ('nonce', bitcoin_data.IntType(64)),
-        ('sub_version', bitcoin_data.VarStrType()),
-        ('mode', bitcoin_data.IntType(32)), # always 1 for legacy compatibility
-        ('best_share_hash', bitcoin_data.PossiblyNoneType(0, bitcoin_data.IntType(256))),
+        ('nonce', pack.IntType(64)),
+        ('sub_version', pack.VarStrType()),
+        ('mode', pack.IntType(32)), # always 1 for legacy compatibility
+        ('best_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         if self.other_version is not None or version < 2:
@@ -129,12 +129,12 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if best_share_hash is not None:
             self.node.handle_share_hashes([best_share_hash], self)
     
-    message_ping = bitcoin_data.ComposedType([])
+    message_ping = pack.ComposedType([])
     def handle_ping(self):
         pass
     
-    message_addrme = bitcoin_data.ComposedType([
-        ('port', bitcoin_data.IntType(16)),
+    message_addrme = pack.ComposedType([
+        ('port', pack.IntType(16)),
     ])
     def handle_addrme(self, port):
         host = self.transport.getPeer().host
@@ -156,9 +156,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                     ),
                 ])
     
-    message_addrs = bitcoin_data.ComposedType([
-        ('addrs', bitcoin_data.ListType(bitcoin_data.ComposedType([
-            ('timestamp', bitcoin_data.IntType(64)),
+    message_addrs = pack.ComposedType([
+        ('addrs', pack.ListType(pack.ComposedType([
+            ('timestamp', pack.IntType(64)),
             ('address', bitcoin_data.address_type),
         ]))),
     ])
@@ -168,8 +168,8 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             if random.random() < .8 and self.node.peers:
                 random.choice(self.node.peers.values()).send_addrs(addrs=[addr_record])
     
-    message_getaddrs = bitcoin_data.ComposedType([
-        ('count', bitcoin_data.IntType(32)),
+    message_getaddrs = pack.ComposedType([
+        ('count', pack.IntType(32)),
     ])
     def handle_getaddrs(self, count):
         if count > 100:
@@ -186,16 +186,16 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.node.get_good_peers(count)
         ])
     
-    message_getshares = bitcoin_data.ComposedType([
-        ('hashes', bitcoin_data.ListType(bitcoin_data.IntType(256))),
-        ('parents', bitcoin_data.VarIntType()),
-        ('stops', bitcoin_data.ListType(bitcoin_data.IntType(256))),
+    message_getshares = pack.ComposedType([
+        ('hashes', pack.ListType(pack.IntType(256))),
+        ('parents', pack.VarIntType()),
+        ('stops', pack.ListType(pack.IntType(256))),
     ])
     def handle_getshares(self, hashes, parents, stops):
         self.node.handle_get_shares(hashes, parents, stops, self)
     
-    message_shares = bitcoin_data.ComposedType([
-        ('shares', bitcoin_data.ListType(p2pool_data.share_type)),
+    message_shares = pack.ComposedType([
+        ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
         res = []
