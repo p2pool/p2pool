@@ -95,21 +95,21 @@ else:
             self.path = path
             
             if not os.path.exists(self.path + '.poolrate'):
-                rrdtool.create(self.path + '.poolrate', '--step', '300', '--no-overwrite',
+                rrdtool.create(self.path + '.poolrate', '--step', '300',
                     'DS:poolrate:GAUGE:600:U:U',
                     'RRA:AVERAGE:0.5:1:288', # last day
                     'RRA:AVERAGE:0.5:7:288', # last week
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
             if not os.path.exists(self.path + '.localrate'):
-                rrdtool.create(self.path + '.localrate', '--step', '300', '--no-overwrite',
+                rrdtool.create(self.path + '.localrate', '--step', '300',
                     'DS:localrate:ABSOLUTE:43200:U:U',
                     'RRA:AVERAGE:0.5:1:288', # last day
                     'RRA:AVERAGE:0.5:7:288', # last week
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
             if not os.path.exists(self.path + '.localdeadrate'):
-                rrdtool.create(self.path + '.localdeadrate', '--step', '300', '--no-overwrite',
+                rrdtool.create(self.path + '.localdeadrate', '--step', '300',
                     'DS:localdeadrate:ABSOLUTE:43200:U:U',
                     'RRA:AVERAGE:0.5:1:288', # last day
                     'RRA:AVERAGE:0.5:7:288', # last week
@@ -126,14 +126,14 @@ else:
         def add_localminer_point(self, name, hashes, dead):
             path = self.path + '.' + name.encode('hex')
             if not os.path.exists(path + '.localminer'):
-                rrdtool.create(path + '.localminer', '--step', '300', '--no-overwrite',
+                rrdtool.create(path + '.localminer', '--step', '300',
                     'DS:localminer:ABSOLUTE:43200:U:U',
                     'RRA:AVERAGE:0.5:1:288', # last day
                     'RRA:AVERAGE:0.5:7:288', # last week
                     'RRA:AVERAGE:0.5:30:288', # last month
                 )
             if not os.path.exists(path + '.localdeadminer'):
-                rrdtool.create(path + '.localdeadminer', '--step', '300', '--no-overwrite',
+                rrdtool.create(path + '.localdeadminer', '--step', '300',
                     'DS:localdeadminer:ABSOLUTE:43200:U:U',
                     'RRA:AVERAGE:0.5:1:288', # last day
                     'RRA:AVERAGE:0.5:7:288', # last week
