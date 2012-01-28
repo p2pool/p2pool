@@ -3,6 +3,7 @@ from __future__ import division
 import hashlib
 
 from p2pool.util import bases, math, pack
+from . import base58
 
 class ChecksummedType(pack.Type):
     def __init__(self, inner):
@@ -191,13 +192,13 @@ human_address_type = ChecksummedType(pack.ComposedType([
 pubkey_type = pack.PassthruType()
 
 def pubkey_hash_to_address(pubkey_hash, net):
-    return human_address_type.pack_base58(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash))
+    return base58.encode(human_address_type.pack(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash)))
 
 def pubkey_to_address(pubkey, net):
     return pubkey_hash_to_address(pubkey_type.hash160(pubkey), net)
 
 def address_to_pubkey_hash(address, net):
-    x = human_address_type.unpack_base58(address)
+    x = human_address_type.unpack(base58.decode(address))
     if x['version'] != net.ADDRESS_VERSION:
         raise ValueError('address not for this net!')
     return x['pubkey_hash']

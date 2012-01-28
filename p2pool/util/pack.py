@@ -2,7 +2,6 @@ import binascii
 import hashlib
 import struct
 
-from p2pool.bitcoin import base58
 import p2pool
 
 class EarlyEnd(Exception):
@@ -81,13 +80,6 @@ class Type(object):
                 raise AssertionError((self._unpack(data), obj))
         
         return data
-    
-    
-    def pack_base58(self, obj):
-        return base58.encode(self.pack(obj))
-    
-    def unpack_base58(self, base58_data):
-        return self.unpack(base58.decode(base58_data))
     
     
     def hash160(self, obj):
