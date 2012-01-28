@@ -50,35 +50,44 @@ class DistanceSkipList(TrackerSkipList):
         assert dist == n
         return hash
 
+def get_attributedelta_type(attrs): # attrs: {name: func}
+    class ProtoAttributeDelta(object):
+        __slots__ = ['head', 'tail'] + attrs.keys()
+        
+        @classmethod
+        def get_none(cls, element_id):
+            return cls(element_id, element_id, **dict((k, 0) for k in attrs))
+        
+        @classmethod
+        def from_element(cls, share):
+            return cls(share.hash, share.previous_hash, **dict((k, v(share)) for k, v in attrs.iteritems()))
+        
+        def __init__(self, head, tail, **kwargs):
+            self.head, self.tail = head, tail
+            for k, v in kwargs.iteritems():
+                setattr(self, k, v)
+        
+        def __add__(self, other):
+            assert self.tail == other.head
+            return self.__class__(self.head, other.tail, **dict((k, getattr(self, k) + getattr(other, k)) for k in attrs))
+        
+        def __sub__(self, other):
+            if self.head == other.head:
+                return self.__class__(other.tail, self.tail, **dict((k, getattr(self, k) - getattr(other, k)) for k in attrs))
+            elif self.tail == other.tail:
+                return self.__class__(self.head, other.head, **dict((k, getattr(self, k) - getattr(other, k)) for k in attrs))
+            else:
+                raise AssertionError()
+        
+        def __repr__(self):
+            return '%s(%r, %r%s)' % (self.__class__, self.head, self.tail, ''.join(', %s=%r' % (k, getattr(self, k)) for k in attrs))
+    ProtoAttributeDelta.attrs = attrs
+    return ProtoAttributeDelta
 
-class AttributeDelta(object):
-    __slots__ = 'head height work tail'.split(' ')
-    
-    @classmethod
-    def get_none(cls, element_id):
-        return cls(element_id, 0, 0, element_id)
-    
-    @classmethod
-    def from_element(cls, share):
-        return cls(share.hash, 1, bitcoin_data.target_to_average_attempts(share.target), share.previous_hash)
-    
-    def __init__(self, head, height, work, tail):
-        self.head, self.height, self.work, self.tail = head, height, work, tail
-    
-    def __add__(self, other):
-        assert self.tail == other.head
-        return AttributeDelta(self.head, self.height + other.height, self.work + other.work, other.tail)
-    
-    def __sub__(self, other):
-        if self.head == other.head:
-            return AttributeDelta(other.tail, self.height - other.height, self.work - other.work, self.tail)
-        elif self.tail == other.tail:
-            return AttributeDelta(self.head, self.height - other.height, self.work - other.work, other.head)
-        else:
-            raise AssertionError()
-    
-    def __repr__(self):
-        return str(self.__class__) + str((self.head, self.height, self.work, self.tail))
+AttributeDelta = get_attributedelta_type(dict(
+    height=lambda share: 1,
+    work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
+))
 
 class Tracker(object):
     def __init__(self, shares=[], delta_type=AttributeDelta):

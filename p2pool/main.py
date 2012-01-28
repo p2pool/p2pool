@@ -43,11 +43,6 @@ def getwork(bitcoind):
 @defer.inlineCallbacks
 def main(args, net, datadir_path):
     try:
-        my_share_hashes = set()
-        my_doa_share_hashes = set()
-        p2pool_data.OkayTrackerDelta.my_share_hashes = my_share_hashes
-        p2pool_data.OkayTrackerDelta.my_doa_share_hashes = my_doa_share_hashes
-        
         print 'p2pool (version %s)' % (p2pool.__version__,)
         print
         try:
@@ -92,7 +87,10 @@ def main(args, net, datadir_path):
         
         ht = bitcoin_p2p.HeightTracker(bitcoind, factory)
         
-        tracker = p2pool_data.OkayTracker(net)
+        my_share_hashes = set()
+        my_doa_share_hashes = set()
+        
+        tracker = p2pool_data.OkayTracker(net, my_share_hashes, my_doa_share_hashes)
         shared_share_hashes = set()
         ss = p2pool_data.ShareStore(os.path.join(datadir_path, 'shares.'), net)
         known_verified = set()

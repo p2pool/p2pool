@@ -264,52 +264,16 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
         lock_time=0,
     )
 
-
-class OkayTrackerDelta(object):
-    __slots__ = 'head height work my_count my_doa_count my_orphan_announce_count my_dead_announce_count tail'.split(' ')
-    
-    @classmethod
-    def get_none(cls, element_id):
-        return cls(element_id, 0, 0, 0, 0, 0, 0, element_id)
-    
-    @classmethod
-    def from_element(cls, share):
-        return cls(share.hash,
-            1, bitcoin_data.target_to_average_attempts(share.target),
-            1 if share.hash in cls.my_share_hashes else 0,
-            1 if share.hash in cls.my_doa_share_hashes else 0,
-            1 if share.hash in cls.my_share_hashes and share.share_data['stale_info'] == 253 else 0,
-            1 if share.hash in cls.my_share_hashes and share.share_data['stale_info'] == 254 else 0,
-        share.previous_hash)
-    
-    def __init__(self, head, height, work, my_count, my_doa_count, my_orphan_announce_count, my_dead_announce_count, tail):
-        self.head, self.height, self.work, self.tail = head, height, work, tail
-        self.my_count, self.my_doa_count, self.my_orphan_announce_count, self.my_dead_announce_count = my_count, my_doa_count, my_orphan_announce_count, my_dead_announce_count
-    
-    def __add__(self, other):
-        assert self.tail == other.head
-        return OkayTrackerDelta(self.head,
-            self.height + other.height, self.work + other.work,
-            self.my_count + other.my_count, self.my_doa_count + other.my_doa_count, self.my_orphan_announce_count + other.my_orphan_announce_count, self.my_dead_announce_count + other.my_dead_announce_count,
-        other.tail)
-    
-    def __sub__(self, other):
-        if self.head == other.head:
-            return OkayTrackerDelta(other.tail, self.height - other.height, self.work - other.work,
-                self.my_count - other.my_count, self.my_doa_count - other.my_doa_count, self.my_orphan_announce_count - other.my_orphan_announce_count, self.my_dead_announce_count - other.my_dead_announce_count,
-            self.tail)
-        elif self.tail == other.tail:
-            return OkayTrackerDelta(self.head, self.height - other.height, self.work - other.work,
-                self.my_count - other.my_count, self.my_doa_count - other.my_doa_count, self.my_orphan_announce_count - other.my_orphan_announce_count, self.my_dead_announce_count - other.my_dead_announce_count,
-            other.head)
-        else:
-            raise AssertionError()
-
 class OkayTracker(forest.Tracker):
-    def __init__(self, net):
+    def __init__(self, net, my_share_hashes, my_doa_share_hashes):
         forest.Tracker.__init__(self)
         self.net = net
-        self.verified = forest.Tracker(delta_type=OkayTrackerDelta)
+        self.verified = forest.Tracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
+            my_count=lambda share: 1 if share.hash in my_share_hashes else 0,
+            my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
+            my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,
+            my_dead_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 254 else 0,
+        )))
         self.verified.get_nth_parent_hash = self.get_nth_parent_hash # self is a superset of self.verified
         
         self.get_cumulative_weights = skiplists.WeightsSkipList(self)
