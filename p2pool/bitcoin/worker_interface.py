@@ -91,4 +91,4 @@ class WorkerInterface(object):
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
         
-        defer.returnValue(res.getwork(identifier=str(self.worker_bridge.new_work_event.times)))
+        defer.returnValue(res.getwork(identifier=str(self.worker_bridge.new_work_event.times), submitold=True))
