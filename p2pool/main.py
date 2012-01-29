@@ -779,15 +779,14 @@ def main(args, net, datadir_path):
                     irc.IRCClient.signedOn(self)
                     self.factory.resetDelay()
                     self.join('#p2pool')
-                    self.watch_id = current_work.changed.watch(self._work_changed)
+                    self.watch_id = tracker.verified.added.watch(self._new_share)
                     self.announced_hashes = set()
-                def _work_changed(self, new_work):
-                    share = tracker.shares[new_work['best_share_hash']]
+                def _new_share(self, share):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
-                        self.say('#p2pool', '\x033,4BLOCK FOUND! http://blockexplorer.com/block/' + pack.IntType(256, 'big').pack(share.header_hash).encode('hex'))
                         self.announced_hashes.add(share.header_hash)
+                        self.say('#p2pool', '\x032,1iBLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_human(share.new_script, net), share.header_hash))
                 def connectionLost(self, reason):
-                    current_work.changed.unwatch(self.watch_id)
+                    tracker.verified.added.unwatch(self.watch_id)
             class IRCClientFactory(protocol.ReconnectingClientFactory):
                 protocol = IRCClient
             reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory())
