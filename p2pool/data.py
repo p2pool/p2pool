@@ -81,7 +81,7 @@ class Share(object):
         if merkle_branch is None and other_txs is None:
             raise ValueError('need either merkle_branch or other_txs')
         if other_txs is not None:
-            new_merkle_branch = bitcoin_data.calculate_merkle_branch([0] + map(bitcoin_data.tx_type.hash256, other_txs), 0)
+            new_merkle_branch = bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0)
             if merkle_branch is not None:
                 if merke_branch != new_merkle_branch:
                     raise ValueError('invalid merkle_branch and other_txs')
@@ -115,10 +115,10 @@ class Share(object):
         if len(self.share_data['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
-        self.pow_hash = net.PARENT.POW_FUNC(header)
-        self.header_hash = bitcoin_data.block_header_type.hash256(header)
+        self.pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
+        self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
         
-        self.hash = share1a_type.hash256(self.as_share1a())
+        self.hash = bitcoin_data.hash256(share1a_type.pack(self.as_share1a()))
         
         if self.pow_hash > self.target:
             print 'hash %x' % self.pow_hash
@@ -142,7 +142,7 @@ class Share(object):
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         
-        if bitcoin_data.check_merkle_branch(bitcoin_data.tx_type.hash256(gentx), 0, self.merkle_branch) != self.header['merkle_root']:
+        if bitcoin_data.check_merkle_branch(bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)), 0, self.merkle_branch) != self.header['merkle_root']:
             raise ValueError('''gentx doesn't match header via merkle_branch''')
     
     def as_share(self):
@@ -260,7 +260,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
             sequence=None,
             script=share_data['coinbase'].ljust(2, '\x00'),
         )],
-        tx_outs=[dict(value=0, script='\x20' + pack.IntType(256).pack(share_info_type.hash256(share_info)))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
+        tx_outs=[dict(value=0, script='\x20' + pack.IntType(256).pack(bitcoin_data.hash256(share_info_type.pack(share_info))))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
         lock_time=0,
     )
 

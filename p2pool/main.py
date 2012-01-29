@@ -475,7 +475,7 @@ def main(args, net, datadir_path):
                     target = max(target, current_work.value['aux_work']['target'])
                 
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
-                merkle_root = bitcoin_data.merkle_hash(map(bitcoin_data.tx_type.hash256, transactions))
+                merkle_root = bitcoin_data.merkle_hash([bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in transactions])
                 self.merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time(), current_work.value['aux_work'], target
                 
                 print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
@@ -502,7 +502,7 @@ def main(args, net, datadir_path):
                     return False
                 share_info, transactions, getwork_time, aux_work, target = self.merkle_root_to_transactions[header['merkle_root']]
                 
-                pow_hash = net.PARENT.POW_FUNC(header)
+                pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
                 on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
                 
                 try:
@@ -513,9 +513,9 @@ def main(args, net, datadir_path):
                             print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
                         if pow_hash <= header['bits'].target:
                             print
-                            print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.block_header_type.hash256(header),)
+                            print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),)
                             print
-                            recent_blocks.append({ 'ts': time.time(), 'hash': '%x' % (bitcoin_data.block_header_type.hash256(header),) })
+                            recent_blocks.append({ 'ts': time.time(), 'hash': '%x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),) })
                 except:
                     log.err(None, 'Error while processing potential block:')
                 
@@ -527,8 +527,8 @@ def main(args, net, datadir_path):
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
                                     tx=transactions[0],
-                                    block_hash=bitcoin_data.block_header_type.hash256(header),
-                                    merkle_branch=bitcoin_data.calculate_merkle_branch(map(bitcoin_data.tx_type.hash256, transactions), 0),
+                                    block_hash=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),
+                                    merkle_branch=bitcoin_data.calculate_merkle_branch([bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in transactions], 0),
                                     index=0,
                                 ),
                                 merkle_branch=[],

@@ -6,17 +6,17 @@ from p2pool.util import pack
 
 class Test(unittest.TestCase):
     def test_header_hash(self):
-        assert data.block_header_type.hash256(dict(
+        assert data.hash256(data.block_header_type.pack(dict(
             version=1,
             previous_block=0x000000000000038a2a86b72387f93c51298298a732079b3b686df3603d2f6282,
             merkle_root=0x37a43a3b812e4eb665975f46393b4360008824aab180f27d642de8c28073bc44,
             timestamp=1323752685,
             bits=data.FloatingInteger(437159528),
             nonce=3658685446,
-        )) == 0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175
+        ))) == 0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175
     
     def test_tx_hash(self):
-        assert data.tx_type.hash256(dict(
+        assert data.hash256(data.tx_type.pack(dict(
             version=1,
             tx_ins=[dict(
                 previous_output=None,
@@ -28,7 +28,7 @@ class Test(unittest.TestCase):
                 script=data.pubkey_hash_to_script2(pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))),
             )],
             lock_time=0,
-        )) == 0xb53802b2333e828d6532059f46ecf6b313a42d79f97925e457fbbfda45367e5c
+        ))) == 0xb53802b2333e828d6532059f46ecf6b313a42d79f97925e457fbbfda45367e5c
     
     def test_address_to_pubkey_hash(self):
         assert data.address_to_pubkey_hash('1KUCp7YP5FP8ViRxhfszSUJCTAajK6viGy', networks.BitcoinMainnet) == pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))

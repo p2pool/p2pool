@@ -213,13 +213,13 @@ class Protocol(BaseProtocol):
         ('tx', bitcoin_data.tx_type),
     ])
     def handle_tx(self, tx):
-        self.get_tx.got_response(bitcoin_data.tx_type.hash256(tx), tx)
+        self.get_tx.got_response(bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)), tx)
     
     message_block = pack.ComposedType([
         ('block', bitcoin_data.block_type),
     ])
     def handle_block(self, block):
-        block_hash = bitcoin_data.block_header_type.hash256(block['header'])
+        block_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header']))
         self.get_block.got_response(block_hash, block)
         self.get_block_header.got_response(block_hash, block['header'])
     
@@ -229,7 +229,7 @@ class Protocol(BaseProtocol):
     def handle_headers(self, headers):
         for header in headers:
             header = header['header']
-            self.get_block_header.got_response(bitcoin_data.block_header_type.hash256(header), header)
+            self.get_block_header.got_response(bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)), header)
         self.factory.new_headers.happened([header['header'] for header in headers])
     
     message_ping = pack.ComposedType([])
@@ -277,7 +277,7 @@ class HeaderWrapper(object):
     
     @classmethod
     def from_header(cls, header):
-        return cls(bitcoin_data.block_header_type.hash256(header), header['previous_block'])
+        return cls(bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)), header['previous_block'])
     
     def __init__(self, hash, previous_hash):
         self.hash, self.previous_hash = hash, previous_hash

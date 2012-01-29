@@ -1,5 +1,4 @@
 import binascii
-import hashlib
 import struct
 
 import p2pool
@@ -80,17 +79,6 @@ class Type(object):
                 raise AssertionError((self._unpack(data), obj))
         
         return data
-    
-    
-    def hash160(self, obj):
-        return IntType(160).unpack(hashlib.new('ripemd160', hashlib.sha256(self.pack(obj)).digest()).digest())
-    
-    def hash256(self, obj):
-        return IntType(256).unpack(hashlib.sha256(hashlib.sha256(self.pack(obj)).digest()).digest())
-    
-    def scrypt(self, obj):
-        import ltc_scrypt
-        return IntType(256).unpack(ltc_scrypt.getPoWHash(self.pack(obj)))
 
 class VarIntType(Type):
     # redundancy doesn't matter here because bitcoin and p2pool both reencode before hashing
@@ -132,13 +120,6 @@ class VarStrType(Type):
     
     def write(self, file, item):
         return self._inner_size.write(file, len(item)), item
-
-class PassthruType(Type):
-    def read(self, file):
-        return read(file, size(file))
-    
-    def write(self, file, item):
-        return file, item
 
 class EnumType(Type):
     def __init__(self, inner, values):

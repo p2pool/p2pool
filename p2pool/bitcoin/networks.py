@@ -1,7 +1,7 @@
 from twisted.internet import defer
 
 from . import data
-from p2pool.util import math
+from p2pool.util import math, pack
 
 BitcoinMainnet = math.Object(
     P2P_PREFIX='f9beb4d9'.decode('hex'),
@@ -12,7 +12,7 @@ BitcoinMainnet = math.Object(
         'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.hash256,
+    POW_FUNC=data.hash256,
     SYMBOL='BTC',
 )
 BitcoinTestnet = math.Object(
@@ -24,7 +24,7 @@ BitcoinTestnet = math.Object(
         'bitcoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.hash256,
+    POW_FUNC=data.hash256,
     SYMBOL='tBTC',
 )
 
@@ -37,7 +37,7 @@ NamecoinMainnet = math.Object(
         'namecoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.hash256,
+    POW_FUNC=data.hash256,
     SYMBOL='NMC',
 )
 NamecoinTestnet = math.Object(
@@ -49,7 +49,7 @@ NamecoinTestnet = math.Object(
         'namecoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.hash256,
+    POW_FUNC=data.hash256,
     SYMBOL='tNMC',
 )
 
@@ -62,7 +62,7 @@ LitecoinMainnet = math.Object(
         'litecoinaddress' in (yield bitcoind.rpc_help()) and
         not (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.scrypt,
+    POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
     SYMBOL='LTC',
 )
 LitecoinTestnet = math.Object(
@@ -74,6 +74,6 @@ LitecoinTestnet = math.Object(
         'litecoinaddress' in (yield bitcoind.rpc_help()) and
         (yield bitcoind.rpc_getinfo())['testnet']
     )),
-    POW_FUNC=data.block_header_type.scrypt,
+    POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
     SYMBOL='tLTC',
 )
