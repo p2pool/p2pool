@@ -15,6 +15,16 @@ class Test(unittest.TestCase):
             nonce=3658685446,
         ))) == 0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175
     
+    def test_header_hash_litecoin(self):
+        assert networks.LitecoinMainnet.POW_FUNC(data.block_header_type.pack(dict(
+            version=1,
+            previous_block=0xd928d3066613d1c9dd424d5810cdd21bfeef3c698977e81ec1640e1084950073,
+            merkle_root=0x03f4b646b58a66594a182b02e425e7b3a93c8a52b600aa468f1bc5549f395f16,
+            timestamp=1327807194,
+            bits=data.FloatingInteger(0x1d01b56f),
+            nonce=20736,
+        ))) < 2**256//2**30
+    
     def test_tx_hash(self):
         assert data.hash256(data.tx_type.pack(dict(
             version=1,
