@@ -98,9 +98,11 @@ def erf(x):
 def find_root(y_over_dy, start, steps=10, bounds=(None, None)):
     guess = start
     for i in xrange(steps):
-        guess = guess - y_over_dy(guess)
+        prev, guess = guess, guess - y_over_dy(guess)
         if bounds[0] is not None and guess < bounds[0]: guess = bounds[0]
         if bounds[1] is not None and guess > bounds[1]: guess = bounds[1]
+        if guess == prev:
+            break
     return guess
 
 def ierf(z):
@@ -131,7 +133,7 @@ else:
             top = right**(x+1) * (1-right)**(n-x+1) * left*(1-left) - left**(x+1) * (1-left)**(n-x+1) * right * (1-right)
             bottom = (x - n*right)*left*(1-left) - (x - n*left)*right*(1-right)
             return top/bottom/b
-        left_a = find_root(f, (1-conf)/2, 12, (0, 1-conf))
+        left_a = find_root(f, (1-conf)/2, bounds=(0, 1-conf))
         return special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, left_a + conf)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
@@ -140,6 +142,14 @@ def binomial_conf_center_radius(x, n, conf=0.95):
         return (left+right)/2, (right-left)/2
     p = x/n
     return p, max(p - left, right - p)
+
+minmax = lambda x: (min(x), max(x))
+
+def format_binomial_conf(x, n, conf=0.95, f=lambda x: x):
+    if n == 0:
+        return '???'
+    left, right = minmax(map(f, binomial_conf_interval(x, n, conf)))
+    return '~%i%% (%i-%i%%)' % (int(100*f(x/n)+1/2), int(100*left), 100-int(100-100*right))
 
 def reversed(x):
     try:

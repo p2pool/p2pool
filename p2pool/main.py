@@ -828,10 +828,11 @@ def main(args, net, datadir_path):
                             this_str += '\nAverage time between blocks: %.2f days' % (
                                 2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
                             )
-                            this_str += '\nPool stales: %i%%' % (int(100*stale_prop+.5),)
-                            stale_center, stale_radius = math.binomial_conf_center_radius(stale_orphan_shares + stale_doa_shares, shares, 0.95)
-                            this_str += u' Own: %i±%i%%' % (int(100*stale_center+.5), int(100*stale_radius+.5))
-                            this_str += u' Own efficiency: %i±%i%%' % (int(100*(1 - stale_center)/(1 - stale_prop)+.5), int(100*stale_radius/(1 - stale_prop)+.5))
+                            this_str += '\nPool stales: %i%% Own: %s Own efficiency: %s' % (
+                                int(100*stale_prop+.5),
+                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
+                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
+                            )
                             if this_str != last_str or time.time() > last_time + 15:
                                 print this_str
                                 last_str = this_str
