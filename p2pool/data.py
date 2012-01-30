@@ -19,7 +19,7 @@ share_data_type = pack.ComposedType([
     ('new_script', pack.VarStrType()),
     ('subsidy', pack.IntType(64)),
     ('donation', pack.IntType(16)),
-    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: 254*perfect_round(my_stale_prop), None if no shares
+    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: perfect_round(254*my_stale_prop), 255 if no shares
 ])
 
 share_info_type = pack.ComposedType([
