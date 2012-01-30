@@ -215,7 +215,7 @@ def main(args, net, datadir_path):
         class Node(p2p.Node):
             def handle_shares(self, shares, peer):
                 if len(shares) > 5:
-                    print 'Processing %i shares...' % (len(shares),)
+                    print 'Processing %i shares from %s...' % (len(shares), '%s:%i' % peer.addr if peer is not None else None)
                 
                 new_count = 0
                 for share in shares:
