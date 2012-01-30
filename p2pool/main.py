@@ -738,17 +738,13 @@ def main(args, net, datadir_path):
             grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
         task.LoopingCall(add_point).start(100)
         
-        while True:
+        def attempt_listen():
             try:
                 reactor.listenTCP(args.worker_port, server.Site(web_root))
             except error.CannotListenError, e:
-                if e.socketError.errno == 98:
-                    print '    Worker port already in use. Retrying in 1 second...'
-                    yield deferral.sleep(1)
-                    continue
-                raise
-            else:
-                break
+                print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
+                reactor.callLater(1, attempt_listen)
+        attempt_listen()
         
         print '    ...success!'
         print
