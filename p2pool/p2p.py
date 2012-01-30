@@ -1,6 +1,7 @@
 from __future__ import division
 
 import random
+import sys
 import time
 
 from twisted.internet import defer, error, protocol, reactor
@@ -256,9 +257,7 @@ class ServerFactory(protocol.ServerFactory):
             try:
                 self.listen_port = reactor.listenTCP(self.node.port, self)
             except error.CannotListenError, e:
-                if e.socketError.errno != 98:
-                    raise
-                print 'P2P port busy, retrying listening in 3 seconds.'
+                print >>sys.stderr, 'Error binding to P2P port: %s. Retrying in 3 seconds.' % (e.socketError,)
                 reactor.callLater(3, attempt_listen)
         attempt_listen()
     
