@@ -12,7 +12,7 @@ import json
 import signal
 import traceback
 
-from twisted.internet import defer, reactor, protocol, task
+from twisted.internet import defer, error, reactor, protocol, task
 from twisted.web import server, resource
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -738,7 +738,17 @@ def main(args, net, datadir_path):
             grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
         task.LoopingCall(add_point).start(100)
         
-        reactor.listenTCP(args.worker_port, server.Site(web_root))
+        while True:
+            try:
+                reactor.listenTCP(args.worker_port, server.Site(web_root))
+            except error.CannotListenError, e:
+                if e.socketError.errno == 98:
+                    print '    Worker port already in use. Retrying in 1 second...'
+                    yield deferral.sleep(1)
+                    continue
+                raise
+            else:
+                break
         
         print '    ...success!'
         print
