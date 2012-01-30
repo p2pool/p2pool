@@ -790,7 +790,7 @@ def main(args, net, datadir_path):
                 def _new_share(self, share):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
                         self.announced_hashes.add(share.header_hash)
-                        self.say('#p2pool', '\x032,1BLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_address(share.new_script, net.PARENT), share.header_hash))
+                        self.say('#p2pool', '\x02BLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_address(share.new_script, net.PARENT), share.header_hash))
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
             class IRCClientFactory(protocol.ReconnectingClientFactory):
