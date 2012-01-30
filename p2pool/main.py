@@ -328,7 +328,7 @@ def main(args, net, datadir_path):
         def work_changed(new_work):
             #print 'Work changed:', new_work
             shares = []
-            for share in tracker.get_chain(new_work['best_share_hash'], tracker.get_height(new_work['best_share_hash'])):
+            for share in tracker.get_chain(new_work['best_share_hash'], min(5, tracker.get_height(new_work['best_share_hash']))):
                 if share.hash in shared_share_hashes:
                     break
                 shared_share_hashes.add(share.hash)
