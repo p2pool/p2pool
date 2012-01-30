@@ -849,6 +849,7 @@ def main(args, net, datadir_path):
         status_thread()
     except:
         log.err(None, 'Fatal error:')
+        reactor.stop()
 
 def run():
     class FixedArgumentParser(argparse.ArgumentParser):
