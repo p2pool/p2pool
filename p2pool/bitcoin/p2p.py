@@ -45,7 +45,7 @@ class BaseProtocol(protocol.Protocol):
             
             if checksum is not None:
                 if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
-                    print 'invalid hash for', repr(command), checksum.encode('hex') if checksum is not None else None, repr(payload[:100].encode('hex')), len(payload)
+                    print 'invalid hash for', self.transport.getPeer().host, repr(command), length, checksum.encode('hex'), hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4].encode('hex'), payload.encode('hex')
                     continue
             
             type_ = getattr(self, 'message_' + command, None)
