@@ -602,13 +602,9 @@ def main(args, net, datadir_path):
             return json.dumps(res)
         
         def get_current_txouts():
-            wb = WorkerBridge()
-            tmp_tag = str(random.randrange(2**64))
-            outputs = wb.merkle_root_to_transactions[wb.get_work(tmp_tag).merkle_root][1][0]['tx_outs']
-            total = sum(out['value'] for out in outputs)
-            total_without_tag = sum(out['value'] for out in outputs if out['script'] != tmp_tag)
-            total_diff = total - total_without_tag
-            return dict((out['script'], out['value'] + math.perfect_round(out['value']*total_diff/total)) for out in outputs if out['script'] != tmp_tag and out['value'])
+            share = tracker.shares[current_work.value['best_share_hash']]
+            share_info, gentx = p2pool_data.generate_transaction(tracker, share.share_info['share_data'], share.header['bits'].target, share.share_info['timestamp'], share.net)
+            return dict((out['script'], out['value']) for out in gentx['tx_outs'])
         
         def get_current_scaled_txouts(scale, trunc=0):
             txouts = get_current_txouts()
