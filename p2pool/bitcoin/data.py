@@ -3,7 +3,6 @@ from __future__ import division
 import hashlib
 
 from p2pool.util import bases, math, pack
-from . import base58
 
 def hash256(data):
     return pack.IntType(256).unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
@@ -206,13 +205,13 @@ human_address_type = ChecksummedType(pack.ComposedType([
 ]))
 
 def pubkey_hash_to_address(pubkey_hash, net):
-    return base58.encode(human_address_type.pack(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash)))
+    return base58_encode(human_address_type.pack(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash)))
 
 def pubkey_to_address(pubkey, net):
     return pubkey_hash_to_address(hash160(pubkey), net)
 
 def address_to_pubkey_hash(address, net):
-    x = human_address_type.unpack(base58.decode(address))
+    x = human_address_type.unpack(base58_decode(address))
     if x['version'] != net.ADDRESS_VERSION:
         raise ValueError('address not for this net!')
     return x['pubkey_hash']
