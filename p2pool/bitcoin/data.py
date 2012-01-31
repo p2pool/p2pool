@@ -2,7 +2,7 @@ from __future__ import division
 
 import hashlib
 
-from p2pool.util import bases, math, pack
+from p2pool.util import math, pack
 
 def hash256(data):
     return pack.IntType(256).unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
@@ -33,7 +33,7 @@ class FloatingInteger(object):
     
     @classmethod
     def from_target_upper_bound(cls, target):
-        n = bases.natural_to_string(target)
+        n = math.natural_to_string(target)
         if n and ord(n[0]) >= 128:
             n = '\x00' + n
         bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
@@ -193,11 +193,11 @@ base58_alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 def base58_encode(bindata):
     bindata2 = bindata.lstrip(chr(0))
-    return base58_alphabet[0]*(len(bindata) - len(bindata2)) + bases.natural_to_string(bases.string_to_natural(bindata2), base58_alphabet)
+    return base58_alphabet[0]*(len(bindata) - len(bindata2)) + math.natural_to_string(math.string_to_natural(bindata2), base58_alphabet)
 
 def base58_decode(b58data):
     b58data2 = b58data.lstrip(base58_alphabet[0])
-    return chr(0)*(len(b58data) - len(b58data2)) + bases.natural_to_string(bases.string_to_natural(b58data2, base58_alphabet))
+    return chr(0)*(len(b58data) - len(b58data2)) + math.natural_to_string(math.string_to_natural(b58data2, base58_alphabet))
 
 human_address_type = ChecksummedType(pack.ComposedType([
     ('version', pack.IntType(8)),

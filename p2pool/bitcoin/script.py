@@ -1,4 +1,4 @@
-from p2pool.util import bases, pack
+from p2pool.util import math, pack
 
 def reads_nothing(f):
     return '', f
@@ -7,7 +7,7 @@ def protoPUSH(length):
 def protoPUSHDATA(size_len):
     def _(f):
         length_str, f = pack.read(f, size_len)
-        length = bases.string_to_natural(length_str[::-1].lstrip(chr(0)))
+        length = math.string_to_natural(length_str[::-1].lstrip(chr(0)))
         data, f = pack.read(f, length)
         return data, f
     return _
