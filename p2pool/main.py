@@ -744,6 +744,9 @@ def main(args, net, datadir_path):
             except error.CannotListenError, e:
                 print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
                 reactor.callLater(1, attempt_listen)
+            else:
+                with open(os.path.join(os.path.join(datadir_path, 'ready_flag')), 'wb') as f:
+                    pass
         attempt_listen()
         
         print '    ...success!'
