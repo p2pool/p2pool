@@ -439,7 +439,7 @@ class Node(object):
     
     def get_good_peers(self, max_count):
         t = time.time()
-        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -(last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
+        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -max(3600, last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
 
 if __name__ == '__main__':
     p = random.randrange(2**15, 2**16)
