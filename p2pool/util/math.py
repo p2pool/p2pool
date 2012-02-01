@@ -113,8 +113,9 @@ try:
 except ImportError:
     print 'Install SciPy for more accurate confidence intervals!'
     def binomial_conf_interval(x, n, conf=0.95):
+        assert 0 <= x <= n and 0 <= conf < 1
         if n == 0:
-            return (1-conf)/2, 1-(1-conf)/2
+            left = random.random()*(1 - conf)
         # approximate - Wilson score interval
         z = math.sqrt(2)*ierf(conf)
         p = x/n
@@ -124,6 +125,7 @@ except ImportError:
         return (topa - topb)/bottom, (topa + topb)/bottom
 else:
     def binomial_conf_interval(x, n, conf=0.95):
+        assert 0 <= x <= n and 0 <= conf < 1
         if n == 0:
             left = random.random()*(1 - conf)
             return left, left + conf
@@ -137,6 +139,7 @@ else:
         return special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, left_a + conf)
 
 def binomial_conf_center_radius(x, n, conf=0.95):
+    assert 0 <= x <= n and 0 <= conf < 1
     left, right = binomial_conf_interval(x, n, conf)
     if n == 0:
         return (left+right)/2, (right-left)/2

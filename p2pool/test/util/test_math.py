@@ -24,3 +24,9 @@ class Test(unittest.TestCase):
                 n2 = math.string_to_natural(s, alphabet)
                 #print n, s.encode('hex'), n2
                 self.assertEquals(n, n2)
+    
+    def test_binom(self):
+        for n in xrange(100):
+            for x in xrange(n + 1):
+                left, right = math.binomial_conf_interval(x, n)
+                assert left >= 0 and right <= 1
