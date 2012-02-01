@@ -967,8 +967,8 @@ def run():
             parser.error('''Bitcoin configuration file not found. Manually enter your RPC password.\r\n'''
                 '''If you actually haven't created a configuration file, you should create one at %s with the text:\r\n'''
                 '''\r\n'''
-                '''server=true\r\n'''
-                '''rpcpassword=%x # (randomly generated for your convenience)''' % (conf_path, random.randrange(2**128)))
+                '''server=1\r\n'''
+                '''rpcpassword=%x''' % (conf_path, random.randrange(2**128)))
         with open(conf_path, 'rb') as f:
             cp = ConfigParser.RawConfigParser()
             cp.readfp(StringIO.StringIO('[x]\r\n' + f.read()))
