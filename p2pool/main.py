@@ -27,10 +27,12 @@ import p2pool, p2pool.data as p2pool_data
 @defer.inlineCallbacks
 def getwork(bitcoind):
     work = yield bitcoind.rpc_getmemorypool()
+    transactions = [bitcoin_data.tx_type.unpack(x.decode('hex')) for x in work['transactions']]
     defer.returnValue(dict(
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
-        transactions=[bitcoin_data.tx_type.unpack(x.decode('hex')) for x in work['transactions']],
+        transactions=transactions,
+        merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions], 0),
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
@@ -135,6 +137,7 @@ def main(args, net, datadir_path):
             current_work2.set(dict(
                 time=work['time'],
                 transactions=work['transactions'],
+                merkle_branch=work['merkle_branch'],
                 subsidy=work['subsidy'],
                 clock_offset=time.time() - work['time'],
                 last_update=time.time(),
@@ -475,8 +478,8 @@ def main(args, net, datadir_path):
                     target = max(target, current_work.value['aux_work']['target'])
                 
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
-                merkle_root = bitcoin_data.merkle_hash([bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in transactions])
-                self.merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time(), current_work.value['aux_work'], target
+                merkle_root = bitcoin_data.check_merkle_branch(bitcoin_data.hash256(bitcoin_data.tx_type.pack(generate_tx)), 0, current_work2.value['merkle_branch'])
+                self.merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time(), current_work.value['aux_work'], target, current_work2.value['merkle_branch']
                 
                 print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
                     bitcoin_data.target_to_difficulty(target),
@@ -500,7 +503,7 @@ def main(args, net, datadir_path):
                 if header['merkle_root'] not in self.merkle_root_to_transactions:
                     print >>sys.stderr, '''Couldn't link returned work's merkle root with its transactions - should only happen if you recently restarted p2pool'''
                     return False
-                share_info, transactions, getwork_time, aux_work, target = self.merkle_root_to_transactions[header['merkle_root']]
+                share_info, transactions, getwork_time, aux_work, target, merkle_branch = self.merkle_root_to_transactions[header['merkle_root']]
                 
                 pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
                 on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
@@ -521,14 +524,13 @@ def main(args, net, datadir_path):
                 
                 try:
                     if aux_work is not None and (pow_hash <= aux_work['target'] or p2pool.DEBUG):
-                        assert pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex') == transactions[0]['tx_ins'][0]['script'][4:4+32].encode('hex')
                         df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(merged_proxy.rpc_getauxblock)(
                             pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
                                     tx=transactions[0],
                                     block_hash=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),
-                                    merkle_branch=bitcoin_data.calculate_merkle_branch([bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in transactions], 0),
+                                    merkle_branch=merkle_branch,
                                     index=0,
                                 ),
                                 merkle_branch=[],
