@@ -1,6 +1,3 @@
-import os
-import platform
-
 from p2pool.bitcoin import networks
 from p2pool.util import math
 
@@ -25,7 +22,6 @@ BitcoinMainnet = math.Object(
     PERSIST=True,
     WORKER_PORT=9332,
     BOOTSTRAP_ADDRS='74.220.242.6:9334 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 89.78.212.44 94.23.34.145 168.7.116.243 72.14.191.28 94.174.40.189:9344'.split(' '),
-    CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
 )
 BitcoinTestnet = math.Object(
     PARENT=networks.BitcoinTestnet,
@@ -42,7 +38,6 @@ BitcoinTestnet = math.Object(
     PERSIST=False,
     WORKER_PORT=19332,
     BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
-    CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'testnet', 'bitcoin.conf'),
 )
 
 LitecoinMainnet = math.Object(
@@ -60,7 +55,6 @@ LitecoinMainnet = math.Object(
     PERSIST=True,
     WORKER_PORT=9327,
     BOOTSTRAP_ADDRS='76.26.53.101 124.205.120.178 190.195.79.161 173.167.113.73 82.161.65.210 67.83.108.0 78.101.67.239 78.100.161.252 87.58.117.233 78.100.162.223 216.239.45.4 78.101.131.221 72.14.191.28 97.81.163.217 69.126.183.240 219.84.64.174 78.101.119.27 89.211.228.244 178.152.122.30 172.16.0.3 76.26.53.101:51319'.split(' '),
-    CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
 )
 LitecoinTestnet = math.Object(
     PARENT=networks.LitecoinTestnet,
@@ -77,7 +71,6 @@ LitecoinTestnet = math.Object(
     PERSIST=False,
     WORKER_PORT=19327,
     BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
-    CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'testnet', 'litecoin.conf'),
 )
 
 nets=dict((net.NAME, net) for net in set([BitcoinMainnet, BitcoinTestnet, LitecoinMainnet, LitecoinTestnet]))

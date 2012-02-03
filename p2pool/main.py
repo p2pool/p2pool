@@ -967,9 +967,9 @@ def run():
     args.bitcoind_rpc_username, args.bitcoind_rpc_password = ([None, None] + args.bitcoind_rpc_userpass)[-2:]
     
     if args.bitcoind_rpc_password is None:
-        if not hasattr(net, 'CONF_FILE_FUNC'):
+        if not hasattr(net.PARENT, 'CONF_FILE_FUNC'):
             parser.error('This network has no configuration file function. Manually enter your RPC password.')
-        conf_path = net.CONF_FILE_FUNC()
+        conf_path = net.PARENT.CONF_FILE_FUNC()
         if not os.path.exists(conf_path):
             parser.error('''Bitcoin configuration file not found. Manually enter your RPC password.\r\n'''
                 '''If you actually haven't created a configuration file, you should create one at %s with the text:\r\n'''
