@@ -562,7 +562,12 @@ def main(args, net, datadir_path):
                     my_share_hashes.add(share.hash)
                     if not on_time:
                         my_doa_share_hashes.add(share.hash)
-                    p2p_node.handle_shares([share], None)
+                    
+                    tracker.add(share)
+                    if not p2pool.DEBUG:
+                        tracker.verified.add(share)
+                    set_real_work2()
+                    
                     try:
                         if pow_hash <= header['bits'].target:
                             for peer in p2p_node.peers.itervalues():
