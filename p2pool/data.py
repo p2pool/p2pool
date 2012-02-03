@@ -73,19 +73,13 @@ class Share(object):
     
     @classmethod
     def from_share1b(cls, share1b, net):
-        return cls(net, **share1b)
+        return cls(net, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
     
-    def __init__(self, net, header, share_info, merkle_branch=None, other_txs=None):
+    def __init__(self, net, header, share_info, merkle_branch, other_txs=None):
         self.net = net
         
-        if merkle_branch is None and other_txs is None:
-            raise ValueError('need either merkle_branch or other_txs')
-        if other_txs is not None:
-            new_merkle_branch = bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0)
-            if merkle_branch is not None:
-                if merke_branch != new_merkle_branch:
-                    raise ValueError('invalid merkle_branch and other_txs')
-            merkle_branch = new_merkle_branch
+        if p2pool.DEBUG and other_txs is not None and bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0) != merkle_branch:
+            raise ValueError('merkle_branch and other_txs do not match')
         
         if len(merkle_branch) > 16:
             raise ValueError('merkle_branch too long!')
@@ -125,7 +119,12 @@ class Share(object):
             print 'targ %x' % self.target
             raise ValueError('not enough work!')
         
-        self.other_txs = other_txs if self.pow_hash <= self.header['bits'].target else None
+        if other_txs is not None and not self.pow_hash <= self.header['bits'].target:
+            raise ValueError('other_txs provided when not a block solution')
+        if other_txs is None and self.pow_hash <= self.header['bits'].target:
+            raise ValueError('other_txs not provided when a block solution')
+        
+        self.other_txs = other_txs
         
         # XXX eww
         self.time_seen = time.time()

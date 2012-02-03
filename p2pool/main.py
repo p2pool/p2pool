@@ -551,7 +551,7 @@ def main(args, net, datadir_path):
                     log.err(None, 'Error while processing merged mining POW:')
                 
                 if pow_hash <= share_info['bits'].target:
-                    share = p2pool_data.Share(net, header, share_info, other_txs=transactions[1:])
+                    share = p2pool_data.Share(net, header, share_info, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
                     print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                         request.getUser(),
                         p2pool_data.format_hash(share.hash),
