@@ -2,6 +2,7 @@ from __future__ import division
 
 import hashlib
 
+import p2pool
 from p2pool.util import math, pack
 
 def hash256(data):
@@ -165,7 +166,8 @@ def calculate_merkle_branch(hashes, index):
     res = [x['hash'] for x in hash_list[0][2]]
     
     assert hash_list[0][1]
-    assert check_merkle_branch(hashes[index], index, res) == hash_list[0][0]
+    if p2pool.DEBUG:
+        assert check_merkle_branch(hashes[index], index, res) == hash_list[0][0]
     assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
     
     return res
