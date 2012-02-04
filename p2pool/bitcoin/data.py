@@ -1,8 +1,6 @@
 from __future__ import division
 
 import hashlib
-import itertools
-import random
 
 import p2pool
 from p2pool.util import math, pack
