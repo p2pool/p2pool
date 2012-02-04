@@ -1,6 +1,8 @@
 from __future__ import division
 
 import hashlib
+import itertools
+import random
 
 import p2pool
 from p2pool.util import math, pack
@@ -125,6 +127,8 @@ block_type = pack.ComposedType([
     ('txs', pack.ListType(tx_type)),
 ])
 
+# merged mining
+
 aux_pow_type = pack.ComposedType([
     ('merkle_tx', merkle_tx_type),
     ('merkle_branch', merkle_branch_type),
@@ -132,6 +136,27 @@ aux_pow_type = pack.ComposedType([
     ('parent_block_header', block_header_type),
 ])
 
+aux_pow_coinbase_type = pack.ComposedType([
+    ('merkle_root', pack.IntType(256, 'big')),
+    ('size', pack.IntType(32)),
+    ('nonce', pack.IntType(32)),
+])
+
+def make_auxpow_tree(chain_ids):
+    for size in (2**i for i in xrange(31)):
+        if size < len(chain_ids):
+            continue
+        res = {}
+        for chain_id in chain_ids:
+            pos = (1103515245 * chain_id + 1103515245 * 12345 + 12345) % size
+            if pos in res:
+                break
+            res[pos] = chain_id
+        else:
+            return res, size
+    raise AssertionError()
+
+# merkle trees
 
 merkle_record_type = pack.ComposedType([
     ('left', pack.IntType(256)),
@@ -177,6 +202,8 @@ def check_merkle_branch(tip_hash, index, merkle_branch):
         dict(left=h, right=c) if 2**i & index else
         dict(left=c, right=h)
     )), enumerate(merkle_branch), tip_hash)
+
+# targets
 
 def target_to_average_attempts(target):
     return 2**256//(target + 1)
