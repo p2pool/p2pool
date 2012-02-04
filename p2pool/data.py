@@ -19,7 +19,7 @@ share_data_type = pack.ComposedType([
     ('new_script', pack.VarStrType()),
     ('subsidy', pack.IntType(64)),
     ('donation', pack.IntType(16)),
-    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa. previously: perfect_round(254*my_stale_prop), 255 if no shares
+    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa
 ])
 
 share_info_type = pack.ComposedType([
@@ -181,19 +181,7 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, dist):
     return attempts//time
 
 def get_average_stale_prop(tracker, share_hash, lookbehind):
-    def stales_per_share(share):
-        if share.share_data['stale_info'] == 253: # orphan
-            return 1
-        elif share.share_data['stale_info'] == 254: # doa
-            return 1
-        elif share.share_data['stale_info'] == 0:
-            return 0
-        elif share.share_data['stale_info'] == 255: # temporary hack until everyone uses new-style stale data
-            return 0
-        else:
-            return 1/(254/share.share_data['stale_info'] - 1) # converts stales/shares to stales/nonstales
-            # 0 and 254 case are taken care of above and this will soon be removed anyway
-    stales = sum(stales_per_share(share) for share in tracker.get_chain(share_hash, lookbehind))
+    stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] in [253, 254])
     return stales/(lookbehind + stales)
 
 def generate_transaction(tracker, share_data, block_target, desired_timestamp, net):
