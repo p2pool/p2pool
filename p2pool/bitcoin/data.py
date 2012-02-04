@@ -248,7 +248,8 @@ def address_to_pubkey_hash(address, net):
 # transactions
 
 def pubkey_to_script2(pubkey):
-    return ('\x41' + pubkey) + '\xac'
+    assert len(pubkey) <= 75
+    return (chr(len(pubkey)) + pubkey) + '\xac'
 
 def pubkey_hash_to_script2(pubkey_hash):
     return '\x76\xa9' + ('\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x88\xac'
