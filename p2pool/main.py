@@ -11,6 +11,7 @@ import time
 import json
 import signal
 import traceback
+import urlparse
 
 from twisted.internet import defer, error, reactor, protocol, task
 from twisted.web import server, resource
@@ -197,7 +198,7 @@ def main(args, net, datadir_path, merged_urls):
         
         @defer.inlineCallbacks
         def set_merged_work(merged_url, merged_userpass):
-            merged_proxy = jsonrpc.Proxy(args.merged_url, (merged_userpass,))
+            merged_proxy = jsonrpc.Proxy(merged_url, (merged_userpass,))
             while True:
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged_proxy.rpc_getauxblock)()
                 pre_merged_work.set(dict(pre_merged_work.value, **{auxblock['chainid']: dict(
