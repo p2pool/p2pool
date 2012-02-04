@@ -910,11 +910,14 @@ def run():
         def convert_arg_line_to_args(self, arg_line):
             return [arg for arg in arg_line.split() if arg.strip()]
     
+    
+    realnets=dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
+    
     parser = FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
         help='use specified network (default: bitcoin)',
-        action='store', choices=sorted(networks.realnets), default='bitcoin', dest='net_name')
+        action='store', choices=sorted(realnets), default='bitcoin', dest='net_name')
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
@@ -945,7 +948,7 @@ def run():
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
-        help='use port PORT to listen for connections (forward this port from your router!) (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='use port PORT to listen for connections (forward this port from your router!) (default: %s)' % ', '.join('%s:%i' % (name, net.P2P_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='p2pool_port')
     p2pool_group.add_argument('-n', '--p2pool-node', metavar='ADDR[:PORT]',
         help='connect to existing p2pool node at ADDR listening on port PORT (defaults to default p2pool P2P port) in addition to builtin addresses',
@@ -956,7 +959,7 @@ def run():
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners (default: %s)' % ', '.join('%s:%i' % (n.NAME, n.WORKER_PORT) for _, n in sorted(networks.realnets.items())),
+        help='listen on PORT for RPC connections from miners (default: %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='worker_port')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
@@ -967,10 +970,10 @@ def run():
         help='connect to this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='''connect to JSON-RPC interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.RPC_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to JSON-RPC interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.RPC_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='''connect to P2P interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (n.NAME, n.PARENT.P2P_PORT) for _, n in sorted(networks.realnets.items())),
+        help='''connect to P2P interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.P2P_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
     
     bitcoind_group.add_argument(metavar='BITCOIND_RPCUSERPASS',
@@ -982,9 +985,10 @@ def run():
     if args.debug:
         p2pool.DEBUG = True
     
-    net = networks.nets[args.net_name + ('_testnet' if args.testnet else '')]
+    net_name = args.net_name + ('_testnet' if args.testnet else '')
+    net = networks.nets[net_name]
     
-    datadir_path = os.path.join(os.path.dirname(sys.argv[0]), 'data', net.NAME)
+    datadir_path = os.path.join(os.path.dirname(sys.argv[0]), 'data', net_name)
     if not os.path.exists(datadir_path):
         os.makedirs(datadir_path)
     

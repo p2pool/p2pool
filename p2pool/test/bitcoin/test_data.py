@@ -16,7 +16,7 @@ class Test(unittest.TestCase):
         ))) == 0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175
     
     def test_header_hash_litecoin(self):
-        assert networks.LitecoinMainnet.POW_FUNC(data.block_header_type.pack(dict(
+        assert networks.nets['litecoin'].POW_FUNC(data.block_header_type.pack(dict(
             version=1,
             previous_block=0xd928d3066613d1c9dd424d5810cdd21bfeef3c698977e81ec1640e1084950073,
             merkle_root=0x03f4b646b58a66594a182b02e425e7b3a93c8a52b600aa468f1bc5549f395f16,
@@ -41,7 +41,7 @@ class Test(unittest.TestCase):
         ))) == 0xb53802b2333e828d6532059f46ecf6b313a42d79f97925e457fbbfda45367e5c
     
     def test_address_to_pubkey_hash(self):
-        assert data.address_to_pubkey_hash('1KUCp7YP5FP8ViRxhfszSUJCTAajK6viGy', networks.BitcoinMainnet) == pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))
+        assert data.address_to_pubkey_hash('1KUCp7YP5FP8ViRxhfszSUJCTAajK6viGy', networks.nets['bitcoin']) == pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))
     
     def test_merkle_hash(self):
         assert data.merkle_hash([
