@@ -639,14 +639,15 @@ def main(args, net, datadir_path, merged_urls):
                 total_random = 0
                 random_set = set()
                 for s in sorted(results, key=results.__getitem__):
+                    if results[s] >= trunc:
+                        break
                     total_random += results[s]
                     random_set.add(s)
-                    if total_random >= trunc and results[s] >= trunc:
-                        break
-                winner = math.weighted_choice((script, results[script]) for script in random_set)
-                for script in random_set:
-                    del results[script]
-                results[winner] = total_random
+                if total_random:
+                    winner = math.weighted_choice((script, results[script]) for script in random_set)
+                    for script in random_set:
+                        del results[script]
+                    results[winner] = total_random
             if sum(results.itervalues()) < int(scale):
                 results[math.weighted_choice(results.iteritems())] += int(scale) - sum(results.itervalues())
             return results
