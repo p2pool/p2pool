@@ -931,10 +931,10 @@ def run():
         help='call getauxblock on this url to get work for merged mining (example: http://ncuser:ncpass@127.0.0.1:10332/)',
         type=str, action='append', default=[], dest='merged_urls')
     parser.add_argument('--merged-url',
-        help='DEPRECIATED, use --merged',
+        help='DEPRECATED, use --merged',
         type=str, action='store', default=None, dest='merged_url')
     parser.add_argument('--merged-userpass',
-        help='DEPRECIATED, use --merged',
+        help='DEPRECATED, use --merged',
         type=str, action='store', default=None, dest='merged_userpass')
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
         help='donate this percentage of work to author of p2pool (default: 0.5)',
@@ -1046,7 +1046,7 @@ def run():
     merged_urls = map(separate_url, args.merged_urls)
     
     if args.merged_url is not None or args.merged_userpass is not None:
-        print '--merged-url and --merged-userpass are depreciated! Use --merged http://USER:PASS@HOST:PORT/ instead!'
+        print '--merged-url and --merged-userpass are deprecated! Use --merged http://USER:PASS@HOST:PORT/ instead!'
         print 'Pausing 10 seconds...'
         time.sleep(10)
         
