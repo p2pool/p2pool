@@ -57,6 +57,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         reactor.callLater(10, self._connect_timeout)
         self.timeout_delayed = reactor.callLater(100, self._timeout)
+        
+        old_dataReceived = self.dataReceived
+        self.dataReceived = lambda data: (self.timeout_delayed.reset(100) if not self.timeout_delayed.called else None, old_dataReceived(data))[0]
     
     def _connect_timeout(self):
         if not self.connected2 and self.transport.connected:
@@ -67,10 +70,6 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         if command != 'version' and not self.connected2:
             self.transport.loseConnection()
             return
-        
-        if not self.timeout_delayed.called:
-            self.timeout_delayed.cancel()
-            self.timeout_delayed = reactor.callLater(100, self._timeout)
         
         bitcoin_p2p.BaseProtocol.packetReceived(self, command, payload2)
     
