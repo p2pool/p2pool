@@ -497,10 +497,9 @@ def main(args, net, datadir_path, merged_urls):
                 merkle_root = bitcoin_data.check_merkle_branch(bitcoin_data.hash256(bitcoin_data.tx_type.pack(generate_tx)), 0, current_work2.value['merkle_branch'])
                 self.merkle_root_to_transactions[merkle_root] = share_info, transactions, time.time(), mm_later, target, current_work2.value['merkle_branch']
                 
-                print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Payout if block: %.6f %s Total block value: %.6f %s including %i transactions' % (
+                print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
                     bitcoin_data.target_to_difficulty(target),
                     bitcoin_data.target_to_difficulty(share_info['bits'].target),
-                    (sum(t['value'] for t in generate_tx['tx_outs'] if t['script'] == payout_script) - current_work2.value['subsidy']//200)*1e-8, net.PARENT.SYMBOL,
                     current_work2.value['subsidy']*1e-8, net.PARENT.SYMBOL,
                     len(current_work2.value['transactions']),
                 )
@@ -837,34 +836,35 @@ def main(args, net, datadir_path, merged_urls):
                             (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
                             stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], min(720, height))
                             real_att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720)) / (1 - stale_prop)
-                            this_str = 'Pool: %sH/s in %i shares (%i verified/%i total) Local shares: %i (%i orphan, %i dead) Peers: %i (%i incoming)' % (
-                                math.format(int(real_att_s)),
-                                height,
-                                len(tracker.verified.shares),
-                                len(tracker.shares),
-                                shares,
-                                stale_orphan_shares,
-                                stale_doa_shares,
-                                len(p2p_node.peers),
-                                sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
-                            ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
                             
                             while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - 60*10:
                                 recent_shares_ts_work2.pop(0)
                             my_att_s = sum(work for ts, work, dead in recent_shares_ts_work2)/(60*10)
+                            
+                            this_str = 'Pool: %sH/s Stale rate: %.1f%% Average time between blocks: %.2f days' % (
+                                math.format(int(real_att_s)),
+                                100*stale_prop,
+                                2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
+                            )
+                            this_str += '\n Shares: %i (%i orphan, %i dead) Stale rate: %s Efficiency: %s Current payout: %.4f %s' % (
+                                shares, stale_orphan_shares, stale_doa_shares,
+                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
+                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
+                                get_current_txouts().get(my_script, 0)*1e-8, net.PARENT.SYMBOL,
+                            )
                             this_str += '\n Local: %sH/s (10 min avg) Local dead on arrival: %s Expected time to share: %s' % (
                                 math.format(int(my_att_s)),
                                 math.format_binomial_conf(sum(1 for tx, work, dead in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
                                 '%.1f min' % (2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s / 60,) if my_att_s else '???',
                             )
-                            this_str += '\n Average time between blocks: %.2f days' % (
-                                2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
-                            )
-                            this_str += '\n Pool stales: %i%% Own: %s Own efficiency: %s' % (
-                                int(100*stale_prop+.5),
-                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
-                                math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
-                            )
+                            this_str += '\n P2Pool: %i shares in chain (%i verified/%i total) Peers: %i (%i incoming)' % (
+                                height,
+                                len(tracker.verified.shares),
+                                len(tracker.shares),
+                                len(p2p_node.peers),
+                                sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
+                            ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
+                            
                             if this_str != last_str or time.time() > last_time + 15:
                                 print this_str
                                 last_str = this_str
