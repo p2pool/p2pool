@@ -824,6 +824,9 @@ def main(args, net, datadir_path, merged_urls):
         
         @defer.inlineCallbacks
         def status_thread():
+            average_period = 600
+            first_pseudoshare_time = None
+            
             last_str = None
             last_time = 0
             while True:
@@ -838,9 +841,11 @@ def main(args, net, datadir_path, merged_urls):
                             stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], min(720, height))
                             real_att_s = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], min(height - 1, 720)) / (1 - stale_prop)
                             
-                            while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - 60*10:
+                            if first_pseudoshare_time is None and recent_shares_ts_work2:
+                                first_pseudoshare_time = recent_shares_ts_work2[0][0]
+                            while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - average_period:
                                 recent_shares_ts_work2.pop(0)
-                            my_att_s = sum(work for ts, work, dead in recent_shares_ts_work2)/(60*10)
+                            my_att_s = sum(work for ts, work, dead in recent_shares_ts_work2)/min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0
                             
                             this_str = 'Pool: %sH/s Stale rate: %.1f%% Average time between blocks: %.2f days' % (
                                 math.format(int(real_att_s)),
@@ -853,8 +858,9 @@ def main(args, net, datadir_path, merged_urls):
                                 math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
                                 get_current_txouts().get(my_script, 0)*1e-8, net.PARENT.SYMBOL,
                             )
-                            this_str += '\n Local: %sH/s (10 min avg) Local dead on arrival: %s Expected time to share: %s' % (
+                            this_str += '\n Local: %sH/s (%.f min avg) Local dead on arrival: %s Expected time to share: %s' % (
                                 math.format(int(my_att_s)),
+                                (min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0)/60,
                                 math.format_binomial_conf(sum(1 for tx, work, dead in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
                                 '%.1f min' % (2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s / 60,) if my_att_s else '???',
                             )
