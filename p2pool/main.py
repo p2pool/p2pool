@@ -73,16 +73,35 @@ def main(args, net, datadir_path, merged_urls):
         print '    ...success!'
         print
         
+        print 'Determining payout script...'
         if args.pubkey_hash is None:
-            print 'Getting payout address from bitcoind...'
-            my_script = yield deferral.retry('Error getting payout address from bitcoind:', 5)(defer.inlineCallbacks(lambda: defer.returnValue(
-                bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash((yield bitcoind.rpc_getaccountaddress('p2pool')), net.PARENT)))
-            ))()
+            address_path = os.path.join(datadir_path, 'cached_payout_address')
+            
+            if os.path.exists(address_path):
+                with open(address_path, 'rb') as f:
+                    address = f.read().strip('\r\n')
+                print '    Loaded cached address: %s...' % (address,)
+            else:
+                address = None
+            
+            if address is not None:
+                res = yield deferral.retry('Error validating cached address:', 5)(lambda: bitcoind.rpc_validateaddress(address))()
+                if not res['isvalid'] or not res['ismine']:
+                    print '    Cached address is either invalid or not controlled by local bitcoind!'
+                    address = None
+            
+            if address is None:
+                print '    Getting payout address from bitcoind...'
+                address = yield deferral.retry('Error getting payout address from bitcoind:', 5)(lambda: bitcoind.rpc_getaccountaddress('p2pool'))()
+            
+            with open(address_path, 'wb') as f:
+                f.write(address)
+            
+            my_script = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net.PARENT))
         else:
-            print 'Computing payout script from provided address....'
+            print '    ...Computing payout script from provided address...'
             my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
-        print '    ...success!'
-        print '    Payout script:', bitcoin_data.script2_to_human(my_script, net.PARENT)
+        print '    ...success! Payout script:', bitcoin_data.script2_to_human(my_script, net.PARENT)
         print
         
         ht = bitcoin_p2p.HeightTracker(bitcoind, factory)
