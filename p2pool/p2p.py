@@ -217,9 +217,9 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     
     def connectionLost(self, reason):
         if self.connected2:
-            self.factory.proto_disconnected(self)
+            self.factory.proto_disconnected(self, reason)
             self.connected2 = False
-        self.factory.proto_lost_connection(self)
+        self.factory.proto_lost_connection(self, reason)
 
 class ServerFactory(protocol.ServerFactory):
     def __init__(self, node, max_conns):
@@ -238,13 +238,13 @@ class ServerFactory(protocol.ServerFactory):
     
     def proto_made_connection(self, proto):
         self.conns.add(proto)
-    def proto_lost_connection(self, proto):
+    def proto_lost_connection(self, proto, reason):
         self.conns.remove(proto)
     
     def proto_connected(self, proto):
         self.node.got_conn(proto)
-    def proto_disconnected(self, proto):
-        self.node.lost_conn(proto)
+    def proto_disconnected(self, proto, reason):
+        self.node.lost_conn(proto, reason)
     
     def start(self):
         assert not self.running
@@ -300,15 +300,15 @@ class ClientFactory(protocol.ClientFactory):
     
     def proto_made_connection(self, proto):
         pass
-    def proto_lost_connection(self, proto):
+    def proto_lost_connection(self, proto, reason):
         pass
     
     def proto_connected(self, proto):
         self.conns.add(proto)
         self.node.got_conn(proto)
-    def proto_disconnected(self, proto):
+    def proto_disconnected(self, proto, reason):
         self.conns.remove(proto)
-        self.node.lost_conn(proto)
+        self.node.lost_conn(proto, reason)
     
     def start(self):
         assert not self.running
@@ -344,14 +344,14 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
     
     def proto_made_connection(self, proto):
         pass
-    def proto_lost_connection(self, proto):
+    def proto_lost_connection(self, proto, reason):
         pass
     
     def proto_connected(self, proto):
         self.resetDelay()
         self.node.got_conn(proto)
-    def proto_disconnected(self, proto):
-        self.node.lost_conn(proto)
+    def proto_disconnected(self, proto, reason):
+        self.node.lost_conn(proto, reason)
 
 class Node(object):
     def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000):
@@ -410,14 +410,14 @@ class Node(object):
         
         print '%s connection to peer %s:%i established. p2pool version: %i %r' % ('Incoming' if conn.incoming else 'Outgoing', conn.addr[0], conn.addr[1], conn.other_version, conn.other_sub_version)
     
-    def lost_conn(self, conn):
+    def lost_conn(self, conn, reason):
         if conn.nonce not in self.peers:
             raise ValueError('''don't have peer''')
         if conn is not self.peers[conn.nonce]:
             raise ValueError('wrong conn')
         del self.peers[conn.nonce]
         
-        print 'Lost peer %s:%i' % (conn.addr[0], conn.addr[1])
+        print 'Lost peer %s:%i - %s' % (conn.addr[0], conn.addr[1], reason.getErrorMessage())
     
     
     def got_addr(self, (host, port), services, timestamp):

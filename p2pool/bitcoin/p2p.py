@@ -246,6 +246,7 @@ class Protocol(BaseProtocol):
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(None)
+        print 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol

@@ -818,6 +818,7 @@ def main(args, net, datadir_path, merged_urls):
                         self.say('#p2pool', '\x02BLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_address(share.new_script, net.PARENT), share.header_hash))
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
+                    print 'IRC connection lost:', reason.getErrorMessage()
             class IRCClientFactory(protocol.ReconnectingClientFactory):
                 protocol = IRCClient
             reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory())
