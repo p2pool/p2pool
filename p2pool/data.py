@@ -299,7 +299,12 @@ class OkayTracker(forest.Tracker):
                     bads.add(share.hash)
             else:
                 if last is not None:
-                    desired.add((self.shares[random.choice(list(self.reverse_shares[last]))].peer, last))
+                    desired.add((
+                        self.shares[random.choice(list(self.reverse_shares[last]))].peer,
+                        last,
+                        max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
+                        min(x.target for x in self.get_chain(head, min(head_height, 5))),
+                    ))
         for bad in bads:
             assert bad not in self.verified.shares
             assert bad in self.heads
@@ -320,41 +325,40 @@ class OkayTracker(forest.Tracker):
                 if not self.attempt_verify(share):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
-                desired.add((self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer, last_last_hash))
-        if p2pool.DEBUG:
-            print len(self.verified.tails), "tails:"
-            for x in self.verified.tails:
-                print format_hash(x), self.score(max(self.verified.tails[x], key=self.verified.get_height), ht)
+                desired.add((
+                    self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer,
+                    last_last_hash,
+                    max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
+                    min(x.target for x in self.get_chain(head, min(head_height, 5))),
+                ))
         
         # decide best tree
-        best_tail = max(self.verified.tails, key=lambda h: self.score(max(self.verified.tails[h], key=self.verified.get_height), ht)) if self.verified.tails else None
+        decorated_tails = sorted((self.score(max(self.verified.tails[tail_hash], key=self.verified.get_height), ht), tail_hash) for tail_hash in self.verified.tails) # XXX using get_height here is quite possibly incorrect and vulnerable
+        if p2pool.DEBUG:
+            print len(decorated_tails), 'tails:'
+            for score, tail_hash in decorated_tails:
+                print format_hash(tail_hash), score
+        best_tail_score, best_tail = decorated_tails[-1] if decorated_tails else (None, None)
+        
         # decide best verified head
-        scores = sorted(self.verified.tails.get(best_tail, []), key=lambda h: (
+        decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
             0 if self.verified.shares[h].peer is None else ht.get_height_rel_highest(self.verified.shares[h].previous_block),
-            -self.verified.shares[h].time_seen
-        ))
-        
-        
+            -self.verified.shares[h].time_seen,
+        ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
-            print len(self.verified.tails), "chain tails and", len(self.verified.tails.get(best_tail, [])), 'chain heads. Top 10 heads:'
-            if len(scores) > 10:
-                print '    ...'
-            for h in scores[-10:]:
-                print '   ', format_hash(h), format_hash(self.verified.shares[h].previous_hash), (
-                    self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-                    self.verified.shares[h].peer is None,
-                    0 if self.verified.shares[h].peer is None else ht.get_height_rel_highest(self.verified.shares[h].previous_block),
-                    -self.verified.shares[h].time_seen
-                )
+            print len(decorated_heads), 'heads. Top 10:'
+            for score, head_hash in decorated_heads[-10:]:
+                print '   ', format_hash(head_hash), format_hash(self.verified.shares[head_hash].previous_hash), score
+        best_head_score, best = decorated_heads[-1] if decorated_heads else None
         
         # eat away at heads
-        if scores:
+        if decorated_heads:
             for i in xrange(1000):
                 to_remove = set()
                 for share_hash, tail in self.heads.iteritems():
-                    if share_hash in scores[-5:]:
+                    if share_hash in [head_hash for score, head_hash in decorated_heads[-5:]]:
                         #print 1
                         continue
                     if self.shares[share_hash].time_seen > time.time() - 300:
@@ -397,18 +401,29 @@ class OkayTracker(forest.Tracker):
             #end = time.time()
             #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
         
-        best = scores[-1] if scores else None
-        
         if best is not None:
             best_share = self.verified.shares[best]
             if ht.get_height_rel_highest(best_share.header['previous_block']) < ht.get_height_rel_highest(previous_block) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
+            
+            timestamp_cutoff = min(int(time.time()), best_share.timestamp) - 3600
+            target_cutoff = 2**256//(self.net.SHARE_PERIOD*best_tail_score[1]) * 2 if best_tail_score[1] is not None else 2**256-1
+        else:
+            timestamp_cutoff = int(time.time()) - 24*60*60
+            target_cutoff = 2**256-1
         
-        return best, desired
+        if p2pool.DEBUG:
+            print 'Desire %i shares. Cutoff: %.1f hours old diff>%.2f' % (len(desired), (time.time()-timestamp_cutoff)/3600, bitcoin_data.target_to_difficulty(target_cutoff))
+            for peer, hash, ts, targ in desired:
+                print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), ts, bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
+        
+        return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff and targ <= target_cutoff]
     
     def score(self, share_hash, ht):
+        # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time
+        
         head_height = self.verified.get_height(share_hash)
         if head_height < self.net.CHAIN_LENGTH:
             return head_height, None
@@ -418,7 +433,7 @@ class OkayTracker(forest.Tracker):
         block_height = max(ht.get_height_rel_highest(share.header['previous_block']) for share in
             self.verified.get_chain(end_point, self.net.CHAIN_LENGTH//16))
         
-        return self.net.CHAIN_LENGTH, (self.verified.get_work(share_hash) - self.verified.get_work(end_point))//(0 - block_height + 1)
+        return self.net.CHAIN_LENGTH, (self.verified.get_work(share_hash) - self.verified.get_work(end_point))//((0 - block_height + 1)*self.net.PARENT.BLOCK_PERIOD)
 
 def format_hash(x):
     if x is None:

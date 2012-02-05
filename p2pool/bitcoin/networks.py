@@ -17,6 +17,7 @@ nets = dict(
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
         SYMBOL='BTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
     ),
@@ -30,6 +31,7 @@ nets = dict(
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
         SYMBOL='tBTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
     ),
@@ -44,6 +46,7 @@ nets = dict(
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
         SYMBOL='NMC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Namecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Namecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.namecoin'), 'bitcoin.conf'),
     ),
@@ -57,6 +60,7 @@ nets = dict(
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
         SYMBOL='tNMC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Namecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Namecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.namecoin'), 'bitcoin.conf'),
     ),
@@ -71,6 +75,7 @@ nets = dict(
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=150, # s
         SYMBOL='LTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
     ),
@@ -84,6 +89,7 @@ nets = dict(
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=150, # s
         SYMBOL='tLTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
     ),
