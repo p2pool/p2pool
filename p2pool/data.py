@@ -351,7 +351,7 @@ class OkayTracker(forest.Tracker):
             print len(decorated_heads), 'heads. Top 10:'
             for score, head_hash in decorated_heads[-10:]:
                 print '   ', format_hash(head_hash), format_hash(self.verified.shares[head_hash].previous_hash), score
-        best_head_score, best = decorated_heads[-1] if decorated_heads else None
+        best_head_score, best = decorated_heads[-1] if decorated_heads else (None, None)
         
         # eat away at heads
         if decorated_heads:
