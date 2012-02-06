@@ -50,7 +50,7 @@ share_type = pack.ComposedType([
 ])
 
 class Share(object):
-    __slots__ = 'header previous_block share_info merkle_branch other_txs timestamp share_data new_script subsidy previous_hash previous_share_hash target nonce pow_hash header_hash hash time_seen peer donation net'.split(' ')
+    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -85,7 +85,6 @@ class Share(object):
             raise ValueError('merkle_branch too long!')
         
         self.header = header
-        self.previous_block = header['previous_block']
         self.share_info = share_info
         self.merkle_branch = merkle_branch
         
@@ -93,17 +92,14 @@ class Share(object):
         self.target = self.share_info['bits'].target
         self.timestamp = self.share_info['timestamp']
         
-        self.new_script = self.share_data['new_script']
-        self.subsidy = self.share_data['subsidy']
-        self.donation = self.share_data['donation']
-        
-        if len(self.new_script) > 100:
+        if len(self.share_data['new_script']) > 100:
             raise ValueError('new_script too long!')
+        if script.get_sigop_count(self.share_data['new_script']) > 1:
+            raise ValueError('too many sigops!')
         
-        self.previous_hash = self.previous_share_hash = self.share_data['previous_share_hash']
-        self.nonce = self.share_data['nonce']
+        self.previous_hash = self.share_data['previous_share_hash']
         
-        if len(self.nonce) > 100:
+        if len(self.share_data['nonce']) > 100:
             raise ValueError('nonce too long!')
         
         if len(self.share_data['coinbase']) > 100:
@@ -134,9 +130,6 @@ class Share(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
     
     def check(self, tracker):
-        if script.get_sigop_count(self.new_script) > 1:
-            raise ValueError('too many sigops!')
-        
         share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
@@ -344,7 +337,7 @@ class OkayTracker(forest.Tracker):
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
-            (self.verified.shares[h].previous_block, self.verified.shares[h].header['bits']) == (previous_block, bits) or self.verified.shares[h].peer is None,
+            (self.verified.shares[h].header['previous_block'], self.verified.shares[h].header['bits']) == (previous_block, bits) or self.verified.shares[h].peer is None,
             -self.verified.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
