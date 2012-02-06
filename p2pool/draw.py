@@ -35,7 +35,7 @@ def perp_and_normalize_to((dx, dy), d):
 
 def go(share, tracker, t, d):
     #c = color.green if share.peer is None else color.red
-    c = get_color(share.new_script)
+    c = get_color(share.share_data['new_script'])
     pos = get_pos(share, t, d)
     pygame.draw.circle(d, c, pos.rounded, 5)
     if share.previous_hash in tracker.shares:
@@ -52,7 +52,7 @@ def go(share, tracker, t, d):
         pygame.draw.circle(d, c, pos.rounded, 10, 2)
     for child_hash in tracker.reverse_shares.get(share.hash, set()):
         go(tracker.shares[child_hash], tracker, t, d)
-    d.blit(f.render(bitcoin_data.script2_to_human(share.new_script, tracker.net.PARENT), True, (255, 255, 255)), pos)
+    d.blit(f.render(bitcoin_data.script2_to_human(share.share_data['new_script'], tracker.net.PARENT), True, (255, 255, 255)), pos)
 
 pygame.font.init()
 f = pygame.font.SysFont("Monospace", 16)
