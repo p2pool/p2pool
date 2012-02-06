@@ -280,7 +280,7 @@ class OkayTracker(forest.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, ht, previous_block):
+    def think(self, block_rel_height_func, previous_block):
         desired = set()
         
         # O(len(self.heads))
@@ -333,7 +333,7 @@ class OkayTracker(forest.Tracker):
                 ))
         
         # decide best tree
-        decorated_tails = sorted((self.score(max(self.verified.tails[tail_hash], key=self.verified.get_height), ht), tail_hash) for tail_hash in self.verified.tails) # XXX using get_height here is quite possibly incorrect and vulnerable
+        decorated_tails = sorted((self.score(max(self.verified.tails[tail_hash], key=self.verified.get_height), block_rel_height_func), tail_hash) for tail_hash in self.verified.tails) # XXX using get_height here is quite possibly incorrect and vulnerable
         if p2pool.DEBUG:
             print len(decorated_tails), 'tails:'
             for score, tail_hash in decorated_tails:
@@ -344,7 +344,7 @@ class OkayTracker(forest.Tracker):
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
-            0 if self.verified.shares[h].peer is None else ht.get_height_rel_highest(self.verified.shares[h].previous_block),
+            0 if self.verified.shares[h].previous_block == previous_block or self.verified.shares[h].peer is None else -1,
             -self.verified.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
@@ -403,7 +403,7 @@ class OkayTracker(forest.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if ht.get_height_rel_highest(best_share.header['previous_block']) < ht.get_height_rel_highest(previous_block) and best_share.header_hash != previous_block and best_share.peer is not None:
+            if best_share.header['previous_block'] != previous_block and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
@@ -421,7 +421,7 @@ class OkayTracker(forest.Tracker):
         
         return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff and targ <= target_cutoff]
     
-    def score(self, share_hash, ht):
+    def score(self, share_hash, block_rel_height_func):
         # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time
         
         head_height = self.verified.get_height(share_hash)
@@ -430,7 +430,7 @@ class OkayTracker(forest.Tracker):
         
         end_point = self.verified.get_nth_parent_hash(share_hash, self.net.CHAIN_LENGTH*15//16)
         
-        block_height = max(ht.get_height_rel_highest(share.header['previous_block']) for share in
+        block_height = max(block_rel_height_func(share.header['previous_block']) for share in
             self.verified.get_chain(end_point, self.net.CHAIN_LENGTH//16))
         
         return self.net.CHAIN_LENGTH, (self.verified.get_work(share_hash) - self.verified.get_work(end_point))//((0 - block_height + 1)*self.net.PARENT.BLOCK_PERIOD)

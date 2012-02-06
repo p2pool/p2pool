@@ -104,8 +104,6 @@ def main(args, net, datadir_path, merged_urls):
         print '    ...success! Payout script:', bitcoin_data.script2_to_human(my_script, net.PARENT)
         print
         
-        ht = bitcoin_p2p.HeightTracker(bitcoind, factory)
-        
         my_share_hashes = set()
         my_doa_share_hashes = set()
         
@@ -169,8 +167,15 @@ def main(args, net, datadir_path, merged_urls):
                 coinbaseflags=work['coinbaseflags'],
             ))
         
+        if '\ngetblock ' in (yield bitcoind.rpc_help()):
+            height_cacher = deferral.DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((yield bitcoind.rpc_getblock('%x' % (block_hash,)))['blockcount'])))
+            def get_height_rel_highest(block_hash):
+                return height_cacher.call_now(block_hash, 0) - height_cacher.call_now(pre_current_work.value['previous_block'], 1000000000)
+        else:
+            get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory).get_height_rel_highest
+        
         def set_real_work2():
-            best, desired = tracker.think(ht, pre_current_work.value['previous_block'])
+            best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'])
             
             t = dict(pre_current_work.value)
             t['best_share_hash'] = best
@@ -212,7 +217,6 @@ def main(args, net, datadir_path, merged_urls):
         print
         
         pre_merged_work.changed.watch(lambda _: set_real_work2())
-        ht.updated.watch(set_real_work2)
         
         
         @defer.inlineCallbacks
