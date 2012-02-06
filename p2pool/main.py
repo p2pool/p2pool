@@ -175,7 +175,7 @@ def main(args, net, datadir_path, merged_urls):
             get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory).get_height_rel_highest
         
         def set_real_work2():
-            best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'])
+            best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'], pre_current_work.value['bits'])
             
             t = dict(pre_current_work.value)
             t['best_share_hash'] = best

@@ -280,7 +280,7 @@ class OkayTracker(forest.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, block_rel_height_func, previous_block):
+    def think(self, block_rel_height_func, previous_block, bits):
         desired = set()
         
         # O(len(self.heads))
@@ -344,7 +344,7 @@ class OkayTracker(forest.Tracker):
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
-            0 if self.verified.shares[h].previous_block == previous_block or self.verified.shares[h].peer is None else -1,
+            (self.verified.shares[h].previous_block, self.verified.shares[h].header['bits']) == (previous_block, bits) or self.verified.shares[h].peer is None,
             -self.verified.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
