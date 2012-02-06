@@ -622,7 +622,7 @@ def main(args, net, datadir_path, merged_urls):
                 
                 
                 if pow_hash > target:
-                    print 'Worker submitted share with hash > target:'
+                    print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
                     print '    Hash:   %56x' % (pow_hash,)
                     print '    Target: %56x' % (target,)
                 
