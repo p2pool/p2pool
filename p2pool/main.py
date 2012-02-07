@@ -28,12 +28,12 @@ import p2pool, p2pool.data as p2pool_data
 @defer.inlineCallbacks
 def getwork(bitcoind):
     work = yield bitcoind.rpc_getmemorypool()
-    transactions = [bitcoin_data.tx_type.unpack(x.decode('hex')) for x in work['transactions']]
+    packed_transactions = [x.decode('hex') for x in work['transactions']]
     defer.returnValue(dict(
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
-        transactions=transactions,
-        merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions], 0),
+        transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
+        merkle_branch=bitcoin_data.calculate_merkle_branch([0] + map(bitcoin_data.hash256, packed_transactions), 0),
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
