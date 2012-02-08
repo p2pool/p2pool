@@ -375,6 +375,8 @@ def main(args, net, datadir_path, merged_urls):
         
         print '    ...success!'
         print
+
+        start_time = time.time()
         
         @defer.inlineCallbacks
         def upnp_thread():
@@ -750,6 +752,9 @@ def main(args, net, datadir_path, merged_urls):
         
         def get_peer_addresses():
             return ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues())
+
+        def get_uptime():
+            return json.dumps(time.time() - start_time)
         
         class WebInterface(resource.Resource):
             def __init__(self, func, mime_type, *fields):
@@ -770,6 +775,7 @@ def main(args, net, datadir_path, merged_urls):
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
         web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.script2_to_human(my_script, net.PARENT)), 'application/json'))
         web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
+        web_root.putChild('uptime', WebInterface(get_uptime, 'application/json'))
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
