@@ -3,12 +3,13 @@ from __future__ import division
 import StringIO
 import json
 import random
+import sys
 
 from twisted.internet import defer
 
 import p2pool
 from p2pool.bitcoin import getwork
-from p2pool.util import jsonrpc, variable
+from p2pool.util import expiring_dict, jsonrpc, variable
 
 class _Page(jsonrpc.Server):
     def __init__(self, parent, long_poll):
@@ -32,9 +33,6 @@ class WorkerBridge(object):
     
     def get_work(self, request):
         raise NotImplementedError()
-    
-    def got_response(self, block_header):
-        print self.got_response, "called with", block_header
 
 class WorkerInterface(object):
     def __init__(self, worker_bridge):
@@ -44,6 +42,8 @@ class WorkerInterface(object):
         
         self.work_cache = {} # request_process_func(request) -> blockattempt
         self.work_cache_times = self.worker_bridge.new_work_event.times
+        
+        self.merkle_root_to_handler = expiring_dict.ExpiringDict(300)
     
     def attach_to(self, res):
         res.putChild('', _Page(self, long_poll=False))
@@ -56,7 +56,11 @@ class WorkerInterface(object):
         request.setHeader('X-Is-P2Pool', 'true')
         
         if data is not None:
-            defer.returnValue(self.worker_bridge.got_response(getwork.decode_data(data), request))
+            header = getwork.decode_data(data)
+            if header['merkle_root'] not in self.merkle_root_to_handler:
+                print >>sys.stderr, '''Couldn't link returned work's merkle root with its handler. This should only happen if this process was recently restarted!'''
+                defer.returnValue(False)
+            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request))
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
@@ -82,7 +86,9 @@ class WorkerInterface(object):
         if key in self.work_cache:
             res, orig_timestamp = self.work_cache.pop(key)
         else:
-            res = self.worker_bridge.get_work(*key)
+            res, handler = self.worker_bridge.get_work(*key)
+            assert res.merkle_root not in self.merkle_root_to_handler
+            self.merkle_root_to_handler[res.merkle_root] = handler
             orig_timestamp = res.timestamp
         
         if res.timestamp + 12 < orig_timestamp + 600:
