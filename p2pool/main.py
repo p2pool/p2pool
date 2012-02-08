@@ -375,7 +375,7 @@ def main(args, net, datadir_path, merged_urls):
         
         print '    ...success!'
         print
-
+        
         start_time = time.time()
         
         @defer.inlineCallbacks
@@ -752,7 +752,7 @@ def main(args, net, datadir_path, merged_urls):
         
         def get_peer_addresses():
             return ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues())
-
+        
         def get_uptime():
             return json.dumps(time.time() - start_time)
         
