@@ -73,6 +73,12 @@ def format(x):
     s = '' if count == 0 else prefixes[count - 1]
     return '%i' % (x,) + s
 
+def format_dt(dt):
+    for value, name in [(60*60*24, 'days'), (60*60, 'hours'), (60, 'minutes'), (1, 'seconds')]:
+        if dt > value:
+            break
+    return '%.01f %s' % (dt/value, name)
+
 perfect_round = lambda x: int(x + random.random())
 
 def erf(x):

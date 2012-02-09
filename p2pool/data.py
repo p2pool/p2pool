@@ -408,9 +408,9 @@ class OkayTracker(forest.Tracker):
             target_cutoff = 2**256-1
         
         if p2pool.DEBUG:
-            print 'Desire %i shares. Cutoff: %.1f hours old diff>%.2f' % (len(desired), (time.time()-timestamp_cutoff)/3600, bitcoin_data.target_to_difficulty(target_cutoff))
+            print 'Desire %i shares. Cutoff: %s old diff>%.2f' % (len(desired), math.format_dt(time.time() - timestamp_cutoff), bitcoin_data.target_to_difficulty(target_cutoff))
             for peer, hash, ts, targ in desired:
-                print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), ts, bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
+                print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
         
         return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff and targ <= target_cutoff]
     

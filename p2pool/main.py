@@ -861,7 +861,7 @@ def main(args, net, datadir_path, merged_urls):
                 yield deferral.sleep(3)
                 try:
                     if time.time() > current_work2.value['last_update'] + 60:
-                        print >>sys.stderr, '''---> LOST CONTACT WITH BITCOIND for 60 seconds, check that it isn't frozen or dead <---'''
+                        print >>sys.stderr, '''---> LOST CONTACT WITH BITCOIND for %s! Check that it isn't frozen or dead! <---''' % (math.format_dt(time.time() - current_work2.value['last_update']),)
                     
                     height = tracker.get_height(current_work.value['best_share_hash'])
                     this_str = 'P2Pool: %i shares in chain (%i verified/%i total) Peers: %i (%i incoming)' % (
@@ -877,11 +877,11 @@ def main(args, net, datadir_path, merged_urls):
                     while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - average_period:
                         recent_shares_ts_work2.pop(0)
                     my_att_s = sum(work for ts, work, dead in recent_shares_ts_work2)/min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0
-                    this_str += '\n Local: %sH/s (%.f min avg) Local dead on arrival: %s Expected time to share: %s' % (
+                    this_str += '\n Local: %sH/s in last %s Local dead on arrival: %s Expected time to share: %s' % (
                         math.format(int(my_att_s)),
-                        (min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0)/60,
+                        math.format_dt(min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0),
                         math.format_binomial_conf(sum(1 for tx, work, dead in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
-                        '%.1f min' % (2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s / 60,) if my_att_s else '???',
+                        math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s else '???',
                     )
                     
                     if height > 2:
@@ -895,10 +895,10 @@ def main(args, net, datadir_path, merged_urls):
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
                             get_current_txouts().get(my_script, 0)*1e-8, net.PARENT.SYMBOL,
                         )
-                        this_str += '\n Pool: %sH/s Stale rate: %.1f%% Average time between blocks: %.2f days' % (
+                        this_str += '\n Pool: %sH/s Stale rate: %.1f%% Expected time to block: %s' % (
                             math.format(int(real_att_s)),
                             100*stale_prop,
-                            2**256 / current_work.value['bits'].target / real_att_s / (60 * 60 * 24),
+                            math.format_dt(2**256 / current_work.value['bits'].target / real_att_s),
                         )
                     
                     if this_str != last_str or time.time() > last_time + 15:
