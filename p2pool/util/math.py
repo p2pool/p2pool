@@ -158,7 +158,7 @@ def format_binomial_conf(x, n, conf=0.95, f=lambda x: x):
     if n == 0:
         return '???'
     left, right = minmax(map(f, binomial_conf_interval(x, n, conf)))
-    return '~%.1f%% (%.f-%.f%%)' % (100*f(x/n), 100*left-1/2, 100*right+1/2)
+    return '~%.1f%% (%.f-%.f%%)' % (100*f(x/n), math.floor(100*left), math.ceil(100*right))
 
 def reversed(x):
     try:
