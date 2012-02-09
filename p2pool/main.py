@@ -27,7 +27,13 @@ import p2pool, p2pool.data as p2pool_data
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
 def getwork(bitcoind):
-    work = yield bitcoind.rpc_getmemorypool()
+    try:
+        work = yield bitcoind.rpc_getmemorypool()
+    except jsonrpc.Error, e:
+        if e.code == -32601: # Method not found
+            print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
+            raise deferral.RetrySilentlyException()
+        raise
     packed_transactions = [x.decode('hex') for x in work['transactions']]
     defer.returnValue(dict(
         version=work['version'],

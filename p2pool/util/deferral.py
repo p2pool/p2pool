@@ -10,6 +10,9 @@ def sleep(t):
     reactor.callLater(t, d.callback, None)
     return d
 
+class RetrySilentlyException(Exception):
+    pass
+
 def retry(message, delay, max_retries=None):
     '''
     @retry('Error getting block:', 1)
@@ -24,10 +27,11 @@ def retry(message, delay, max_retries=None):
             for i in itertools.count():
                 try:
                     result = yield func(*args, **kwargs)
-                except:
+                except Exception, e:
                     if i == max_retries:
                         raise
-                    log.err(None, message)
+                    if not isinstance(e, RetrySilentlyException):
+                        log.err(None, message)
                     yield sleep(delay)
                 else:
                     defer.returnValue(result)
