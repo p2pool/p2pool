@@ -129,14 +129,14 @@ else:
         if n == 0:
             left = random.random()*(1 - conf)
             return left, left + conf
-        b = special.beta(x+1, n-x+1)
+        bl = float(special.betaln(x+1, n-x+1))
         def f(left_a):
-            left, right = max(1e-8, special.betaincinv(x+1, n-x+1, left_a)), min(1-1e-8, special.betaincinv(x+1, n-x+1, left_a + conf))
-            top = right**(x+1) * (1-right)**(n-x+1) * left*(1-left) - left**(x+1) * (1-left)**(n-x+1) * right * (1-right)
+            left, right = max(1e-8, float(special.betaincinv(x+1, n-x+1, left_a))), min(1-1e-8, float(special.betaincinv(x+1, n-x+1, left_a + conf)))
+            top = math.exp(math.log(right)*(x+1) + math.log(1-right)*(n-x+1) + math.log(left) + math.log(1-left) - bl) - math.exp(math.log(left)*(x+1) + math.log(1-left)*(n-x+1) + math.log(right) + math.log(1-right) - bl)
             bottom = (x - n*right)*left*(1-left) - (x - n*left)*right*(1-right)
-            return top/bottom/b
+            return top/bottom
         left_a = find_root(f, (1-conf)/2, bounds=(0, 1-conf))
-        return special.betaincinv(x+1, n-x+1, left_a), special.betaincinv(x+1, n-x+1, left_a + conf)
+        return float(special.betaincinv(x+1, n-x+1, left_a)), float(special.betaincinv(x+1, n-x+1, left_a + conf))
 
 def binomial_conf_center_radius(x, n, conf=0.95):
     assert 0 <= x <= n and 0 <= conf < 1
