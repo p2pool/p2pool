@@ -963,6 +963,9 @@ def run():
     parser.add_argument('-a', '--address',
         help='generate payouts to this address (default: <address requested from bitcoind>)',
         type=str, action='store', default=None, dest='address')
+    parser.add_argument('--datadir',
+        help='store data in this directory (default: <directory run_p2pool.py is in>/data)',
+        type=str, action='store', default=None, dest='datadir')
     parser.add_argument('--logfile',
         help='''log to this file (default: data/<NET>/log)''',
         type=str, action='store', default=None, dest='logfile')
@@ -1024,7 +1027,7 @@ def run():
     net_name = args.net_name + ('_testnet' if args.testnet else '')
     net = networks.nets[net_name]
     
-    datadir_path = os.path.join(os.path.dirname(sys.argv[0]), 'data', net_name)
+    datadir_path = os.path.join((os.path.join(os.path.dirname(sys.argv[0]), 'data') if args.datadir is None else args.datadir), net_name)
     if not os.path.exists(datadir_path):
         os.makedirs(datadir_path)
     
