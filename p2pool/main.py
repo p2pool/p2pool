@@ -626,7 +626,7 @@ def main(args, net, datadir_path, merged_urls):
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
-                        recent_shares_ts_work2.append((time.time(), bitcoin_data.target_to_average_attempts(target), not on_time))
+                        recent_shares_ts_work2.append((time.time(), bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser()))
                     
                     
                     if pow_hash > target:
@@ -734,8 +734,16 @@ def main(args, net, datadir_path, merged_urls):
                 tracker.shares[tracker.get_nth_parent_hash(current_work.value['best_share_hash'], lookbehind - 1)].timestamp)
             share_att_s = my_work / actual_time
             
+            miner_hash_rates = {}
+            miner_dead_hash_rates = {}
+            for ts, work, dead, user in recent_shares_ts_work2:
+                miner_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+                if dead:
+                    miner_dead_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+            
             return json.dumps(dict(
                 my_hash_rates_in_last_hour=dict(
+                    note="DEPRECATED",
                     nonstale=share_att_s,
                     rewarded=share_att_s/(1 - global_stale_prop),
                     actual=share_att_s/(1 - my_stale_prop) if my_stale_prop is not None else 0, # 0 because we don't have any shares anyway
@@ -752,6 +760,8 @@ def main(args, net, datadir_path, merged_urls):
                     orphan_stale=my_orphan_count/my_share_count if my_share_count != 0 else None,
                     dead_stale=my_doa_count/my_share_count if my_share_count != 0 else None,
                 ),
+                miner_hash_rates=miner_hash_rates,
+                miner_dead_hash_rates=miner_dead_hash_rates,
             ))
         
         def get_peer_addresses():
@@ -882,11 +892,11 @@ def main(args, net, datadir_path, merged_urls):
                         first_pseudoshare_time = recent_shares_ts_work2[0][0]
                     while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - average_period:
                         recent_shares_ts_work2.pop(0)
-                    my_att_s = sum(work for ts, work, dead in recent_shares_ts_work2)/min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0
+                    my_att_s = sum(work for ts, work, dead, user in recent_shares_ts_work2)/min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0
                     this_str += '\n Local: %sH/s in last %s Local dead on arrival: %s Expected time to share: %s' % (
                         math.format(int(my_att_s)),
                         math.format_dt(min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0),
-                        math.format_binomial_conf(sum(1 for tx, work, dead in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
+                        math.format_binomial_conf(sum(1 for tx, work, dead, user in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
                         math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s else '???',
                     )
                     
