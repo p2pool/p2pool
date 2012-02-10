@@ -47,7 +47,7 @@ def getwork(bitcoind):
     ))
 
 @defer.inlineCallbacks
-def main(args, net, datadir_path, merged_urls):
+def main(args, net, datadir_path, merged_urls, worker_endpoint):
     try:
         print 'p2pool (version %s)' % (p2pool.__version__,)
         print
@@ -404,7 +404,7 @@ def main(args, net, datadir_path, merged_urls):
         
         # start listening for workers with a JSON-RPC server
         
-        print 'Listening for workers on port %i... and host %s' % (args.worker_port,args.worker_host)
+        print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
         if os.path.exists(os.path.join(datadir_path, 'vip_pass')):
             with open(os.path.join(datadir_path, 'vip_pass'), 'rb') as f:
@@ -808,7 +808,7 @@ def main(args, net, datadir_path, merged_urls):
         
         def attempt_listen():
             try:
-                reactor.listenTCP(args.worker_port, server.Site(web_root), interface=args.worker_host)
+                reactor.listenTCP(args.worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
             except error.CannotListenError, e:
                 print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
                 reactor.callLater(1, attempt_listen)
@@ -1016,16 +1016,12 @@ def run():
         action='store_false', default=True, dest='upnp')
     
     worker_group = parser.add_argument_group('worker interface')
-    worker_group.add_argument('-w', '--worker-port', metavar='PORT',
-        help='listen on PORT for RPC connections from miners (default: %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
-        type=int, action='store', default=None, dest='worker_port')
-    worker_group.add_argument('-host', '--worker-host', metavar='HOST',
-        help='listen on HOST for RPC connections from miners (default: 0.0.0.0)',
-        type=str, action='store', default='0.0.0.0', dest='worker_host')
+    worker_group.add_argument('-w', '--worker-port', metavar='[ADDR:]PORT',
+        help='listen on PORT on interface with ADDR for RPC connections from miners (default: all interfaces, %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
+        type=str, action='store', default=None, dest='worker_endpoint')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
-    
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
@@ -1092,8 +1088,13 @@ def run():
     if args.p2pool_port is None:
         args.p2pool_port = net.P2P_PORT
     
-    if args.worker_port is None:
-        args.worker_port = net.WORKER_PORT
+    if args.worker_endpoint is None:
+        worker_endpoint = '', net.WORKER_PORT
+    elif ':' not in args.worker_endpoint:
+        worker_endpoint = '', int(args.worker_endpoint)
+    else:
+        addr, port = args.worker_endpoint.rsplit(':', 1)
+        worker_endpoint = addr, int(port)
     
     if args.address is not None:
         try:
@@ -1137,5 +1138,5 @@ def run():
         signal.signal(signal.SIGUSR1, sigusr1)
     task.LoopingCall(logfile.reopen).start(5)
     
-    reactor.callWhenRunning(main, args, net, datadir_path, merged_urls)
+    reactor.callWhenRunning(main, args, net, datadir_path, merged_urls, worker_endpoint)
     reactor.run()
