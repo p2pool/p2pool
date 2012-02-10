@@ -552,13 +552,10 @@ def main(args, net, datadir_path, merged_urls):
                     
                     try:
                         if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                            @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
-                            def submit_block():
-                                if factory.conn.value is None:
-                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Hash: %x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),)
-                                    raise deferral.RetrySilentlyException()
+                            if factory.conn.value is not None:
                                 factory.conn.value.send_block(block=dict(header=header, txs=transactions))
-                            submit_block()
+                            else:
+                                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
                             if pow_hash <= header['bits'].target:
                                 print
                                 print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),)
