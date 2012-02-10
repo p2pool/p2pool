@@ -308,6 +308,7 @@ class HeightTracker(object):
         self._think_task.start(15)
         self._think2_task = task.LoopingCall(self._think2)
         self._think2_task.start(15)
+        self.best_hash = None
     
     def _think(self):
         try:
@@ -325,6 +326,7 @@ class HeightTracker(object):
         try:
             ba = getwork.BlockAttempt.from_getwork((yield self._rpc_proxy.rpc_getwork()))
             self._request(ba.previous_block)
+            self.best_hash = ba.previous_block
         except:
             log.err(None, 'Error in HeightTracker._think2:')
     
@@ -358,10 +360,11 @@ class HeightTracker(object):
     
     def get_height_rel_highest(self, block_hash):
         # callers: highest height can change during yields!
+        best_height, best_last = self._tracker.get_height_and_last(self.best_hash)
         height, last = self._tracker.get_height_and_last(block_hash)
-        if last not in self._tracker.tails:
+        if last != best_last:
             return -1000000000 # XXX hack
-        return height - max(self._tracker.get_height(head_hash) for head_hash in self._tracker.tails[last])
+        return height - best_height
     
     def stop(self):
         self._factory.new_headers.unwatch(self._watch1)
