@@ -111,7 +111,7 @@ class Protocol(BaseProtocol):
     
     @property
     def use_checksum(self):
-        return self.version >= 209
+        return self.version >= 209 or time.time() > 1329696000
     
     def connectionMade(self):
         BaseProtocol.connectionMade(self)
