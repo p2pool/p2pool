@@ -808,7 +808,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         def attempt_listen():
             try:
-                reactor.listenTCP(args.worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
+                reactor.listenTCP(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
             except error.CannotListenError, e:
                 print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
                 reactor.callLater(1, attempt_listen)
