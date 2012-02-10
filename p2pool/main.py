@@ -404,7 +404,7 @@ def main(args, net, datadir_path, merged_urls):
         
         # start listening for workers with a JSON-RPC server
         
-        print 'Listening for workers on port %i...' % (args.worker_port,)
+        print 'Listening for workers on port %i... and host %s' % (args.worker_port,args.worker_host)
         
         if os.path.exists(os.path.join(datadir_path, 'vip_pass')):
             with open(os.path.join(datadir_path, 'vip_pass'), 'rb') as f:
@@ -808,7 +808,7 @@ def main(args, net, datadir_path, merged_urls):
         
         def attempt_listen():
             try:
-                reactor.listenTCP(args.worker_port, server.Site(web_root))
+                reactor.listenTCP(args.worker_port, server.Site(web_root), interface=args.worker_host)
             except error.CannotListenError, e:
                 print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
                 reactor.callLater(1, attempt_listen)
@@ -1019,9 +1019,13 @@ def run():
     worker_group.add_argument('-w', '--worker-port', metavar='PORT',
         help='listen on PORT for RPC connections from miners (default: %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='worker_port')
+    worker_group.add_argument('-host', '--worker-host', metavar='HOST',
+        help='listen on HOST for RPC connections from miners (default: 0.0.0.0)',
+        type=str, action='store', default='0.0.0.0', dest='worker_host')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
+    
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
