@@ -859,7 +859,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     self.watch_id = tracker.verified.added.watch(self._new_share)
                     self.announced_hashes = set()
                 def _new_share(self, share):
-                    if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes:
+                    if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes and abs(share.timestamp - time.time()) < 10*60:
                         self.announced_hashes.add(share.header_hash)
                         self.say('#p2pool', '\x02BLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), share.header_hash))
                 def connectionLost(self, reason):
