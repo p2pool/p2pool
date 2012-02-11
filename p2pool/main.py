@@ -1016,7 +1016,7 @@ def run():
         action='store_false', default=True, dest='upnp')
     
     worker_group = parser.add_argument_group('worker interface')
-    worker_group.add_argument('-w', '--worker-port', metavar='[ADDR:]PORT',
+    worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
         help='listen on PORT on interface with ADDR for RPC connections from miners (default: all interfaces, %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
         type=str, action='store', default=None, dest='worker_endpoint')
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
