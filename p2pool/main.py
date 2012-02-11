@@ -796,6 +796,50 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if draw is not None:
             web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
         
+        new_root = resource.Resource()
+        web_root.putChild('web', new_root)
+        
+        stat_log = []
+        if os.path.exists(os.path.join(datadir_path, 'stats')):
+            try:
+                with open(os.path.join(datadir_path, 'stats'), 'rb') as f:
+                    stat_log = json.loads(f.read())
+            except:
+                log.err(None, 'Error loading stats:')
+        def update_stat_log():
+            while stat_log and stat_log[0]['time'] < time.time() - 24*60*60:
+                stat_log.pop(0)
+            
+            lookbehind = 3600//net.SHARE_PERIOD
+            if tracker.get_height(current_work.value['best_share_hash']) < lookbehind:
+                return None
+            
+            global_stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], lookbehind)
+            (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
+            
+            miner_hash_rates = {}
+            miner_dead_hash_rates = {}
+            for ts, work, dead, user in recent_shares_ts_work2:
+                miner_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+                if dead:
+                    miner_dead_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+            
+            stat_log.append(dict(
+                time=time.time(),
+                pool_hash_rate=p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], lookbehind)/(1-global_stale_prop),
+                pool_stale_prop=global_stale_prop,
+                local_hash_rates=miner_hash_rates,
+                local_dead_hash_rates=miner_dead_hash_rates,
+                shares=shares,
+                stale_shares=stale_orphan_shares + stale_doa_shares,
+                stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
+            ))
+            
+            with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
+                f.write(json.dumps(stat_log))
+        task.LoopingCall(update_stat_log).start(5*60)
+        new_root.putChild('log', WebInterface(lambda: json.dumps(stat_log), 'application/json'))
+        
         grapher = graphs.Grapher(os.path.join(datadir_path, 'rrd'))
         web_root.putChild('graphs', grapher.get_resource())
         def add_point():
