@@ -3,6 +3,7 @@ from __future__ import absolute_import, division
 import __builtin__
 import math
 import random
+import time
 
 def median(x, use_float=True):
     # there exist better algorithms...
@@ -217,6 +218,35 @@ def string_to_natural(s, alphabet=None):
         assert len(set(alphabet)) == len(alphabet)
         assert not s.startswith(alphabet[0])
         return sum(alphabet.index(char) * len(alphabet)**i for i, char in enumerate(reversed(s)))
+
+class RateMonitor(object):
+    def __init__(self, max_lookback_time):
+        self.max_lookback_time = max_lookback_time
+        
+        self.datums = []
+        self.first_timestamp = None
+    
+    def _prune(self):
+        start_time = time.time() - self.max_lookback_time
+        for i, (ts, datum) in enumerate(self.datums):
+            if ts > start_time:
+                self.datums[:] = self.datums[i:]
+                return
+    
+    def get_datums_in_last(self, dt=None):
+        if dt is None:
+            dt = self.max_lookback_time
+        assert dt <= self.max_lookback_time
+        self._prune()
+        now = time.time()
+        return [datum for ts, datum in self.datums if ts > now - dt], min(dt, now - self.first_timestamp) if self.first_timestamp is not None else 0
+    
+    def add_datum(self, datum):
+        self._prune()
+        t = time.time()
+        self.datums.append((t, datum))
+        if self.first_timestamp is None:
+            self.first_timestamp = t
 
 if __name__ == '__main__':
     import random

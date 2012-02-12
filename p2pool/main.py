@@ -450,7 +450,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
         
         
-        recent_shares_ts_work2 = []
+        local_rate_monitor = math.RateMonitor(10*60)
         
         class WorkerBridge(worker_interface.WorkerBridge):
             def __init__(self):
@@ -629,7 +629,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
-                        recent_shares_ts_work2.append((time.time(), bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser()))
+                        local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=request.getUser()))
                     
                     
                     if pow_hash > target:
@@ -739,10 +739,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             
             miner_hash_rates = {}
             miner_dead_hash_rates = {}
-            for ts, work, dead, user in recent_shares_ts_work2:
-                miner_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
-                if dead:
-                    miner_dead_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+            datums, dt = local_rate_monitor.get_datums_in_last()
+            for datum in datums:
+                miner_hash_rates[datum['user']] = miner_hash_rates.get(datum['user'], 0) + datum['work']/dt
+                if datum['dead']:
+                    miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
             
             return json.dumps(dict(
                 my_hash_rates_in_last_hour=dict(
@@ -819,10 +820,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             
             miner_hash_rates = {}
             miner_dead_hash_rates = {}
-            for ts, work, dead, user in recent_shares_ts_work2:
-                miner_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
-                if dead:
-                    miner_dead_hash_rates[user] = miner_hash_rates.get(user, 0) + work/600
+            datums, dt = local_rate_monitor.get_datums_in_last()
+            for datum in datums:
+                miner_hash_rates[datum['user']] = miner_hash_rates.get(datum['user'], 0) + datum['work']/dt
+                if datum['dead']:
+                    miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
             
             stat_log.append(dict(
                 time=time.time(),
@@ -915,9 +917,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         @defer.inlineCallbacks
         def status_thread():
-            average_period = 600
-            first_pseudoshare_time = None
-            
             last_str = None
             last_time = 0
             while True:
@@ -935,15 +934,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
                     ) + (' FDs: %i R/%i W' % (len(reactor.getReaders()), len(reactor.getWriters())) if p2pool.DEBUG else '')
                     
-                    if first_pseudoshare_time is None and recent_shares_ts_work2:
-                        first_pseudoshare_time = recent_shares_ts_work2[0][0]
-                    while recent_shares_ts_work2 and recent_shares_ts_work2[0][0] < time.time() - average_period:
-                        recent_shares_ts_work2.pop(0)
-                    my_att_s = sum(work for ts, work, dead, user in recent_shares_ts_work2)/min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0
+                    datums, dt = local_rate_monitor.get_datums_in_last()
+                    my_att_s = sum(datum['work']/dt for datum in datums)
                     this_str += '\n Local: %sH/s in last %s Local dead on arrival: %s Expected time to share: %s' % (
                         math.format(int(my_att_s)),
-                        math.format_dt(min(time.time() - first_pseudoshare_time, average_period) if first_pseudoshare_time is not None else 0),
-                        math.format_binomial_conf(sum(1 for tx, work, dead, user in recent_shares_ts_work2 if dead), len(recent_shares_ts_work2), 0.95),
+                        math.format_dt(dt),
+                        math.format_binomial_conf(sum(1 for datum in datums if datum['dead']), len(datums), 0.95),
                         math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s else '???',
                     )
                     
