@@ -70,3 +70,5 @@ nets = dict(
         BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
     ),
 )
+for net_name, net in nets.iteritems():
+    net.NAME = net_name

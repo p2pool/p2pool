@@ -20,6 +20,7 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='BTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://blockexplorer.com/block/',
     ),
     bitcoin_testnet=math.Object(
         P2P_PREFIX='fabfb5da'.decode('hex'),
@@ -34,6 +35,7 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='tBTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://blockexplorer.com/testnet/block/',
     ),
     
     nameecoin=math.Object(
@@ -49,6 +51,7 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='NMC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Namecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Namecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.namecoin'), 'bitcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer.dot-bit.org/b/',
     ),
     namecoin_testnet=math.Object(
         P2P_PREFIX='fabfb5fe'.decode('hex'),
@@ -63,6 +66,7 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='tNMC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Namecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Namecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.namecoin'), 'bitcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://testnet.explorer.dot-bit.org/b/',
     ),
     
     litecoin=math.Object(
@@ -78,6 +82,7 @@ nets = dict(
         BLOCK_PERIOD=150, # s
         SYMBOL='LTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://litecoin.kicks-ass.org/block/',
     ),
     litecoin_testnet=math.Object(
         P2P_PREFIX='fcc1b7dc'.decode('hex'),
@@ -92,5 +97,8 @@ nets = dict(
         BLOCK_PERIOD=150, # s
         SYMBOL='tLTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-litecoin-testnet-explorer/block/',
     ),
 )
+for net_name, net in nets.iteritems():
+    net.NAME = net_name

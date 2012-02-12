@@ -312,9 +312,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 else:
                     print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
                 print
-                print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %x' % (p2pool_data.format_hash(share.hash), share.header_hash)
+                print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
-                recent_blocks.append({ 'ts': share.timestamp, 'hash': '%x' % (share.header_hash) })
+                recent_blocks.append(dict(ts=share.timestamp, hash='%064x' % (share.header_hash,)))
         
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
@@ -561,15 +561,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
                             def submit_block():
                                 if factory.conn.value is None:
-                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Hash: %x' % (header_hash,)
+                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%32x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
                                     raise deferral.RetrySilentlyException()
                                 factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                             submit_block()
                             if pow_hash <= header['bits'].target:
                                 print
-                                print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (header_hash,)
+                                print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
                                 print
-                                recent_blocks.append(dict(ts=time.time(), hash='%x' % (header_hash,)))
+                                recent_blocks.append(dict(ts=time.time(), hash='%064x' % (header_hash,)))
                     except:
                         log.err(None, 'Error while processing potential block:')
                     
@@ -904,7 +904,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if args.irc_announce:
             from twisted.words.protocols import irc
             class IRCClient(irc.IRCClient):
-                nickname = 'p2pool'
+                nickname = 'p2pool_%s%i' % (net.NAME, random.randrange(100))
                 def lineReceived(self, line):
                     print repr(line)
                     irc.IRCClient.lineReceived(self, line)
@@ -917,7 +917,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 def _new_share(self, share):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes and abs(share.timestamp - time.time()) < 10*60:
                         self.announced_hashes.add(share.header_hash)
-                        self.say('#p2pool', '\x02BLOCK FOUND by %s! http://blockexplorer.com/block/%064x' % (bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), share.header_hash))
+                        self.say('#p2pool', '\x02BLOCK FOUND by %s! %s%064x' % (bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash))
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
                     print 'IRC connection lost:', reason.getErrorMessage()
