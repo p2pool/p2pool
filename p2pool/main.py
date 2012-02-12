@@ -838,6 +838,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares=shares,
                 stale_shares=stale_orphan_shares + stale_doa_shares,
                 stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
+                current_payout=get_current_txouts().get(my_script, 0)*1e-8,
             ))
             
             with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
