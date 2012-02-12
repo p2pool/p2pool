@@ -13,7 +13,7 @@ def sleep(t):
 class RetrySilentlyException(Exception):
     pass
 
-def retry(message, delay, max_retries=None):
+def retry(message='Error:', delay=3, max_retries=None):
     '''
     @retry('Error getting block:', 1)
     @defer.inlineCallbacks
