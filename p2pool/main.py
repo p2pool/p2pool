@@ -155,6 +155,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         requested = expiring_dict.ExpiringDict(300)
         
+        print 'Initializing work...'
         @defer.inlineCallbacks
         def set_real_work1():
             work = yield getwork(bitcoind)
@@ -172,11 +173,16 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 bits=work['bits'],
                 coinbaseflags=work['coinbaseflags'],
             ))
+        yield set_real_work1()
         
         if '\ngetblock ' in (yield bitcoind.rpc_help()):
             height_cacher = deferral.DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((yield bitcoind.rpc_getblock('%x' % (block_hash,)))['blockcount'])))
+            best_height_cached = variable.Variable((yield height_cacher(pre_current_work.value['previous_block'])))
             def get_height_rel_highest(block_hash):
-                return height_cacher.call_now(block_hash, 0) - height_cacher.call_now(pre_current_work.value['previous_block'], 1000000000)
+                this_height = height_cacher.call_now(block_hash, 0)
+                best_height = height_cacher.call_now(pre_current_work.value['previous_block'], 0)
+                best_height_cached.set(max(best_height_cached.value, this_height, best_height))
+                return this_height - best_height_cached.value
         else:
             get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory).get_height_rel_highest
         
@@ -216,13 +222,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 )
                 requested[share_hash] = t, count + 1
         pre_current_work.changed.watch(lambda _: set_real_work2())
-        
-        print 'Initializing work...'
-        yield set_real_work1()
+        pre_merged_work.changed.watch(lambda _: set_real_work2())
+        set_real_work2()
         print '    ...success!'
         print
-        
-        pre_merged_work.changed.watch(lambda _: set_real_work2())
         
         
         @defer.inlineCallbacks
