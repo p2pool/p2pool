@@ -1035,12 +1035,6 @@ def run():
     parser.add_argument('--merged',
         help='call getauxblock on this url to get work for merged mining (example: http://ncuser:ncpass@127.0.0.1:10332/)',
         type=str, action='append', default=[], dest='merged_urls')
-    parser.add_argument('--merged-url',
-        help='DEPRECATED, use --merged',
-        type=str, action='store', default=None, dest='merged_url')
-    parser.add_argument('--merged-userpass',
-        help='DEPRECATED, use --merged',
-        type=str, action='store', default=None, dest='merged_userpass')
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
         help='donate this percentage of work to author of p2pool (default: 0.5)',
         type=float, action='store', default=0.5, dest='donation_percentage')
@@ -1155,17 +1149,6 @@ def run():
         userpass, new_netloc = s.netloc.rsplit('@', 1)
         return urlparse.urlunsplit(s._replace(netloc=new_netloc)), userpass
     merged_urls = map(separate_url, args.merged_urls)
-    
-    if args.merged_url is not None or args.merged_userpass is not None:
-        print '--merged-url and --merged-userpass are deprecated! Use --merged http://USER:PASS@HOST:PORT/ instead!'
-        print 'Pausing 10 seconds...'
-        time.sleep(10)
-        
-        if args.merged_url is None or args.merged_userpass is None:
-            parser.error('must specify both --merged-url and --merged-userpass')
-        
-        merged_urls = merged_urls + [(args.merged_url, args.merged_userpass)]
-    
     
     if args.logfile is None:
         args.logfile = os.path.join(datadir_path, 'log')
