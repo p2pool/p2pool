@@ -547,6 +547,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     share_target=target,
                 )
                 
+                received_header_hashes = set()
+                
                 def got_response(header, request):
                     assert header['merkle_root'] == merkle_root
                     
@@ -626,7 +628,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         except:
                             log.err(None, 'Error forwarding block solution:')
                     
-                    if pow_hash <= target:
+                    if pow_hash <= target and header_hash not in received_header_hashes:
                         reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
                         if request.getPassword() == vip_pass:
                             reactor.callLater(1, grapher.add_localminer_point, request.getUser(), bitcoin_data.target_to_average_attempts(target), not on_time)
@@ -635,6 +637,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             self.recent_shares_ts_work.pop(0)
                         local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=request.getUser()))
                     
+                    if header_hash in received_header_hashes:
+                        print >>sys.stderr, 'Worker %s @ %s submitted share more than once!' % (request.getUser(), request.getClientIP())
+                    received_header_hashes.add(header_hash)
                     
                     if pow_hash > target:
                         print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
