@@ -550,6 +550,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 def got_response(header, request):
                     assert header['merkle_root'] == merkle_root
                     
+                    header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
                     pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
                     on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
                     
@@ -558,15 +559,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
                             def submit_block():
                                 if factory.conn.value is None:
-                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Hash: %x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),)
+                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Hash: %x' % (header_hash,)
                                     raise deferral.RetrySilentlyException()
                                 factory.conn.value.send_block(block=dict(header=header, txs=transactions))
                             submit_block()
                             if pow_hash <= header['bits'].target:
                                 print
-                                print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),)
+                                print 'GOT BLOCK FROM MINER! Passing to bitcoind! bitcoin: %x' % (header_hash,)
                                 print
-                                recent_blocks.append({ 'ts': time.time(), 'hash': '%x' % (bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),) })
+                                recent_blocks.append(dict(ts=time.time(), hash='%x' % (header_hash,)))
                     except:
                         log.err(None, 'Error while processing potential block:')
                     
@@ -578,7 +579,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                     bitcoin_data.aux_pow_type.pack(dict(
                                         merkle_tx=dict(
                                             tx=transactions[0],
-                                            block_hash=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)),
+                                            block_hash=header_hash,
                                             merkle_branch=merkle_branch,
                                             index=0,
                                         ),
