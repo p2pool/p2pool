@@ -276,9 +276,13 @@ class ClientFactory(protocol.ClientFactory):
         self.desired_conns = desired_conns
         self.max_attempts = max_attempts
         
-        self.attempts = {}
+        self.attempts = set()
         self.conns = set()
         self.running = False
+    
+    def _host_to_ident(self, host):
+        a, b, c, d = host.split('.')
+        return a, b
     
     def buildProtocol(self, addr):
         p = Protocol(self.node, False)
@@ -286,21 +290,16 @@ class ClientFactory(protocol.ClientFactory):
         return p
     
     def startedConnecting(self, connector):
-        host, port = connector.getDestination().host, connector.getDestination().port
-        if (host, port) in self.attempts:
-            raise ValueError('already have attempt')
-        self.attempts[host, port] = connector
+        ident = self._host_to_ident(connector.getDestination().host)
+        if ident in self.attempts:
+            raise AssertionError('already have attempt')
+        self.attempts.add(ident)
     
     def clientConnectionFailed(self, connector, reason):
-        self.clientConnectionLost(connector, reason)
+        self.attempts.remove(self._host_to_ident(connector.getDestination().host))
     
     def clientConnectionLost(self, connector, reason):
-        host, port = connector.getDestination().host, connector.getDestination().port
-        if (host, port) not in self.attempts:
-            raise ValueError('''don't have attempt''')
-        if connector is not self.attempts[host, port]:
-            raise ValueError('wrong connector')
-        del self.attempts[host, port]
+        self.attempts.remove(self._host_to_ident(connector.getDestination().host))
     
     def proto_made_connection(self, proto):
         pass
@@ -329,7 +328,7 @@ class ClientFactory(protocol.ClientFactory):
                 if len(self.conns) < self.desired_conns and len(self.attempts) < self.max_attempts and self.node.addr_store:
                     (host, port), = self.node.get_good_peers(1)
                     
-                    if (host, port) not in self.attempts:
+                    if self._host_to_ident(host) not in self.attempts:
                         #print 'Trying to connect to', host, port
                         reactor.connectTCP(host, port, self, timeout=5)
             except:
