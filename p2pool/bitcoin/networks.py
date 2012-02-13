@@ -82,7 +82,7 @@ nets = dict(
         BLOCK_PERIOD=150, # s
         SYMBOL='LTC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://litecoin.kicks-ass.org/block/',
+        BLOCK_EXPLORER_URL_PREFIX='http://abe.liteco.in/block/',
     ),
     litecoin_testnet=math.Object(
         P2P_PREFIX='fcc1b7dc'.decode('hex'),
