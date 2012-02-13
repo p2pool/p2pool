@@ -915,10 +915,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     self.join(self.channel)
                     self.watch_id = tracker.verified.added.watch(self._new_share)
                     self.announced_hashes = set()
+                    self.delayed_messages = {}
+                def privmsg(self, user, channel, message):
+                    if channel == self.channel and message in self.delayed_messages:
+                        self.delayed_messages.pop(message).cancel()
                 def _new_share(self, share):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes and abs(share.timestamp - time.time()) < 10*60:
                         self.announced_hashes.add(share.header_hash)
-                        self.say(self.channel, '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash))
+                        message = '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
+                        self.delayed_messages[message] = reactor.callLater(random.expovariate(1/5), lambda: (self.say(self.channel, message), self.delayed_messages.pop(message)))
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
                     print 'IRC connection lost:', reason.getErrorMessage()
