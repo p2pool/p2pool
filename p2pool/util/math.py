@@ -145,14 +145,6 @@ else:
         left_a = find_root(f, (1-conf)/2, bounds=(0, 1-conf))
         return float(special.betaincinv(x+1, n-x+1, left_a)), float(special.betaincinv(x+1, n-x+1, left_a + conf))
 
-def binomial_conf_center_radius(x, n, conf=0.95):
-    assert 0 <= x <= n and 0 <= conf < 1
-    left, right = binomial_conf_interval(x, n, conf)
-    if n == 0:
-        return (left+right)/2, (right-left)/2
-    p = x/n
-    return p, max(p - left, right - p)
-
 minmax = lambda x: (min(x), max(x))
 
 def format_binomial_conf(x, n, conf=0.95, f=lambda x: x):
