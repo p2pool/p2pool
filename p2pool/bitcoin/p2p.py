@@ -294,7 +294,7 @@ class HeightTracker(object):
         self._tracker = forest.Tracker()
         
         self._watch1 = self._factory.new_headers.watch(self._heard_headers)
-        self._watch2 = self._factory.new_block.watch(self._heard_block)
+        self._watch2 = self._factory.new_block.watch(self._request)
         
         self._requested = set()
         self._clear_task = task.LoopingCall(self._requested.clear)
@@ -346,9 +346,6 @@ class HeightTracker(object):
             print 'Have %i/%i block headers' % (len(self._tracker.shares), self._backlog_needed)
             self._last_notified_size = len(self._tracker.shares)
     
-    def _heard_block(self, block_hash):
-        self._request(block_hash)
-    
     @defer.inlineCallbacks
     def _request(self, last):
         if last in self._tracker.shares:
@@ -365,13 +362,6 @@ class HeightTracker(object):
         if last != best_last:
             return -1000000000 # XXX hack
         return height - best_height
-    
-    def stop(self):
-        self._factory.new_headers.unwatch(self._watch1)
-        self._factory.new_block.unwatch(self._watch2)
-        self._clear_task.stop()
-        self._think_task.stop()
-        self._think2_task.stop()
 
 if __name__ == '__main__':
     from . import networks

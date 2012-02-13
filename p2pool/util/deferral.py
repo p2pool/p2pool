@@ -149,14 +149,9 @@ class DeferredCacher(object):
     
     _nothing = object()
     def call_now(self, key, default=_nothing):
-        if key in self.waiting:
-            if default is not self._nothing:
-                return default
-            raise NotNowError(key)
-        
         if key in self.backing:
             return self.backing[key]
-        else:
+        if key not in self.waiting:
             self.waiting[key] = defer.Deferred()
             def cb(value):
                 self.backing[key] = value
@@ -168,6 +163,6 @@ class DeferredCacher(object):
                 fail.printTraceback()
                 print
             self.func(key).addCallback(cb).addErrback(eb)
-            if default is not self._nothing:
-                return default
-            raise NotNowError(key)
+        if default is not self._nothing:
+            return default
+        raise NotNowError(key)
