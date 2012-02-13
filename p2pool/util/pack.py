@@ -21,8 +21,6 @@ def size((data, pos)):
 class Type(object):
     __slots__ = []
     
-    # the same data can have only one unpacked representation, but multiple packed binary representations
-    
     def __hash__(self):
         rval = getattr(self, '_hash', None)
         if rval is None:
