@@ -254,6 +254,7 @@ def get_record(fields):
 class ComposedType(Type):
     def __init__(self, fields):
         self.fields = tuple(fields)
+        self.field_names = set(k for k, v in fields)
     
     def read(self, file):
         item = get_record(k for k, v in self.fields)
@@ -262,6 +263,7 @@ class ComposedType(Type):
         return item, file
     
     def write(self, file, item):
+        assert set(item.keys()) == self.field_names
         for key, type_ in self.fields:
             file = type_.write(file, item[key])
         return file
