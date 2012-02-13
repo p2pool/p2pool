@@ -904,20 +904,21 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if args.irc_announce:
             from twisted.words.protocols import irc
             class IRCClient(irc.IRCClient):
-                nickname = 'p2pool_%s%i' % (net.NAME, random.randrange(100))
+                nickname = 'p2pool%02i' % (random.randrange(100),)
+                channel = '#p2pool' if net.NAME == 'bitcoin' else '#p2pool-alt'
                 def lineReceived(self, line):
                     print repr(line)
                     irc.IRCClient.lineReceived(self, line)
                 def signedOn(self):
                     irc.IRCClient.signedOn(self)
                     self.factory.resetDelay()
-                    self.join('#p2pool')
+                    self.join(self.channel)
                     self.watch_id = tracker.verified.added.watch(self._new_share)
                     self.announced_hashes = set()
                 def _new_share(self, share):
                     if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes and abs(share.timestamp - time.time()) < 10*60:
                         self.announced_hashes.add(share.header_hash)
-                        self.say('#p2pool', '\x02BLOCK FOUND by %s! %s%064x' % (bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash))
+                        self.say(self.channel, '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.share_data['new_script'], net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash))
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
                     print 'IRC connection lost:', reason.getErrorMessage()
