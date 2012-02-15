@@ -177,6 +177,8 @@ def get_average_stale_prop(tracker, share_hash, lookbehind):
     stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] in [253, 254])
     return stales/(lookbehind + stales)
 
+DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
+
 def generate_transaction(tracker, share_data, block_target, desired_timestamp, net):
     previous_share_hash = share_data['previous_share_hash']
     new_script = share_data['new_script']
@@ -211,13 +213,11 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
     weights, total_weight, donation_weight = math.add_dicts({new_script: this_att*(65535-donation)}, other_weights), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
     assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
     
-    SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
-    
     # 1 satoshi is always donated so that a list of p2pool generated blocks can be easily found by looking at the donation address
     amounts = dict((script, (subsidy-1)*(199*weight)//(200*total_weight)) for (script, weight) in weights.iteritems())
     amounts[new_script] = amounts.get(new_script, 0) + (subsidy-1)//200
-    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + (subsidy-1)*(199*donation_weight)//(200*total_weight)
-    amounts[SCRIPT] = amounts.get(SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
+    amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + (subsidy-1)*(199*donation_weight)//(200*total_weight)
+    amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
     
     if sum(amounts.itervalues()) != subsidy:
         raise ValueError()
