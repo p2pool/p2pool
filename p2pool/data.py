@@ -396,7 +396,7 @@ class OkayTracker(forest.Tracker):
         
         if best is not None:
             best_share = self.verified.shares[best]
-            if best_share.header['previous_block'] != previous_block and best_share.header_hash != previous_block and best_share.peer is not None:
+            if (best_share.header['previous_block'], best_share.header['bits']) != (previous_block, bits) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
