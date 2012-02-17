@@ -123,6 +123,7 @@ except ImportError:
         assert 0 <= x <= n and 0 <= conf < 1
         if n == 0:
             left = random.random()*(1 - conf)
+            return left, left + conf
         # approximate - Wilson score interval
         z = math.sqrt(2)*ierf(conf)
         p = x/n
