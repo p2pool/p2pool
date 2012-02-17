@@ -246,9 +246,12 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, n
 
 class OkayTracker(forest.Tracker):
     def __init__(self, net, my_share_hashes, my_doa_share_hashes):
-        forest.Tracker.__init__(self)
+        forest.Tracker.__init__(self, delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
+            work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
+        )))
         self.net = net
         self.verified = forest.Tracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
+            work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
             my_count=lambda share: 1 if share.hash in my_share_hashes else 0,
             my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
             my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,

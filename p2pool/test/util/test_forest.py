@@ -2,7 +2,6 @@ import random
 import unittest
 
 from p2pool.util import forest, math
-from p2pool.bitcoin import data as bitcoin_data
 
 class DumbTracker(object):
     def __init__(self, shares=[]):
@@ -35,35 +34,25 @@ class DumbTracker(object):
     def tails(self):
         return dict((x, set(y for y in self.shares if self.get_last(y) == x and y not in self.reverse_shares)) for x in self.reverse_shares if x not in self.shares)
     
-    def get_height(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return height
-    
-    def get_work(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return work
-    
-    def get_last(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return last
-    
-    def get_height_and_last(self, share_hash):
-        height, work, last = self.get_height_work_and_last(share_hash)
-        return height, last
-    
     def get_nth_parent_hash(self, share_hash, n):
         for i in xrange(n):
             share_hash = self.shares[share_hash].previous_hash
         return share_hash
     
-    def get_height_work_and_last(self, share_hash):
+    def get_height(self, share_hash):
+        height, last = self.get_height_and_last(share_hash)
+        return height
+    
+    def get_last(self, share_hash):
+        height, last = self.get_height_and_last(share_hash)
+        return last
+    
+    def get_height_and_last(self, share_hash):
         height = 0
-        work = 0
         while share_hash in self.shares:
-            share_hash, work_inc = self.shares[share_hash].previous_hash, bitcoin_data.target_to_average_attempts(self.shares[share_hash].target)
+            share_hash = self.shares[share_hash].previous_hash
             height += 1
-            work += work_inc
-        return height, work, share_hash
+        return height, share_hash
     
     def get_chain(self, start_hash, length):
         # same implementation :/
@@ -83,7 +72,6 @@ class DumbTracker(object):
             possible_child_hash = self.shares[possible_child_hash].previous_hash
 
 class FakeShare(object):
-    target = 2**256 - 1
     def __init__(self, **kwargs):
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
@@ -104,7 +92,7 @@ def test_tracker(self):
         return
     
     for start in self.shares:
-        a, b = self.get_height_work_and_last(start), t.get_height_work_and_last(start)
+        a, b = self.get_height_and_last(start), t.get_height_and_last(start)
         assert a == b, (a, b)
         
         other = random.choice(self.shares.keys())

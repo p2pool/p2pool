@@ -6,7 +6,6 @@ import itertools
 import weakref
 
 from p2pool.util import skiplist, variable
-from p2pool.bitcoin import data as bitcoin_data
 
 
 class TrackerSkipList(skiplist.SkipList):
@@ -85,8 +84,7 @@ def get_attributedelta_type(attrs): # attrs: {name: func}
     return ProtoAttributeDelta
 
 AttributeDelta = get_attributedelta_type(dict(
-    height=lambda share: 1,
-    work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
+    height=lambda item: 1,
 ))
 
 class Tracker(object):
