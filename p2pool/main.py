@@ -844,7 +844,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     incoming=sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
                     outgoing=sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming),
                 ),
-                attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.shares[current_work.value['best_share_hash']].target),
+                attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.shares[current_work.value['best_share_hash']].max_target),
                 attempts_to_block=bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
                 block_value=current_work2.value['subsidy']*1e-8,
             ))
@@ -958,7 +958,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         math.format(int(my_att_s)),
                         math.format_dt(dt),
                         math.format_binomial_conf(sum(1 for datum in datums if datum['dead']), len(datums), 0.95),
-                        math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s and current_work.value['best_share_hash'] else '???',
+                        math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].max_target / my_att_s) if my_att_s and current_work.value['best_share_hash'] else '???',
                     )
                     
                     if height > 2:

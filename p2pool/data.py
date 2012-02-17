@@ -50,7 +50,7 @@ share_type = pack.ComposedType([
 ])
 
 class Share(object):
-    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net new_script'.split(' ')
+    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net new_script max_target'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -82,7 +82,7 @@ class Share(object):
         self.merkle_branch = merkle_branch
         
         self.share_data = self.share_info['share_data']
-        self.target = self.share_info['bits'].target
+        self.target = self.max_target = self.share_info['bits'].target
         self.timestamp = self.share_info['timestamp']
         
         if len(self.share_data['new_script']) > 100:
@@ -153,11 +153,11 @@ class Share(object):
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
 
-def get_pool_attempts_per_second(tracker, previous_share_hash, dist):
+def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False):
     assert dist >= 2
     near = tracker.shares[previous_share_hash]
     far = tracker.shares[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
-    attempts = tracker.get_work(near.hash) - tracker.get_work(far.hash)
+    attempts = tracker.get_work(near.hash) - tracker.get_work(far.hash) if not min_work else tracker.get_delta(near.hash).min_work - tracker.get_delta(far.hash).min_work
     time = near.timestamp - far.timestamp
     if time <= 0:
         time = 1
@@ -238,6 +238,7 @@ class OkayTracker(forest.Tracker):
     def __init__(self, net, my_share_hashes, my_doa_share_hashes):
         forest.Tracker.__init__(self, delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
             work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
+            min_work=lambda share: bitcoin_data.target_to_average_attempts(share.max_target),
         )))
         self.net = net
         self.verified = forest.Tracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
