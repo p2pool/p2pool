@@ -79,7 +79,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print '    ...success!'
         print
         
-        print 'Determining payout script...'
+        print 'Determining payout address...'
         if args.pubkey_hash is None:
             address_path = os.path.join(datadir_path, 'cached_payout_address')
             
@@ -103,11 +103,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             with open(address_path, 'wb') as f:
                 f.write(address)
             
-            my_script = bitcoin_data.pubkey_hash_to_script2(bitcoin_data.address_to_pubkey_hash(address, net.PARENT))
+            my_pubkey_hash = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
         else:
-            print '    ...Computing payout script from provided address...'
-            my_script = bitcoin_data.pubkey_hash_to_script2(args.pubkey_hash)
-        print '    ...success! Payout script:', bitcoin_data.script2_to_human(my_script, net.PARENT)
+            my_pubkey_hash = args.pubkey_hash
+        print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
         print
         
         my_share_hashes = set()
@@ -461,22 +460,21 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 self.new_work_event = current_work.changed
                 self.recent_shares_ts_work = []
             
-            def _get_payout_script_from_username(self, user):
+            def _get_payout_pubkey_hash_from_username(self, user):
                 if user is None:
                     return None
                 try:
-                    pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
+                    return bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
                 except: # XXX blah
                     return None
-                return bitcoin_data.pubkey_hash_to_script2(pubkey_hash)
             
             def preprocess_request(self, request):
-                payout_script = self._get_payout_script_from_username(request.getUser())
-                if payout_script is None or random.uniform(0, 100) < args.worker_fee:
-                    payout_script = my_script
-                return payout_script,
+                payout_pubkey_hash = self._get_payout_pubkey_hash_from_username(request.getUser())
+                if payout_pubkey_hash is None or random.uniform(0, 100) < args.worker_fee:
+                    payout_pubkey_hash = my_pubkey_hash
+                return payout_pubkey_hash,
             
-            def get_work(self, payout_script):
+            def get_work(self, pubkey_hash):
                 if len(p2p_node.peers) == 0 and net.PERSIST:
                     raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
                 if current_work.value['best_share_hash'] is None and net.PERSIST:
@@ -503,7 +501,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         previous_share_hash=current_work.value['best_share_hash'],
                         coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
                         nonce=struct.pack('<Q', random.randrange(2**64)),
-                        new_script=payout_script,
+                        new_script=bitcoin_data.pubkey_hash_to_script2(pubkey_hash),
                         subsidy=current_work2.value['subsidy'],
                         donation=math.perfect_round(65535*args.donation_percentage/100),
                         stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
@@ -800,7 +798,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
         web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
         web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
-        web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.script2_to_human(my_script, net.PARENT)), 'application/json'))
+        web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)), 'application/json'))
         web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
         web_root.putChild('uptime', WebInterface(get_uptime, 'application/json'))
         if draw is not None:
@@ -844,7 +842,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares=shares,
                 stale_shares=stale_orphan_shares + stale_doa_shares,
                 stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
-                current_payout=get_current_txouts().get(my_script, 0)*1e-8,
+                current_payout=get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8,
             ))
             
             with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
@@ -968,7 +966,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             shares, stale_orphan_shares, stale_doa_shares,
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
-                            get_current_txouts().get(my_script, 0)*1e-8, net.PARENT.SYMBOL,
+                            get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8, net.PARENT.SYMBOL,
                         )
                         this_str += '\n Pool: %sH/s Stale rate: %.1f%% Expected time to block: %s' % (
                             math.format(int(real_att_s)),
