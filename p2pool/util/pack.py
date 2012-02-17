@@ -281,3 +281,15 @@ class PossiblyNoneType(Type):
         if item == self.none_value:
             raise ValueError('none_value used')
         return self.inner.write(file, self.none_value if item is None else item)
+
+class FixedStrType(Type):
+    def __init__(self, length):
+        self.length = length
+    
+    def read(self, file):
+        return read(file, self.length)
+    
+    def write(self, file, item):
+        if len(item) != self.length:
+            raise ValueError('incorrect length item!')
+        return file, item
