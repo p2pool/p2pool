@@ -50,7 +50,7 @@ share_type = pack.ComposedType([
 ])
 
 class Share(object):
-    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net'.split(' ')
+    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net new_script'.split(' ')
     
     @classmethod
     def from_share(cls, share, net):
@@ -96,6 +96,7 @@ class Share(object):
             raise ValueError('new_script too long!')
         if script.get_sigop_count(self.share_data['new_script']) > 1:
             raise ValueError('too many sigops!')
+        self.new_script = self.share_data['new_script']
         
         self.previous_hash = self.share_data['previous_share_hash']
         

@@ -7,7 +7,7 @@ class WeightsSkipList(forest.TrackerSkipList):
         from p2pool.bitcoin import data as bitcoin_data
         share = self.tracker.shares[element]
         att = bitcoin_data.target_to_average_attempts(share.target)
-        return 1, {share.share_data['new_script']: att*(65535-share.share_data['donation'])}, att*65535, att*share.share_data['donation']
+        return 1, {share.new_script: att*(65535-share.share_data['donation'])}, att*65535, att*share.share_data['donation']
     
     def combine_deltas(self, (share_count1, weights1, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2)):
         return share_count1 + share_count2, math.add_dicts(weights1, weights2), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
