@@ -55,25 +55,18 @@ class Share(object):
     @classmethod
     def from_share(cls, share, net):
         if share['type'] == 0:
-            res = cls.from_share1a(share1a_type.unpack(share['contents']), net)
+            res = cls(net, **share1a_type.unpack(share['contents']))
             if not (res.pow_hash > res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 1:
-            res = cls.from_share1b(share1b_type.unpack(share['contents']), net)
+            share1b = share1b_type.unpack(share['contents'])
+            res = cls(net, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
             if not (res.pow_hash <= res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         else:
             raise ValueError('unknown share type: %r' % (share['type'],))
-    
-    @classmethod
-    def from_share1a(cls, share1a, net):
-        return cls(net, **share1a)
-    
-    @classmethod
-    def from_share1b(cls, share1b, net):
-        return cls(net, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
     
     def __init__(self, net, header, share_info, merkle_branch, other_txs=None):
         self.net = net
@@ -142,18 +135,14 @@ class Share(object):
         if self.pow_hash > self.header['bits'].target: # share1a
             return dict(type=0, contents=share1a_type.pack(self.as_share1a()))
         elif self.pow_hash <= self.header['bits'].target: # share1b
-            return dict(type=1, contents=share1b_type.pack(self.as_share1b()))
+            if self.other_txs is None:
+                raise ValueError('share does not contain all txs')
+            return dict(type=1, contents=share1b_type.pack(dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)))
         else:
             raise AssertionError()
     
     def as_share1a(self):
         return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
-    
-    def as_share1b(self):
-        if self.other_txs is None:
-            raise ValueError('share does not contain all txs')
-        
-        return dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)
     
     def as_block(self, tracker):
         if self.other_txs is None:
