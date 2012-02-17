@@ -40,7 +40,7 @@ nets = dict(
         SANE_MAX_TARGET=2**256//2**32 - 1,
     ),
     
-    nameecoin=math.Object(
+    namecoin=math.Object(
         P2P_PREFIX='f9beb4fe'.decode('hex'),
         P2P_PORT=8334,
         ADDRESS_VERSION=52,
