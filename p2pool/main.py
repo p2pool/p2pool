@@ -961,7 +961,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         math.format(int(my_att_s)),
                         math.format_dt(dt),
                         math.format_binomial_conf(sum(1 for datum in datums if datum['dead']), len(datums), 0.95),
-                        math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s else '???',
+                        math.format_dt(2**256 / tracker.shares[current_work.value['best_share_hash']].target / my_att_s) if my_att_s and current_work.value['best_share_hash'] else '???',
                     )
                     
                     if height > 2:
