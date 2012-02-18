@@ -420,6 +420,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         # setup worker logic
         
         removed_unstales_var = variable.Variable((0, 0, 0))
+        removed_doa_unstales_var = variable.Variable(0)
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
@@ -429,10 +430,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     removed_unstales_var.value[1] + (1 if share.share_data['stale_info'] == 253 else 0),
                     removed_unstales_var.value[2] + (1 if share.share_data['stale_info'] == 254 else 0),
                 ))
-        
-        removed_doa_unstales_var = variable.Variable(0)
-        @tracker.verified.removed.watch
-        def _(share):
             if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_doa_unstales.set(removed_doa_unstales.value + 1)
         
