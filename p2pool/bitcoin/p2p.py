@@ -286,7 +286,7 @@ class HeaderWrapper(object):
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, rpc_proxy, factory, backlog_needed=1000):
+    def __init__(self, rpc_proxy, factory, backlog_needed):
         self._rpc_proxy = rpc_proxy
         self._factory = factory
         self._backlog_needed = backlog_needed

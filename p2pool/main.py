@@ -184,7 +184,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 best_height_cached.set(max(best_height_cached.value, this_height, best_height))
                 return this_height - best_height_cached.value
         else:
-            get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory).get_height_rel_highest
+            get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height_rel_highest
         
         def set_real_work2():
             best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'], pre_current_work.value['bits'])
