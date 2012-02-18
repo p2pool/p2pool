@@ -843,6 +843,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 stale_shares=stale_orphan_shares + stale_doa_shares,
                 stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
                 current_payout=get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8,
+                peers=dict(
+                    incoming=sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
+                    outgoing=sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming),
+                ),
+                attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.shares[current_work.value['best_share_hash']].target),
+                attempts_to_block=bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
+                block_value=current_work2.value['subsidy']*1e-8,
             ))
             
             with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
