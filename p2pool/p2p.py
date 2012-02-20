@@ -14,16 +14,13 @@ from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, pack
 
 class Protocol(bitcoin_p2p.BaseProtocol):
-    version = 2
-    sub_version = p2pool.__version__
-    
     def __init__(self, node, incoming):
         bitcoin_p2p.BaseProtocol.__init__(self, node.net.PREFIX, 1000000)
         self.node = node
         self.incoming = incoming
-    
-    other_version = None
-    connected2 = False
+        
+        self.other_version = None
+        self.connected2 = False
     
     def connectionMade(self):
         self.factory.proto_made_connection(self)
@@ -31,7 +28,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=self.version,
+            version=2,
             services=0,
             addr_to=dict(
                 services=0,
@@ -44,7 +41,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
                 port=self.transport.getHost().port,
             ),
             nonce=self.node.nonce,
-            sub_version=self.sub_version,
+            sub_version=p2pool.__version__,
             mode=1,
             best_share_hash=self.node.best_share_hash_func(),
         )
