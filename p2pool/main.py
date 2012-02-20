@@ -697,12 +697,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             return json.dumps(res)
         
         def get_current_txouts():
-            share = tracker.shares[current_work.value['best_share_hash']]
-            if isinstance(share, p2pool_data.NewShare):
-                share_info, gentx = p2pool_data.new_generate_transaction(tracker, share.share_info['share_data'], share.header['bits'].target, share.share_info['timestamp'], share.share_info['bits'].target, share.net)
-            else:
-                share_info, gentx = p2pool_data.generate_transaction(tracker, share.share_info['share_data'], share.header['bits'].target, share.share_info['timestamp'], share.net)
-            return dict((out['script'], out['value']) for out in gentx['tx_outs'])
+            weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'],
+                min(tracker.get_height(current_work.value['best_share_hash']), net.REAL_CHAIN_LENGTH),
+                65535*net.SPREAD*bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
+            )
+            res = dict((script, current_work2.value['subsidy']*weight//total_weight) for script, weight in weights.iteritems())
+            res[p2pool_data.DONATION_SCRIPT] = res.get(p2pool_data.DONATION_SCRIPT, 0) + current_work2.value['subsidy'] - sum(res.itervalues())
+            return res
         
         def get_current_scaled_txouts(scale, trunc=0):
             txouts = get_current_txouts()
