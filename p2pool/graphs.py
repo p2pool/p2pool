@@ -36,7 +36,8 @@ else:
             rrdtool.graph(filename, '--imgformat', 'PNG', *self.arg_func())
             
             request.setHeader('Content-Type', 'image/png')
-            return open(filename, 'rb').read()
+            request.write(open(filename, 'rb').read())
+            os.remove(filename)
     
     class Resource(resource.Resource):
         def __init__(self, grapher):
