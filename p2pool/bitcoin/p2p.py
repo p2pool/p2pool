@@ -20,18 +20,20 @@ class TooLong(Exception):
     pass
 
 class BaseProtocol(protocol.Protocol):
-    def connectionMade(self):
+    def __init__(self, message_prefix, max_payload_length):
+        self._message_prefix = message_prefix
+        self._max_payload_length = max_payload_length
         self.dataReceived = datachunker.DataChunker(self.dataReceiver())
     
     def dataReceiver(self):
         while True:
             start = ''
-            while start != self._prefix:
-                start = (start + (yield 1))[-len(self._prefix):]
+            while start != self._message_prefix:
+                start = (start + (yield 1))[-len(self._message_prefix):]
             
             command = (yield 12).rstrip('\0')
             length, = struct.unpack('<I', (yield 4))
-            if length > self.max_payload_length:
+            if length > self._max_payload_length:
                 print 'length too large'
                 continue
             checksum = yield 4
@@ -77,9 +79,9 @@ class BaseProtocol(protocol.Protocol):
             raise ValueError('invalid command')
         #print 'SEND', command, repr(payload2)[:500]
         payload = type_.pack(payload2)
-        if len(payload) > self.max_payload_length:
+        if len(payload) > self._max_payload_length:
             raise TooLong('payload too long')
-        self.transport.write(self._prefix + struct.pack('<12sI', command, len(payload)) + hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] + payload)
+        self.transport.write(self._message_prefix + struct.pack('<12sI', command, len(payload)) + hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] + payload)
     
     def __getattr__(self, attr):
         prefix = 'send_'
@@ -91,13 +93,9 @@ class BaseProtocol(protocol.Protocol):
 
 class Protocol(BaseProtocol):
     def __init__(self, net):
-        self._prefix = net.P2P_PREFIX
-    
-    max_payload_length = 1000000
+        BaseProtocol.__init__(self, net.P2P_PREFIX, 1000000)
     
     def connectionMade(self):
-        BaseProtocol.connectionMade(self)
-        
         self.send_version(
             version=32200,
             services=1,

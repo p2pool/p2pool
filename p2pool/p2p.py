@@ -18,19 +18,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     sub_version = p2pool.__version__
     
     def __init__(self, node, incoming):
+        bitcoin_p2p.BaseProtocol.__init__(self, node.net.PREFIX, 1000000)
         self.node = node
         self.incoming = incoming
-        
-        self._prefix = self.node.net.PREFIX
-    
-    max_payload_length = 1000000
     
     other_version = None
     connected2 = False
     
     def connectionMade(self):
-        bitcoin_p2p.BaseProtocol.connectionMade(self)
-        
         self.factory.proto_made_connection(self)
         
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
