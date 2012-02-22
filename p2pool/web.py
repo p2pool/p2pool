@@ -279,11 +279,33 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
                 return ''
             request.setHeader('Content-Type', 'text/html')
             request.write('<h1>P2Pool share explorer</h1>')
+            
             request.write('<h2>Verified heads</h2>')
             request.write('<ul>')
-            for head in tracker.heads:
-                request.write('<li><a href="%x">%s%s</a></li>' % (head, p2pool_data.format_hash(head), ' BEST' if head == current_work.value['best_share_hash'] else ''))
+            for h in tracker.verified.heads:
+                request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
             request.write('</ul>')
+            
+            request.write('<h2>Verified tails</h2>')
+            request.write('<ul>')
+            for tail in tracker.verified.tails:
+                for h in tracker.reverse_shares.get(tail, set()):
+                    request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
+            request.write('</ul>')
+            
+            request.write('<h2>Heads</h2>')
+            request.write('<ul>')
+            for h in tracker.heads:
+                request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
+            request.write('</ul>')
+            
+            request.write('<h2>Tails</h2>')
+            request.write('<ul>')
+            for tail in tracker.tails:
+                for h in tracker.reverse_shares.get(tail, set()):
+                    request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
+            request.write('</ul>')
+            
             return ''
         def getChild(self, child, request):
             if not child:
