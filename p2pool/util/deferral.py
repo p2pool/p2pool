@@ -1,6 +1,7 @@
 from __future__ import division
 
 import itertools
+import sys
 
 from twisted.internet import defer, reactor
 from twisted.python import failure, log
@@ -13,7 +14,7 @@ def sleep(t):
 class RetrySilentlyException(Exception):
     pass
 
-def retry(message='Error:', delay=3, max_retries=None):
+def retry(message='Error:', delay=3, max_retries=None, traceback=True):
     '''
     @retry('Error getting block:', 1)
     @defer.inlineCallbacks
@@ -31,7 +32,10 @@ def retry(message='Error:', delay=3, max_retries=None):
                     if i == max_retries:
                         raise
                     if not isinstance(e, RetrySilentlyException):
-                        log.err(None, message)
+                        if traceback:
+                            log.err(None, message)
+                        else:
+                            print >>sys.stderr, message, e
                     yield sleep(delay)
                 else:
                     defer.returnValue(result)

@@ -12,7 +12,7 @@ import signal
 import traceback
 import urlparse
 
-from twisted.internet import defer, error, reactor, protocol, task
+from twisted.internet import defer, reactor, protocol, task
 from twisted.web import server
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -683,16 +683,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks)
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
         
-        def attempt_listen():
-            try:
-                reactor.listenTCP(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
-            except error.CannotListenError, e:
-                print >>sys.stderr, 'Error binding to worker port: %s. Retrying in 1 second.' % (e.socketError,)
-                reactor.callLater(1, attempt_listen)
-            else:
-                with open(os.path.join(os.path.join(datadir_path, 'ready_flag')), 'wb') as f:
-                    pass
-        attempt_listen()
+        deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
+        
+        with open(os.path.join(os.path.join(datadir_path, 'ready_flag')), 'wb') as f:
+            pass
         
         print '    ...success!'
         print

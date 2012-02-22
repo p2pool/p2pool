@@ -1,10 +1,9 @@
 from __future__ import division
 
 import random
-import sys
 import time
 
-from twisted.internet import defer, error, protocol, reactor
+from twisted.internet import defer, protocol, reactor
 from twisted.python import log
 
 import p2pool
@@ -254,14 +253,9 @@ class ServerFactory(protocol.ServerFactory):
         self.running = True
         
         def attempt_listen():
-            if not self.running:
-                return
-            try:
+            if self.running:
                 self.listen_port = reactor.listenTCP(self.node.port, self)
-            except error.CannotListenError, e:
-                print >>sys.stderr, 'Error binding to P2P port: %s. Retrying in 3 seconds.' % (e.socketError,)
-                reactor.callLater(3, attempt_listen)
-        attempt_listen()
+        deferral.retry('Error binding to P2P port:', traceback=False)(attempt_listen)()
     
     def stop(self):
         assert self.running
