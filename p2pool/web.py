@@ -1,3 +1,5 @@
+from __future__ import division
+
 import cgi
 import json
 import os
@@ -231,20 +233,44 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             if self.share_hash not in tracker.shares:
                 return 'share not known'
             share = tracker.shares[self.share_hash]
-            request.write('<h1>Share</h1>')
+            
+            format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH</p>' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
+            
+            request.write('<h1>Share <a href="%x">%s</a></h1>' % (share.hash, p2pool_data.format_hash(share.hash)))
             request.write('<p>Previous: <a href="%x">%s</a></p>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
-            for next in tracker.reverse_shares.get(share.hash, set()):
-                request.write('<p>Next: <a href="%x">%s</a></p>' % (next, p2pool_data.format_hash(next)))
+            request.write('<p>Next: %s</p>' % (', '.join('<a href="%x">%s</a>' % (next, p2pool_data.format_hash(next)) for next in tracker.reverse_shares.get(share.hash, set())),))
             request.write('<p>Verified: %s</p>' % (share.hash in tracker.verified.shares,))
-            request.write('<ul>')
-            for attr in dir(share):
-                if attr.startswith('_') or attr == 'previous_hash':
-                    continue
-                value = getattr(share, attr)
-                if isinstance(value, types.MethodType):
-                    continue
-                request.write('<li>%s: %s</li>' % (attr, cgi.escape(repr(value))))
-            request.write('</ul>')
+            request.write('<p>Time first seen: %s</p>' % (time.ctime(start_time if share.time_seen == 0 else share.time_seen),))
+            request.write('<p>Peer first received from: %s</p>' % ('%s:%i' % share.peer.addr if share.peer is not None else 'self or cache',))
+            
+            request.write('<h2>Share data</h2>')
+            request.write('<p>Timestamp: %s</p>' % (time.ctime(share.timestamp),))
+            request.write('<p>Difficulty: %s</p>' % (format_bits(share.share_info['bits']),))
+            request.write('<p>Minimum difficulty: %s</p>' % (format_bits(share.share_info.get('max_bits', share.share_info['bits'])),))
+            request.write('<p>Payout script: %s</p>' % (bitcoin_data.script2_to_human(share.new_script, share.net.PARENT),))
+            request.write('<p>Donation: %.2f%%</p>' % (share.share_data['donation']/65535*100,))
+            request.write('<p>Stale info: %s</p>' % ({0: 'none', 253: 'had an orphan', 254: 'had a dead'}.get(share.share_data['stale_info'], 'unknown %i' % (share.share_data['stale_info'],)),))
+            request.write('<p>Nonce: %s</p>' % (cgi.escape(repr(share.share_data['nonce'])),))
+            
+            request.write('<h2>Block header</h2>')
+            request.write('<p>Hash: <a href="%s%064x">%064x</a></p>' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash, share.header_hash))
+            request.write('<p>Version: %i</p>' % (share.header['version'],))
+            request.write('<p>Previous block: <a href="%s%064x">%064x</a></p>' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header['previous_block'], share.header['previous_block']))
+            request.write('<p>Timestamp: %s (%i)</p>' % (time.ctime(share.header['timestamp']), share.header['timestamp']))
+            request.write('<p>Difficulty: %f (bits=%#8x) Work: %sH</p>' % (bitcoin_data.target_to_difficulty(share.header['bits'].target), share.header['bits'].bits, math.format(bitcoin_data.target_to_average_attempts(share.header['bits'].target))))
+            request.write('<p>Nonce: %i</p>' % (share.header['nonce'],))
+            if share.other_txs is not None:
+                tx_count = len(share.other_txs)
+            elif len(share.merkle_branch) == 0:
+                tx_count = 1
+            else:
+                tx_count = 'between %i and %i' % (2**len(share.merkle_branch)//2+1, 2**len(share.merkle_branch))
+            request.write('<p>Transactions: %s</p>' % (tx_count,))
+            coinbase = share.share_data['coinbase'].ljust(2, '\x00')
+            request.write('<p>Coinbase: %s %s</p>' % (cgi.escape(repr(coinbase)), coinbase.encode('hex')))
+            request.write('<p>Generation value: %.8f %s</p>' % (share.share_data['subsidy']*1e-8, net.PARENT.SYMBOL))
+            #request.write('<p>Generation txn: %32x</p>' % (share.gentx_hash,))
+            
             return ''
     class Explorer(resource.Resource):
         def render_GET(self, request):

@@ -240,6 +240,8 @@ def get_record(fields):
             #        yield field, getattr(self, field)
             def keys(self):
                 return self.__slots__
+            def get(self, key, default=None):
+                return getattr(self, key, default)
             def __eq__(self, other):
                 if isinstance(other, dict):
                     return dict(self) == other
