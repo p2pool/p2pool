@@ -348,9 +348,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         )
         p2p_node.start()
         
-        def save_addrs():
-            open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in p2p_node.addr_store.iteritems())
-        task.LoopingCall(save_addrs).start(60)
+        task.LoopingCall(lambda: open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in p2p_node.addr_store.iteritems())).start(60)
         
         # send share when the chain changes to their chain
         def work_changed(new_work):
