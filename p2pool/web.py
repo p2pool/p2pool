@@ -1,6 +1,8 @@
+import cgi
 import json
 import os
 import time
+import types
 
 from twisted.internet import task
 from twisted.python import log
@@ -220,6 +222,48 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             f.write(json.dumps(stat_log))
     task.LoopingCall(update_stat_log).start(5*60)
     new_root.putChild('log', WebInterface(lambda: json.dumps(stat_log), 'application/json'))
+    
+    class ShareExplorer(resource.Resource):
+        def __init__(self, share_hash):
+            self.share_hash = share_hash
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'text/html')
+            if self.share_hash not in tracker.shares:
+                return 'share not known'
+            share = tracker.shares[self.share_hash]
+            request.write('<h1>Share</h1>')
+            request.write('<p>Previous: <a href="%x">%s</a></p>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
+            for next in tracker.reverse_shares.get(share.hash, set()):
+                request.write('<p>Next: <a href="%x">%s</a></p>' % (next, p2pool_data.format_hash(next)))
+            request.write('<p>Verified: %s</p>' % (share.hash in tracker.verified.shares,))
+            request.write('<ul>')
+            for attr in dir(share):
+                if attr.startswith('_') or attr == 'previous_hash':
+                    continue
+                value = getattr(share, attr)
+                if isinstance(value, types.MethodType):
+                    continue
+                request.write('<li>%s: %s</li>' % (attr, cgi.escape(repr(value))))
+            request.write('</ul>')
+            return ''
+    class Explorer(resource.Resource):
+        def render_GET(self, request):
+            if not request.path.endswith('/'):
+                request.redirect(request.path + '/')
+                return ''
+            request.setHeader('Content-Type', 'text/html')
+            request.write('<h1>P2Pool share explorer</h1>')
+            request.write('<h2>Verified heads</h2>')
+            request.write('<ul>')
+            for head in tracker.heads:
+                request.write('<li><a href="%x">%s%s</a></li>' % (head, p2pool_data.format_hash(head), ' BEST' if head == current_work.value['best_share_hash'] else ''))
+            request.write('</ul>')
+            return ''
+        def getChild(self, child, request):
+            if not child:
+                return self
+            return ShareExplorer(int(child, 16))
+    new_root.putChild('explorer', Explorer())
     
     grapher = graphs.Grapher(os.path.join(datadir_path, 'rrd'))
     web_root.putChild('graphs', grapher.get_resource())
