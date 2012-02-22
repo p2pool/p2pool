@@ -375,22 +375,21 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print '    ...success!'
         print
         
-        @defer.inlineCallbacks
-        def upnp_thread():
-            while True:
-                try:
-                    is_lan, lan_ip = yield ipdiscover.get_local_ip()
-                    if is_lan:
-                        pm = yield portmapper.get_port_mapper()
-                        yield pm._upnp.add_port_mapping(lan_ip, args.p2pool_port, args.p2pool_port, 'p2pool', 'TCP')
-                except defer.TimeoutError:
-                    pass
-                except:
-                    if p2pool.DEBUG:
-                        log.err(None, "UPnP error:")
-                yield deferral.sleep(random.expovariate(1/120))
-        
         if args.upnp:
+            @defer.inlineCallbacks
+            def upnp_thread():
+                while True:
+                    try:
+                        is_lan, lan_ip = yield ipdiscover.get_local_ip()
+                        if is_lan:
+                            pm = yield portmapper.get_port_mapper()
+                            yield pm._upnp.add_port_mapping(lan_ip, args.p2pool_port, args.p2pool_port, 'p2pool', 'TCP')
+                    except defer.TimeoutError:
+                        pass
+                    except:
+                        if p2pool.DEBUG:
+                            log.err(None, 'UPnP error:')
+                    yield deferral.sleep(random.expovariate(1/120))
             upnp_thread()
         
         # start listening for workers with a JSON-RPC server
