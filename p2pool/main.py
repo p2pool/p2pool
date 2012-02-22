@@ -437,6 +437,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
         
         
+        pseudoshare_received = variable.Event()
         local_rate_monitor = math.RateMonitor(10*60)
         
         class WorkerBridge(worker_interface.WorkerBridge):
@@ -646,9 +647,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             log.err(None, 'Error forwarding block solution:')
                     
                     if pow_hash <= target and header_hash not in received_header_hashes:
-                        reactor.callLater(1, grapher.add_localrate_point, bitcoin_data.target_to_average_attempts(target), not on_time)
-                        if request.getPassword() == vip_pass:
-                            reactor.callLater(1, grapher.add_localminer_point, request.getUser(), bitcoin_data.target_to_average_attempts(target), not on_time)
+                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser() if request.getPassword() == vip_pass else None)
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
@@ -669,7 +668,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         
-        web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks)
+        web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received)
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
         
         deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])

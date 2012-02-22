@@ -4,7 +4,7 @@ import os
 import time
 import types
 
-from twisted.internet import task
+from twisted.internet import reactor, task
 from twisted.python import log
 from twisted.web import resource
 
@@ -12,7 +12,7 @@ from bitcoin import data as bitcoin_data
 from . import data as p2pool_data, graphs
 from util import math
 
-def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks):
+def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -274,5 +274,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         poolrate = nonstalerate / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))
         grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
     task.LoopingCall(add_point).start(100)
+    @pseudoshare_received.watch
+    def _(work, dead, user):
+        reactor.callLater(1, grapher.add_localrate_point, work, dead)
+        if user is not None:
+            reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
+
     
     return web_root
