@@ -378,6 +378,12 @@ def new_generate_transaction(tracker, share_data, block_target, desired_timestam
         lock_time=0,
     )
 
+def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
+    weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
+    res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
+    res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
+    return res
+
 class NewShare(object):
     __slots__ = 'net min_header share_info hash_link merkle_branch other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
     

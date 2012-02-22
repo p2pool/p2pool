@@ -670,15 +670,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 
                 return ba, got_response
         
-        
-        def get_current_txouts():
-            weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'],
-                min(tracker.get_height(current_work.value['best_share_hash']), net.REAL_CHAIN_LENGTH),
-                65535*net.SPREAD*bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
-            )
-            res = dict((script, current_work2.value['subsidy']*weight//total_weight) for script, weight in weights.iteritems())
-            res[p2pool_data.DONATION_SCRIPT] = res.get(p2pool_data.DONATION_SCRIPT, 0) + current_work2.value['subsidy'] - sum(res.itervalues())
-            return res
+        get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         
         web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks)
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
