@@ -485,7 +485,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     mm_data = ''
                     mm_later = []
                 
-                new = time.time() > net.SWITCH_TIME
+                new = tracker.shares[current_work.value['best_share_hash']].timestamp > net.SWITCH_TIME
                 
                 if new:
                     share_info, generate_tx = p2pool_data.new_generate_transaction(
