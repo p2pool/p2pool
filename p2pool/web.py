@@ -57,20 +57,16 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     def get_current_payouts():
         return json.dumps(dict((bitcoin_data.script2_to_human(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems()))
     
-    def get_patron_sendmany(this):
-        try:
-            if '/' in this:
-                this, trunc = this.split('/', 1)
-            else:
-                trunc = '0.01'
-            return json.dumps(dict(
-                (bitcoin_data.script2_to_address(script, net.PARENT), value/1e8)
-                for script, value in get_current_scaled_txouts(scale=int(float(this)*1e8), trunc=int(float(trunc)*1e8)).iteritems()
-                if bitcoin_data.script2_to_address(script, net.PARENT) is not None
-            ))
-        except:
-            log.err()
-            return json.dumps(None)
+    def get_patron_sendmany(total=None, trunc='0.01'):
+        if total is None:
+            return 'need total argument. go to patron_sendmany/<TOTAL>'
+        total = int(float(total)*1e8)
+        trunc = int(float(trunc)*1e8)
+        return json.dumps(dict(
+            (bitcoin_data.script2_to_address(script, net.PARENT), value/1e8)
+            for script, value in get_current_scaled_txouts(total, trunc).iteritems()
+            if bitcoin_data.script2_to_address(script, net.PARENT) is not None
+        ))
     
     def get_global_stats():
         # averaged over last hour
@@ -146,19 +142,23 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         return json.dumps(time.time() - start_time)
     
     class WebInterface(resource.Resource):
-        def __init__(self, func, mime_type, *fields):
-            self.func, self.mime_type, self.fields = func, mime_type, fields
+        def __init__(self, func, mime_type, args=()):
+            resource.Resource.__init__(self)
+            self.func, self.mime_type, self.args = func, mime_type, args
+        
+        def getChild(self, child, request):
+            return WebInterface(self.func, self.mime_type, self.args + (child,))
         
         def render_GET(self, request):
             request.setHeader('Content-Type', self.mime_type)
             request.setHeader('Access-Control-Allow-Origin', '*')
-            return self.func(*(request.args[field][0] for field in self.fields))
+            return self.func(*self.args)
     
     web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
     web_root.putChild('users', WebInterface(get_users, 'application/json'))
     web_root.putChild('fee', WebInterface(lambda: json.dumps(worker_fee), 'application/json'))
     web_root.putChild('current_payouts', WebInterface(get_current_payouts, 'application/json'))
-    web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain', 'total'))
+    web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
     web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
     web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
     web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
