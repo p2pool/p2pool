@@ -532,7 +532,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 target = net.PARENT.SANE_MAX_TARGET
                 if len(self.recent_shares_ts_work) == 50:
                     hash_rate = sum(work for ts, work in self.recent_shares_ts_work)//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-                    target = min(target, 2**256//(hash_rate * 5))
+                    target = min(target, 2**256//(hash_rate))
                 target = max(target, share_info['bits'].target)
                 for aux_work in current_work.value['mm_chains'].itervalues():
                     target = max(target, aux_work['target'])
