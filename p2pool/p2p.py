@@ -199,7 +199,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             res.append(share_obj)
         self.node.handle_shares(res, self)
     
-    def sendShares(self, shares, full=False):
+    def sendShares(self, shares):
         def att(f, **kwargs):
             try:
                 f(**kwargs)
