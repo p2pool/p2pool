@@ -192,12 +192,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
-        res = []
-        for share in shares:
-            share_obj = p2pool_data.Share.from_share(share, self.node.net)
-            share_obj.peer = self
-            res.append(share_obj)
-        self.node.handle_shares(res, self)
+        self.node.handle_shares([p2pool_data.Share.from_share(share, self.node.net, self) for share in shares], self)
     
     def sendShares(self, shares):
         def att(f, **kwargs):

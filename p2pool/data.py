@@ -119,34 +119,35 @@ class Share(object):
     __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net new_script max_target'.split(' ')
     
     @classmethod
-    def from_share(cls, share, net):
+    def from_share(cls, share, net, peer):
         if share['type'] == 0:
-            res = cls(net, **share1a_type.unpack(share['contents']))
+            res = cls(net, peer, **share1a_type.unpack(share['contents']))
             if not (res.pow_hash > res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 1:
             share1b = share1b_type.unpack(share['contents'])
-            res = cls(net, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
+            res = cls(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
             if not (res.pow_hash <= res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 2:
-            res = NewShare(net, **new_share1a_type.unpack(share['contents']))
+            res = NewShare(net, peer, **new_share1a_type.unpack(share['contents']))
             if not (res.pow_hash > res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         elif share['type'] == 3:
             share1b = new_share1b_type.unpack(share['contents'])
-            res = NewShare(net, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
+            res = NewShare(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
             if not (res.pow_hash <= res.header['bits'].target):
                 raise ValueError('invalid share type')
             return res
         else:
             raise ValueError('unknown share type: %r' % (share['type'],))
     
-    def __init__(self, net, header, share_info, merkle_branch, other_txs=None):
+    def __init__(self, net, peer, header, share_info, merkle_branch, other_txs=None):
         self.net = net
+        self.peer = peer
         
         if p2pool.DEBUG and other_txs is not None and bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0) != merkle_branch:
             raise ValueError('merkle_branch and other_txs do not match')
@@ -197,7 +198,6 @@ class Share(object):
         
         # XXX eww
         self.time_seen = time.time()
-        self.peer = None
     
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
@@ -387,7 +387,7 @@ def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
 class NewShare(object):
     __slots__ = 'net min_header share_info hash_link merkle_branch other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
     
-    def __init__(self, net, min_header, share_info, hash_link, merkle_branch, other_txs=None):
+    def __init__(self, net, peer, min_header, share_info, hash_link, merkle_branch, other_txs=None):
         if len(share_info['share_data']['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
@@ -400,6 +400,7 @@ class NewShare(object):
         assert not hash_link['extra_data'], repr(hash_link['extra_data'])
         
         self.net = net
+        self.peer = peer
         self.min_header = min_header
         self.share_info = share_info
         self.hash_link = hash_link
@@ -441,7 +442,6 @@ class NewShare(object):
         
         # XXX eww
         self.time_seen = time.time()
-        self.peer = None
     
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
@@ -695,7 +695,7 @@ class ShareStore(object):
                             yield 'verified_hash', verified_hash
                             verified_hashes.add(verified_hash)
                         elif type_id == 5:
-                            share = Share.from_share(share_type.unpack(data_hex.decode('hex')), self.net)
+                            share = Share.from_share(share_type.unpack(data_hex.decode('hex')), self.net, None)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         else:
