@@ -50,13 +50,11 @@ class BaseProtocol(protocol.Protocol):
                 continue
             
             try:
-                payload2 = type_.unpack(payload)
+                self.packetReceived(command, type_.unpack(payload))
             except:
-                print 'RECV', command, repr(payload.encode('hex')), len(payload)
-                log.err(None, 'Error parsing message: (see RECV line)')
-                continue
-            
-            self.packetReceived(command, payload2)
+                print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
+                log.err(None, 'Error handling message: (see RECV line)')
+                self.transport.loseConnection()
     
     def packetReceived(self, command, payload2):
         handler = getattr(self, 'handle_' + command, None)
@@ -65,11 +63,7 @@ class BaseProtocol(protocol.Protocol):
                 print 'no handler for', repr(command)
             return
         
-        try:
-            handler(**payload2)
-        except:
-            print 'RECV', command, repr(payload2)[:100]
-            log.err(None, 'Error handling message: (see RECV line)')
+        handler(**payload2)
     
     def sendPacket(self, command, payload2):
         if len(command) >= 12:
