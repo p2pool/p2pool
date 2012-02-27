@@ -27,7 +27,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=2,
+            version=3,
             services=0,
             addr_to=dict(
                 services=0,
