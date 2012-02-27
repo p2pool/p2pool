@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>P2Pool Graphs</title>
+        <script type="text/javascript" src="d3.v2.min.js"></script>
+        
+        <style type="text/css">
+            body {
+                font-family: Sans-serif;
+                font-size: 12px;
+            }
+            
+            line {
+                stroke: black;
+                stroke-width: 1;
+                shape-rendering: crispEdges;
+            }
+            
+            .rate {
+                stroke: #0000FF;
+                stroke-width: 1.4;
+                fill: none;
+            }
+            
+            .deadrate {
+                stroke: #FF0000;
+                stroke-width: 1.4;
+                fill: none;
+            }
+            
+            text {
+                font-family: Sans-serif;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    
+    <body>
+        <h1>P2Pool Graphs</h1>
+        
+        <h2>Last hour</h1>
+        <div id="graph_hour"></div>
+        
+        <h2>Last day</h1>
+        <div id="graph_day"></div>
+        
+        <h2>Last week</h1>
+        <div id="graph_week"></div>
+        
+        <h2>Last month</h1>
+        <div id="graph_month"></div>
+        
+        <script type="text/javascript">
+            function getData(url) {
+                xmlhttp = new XMLHttpRequest();
+                xmlhttp.open("GET",  url, false);
+                xmlhttp.send();
+                var data = JSON.parse(xmlhttp.responseText);
+                data.shift(); // remove current bin
+                
+                return data;
+            }
+            
+            function plot(e, url) {
+                data = getData("/web/graph_data/local_hash_rate/" + url);
+                dead_data = getData("/web/graph_data/local_dead_hash_rate/" + url);
+                
+                var w = 640;
+                var h = 300;
+                var margin = 50;
+                
+                function itemgetter(i) {
+                    return function(x) {
+                        return x[i];
+                    }
+                }
+                function as_date(x) {
+                    return new Date(1000*x);
+                }
+                
+                var x = d3.time.scale().domain([as_date(d3.min(data, itemgetter(0))), as_date(d3.max(data, itemgetter(0)))]).range([0 + margin * 2, w - margin * 2]);
+                var y = d3.scale.linear().domain([0, d3.max(data, itemgetter(1))]).range([h - margin, margin]);
+                
+                var line = d3.svg.line().x(function(d, i) { return x(as_date(d[0])); }).y(function(d) { return y(d[1]); });
+                
+                e.selectAll("svg").remove();
+                var g = e.insert("svg:svg").attr("width", w).attr("height", h);
+                
+                g.append("svg:path")
+                    .attr("d", line(data))
+                    .attr("class", "rate");
+                
+                g.append("svg:path")
+                    .attr("d", line(dead_data))
+                    .attr("class", "deadrate");
+                
+                
+                g.append("svg:line")
+                    .attr("x1", margin * 2)
+                    .attr("y1", h - margin)
+                    .attr("x2", w - margin * 2)
+                    .attr("y2", h - margin);
+                
+                g.selectAll()
+                    .data(x.ticks(13))
+                    .enter().append("svg:g")
+                    .attr("transform", function(d) { return "translate(" + x(d) + "," + (h-margin/2) + ")"; })
+                    .append("svg:text")
+                    .attr("transform", "rotate(45)")
+                    .attr("text-anchor", "middle")
+                    .text(x.tickFormat(13));
+                
+                g.selectAll()
+                    .data(x.ticks(13))
+                    .enter().append("svg:line")
+                    .attr("x1", x)
+                    .attr("y1", h - margin)
+                    .attr("x2", x)
+                    .attr("y2", h - margin + 5);
+                
+                
+                g.append("svg:line")
+                    .attr("x1", margin * 2)
+                    .attr("y1", h - margin)
+                    .attr("x2", margin * 2)
+                    .attr("y2", margin);
+                
+                g.selectAll()
+                    .data(y.ticks(18))
+                    .enter().append("svg:line")
+                    .attr("x1", margin * 2 - 5)
+                    .attr("y1", y)
+                    .attr("x2", margin * 2)
+                    .attr("y2", y);
+                
+                g.selectAll()
+                    .data(y.ticks(6))
+                    .enter().append("svg:text")
+                    .text(d3.format(".3s"))
+                    .attr("x", margin - 2.5)
+                    .attr("y", function(d) { return y(d) + 4; })
+                    .attr("text-anchor", "middle");
+            }
+            
+            function attachGraph(e, url) {
+                plot(e, url);
+                //setInterval(function() { plot(e, url); }, 5000);
+            }
+            
+            attachGraph(d3.select("#graph_hour"), "last_hour");
+            attachGraph(d3.select("#graph_day"), "last_day");
+            attachGraph(d3.select("#graph_week"), "last_week");
+            attachGraph(d3.select("#graph_month"), "last_month");
+        </script>
+    </body>
+</html>

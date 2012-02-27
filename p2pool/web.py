@@ -3,15 +3,16 @@ from __future__ import division
 import cgi
 import json
 import os
+import sys
 import time
 
 from twisted.internet import reactor, task
 from twisted.python import log
-from twisted.web import resource
+from twisted.web import resource, static
 
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data, graphs
-from util import math
+from util import graph, math
 
 def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received):
     start_time = time.time()
@@ -334,5 +335,25 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         if user is not None:
             reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
     
+    dataview_descriptions = {
+        'last_hour': graph.DataViewDescription(150, 60*60),
+        'last_day': graph.DataViewDescription(300, 60*60*24),
+        'last_week': graph.DataViewDescription(300, 60*60*24*7),
+        'last_month': graph.DataViewDescription(300, 60*60*24*30),
+    }
+    hd = graph.HistoryDatabase.from_file({
+        'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
+        'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
+    }, os.path.join(datadir_path, 'graph_db'))
+    task.LoopingCall(hd.write, os.path.join(datadir_path, 'graph_db')).start(100)
+    @pseudoshare_received.watch
+    def _(work, dead, user):
+        t = time.time()
+        hd.datastreams['local_hash_rate'].add_datum(t, work)
+        if dead:
+            hd.datastreams['local_dead_hash_rate'].add_datum(t, work)
+    new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data()), 'application/json'))
+    
+    web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
     
     return web_root
