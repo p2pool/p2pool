@@ -54,7 +54,7 @@ class BaseProtocol(protocol.Protocol):
             except:
                 print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
                 log.err(None, 'Error handling message: (see RECV line)')
-                self.transport.loseConnection()
+                self.badPeerHappened()
     
     def packetReceived(self, command, payload2):
         handler = getattr(self, 'handle_' + command, None)
@@ -64,6 +64,9 @@ class BaseProtocol(protocol.Protocol):
             return
         
         handler(**payload2)
+    
+    def badPeerHappened(self):
+        self.transport.loseConnection()
     
     def sendPacket(self, command, payload2):
         if len(command) >= 12:

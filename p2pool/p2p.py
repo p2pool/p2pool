@@ -67,6 +67,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         
         bitcoin_p2p.BaseProtocol.packetReceived(self, command, payload2)
     
+    def badPeerHappened(self):
+        self.transport.loseConnection()
+        self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
+    
     def _timeout(self):
         if self.transport.connected:
             print 'Connection timed out, disconnecting from %s:%i' % self.addr
@@ -221,6 +225,8 @@ class ServerFactory(protocol.ServerFactory):
     def buildProtocol(self, addr):
         if sum(self.conns.itervalues()) >= self.max_conns or self.conns.get(self._host_to_ident(addr.host), 0) >= 3:
             return None
+        if addr.host in self.node.bans and self.node.bans[addr.host] > time.time():
+            return None
         p = Protocol(self.node, True)
         p.factory = self
         return p
@@ -316,7 +322,11 @@ class ClientFactory(protocol.ClientFactory):
                 if len(self.conns) < self.desired_conns and len(self.attempts) < self.max_attempts and self.node.addr_store:
                     (host, port), = self.node.get_good_peers(1)
                     
-                    if self._host_to_ident(host) not in self.attempts:
+                    if self._host_to_ident(host) in self.attempts:
+                        pass
+                    elif host in self.node.bans and self.node.bans[host] > time.time():
+                        pass
+                    else:
                         #print 'Trying to connect to', host, port
                         reactor.connectTCP(host, port, self, timeout=5)
             except:
@@ -355,6 +365,7 @@ class Node(object):
         
         self.nonce = random.randrange(2**64)
         self.peers = {}
+        self.bans = {} # address -> end_time
         self.clientfactory = ClientFactory(self, desired_outgoing_conns, max_outgoing_attempts)
         self.serverfactory = ServerFactory(self, max_incoming_conns)
         self.running = False
