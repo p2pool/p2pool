@@ -244,7 +244,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             request.write('<p>Peer first received from: %s</p>' % ('%s:%i' % share.peer.addr if share.peer is not None else 'self or cache',))
             
             request.write('<h2>Share data</h2>')
-            request.write('<p>Timestamp: %s</p>' % (time.ctime(share.timestamp),))
+            request.write('<p>Timestamp: %s (%i)</p>' % (time.ctime(share.timestamp), share.timestamp))
             request.write('<p>Difficulty: %s</p>' % (format_bits(share.share_info['bits']),))
             request.write('<p>Minimum difficulty: %s</p>' % (format_bits(share.share_info.get('max_bits', share.share_info['bits'])),))
             request.write('<p>Payout script: %s</p>' % (bitcoin_data.script2_to_human(share.new_script, share.net.PARENT),))
