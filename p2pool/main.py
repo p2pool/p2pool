@@ -168,7 +168,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         yield set_real_work1()
         
         if '\ngetblock ' in (yield deferral.retry()(bitcoind.rpc_help)()):
-            height_cacher = deferral.DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((yield bitcoind.rpc_getblock('%x' % (block_hash,)))['blockcount'])))
+            height_cacher = deferral.DeferredCacher(defer.inlineCallbacks(lambda block_hash: defer.returnValue((lambda x: x['blockcount'] if 'blockcount' in x else x['height'])((yield bitcoind.rpc_getblock('%x' % (block_hash,)))))))
             best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(pre_current_work.value['previous_block'])))
             def get_height_rel_highest(block_hash):
                 this_height = height_cacher.call_now(block_hash, 0)
