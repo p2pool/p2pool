@@ -551,7 +551,7 @@ class OkayTracker(forest.Tracker):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((
-                    self.verified.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer,
+                    self.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer,
                     last_last_hash,
                     max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
                     min(x.target for x in self.get_chain(head, min(head_height, 5))),
@@ -568,15 +568,15 @@ class OkayTracker(forest.Tracker):
         # decide best verified head
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-            #self.verified.shares[h].peer is None,
+            #self.shares[h].peer is None,
             self.shares[h].pow_hash < self.shares[h].header['bits'].target, # is block solution
-            (self.verified.shares[h].header['previous_block'], self.verified.shares[h].header['bits']) == (previous_block, bits) or self.verified.shares[h].peer is None,
-            -self.verified.shares[h].time_seen,
+            (self.shares[h].header['previous_block'], self.shares[h].header['bits']) == (previous_block, bits) or self.shares[h].peer is None,
+            -self.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
             print len(decorated_heads), 'heads. Top 10:'
             for score, head_hash in decorated_heads[-10:]:
-                print '   ', format_hash(head_hash), format_hash(self.verified.shares[head_hash].previous_hash), score
+                print '   ', format_hash(head_hash), format_hash(self.shares[head_hash].previous_hash), score
         best_head_score, best = decorated_heads[-1] if decorated_heads else (None, None)
         
         # eat away at heads
@@ -628,7 +628,7 @@ class OkayTracker(forest.Tracker):
             #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
         
         if best is not None:
-            best_share = self.verified.shares[best]
+            best_share = self.shares[best]
             if (best_share.header['previous_block'], best_share.header['bits']) != (previous_block, bits) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
