@@ -296,13 +296,18 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
                 peer.sendShares(shares)
         
+        
+        @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
+        def submit_block(block):
+            if factory.conn.value is None:
+                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%32x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
+                raise deferral.RetrySilentlyException()
+            factory.conn.value.send_block(block)
+        
         @tracker.verified.added.watch
         def _(share):
             if share.pow_hash <= share.header['bits'].target:
-                if factory.conn.value is not None:
-                    factory.conn.value.send_block(block=share.as_block(tracker))
-                else:
-                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! Erp!'
+                submit_block(share.as_block(tracker))
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
@@ -571,13 +576,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     try:
                         if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                            @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
-                            def submit_block():
-                                if factory.conn.value is None:
-                                    print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%32x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
-                                    raise deferral.RetrySilentlyException()
-                                factory.conn.value.send_block(block=dict(header=header, txs=transactions))
-                            submit_block()
+                            submit_block(dict(header=header, txs=transactions))
                             if pow_hash <= header['bits'].target:
                                 print
                                 print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
