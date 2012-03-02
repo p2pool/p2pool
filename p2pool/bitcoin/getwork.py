@@ -48,7 +48,7 @@ class BlockAttempt(object):
             'data': _swap4(block_data).encode('hex') + '000000800000000000000000000000000000000000000000000000000000000000000000000000000000000080020000',
             'hash1': '00000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000010000',
             'target': pack.IntType(256).pack(self.share_target).encode('hex'),
-            'midstate': _swap4(sha256.process(block_data[:64])).encode('hex'),
+            'midstate': _swap4(sha256.process(sha256.initial_state, block_data[:64])).encode('hex'),
         }
         
         if _check:

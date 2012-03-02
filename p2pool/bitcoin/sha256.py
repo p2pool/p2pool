@@ -2,7 +2,7 @@ from __future__ import division
 
 import struct
 
-initial_state = struct.pack('>8I', 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19)
+
 k = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -14,43 +14,29 @@ k = [
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ]
 
-def process(chunk, state=initial_state):
+def process(state, chunk):
     def rightrotate(x, n):
         return (x >> n) | (x << 32 - n) % 2**32
     
-    assert len(chunk) == 512//8
     w = list(struct.unpack('>16I', chunk))
-    
-    assert len(state) == 256//8
-    state = struct.unpack('>8I', state)
-    
     for i in xrange(16, 64):
         s0 = rightrotate(w[i-15], 7) ^ rightrotate(w[i-15], 18) ^ (w[i-15] >> 3)
         s1 = rightrotate(w[i-2], 17) ^ rightrotate(w[i-2], 19) ^ (w[i-2] >> 10)
         w.append((w[i-16] + s0 + w[i-7] + s1) % 2**32)
     
-    a, b, c, d, e, f, g, h = state
-    
-    for i in xrange(64):
-        s0 = rightrotate(a, 2) ^ rightrotate(a, 13) ^ rightrotate(a, 22)
-        maj = (a & b) ^ (a & c) ^ (b & c)
-        t2 = (s0 + maj) % 2**32
-        s1 = rightrotate(e, 6) ^ rightrotate(e, 11) ^ rightrotate(e, 25)
-        ch = (e & f) ^ (~e & g)
-        t1 = (h + s1 + ch + k[i] + w[i]) % 2**32
+    a, b, c, d, e, f, g, h = start_state = struct.unpack('>8I', state)
+    for k_i, w_i in zip(k, w):
+        t1 = (h + (rightrotate(e, 6) ^ rightrotate(e, 11) ^ rightrotate(e, 25)) + ((e & f) ^ (~e & g)) + k_i + w_i) % 2**32
         
-        h = g
-        g = f
-        f = e
-        e = (d + t1) % 2**32
-        d = c
-        c = b
-        b = a
-        a = (t1 + t2) % 2**32
+        a, b, c, d, e, f, g, h = (
+            (t1 + (rightrotate(a, 2) ^ rightrotate(a, 13) ^ rightrotate(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) % 2**32,
+            a, b, c, (d + t1) % 2**32, e, f, g,
+        )
     
-    state = [(x + y) % 2**32 for x, y in zip(state, [a, b, c, d, e, f, g, h])]
-    
-    return struct.pack('>8I', *state)
+    return struct.pack('>8I', *((x + y) % 2**32 for x, y in zip(start_state, [a, b, c, d, e, f, g, h])))
+
+
+initial_state = struct.pack('>8I', 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19)
 
 class sha256(object):
     digest_size = 256//8
@@ -66,7 +52,7 @@ class sha256(object):
         
         chunks = [buf[i:i + self.block_size] for i in xrange(0, len(buf) + 1, self.block_size)]
         for chunk in chunks[:-1]:
-            state = process(chunk, state)
+            state = process(state, chunk)
         
         self.state = state
         self.buf = chunks[-1]
@@ -81,7 +67,7 @@ class sha256(object):
         buf = self.buf + '\x80' + '\x00'*((self.block_size - 9 - len(self.buf)) % self.block_size) + struct.pack('>Q', self.length)
         
         for chunk in [buf[i:i + self.block_size] for i in xrange(0, len(buf), self.block_size)]:
-            state = process(chunk, state)
+            state = process(state, chunk)
         
         return state
     
