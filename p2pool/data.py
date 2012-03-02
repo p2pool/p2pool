@@ -569,6 +569,7 @@ class OkayTracker(forest.Tracker):
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.verified.shares[h].peer is None,
+            self.shares[h].pow_hash < self.shares[h].header['bits'].target, # is block solution
             (self.verified.shares[h].header['previous_block'], self.verified.shares[h].header['bits']) == (previous_block, bits) or self.verified.shares[h].peer is None,
             -self.verified.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
