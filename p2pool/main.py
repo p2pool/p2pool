@@ -297,12 +297,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 peer.sendShares(shares)
         
         
-        @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
-        def submit_block(block):
-            if factory.conn.value is None:
-                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%32x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
-                raise deferral.RetrySilentlyException()
-            factory.conn.value.send_block(block)
+        submit_block = deferral.retry('Error submitting primary block: (will retry)', 10, 10)(lambda block: bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex')))
         
         @tracker.verified.added.watch
         def _(share):
