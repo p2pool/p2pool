@@ -448,23 +448,26 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             
             def preprocess_request(self, request):
                 user = request.getUser() if request.getUser() is not None else ''
-                pubkey_hash = my_pubkey_hash
-                max_target = 2**256 - 1
+                
+                desired_share_target = 2**256 - 1
                 if '/' in user:
                     user, min_diff_str = user.rsplit('/', 1)
                     try:
-                        max_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
+                        desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
                     except:
                         pass
-                try:
-                    pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
-                except: # XXX blah
-                    pass
+                
                 if random.uniform(0, 100) < args.worker_fee:
                     pubkey_hash = my_pubkey_hash
-                return pubkey_hash, max_target
+                else:
+                    try:
+                        pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, net.PARENT)
+                    except: # XXX blah
+                        pubkey_hash = my_pubkey_hash
+                
+                return pubkey_hash, desired_share_target
             
-            def get_work(self, pubkey_hash, max_target):
+            def get_work(self, pubkey_hash, desired_share_target):
                 if len(p2p_node.peers) == 0 and net.PERSIST:
                     raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
                 if current_work.value['best_share_hash'] is None and net.PERSIST:
@@ -505,7 +508,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         ),
                         block_target=current_work.value['bits'].target,
                         desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                        desired_target=max_target,
+                        desired_target=desired_share_target,
                         net=net,
                     )
                 else:
