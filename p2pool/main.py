@@ -922,6 +922,8 @@ def run():
             ]:
                 if getattr(args, var_name) is None and cp.has_option('x', conf_name):
                     setattr(args, var_name, var_type(cp.get('x', conf_name)))
+        if args.bitcoind_rpc_password is None:
+            parser.error('''Bitcoin configuration file didn't contain an rpcpassword= line! Add one!''')
     
     if args.bitcoind_rpc_username is None:
         args.bitcoind_rpc_username = ''
