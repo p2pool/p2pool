@@ -496,49 +496,26 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     mm_data = ''
                     mm_later = []
                 
-                new = (tracker.shares[current_work.value['best_share_hash']].timestamp if current_work.value['best_share_hash'] is not None else time.time()) > net.SWITCH_TIME
-                
-                if new:
-                    share_info, generate_tx = p2pool_data.new_generate_transaction(
-                        tracker=tracker,
-                        share_data=dict(
-                            previous_share_hash=current_work.value['best_share_hash'],
-                            coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
-                            nonce=random.randrange(2**32),
-                            pubkey_hash=pubkey_hash,
-                            subsidy=current_work2.value['subsidy'],
-                            donation=math.perfect_round(65535*args.donation_percentage/100),
-                            stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
-                                253 if orphans > orphans_recorded_in_chain else
-                                254 if doas > doas_recorded_in_chain else
-                                0
-                            )(*get_stale_counts()),
-                        ),
-                        block_target=current_work.value['bits'].target,
-                        desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                        desired_target=desired_share_target,
-                        net=net,
-                    )
-                else:
-                    share_info, generate_tx = p2pool_data.generate_transaction(
-                        tracker=tracker,
-                        share_data=dict(
-                            previous_share_hash=current_work.value['best_share_hash'],
-                            coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
-                            nonce=struct.pack('<Q', random.randrange(2**64)),
-                            new_script=bitcoin_data.pubkey_hash_to_script2(pubkey_hash),
-                            subsidy=current_work2.value['subsidy'],
-                            donation=math.perfect_round(65535*args.donation_percentage/100),
-                            stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
-                                253 if orphans > orphans_recorded_in_chain else
-                                254 if doas > doas_recorded_in_chain else
-                                0
-                            )(*get_stale_counts()),
-                        ),
-                        block_target=current_work.value['bits'].target,
-                        desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                        net=net,
-                    )
+                share_info, generate_tx = p2pool_data.generate_transaction(
+                    tracker=tracker,
+                    share_data=dict(
+                        previous_share_hash=current_work.value['best_share_hash'],
+                        coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
+                        nonce=random.randrange(2**32),
+                        pubkey_hash=pubkey_hash,
+                        subsidy=current_work2.value['subsidy'],
+                        donation=math.perfect_round(65535*args.donation_percentage/100),
+                        stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
+                            253 if orphans > orphans_recorded_in_chain else
+                            254 if doas > doas_recorded_in_chain else
+                            0
+                        )(*get_stale_counts()),
+                    ),
+                    block_target=current_work.value['bits'].target,
+                    desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
+                    desired_target=desired_share_target,
+                    net=net,
+                )
                 
                 target = net.PARENT.SANE_MAX_TARGET
                 if desired_pseudoshare_target is None:
@@ -624,12 +601,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             log.err(None, 'Error while processing merged mining POW:')
                     
                     if pow_hash <= share_info['bits'].target:
-                        if new:
-                            min_header = dict(header);del min_header['merkle_root']
-                            hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.gentx_before_refhash)
-                            share = p2pool_data.NewShare(net, None, min_header, share_info, hash_link=hash_link, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
-                        else:
-                            share = p2pool_data.Share(net, None, header, share_info, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+                        min_header = dict(header);del min_header['merkle_root']
+                        hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.gentx_before_refhash)
+                        share = p2pool_data.Share(net, None, min_header, share_info, hash_link=hash_link, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+                        
                         print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                             request.getUser(),
                             p2pool_data.format_hash(share.hash),

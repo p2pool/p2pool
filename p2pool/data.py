@@ -34,36 +34,6 @@ def check_hash_link(hash_link, data, const_ending=''):
 
 # shares
 
-share_data_type = pack.ComposedType([
-    ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
-    ('coinbase', pack.VarStrType()),
-    ('nonce', pack.VarStrType()),
-    ('new_script', pack.VarStrType()),
-    ('subsidy', pack.IntType(64)),
-    ('donation', pack.IntType(16)),
-    ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa
-])
-
-share_info_type = pack.ComposedType([
-    ('share_data', share_data_type),
-    ('bits', bitcoin_data.FloatingIntegerType()),
-    ('timestamp', pack.IntType(32)),
-])
-
-share1a_type = pack.ComposedType([
-    ('header', bitcoin_data.block_header_type),
-    ('share_info', share_info_type),
-    ('merkle_branch', bitcoin_data.merkle_branch_type),
-])
-
-share1b_type = pack.ComposedType([
-    ('header', bitcoin_data.block_header_type),
-    ('share_info', share_info_type),
-    ('other_txs', pack.ListType(bitcoin_data.tx_type)),
-])
-
-# new
-
 small_block_header_type = pack.ComposedType([
     ('version', pack.VarIntType()), # XXX must be constrained to 32 bits
     ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
@@ -72,7 +42,7 @@ small_block_header_type = pack.ComposedType([
     ('nonce', pack.IntType(32)),
 ])
 
-new_share_data_type = pack.ComposedType([
+share_data_type = pack.ComposedType([
     ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ('coinbase', pack.VarStrType()),
     ('nonce', pack.IntType(32)),
@@ -82,155 +52,37 @@ new_share_data_type = pack.ComposedType([
     ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa
 ])
 
-new_share_info_type = pack.ComposedType([
-    ('share_data', new_share_data_type),
+share_info_type = pack.ComposedType([
+    ('share_data', share_data_type),
     ('max_bits', bitcoin_data.FloatingIntegerType()),
     ('bits', bitcoin_data.FloatingIntegerType()),
     ('timestamp', pack.IntType(32)),
 ])
 
-new_share1a_type = pack.ComposedType([
+share1a_type = pack.ComposedType([
     ('min_header', small_block_header_type),
-    ('share_info', new_share_info_type),
+    ('share_info', share_info_type),
     ('hash_link', hash_link_type),
     ('merkle_branch', bitcoin_data.merkle_branch_type),
 ])
 
-new_share1b_type = pack.ComposedType([
+share1b_type = pack.ComposedType([
     ('min_header', small_block_header_type),
-    ('share_info', new_share_info_type),
+    ('share_info', share_info_type),
     ('hash_link', hash_link_type),
     ('other_txs', pack.ListType(bitcoin_data.tx_type)),
 ])
 
 
 # type:
-# 0: share1a
-# 1: share1b
-# 2: new_share1a
-# 3: new_share1b
+# 2: share1a
+# 3: share1b
 
 share_type = pack.ComposedType([
     ('type', pack.VarIntType()),
     ('contents', pack.VarStrType()),
 ])
 
-class Share(object):
-    __slots__ = 'header share_info merkle_branch other_txs timestamp share_data previous_hash target pow_hash header_hash hash time_seen peer net new_script max_target'.split(' ')
-    
-    @classmethod
-    def from_share(cls, share, net, peer):
-        if share['type'] == 0:
-            res = cls(net, peer, **share1a_type.unpack(share['contents']))
-            if not (res.pow_hash > res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
-        elif share['type'] == 1:
-            share1b = share1b_type.unpack(share['contents'])
-            res = cls(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
-            if not (res.pow_hash <= res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
-        elif share['type'] == 2:
-            res = NewShare(net, peer, **new_share1a_type.unpack(share['contents']))
-            if not (res.pow_hash > res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
-        elif share['type'] == 3:
-            share1b = new_share1b_type.unpack(share['contents'])
-            res = NewShare(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
-            if not (res.pow_hash <= res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
-        else:
-            raise ValueError('unknown share type: %r' % (share['type'],))
-    
-    def __init__(self, net, peer, header, share_info, merkle_branch, other_txs=None):
-        self.net = net
-        self.peer = peer
-        
-        if p2pool.DEBUG and other_txs is not None and bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0) != merkle_branch:
-            raise ValueError('merkle_branch and other_txs do not match')
-        
-        if len(merkle_branch) > 16:
-            raise ValueError('merkle_branch too long!')
-        
-        self.header = header
-        self.share_info = share_info
-        self.merkle_branch = merkle_branch
-        
-        self.share_data = self.share_info['share_data']
-        self.target = self.max_target = self.share_info['bits'].target
-        self.timestamp = self.share_info['timestamp']
-        if self.timestamp > net.SWITCH_TIME + 60*60:
-            raise ValueError('old share an hour after switch time')
-        
-        if len(self.share_data['new_script']) > 100:
-            raise ValueError('new_script too long!')
-        if script.get_sigop_count(self.share_data['new_script']) > 1:
-            raise ValueError('too many sigops!')
-        self.new_script = self.share_data['new_script']
-        
-        self.previous_hash = self.share_data['previous_share_hash']
-        
-        if len(self.share_data['nonce']) > 100:
-            raise ValueError('nonce too long!')
-        
-        if len(self.share_data['coinbase']) > 100:
-            raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
-        
-        self.pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
-        self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
-        
-        self.hash = bitcoin_data.hash256(share1a_type.pack(self.as_share1a()))
-        
-        if self.pow_hash > self.target:
-            print 'hash %x' % self.pow_hash
-            print 'targ %x' % self.target
-            raise ValueError('not enough work!')
-        
-        if other_txs is not None and not self.pow_hash <= self.header['bits'].target:
-            raise ValueError('other_txs provided when not a block solution')
-        if other_txs is None and self.pow_hash <= self.header['bits'].target:
-            raise ValueError('other_txs not provided when a block solution')
-        
-        self.other_txs = other_txs
-        
-        # XXX eww
-        self.time_seen = time.time()
-    
-    def __repr__(self):
-        return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
-    
-    def check(self, tracker):
-        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.net)
-        if share_info != self.share_info:
-            raise ValueError('share difficulty invalid')
-        
-        if bitcoin_data.check_merkle_branch(bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)), 0, self.merkle_branch) != self.header['merkle_root']:
-            raise ValueError('''gentx doesn't match header via merkle_branch''')
-    
-    def as_share(self):
-        if self.pow_hash > self.header['bits'].target: # share1a
-            return dict(type=0, contents=share1a_type.pack(self.as_share1a()))
-        elif self.pow_hash <= self.header['bits'].target: # share1b
-            if self.other_txs is None:
-                raise ValueError('share does not contain all txs')
-            return dict(type=1, contents=share1b_type.pack(dict(header=self.header, share_info=self.share_info, other_txs=self.other_txs)))
-        else:
-            raise AssertionError()
-    
-    def as_share1a(self):
-        return dict(header=self.header, share_info=self.share_info, merkle_branch=self.merkle_branch)
-    
-    def as_block(self, tracker):
-        if self.other_txs is None:
-            raise ValueError('share does not contain all txs')
-        
-        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.net)
-        assert share_info == self.share_info
-        
-        return dict(header=self.header, txs=[gentx] + self.other_txs)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False):
     assert dist >= 2
@@ -248,79 +100,14 @@ def get_average_stale_prop(tracker, share_hash, lookbehind):
 
 DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
 
-def generate_transaction(tracker, share_data, block_target, desired_timestamp, net):
-    previous_share_hash = share_data['previous_share_hash']
-    new_script = share_data['new_script']
-    subsidy = share_data['subsidy']
-    donation = share_data['donation']
-    assert 0 <= donation <= 65535
-    
-    if len(share_data['coinbase']) > 100:
-        raise ValueError('coinbase too long!')
-    
-    previous_share = tracker.shares[previous_share_hash] if previous_share_hash is not None else None
-    
-    chain_length = getattr(net, 'REAL_CHAIN_LENGTH_FUNC', lambda _: net.REAL_CHAIN_LENGTH)(previous_share.timestamp if previous_share is not None else None)
-    
-    height, last = tracker.get_height_and_last(previous_share_hash)
-    assert height >= chain_length or last is None
-    if height < net.TARGET_LOOKBEHIND:
-        bits = bitcoin_data.FloatingInteger.from_target_upper_bound(net.MAX_TARGET)
-    else:
-        attempts_per_second = get_pool_attempts_per_second(tracker, previous_share_hash, net.TARGET_LOOKBEHIND)
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
-        pre_target2 = math.clip(pre_target, (previous_share.target*9//10, previous_share.target*11//10))
-        pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
-        bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
-    
-    attempts_to_block = bitcoin_data.target_to_average_attempts(block_target)
-    max_att = net.SPREAD * attempts_to_block
-    
-    this_att = min(bitcoin_data.target_to_average_attempts(bits.target), max_att)
-    other_weights, other_total_weight, other_donation_weight = tracker.get_cumulative_weights(previous_share_hash, min(height, chain_length), 65535*max(0, max_att - this_att))
-    assert other_total_weight == sum(other_weights.itervalues()) + other_donation_weight, (other_total_weight, sum(other_weights.itervalues()) + other_donation_weight)
-    weights, total_weight, donation_weight = math.add_dicts({new_script: this_att*(65535-donation)}, other_weights), this_att*65535 + other_total_weight, this_att*donation + other_donation_weight
-    assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
-    
-    # 1 satoshi is always donated so that a list of p2pool generated blocks can be easily found by looking at the donation address
-    amounts = dict((script, (subsidy-1)*(199*weight)//(200*total_weight)) for (script, weight) in weights.iteritems())
-    amounts[new_script] = amounts.get(new_script, 0) + (subsidy-1)//200
-    amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + (subsidy-1)*(199*donation_weight)//(200*total_weight)
-    amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + subsidy - sum(amounts.itervalues()) # collect any extra satoshis :P
-    
-    if sum(amounts.itervalues()) != subsidy:
-        raise ValueError()
-    if any(x < 0 for x in amounts.itervalues()):
-        raise ValueError()
-    
-    dests = sorted(amounts.iterkeys(), key=lambda script: (amounts[script], script))
-    dests = dests[-4000:] # block length limit, unlikely to ever be hit
-    
-    share_info = dict(
-        share_data=share_data,
-        bits=bits,
-        timestamp=math.clip(desired_timestamp, (previous_share.timestamp - 60, previous_share.timestamp + 60)) if previous_share is not None else desired_timestamp,
-    )
-    
-    return share_info, dict(
-        version=1,
-        tx_ins=[dict(
-            previous_output=None,
-            sequence=None,
-            script=share_data['coinbase'].ljust(2, '\x00'),
-        )],
-        tx_outs=[dict(value=0, script='\x20' + pack.IntType(256).pack(bitcoin_data.hash256(share_info_type.pack(share_info))))] + [dict(value=amounts[script], script=script) for script in dests if amounts[script]],
-        lock_time=0,
-    )
-
 ref_type = pack.ComposedType([
     ('identifier', pack.FixedStrType(64//8)),
-    ('share_info', new_share_info_type),
+    ('share_info', share_info_type),
 ])
 
 gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x20' + pack.IntType(256).pack(0))[:2]
 
-def new_generate_transaction(tracker, share_data, block_target, desired_timestamp, desired_target, net):
+def generate_transaction(tracker, share_data, block_target, desired_timestamp, desired_target, net):
     previous_share = tracker.shares[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
     
     height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
@@ -384,8 +171,24 @@ def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
     res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
     return res
 
-class NewShare(object):
+class Share(object):
     __slots__ = 'net min_header share_info hash_link merkle_branch other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
+    
+    @classmethod
+    def from_share(cls, share, net, peer):
+        if share['type'] == 2:
+            res = cls(net, peer, **share1a_type.unpack(share['contents']))
+            if not (res.pow_hash > res.header['bits'].target):
+                raise ValueError('invalid share type')
+            return res
+        elif share['type'] == 3:
+            share1b = share1b_type.unpack(share['contents'])
+            res = cls(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
+            if not (res.pow_hash <= res.header['bits'].target):
+                raise ValueError('invalid share type')
+            return res
+        else:
+            raise ValueError('unknown share type: %r' % (share['type'],))
     
     def __init__(self, net, peer, min_header, share_info, hash_link, merkle_branch, other_txs=None):
         if len(share_info['share_data']['coinbase']) > 100:
@@ -414,8 +217,6 @@ class NewShare(object):
         self.timestamp = self.share_info['timestamp']
         self.previous_hash = self.share_data['previous_share_hash']
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
-        if self.timestamp < net.SWITCH_TIME - 60*60:
-            raise ValueError('new share an hour before switch time')
         
         self.gentx_hash = check_hash_link(
             hash_link,
@@ -447,7 +248,7 @@ class NewShare(object):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
     
     def check(self, tracker):
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.net)
         if share_info != self.share_info:
             raise ValueError('share difficulty invalid')
         if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:
@@ -457,17 +258,17 @@ class NewShare(object):
         if block_hint is None:
             block_hint = self.pow_hash <= self.header['bits'].target
         if not block_hint: # share1a
-            return dict(type=2, contents=new_share1a_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, merkle_branch=self.merkle_branch)))
+            return dict(type=2, contents=share1a_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, merkle_branch=self.merkle_branch)))
         else: # share1b
             if self.other_txs is None:
                 raise ValueError('share does not contain all txs')
-            return dict(type=3, contents=new_share1b_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, other_txs=self.other_txs)))
+            return dict(type=3, contents=share1b_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, other_txs=self.other_txs)))
     
     def as_block(self, tracker):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         
-        share_info, gentx = new_generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.net)
+        share_info, gentx = generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.net)
         assert share_info == self.share_info
         
         return dict(header=self.header, txs=[gentx] + self.other_txs)
