@@ -654,21 +654,20 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         except:
                             log.err(None, 'Error forwarding block solution:')
                     
-                    if pow_hash <= target and header_hash not in received_header_hashes:
+                    if pow_hash > target:
+                        print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
+                        print '    Hash:   %56x' % (pow_hash,)
+                        print '    Target: %56x' % (target,)
+                    elif header_hash in received_header_hashes:
+                        print >>sys.stderr, 'Worker %s @ %s submitted share more than once!' % (request.getUser(), request.getClientIP())
+                    else:
+                        received_header_hashes.add(header_hash)
+                        
                         pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser() if request.getPassword() == vip_pass else None)
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
                         local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=request.getUser()))
-                    
-                    if header_hash in received_header_hashes:
-                        print >>sys.stderr, 'Worker %s @ %s submitted share more than once!' % (request.getUser(), request.getClientIP())
-                    received_header_hashes.add(header_hash)
-                    
-                    if pow_hash > target:
-                        print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
-                        print '    Hash:   %56x' % (pow_hash,)
-                        print '    Target: %56x' % (target,)
                     
                     return on_time
                 
