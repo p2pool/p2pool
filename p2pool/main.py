@@ -449,6 +449,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             def preprocess_request(self, request):
                 user = request.getUser() if request.getUser() is not None else ''
                 
+                desired_pseudoshare_target = None
+                if '+' in user:
+                    user, desired_pseudoshare_difficulty_str = user.rsplit('+', 1)
+                    try:
+                        desired_pseudoshare_target = bitcoin_data.difficulty_to_target(float(desired_pseudoshare_difficulty_str))
+                    except:
+                        pass
+                
                 desired_share_target = 2**256 - 1
                 if '/' in user:
                     user, min_diff_str = user.rsplit('/', 1)
@@ -465,9 +473,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     except: # XXX blah
                         pubkey_hash = my_pubkey_hash
                 
-                return pubkey_hash, desired_share_target
+                return pubkey_hash, desired_share_target, desired_pseudoshare_target
             
-            def get_work(self, pubkey_hash, desired_share_target):
+            def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
                 if len(p2p_node.peers) == 0 and net.PERSIST:
                     raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
                 if current_work.value['best_share_hash'] is None and net.PERSIST:
@@ -533,9 +541,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     )
                 
                 target = net.PARENT.SANE_MAX_TARGET
-                if len(self.recent_shares_ts_work) == 50:
-                    hash_rate = sum(work for ts, work in self.recent_shares_ts_work)//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-                    target = min(target, 2**256//(hash_rate))
+                if desired_pseudoshare_target is None:
+                    if len(self.recent_shares_ts_work) == 50:
+                        hash_rate = sum(work for ts, work in self.recent_shares_ts_work)//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
+                        target = min(target, 2**256//hash_rate)
+                else:
+                    target = min(target, desired_pseudoshare_target)
                 target = max(target, share_info['bits'].target)
                 for aux_work in current_work.value['mm_chains'].itervalues():
                     target = max(target, aux_work['target'])
