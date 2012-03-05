@@ -1,25 +1,17 @@
 import os
+import subprocess
 import sys
+
+subprocess.check_call(['git', 'checkout', 'p2pool/__init__.py'])
+version = __import__('p2pool').__version__
+open('p2pool/__init__.py', 'wb').write('__version__ = %r%s%sDEBUG = False%s' % (version, os.linesep, os.linesep, os.linesep))
 
 from distutils.core import setup
 import py2exe
 
-def get_version():
-    root_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-    git_dir = os.path.join(root_dir, '.git')
-    head = open(os.path.join(git_dir, 'HEAD')).read().strip()
-    prefix = 'ref: '
-    if head.startswith(prefix):
-        path = head[len(prefix):].split('/')
-        return open(os.path.join(git_dir, *path)).read().strip()[:7]
-    else:
-        return head[:7]
-
-open('p2pool/__init__.py', 'wb').write('__version__ = %r\r\n\r\nDEBUG = False\r\n' % get_version())
-
 sys.argv[1:] = ['py2exe']
 setup(name='p2pool',
-    version='1.0',
+    version=version,
     description='Peer-to-peer Bitcoin mining pool',
     author='Forrest Voight',
     author_email='forrest@forre.st',
@@ -35,5 +27,6 @@ setup(name='p2pool',
     zipfile=None,
 )
 
-os.rename('dist', 'p2pool_win32_' + get_version())
-print 'p2pool_win32_' + get_version()
+dir_name = 'p2pool_win32_' + version
+print dir_name
+os.rename('dist', dir_name)
