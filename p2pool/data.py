@@ -497,7 +497,10 @@ class ShareStore(object):
                             yield 'verified_hash', verified_hash
                             verified_hashes.add(verified_hash)
                         elif type_id == 5:
-                            share = Share.from_share(share_type.unpack(data_hex.decode('hex')), self.net, None)
+                            raw_share = share_type.unpack(data_hex.decode('hex'))
+                            if raw_share['type'] in [0, 1]:
+                                continue
+                            share = Share.from_share(raw_share, self.net, None)
                             yield 'share', share
                             share_hashes.add(share.hash)
                         else:
