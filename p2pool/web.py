@@ -162,7 +162,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
     web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
     web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
-    web_root.putChild('peer_versions', WebInterface(lambda: ''.join(peer.other_sub_version+'\n' for peer in p2p_node.peers.itervalues()), 'text/plain'))
+    web_root.putChild('peer_versions', WebInterface(lambda: ''.join('%s:%i ' % peer.addr + peer.other_sub_version + '\n' for peer in p2p_node.peers.itervalues()), 'text/plain'))
     web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)), 'application/json'))
     web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
     web_root.putChild('uptime', WebInterface(get_uptime, 'application/json'))
