@@ -239,7 +239,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             
             request.write('<h1>Share <a href="%x">%s</a></h1>' % (share.hash, p2pool_data.format_hash(share.hash)))
             request.write('<p>Previous: <a href="%x">%s</a></p>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
-            request.write('<p>Next: %s</p>' % (', '.join('<a href="%x">%s</a>' % (next, p2pool_data.format_hash(next)) for next in tracker.reverse_shares.get(share.hash, set())),))
+            request.write('<p>Next: %s</p>' % (', '.join('<a href="%x">%s</a>' % (next, p2pool_data.format_hash(next)) for next in sorted(tracker.reverse_shares.get(share.hash, set()), key=lambda sh: -len(tracker.reverse_shares.get(sh, set())))),))
             request.write('<p>Verified: %s</p>' % (share.hash in tracker.verified.shares,))
             request.write('<p>Time first seen: %s</p>' % (time.ctime(start_time if share.time_seen == 0 else share.time_seen),))
             request.write('<p>Peer first received from: %s</p>' % ('%s:%i' % share.peer.addr if share.peer is not None else 'self or cache',))

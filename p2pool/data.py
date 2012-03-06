@@ -84,7 +84,7 @@ share_type = pack.ComposedType([
 ])
 
 
-def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False):
+def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False, integer=False):
     assert dist >= 2
     near = tracker.shares[previous_share_hash]
     far = tracker.shares[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
@@ -92,7 +92,9 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=Fa
     time = near.timestamp - far.timestamp
     if time <= 0:
         time = 1
-    return attempts//time
+    if integer:
+        return attempts//time
+    return attempts/time
 
 def get_average_stale_prop(tracker, share_hash, lookbehind):
     stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] in [253, 254])
@@ -115,8 +117,8 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, d
     if height < net.TARGET_LOOKBEHIND:
         pre_target3 = net.MAX_TARGET
     else:
-        attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True)
-        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1
+        attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True, integer=True)
+        pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
         pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
         pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
     max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
