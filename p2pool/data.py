@@ -177,20 +177,14 @@ class Share(object):
     @classmethod
     def from_share(cls, share, net, peer):
         if share['type'] == 2:
-            res = cls(net, peer, **share1a_type.unpack(share['contents']))
-            if not (res.pow_hash > res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
+            return cls(net, peer, other_txs=None, **share1a_type.unpack(share['contents']))
         elif share['type'] == 3:
             share1b = share1b_type.unpack(share['contents'])
-            res = cls(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
-            if not (res.pow_hash <= res.header['bits'].target):
-                raise ValueError('invalid share type')
-            return res
+            return cls(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
         else:
             raise ValueError('unknown share type: %r' % (share['type'],))
     
-    def __init__(self, net, peer, min_header, share_info, hash_link, merkle_branch, other_txs=None):
+    def __init__(self, net, peer, min_header, share_info, hash_link, merkle_branch, other_txs):
         if len(share_info['share_data']['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
@@ -210,7 +204,6 @@ class Share(object):
         self.merkle_branch = merkle_branch
         self.other_txs = other_txs
         
-        self.hash = bitcoin_data.hash256(share_type.pack(self.as_share(block_hint=other_txs is not None)))
         self.share_data = self.share_info['share_data']
         self.max_target = self.share_info['max_bits'].target
         self.target = self.share_info['bits'].target
@@ -241,6 +234,8 @@ class Share(object):
         if other_txs is None and self.pow_hash <= self.header['bits'].target:
             raise ValueError('other_txs not provided when a block solution')
         
+        self.hash = bitcoin_data.hash256(share_type.pack(self.as_share()))
+        
         # XXX eww
         self.time_seen = time.time()
     
@@ -254,14 +249,10 @@ class Share(object):
         if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:
             raise ValueError('''gentx doesn't match hash_link''')
     
-    def as_share(self, block_hint=None):
-        if block_hint is None:
-            block_hint = self.pow_hash <= self.header['bits'].target
-        if not block_hint: # share1a
+    def as_share(self):
+        if not self.pow_hash <= self.header['bits'].target: # share1a
             return dict(type=2, contents=share1a_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, merkle_branch=self.merkle_branch)))
         else: # share1b
-            if self.other_txs is None:
-                raise ValueError('share does not contain all txs')
             return dict(type=3, contents=share1b_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, other_txs=self.other_txs)))
     
     def as_block(self, tracker):
@@ -370,7 +361,7 @@ class OkayTracker(forest.Tracker):
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
             #self.shares[h].peer is None,
-            self.shares[h].pow_hash < self.shares[h].header['bits'].target, # is block solution
+            self.shares[h].pow_hash <= self.shares[h].header['bits'].target, # is block solution
             (self.shares[h].header['previous_block'], self.shares[h].header['bits']) == (previous_block, bits) or self.shares[h].peer is None,
             -self.shares[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
