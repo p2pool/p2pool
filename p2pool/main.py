@@ -296,8 +296,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
                 peer.sendShares(shares)
         
-        
-        submit_block = deferral.retry('Error submitting primary block: (will retry)', 10, 10)(lambda block: bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex')))
+        @deferral.retry('Error submitting block: (will retry)', 10, 10)
+        @defer.inlineCallbacks
+        def submit_block(block):
+            result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
+            expected_result = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
+            if result != expected_result:
+                print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (result, expected_result)
+                raise deferral.RetrySilentlyException()
         
         @tracker.verified.added.watch
         def _(share):
