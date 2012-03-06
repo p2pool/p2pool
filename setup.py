@@ -16,7 +16,7 @@ setup(name='p2pool',
     author='Forrest Voight',
     author_email='forrest@forre.st',
     url='http://p2pool.forre.st/',
-    data_files=[('', ['README', 'README-Litecoin'])],
+    data_files=[('', ['README'])],
     
     console=['run_p2pool.py'],
     options=dict(py2exe=dict(
