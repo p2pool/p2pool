@@ -352,7 +352,7 @@ class OkayTracker(forest.Tracker):
                 ))
         
         # decide best tree
-        decorated_tails = sorted((self.score(max(self.verified.tails[tail_hash], key=self.verified.get_height), block_rel_height_func), tail_hash) for tail_hash in self.verified.tails) # XXX using get_height here is quite possibly incorrect and vulnerable
+        decorated_tails = sorted((self.score(max(self.verified.tails[tail_hash], key=self.verified.get_work), block_rel_height_func), tail_hash) for tail_hash in self.verified.tails)
         if p2pool.DEBUG:
             print len(decorated_tails), 'tails:'
             for score, tail_hash in decorated_tails:
