@@ -298,17 +298,16 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         @deferral.retry('Error submitting block: (will retry)', 10, 10)
         @defer.inlineCallbacks
-        def submit_block(block):
-            result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
-            expected_result = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
-            if result != expected_result:
+        def submit_block(block, ignore_failure):
+            success = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
+            success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
+            if (not success and success_expected and not ignore_failure) or (success and not success_expected):
                 print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (result, expected_result)
-                raise deferral.RetrySilentlyException()
         
         @tracker.verified.added.watch
         def _(share):
             if share.pow_hash <= share.header['bits'].target:
-                submit_block(share.as_block(tracker))
+                submit_block(share.as_block(tracker), ignore_failure=True)
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
@@ -568,7 +567,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     try:
                         if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                            submit_block(dict(header=header, txs=transactions))
+                            submit_block(dict(header=header, txs=transactions), ignore_failure=False)
                             if pow_hash <= header['bits'].target:
                                 print
                                 print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
