@@ -238,7 +238,13 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH</p>' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
             
             request.write('<h1>Share <a href="%x">%s</a></h1>' % (share.hash, p2pool_data.format_hash(share.hash)))
-            request.write('<p>Previous: <a href="%x">%s</a></p>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
+            if share.previous_hash is not None:
+                request.write('<p>Previous: <a href="%x">%s</a>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
+            if tracker.get_height(share.hash) >= 100:
+                jump_hash = tracker.get_nth_parent_hash(share.hash, 100)
+                if jump_hash is not None:
+                    request.write(' (100 jump <a href="%x">%s</a>)' % (jump_hash, p2pool_data.format_hash(jump_hash)))
+            request.write('</p>')
             request.write('<p>Next: %s</p>' % (', '.join('<a href="%x">%s</a>' % (next, p2pool_data.format_hash(next)) for next in sorted(tracker.reverse_shares.get(share.hash, set()), key=lambda sh: -len(tracker.reverse_shares.get(sh, set())))),))
             request.write('<p>Verified: %s</p>' % (share.hash in tracker.verified.shares,))
             request.write('<p>Time first seen: %s</p>' % (time.ctime(start_time if share.time_seen == 0 else share.time_seen),))
