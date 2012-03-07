@@ -40,7 +40,7 @@ class WorkerInterface(object):
         
         self.worker_views = {}
         
-        self.work_cache = {} # request_process_func(request) -> blockattempt
+        self.work_cache = {}
         self.work_cache_times = self.worker_bridge.new_work_event.times
         
         self.merkle_root_to_handler = expiring_dict.ExpiringDict(300)
@@ -84,15 +84,16 @@ class WorkerInterface(object):
             self.work_cache_times = self.worker_bridge.new_work_event.times
         
         if key in self.work_cache:
-            res, orig_timestamp = self.work_cache.pop(key)
+            res, orig_timestamp, handler = self.work_cache.pop(key)
         else:
             res, handler = self.worker_bridge.get_work(*key)
             assert res.merkle_root not in self.merkle_root_to_handler
-            self.merkle_root_to_handler[res.merkle_root] = handler
             orig_timestamp = res.timestamp
         
+        self.merkle_root_to_handler[res.merkle_root] = handler
+        
         if res.timestamp + 12 < orig_timestamp + 600:
-            self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp
+            self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp, handler
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
