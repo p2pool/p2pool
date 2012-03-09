@@ -171,7 +171,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             @deferral.DeferredCacher
             @defer.inlineCallbacks
             def height_cacher(block_hash):
-                x = yield bitcoind.rpc_getblock('%x' % (block_hash,))
+                try:
+                    x = yield bitcoind.rpc_getblock('%x' % (block_hash,))
+                except jsonrpc.Error, e:
+                    if e.code == -5 and not p2pool.DEBUG:
+                        raise deferral.RetrySilentlyException()
+                    raise
                 defer.returnValue(x['blockcount'] if 'blockcount' in x else x['height'])
             best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(pre_current_work.value['previous_block'])))
             def get_height_rel_highest(block_hash):
