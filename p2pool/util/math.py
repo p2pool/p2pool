@@ -118,7 +118,6 @@ def ierf(z):
 try:
     from scipy import special
 except ImportError:
-    print 'Install SciPy for more accurate confidence intervals!'
     def binomial_conf_interval(x, n, conf=0.95):
         assert 0 <= x <= n and 0 <= conf < 1
         if n == 0:
