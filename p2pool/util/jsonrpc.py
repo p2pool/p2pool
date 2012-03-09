@@ -117,10 +117,12 @@ class Server(deferred_resource.DeferredResource):
             result = None
             error = Error(-32099, u'Unknown error')._to_obj()
         
-        request.setHeader('Content-Type', 'application/json')
-        request.write(json.dumps(dict(
+        data = json.dumps(dict(
             jsonrpc='2.0',
             id=id_,
             result=result,
             error=error,
-        )))
+        ))
+        request.setHeader('Content-Type', 'application/json')
+        request.setHeader('Content-Length', len(data))
+        request.write(data)
