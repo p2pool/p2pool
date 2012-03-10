@@ -1,5 +1,6 @@
 from __future__ import division
 
+import ctypes
 import struct
 
 
@@ -35,6 +36,35 @@ def process(state, chunk):
     
     return struct.pack('>8I', *((x + y) % 2**32 for x, y in zip(start_state, [a, b, c, d, e, f, g, h])))
 
+def make_accelerated_process_func():
+    sha256_kernel = '4157415641554154555341504531c0420fb60407460fb64c0701c1e01841c1e1104409c8460fb64c07034409c8460fb64c070241c1e1084409c842894404c84983c0044983f82075c631c08b7c04c8897c04e84883c0044883f82075ee31ff0fb6043e440fb6443e01c1e01841c1e0104409c0440fb6443e034409c0440fb6443e0241c1e0084409c089443c884883c7044883ff4075c831c0bd07000000bb0400000041bb0600000041ba05000000e99c00000083fe0f0f868d0000008d78ff4989f44183e40f83e70f448b74bc888d78f283e80683e00f448b4c848883e70f46034ca4884589f54489f0448b44bc884d89efc1e00f41c1e60d49c1ef114409f84d89ef49c1ed0a49c1ef134489c74509fe4431f04431e84989fd4101c14489c049c1ed07c1e01941c1e00e4409e84989fd48c1ef0349c1ed124509e84431c031f84401c8428944a4884883c20489f089de4189e929c64129c183e6074183e1078b7cb4e84489de29c683e607448b6cb4e84889c64189fc83e60f4189fe448b44b4884489d644030229c64603448ce841c1e61a83e6078b74b4e84431ee21fe4431ee4d89e54101f089fe49c1ed0bc1e615c1e7074409ee4d89e549c1ec1949c1ed064409e74509ee4431f631fe458d2c3089c6f7de83e6078b7cb4e8be0100000029c683e6074189fc448b74b4e889fe4d89e0c1e6134d89e749c1e80d4409c64189f849c1ef0241c1e01e4509f84431c64d89e04189fc49c1e81641c1e40a4509c44589f04431e641bc020000004109f84129c44421f74183e407462344a4e84109f8bf0300000029c74401c683e70744016cbce84101f58d700146896c8ce883fe400f854afeffff31c08b5404e8035404c889d688540103c1ee184088340189d6c1ee10408874010189d6c1ee0840887401024883c0044883f82075cd585b5d415c415d415e415fc3909090909090909090'.decode('hex') # does this look suspicious?
+
+    libc = ctypes.CDLL("libc.so.6")
+    libc.mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+    libc.sysconf.restype = ctypes.c_long
+    def make_executable(addr, size):
+        _SC_PAGESIZE = 30
+        PROT_READ = 1
+        PROT_WRITE = 2
+        PROT_EXECUTE = 4
+        pagesize = libc.sysconf(_SC_PAGESIZE)
+        if pagesize <= 0:
+            raise Error()
+        gap = addr % pagesize
+        if libc.mprotect(addr - gap, size + gap, PROT_READ | PROT_WRITE | PROT_EXECUTE):
+            raise Error()
+    
+    sha256_func = ctypes.cast(sha256_kernel, ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint32), ctypes.c_char_p))
+    make_executable(ctypes.cast(sha256_kernel, ctypes.c_void_p).value, len(sha256_kernel))
+    
+    k2 = (ctypes.c_uint32*len(k))(*k)
+    def process(state, chunk):
+        s = ctypes.create_string_buffer(32)
+        sha256_func(state, chunk, k2, s)
+        return s.raw
+        sha256_kernel # keeps it from being freed
+    return process
+process = make_accelerated_process_func()
 
 initial_state = struct.pack('>8I', 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19)
 
