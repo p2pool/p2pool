@@ -135,6 +135,9 @@ class Protocol(BaseProtocol):
             self.factory.resetDelay()
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(self)
+        
+        self.pinger = task.LoopingCall(self.send_ping)
+        self.pinger.start(30)
     
     message_inv = pack.ComposedType([
         ('invs', pack.ListType(pack.ComposedType([
@@ -216,6 +219,8 @@ class Protocol(BaseProtocol):
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(None)
+        if hasattr(self, 'pinger'):
+            self.pinger.stop()
         print 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
 
 class ClientFactory(protocol.ReconnectingClientFactory):
