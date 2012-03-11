@@ -17,7 +17,7 @@ from twisted.python import log
 from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
-from bitcoin import worker_interface
+from bitcoin import worker_interface, height_tracker
 from util import expiring_dict, jsonrpc, variable, deferral, math, logging, pack
 from . import p2p, networks, web
 import p2pool, p2pool.data as p2pool_data
@@ -166,25 +166,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             ))
         yield set_real_work1()
         
-        if '\ngetblock ' in (yield deferral.retry()(bitcoind.rpc_help)()):
-            @deferral.DeferredCacher
-            @defer.inlineCallbacks
-            def height_cacher(block_hash):
-                try:
-                    x = yield bitcoind.rpc_getblock('%x' % (block_hash,))
-                except jsonrpc.Error, e:
-                    if e.code == -5 and not p2pool.DEBUG:
-                        raise deferral.RetrySilentlyException()
-                    raise
-                defer.returnValue(x['blockcount'] if 'blockcount' in x else x['height'])
-            best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(pre_current_work.value['previous_block'])))
-            def get_height_rel_highest(block_hash):
-                this_height = height_cacher.call_now(block_hash, 0)
-                best_height = height_cacher.call_now(pre_current_work.value['previous_block'], 0)
-                best_height_cached.set(max(best_height_cached.value, this_height, best_height))
-                return this_height - best_height_cached.value
-        else:
-            get_height_rel_highest = bitcoin_p2p.HeightTracker(bitcoind, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height_rel_highest
+        get_height_rel_highest = yield height_tracker.get_height_rel_highest_func(bitcoind, factory, pre_current_work, net)
         
         def set_real_work2():
             best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'], pre_current_work.value['bits'])
