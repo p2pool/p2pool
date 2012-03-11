@@ -64,7 +64,7 @@ class Proxy(object):
         if resp['id'] != id_:
             raise ValueError('invalid id')
         if 'error' in resp and resp['error'] is not None:
-            raise Error(**resp['error'])
+            raise Error(**unicode(resp['error']))
         defer.returnValue(resp['result'])
     
     def __getattr__(self, attr):
