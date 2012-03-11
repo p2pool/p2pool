@@ -13,8 +13,8 @@ class Error(Exception):
     def __init__(self, code, message, data=None):
         if not isinstance(code, int):
             raise TypeError('code must be an int')
-        if not isinstance(message, unicode):
-            raise TypeError('message must be a unicode')
+        #if not isinstance(message, unicode):
+        #    raise TypeError('message must be a unicode')
         self.code, self.message, self.data = code, message, data
     def __str__(self):
         return '%i %s' % (self.code, self.message) + (' %r' % (self.data, ) if self.data is not None else '')
