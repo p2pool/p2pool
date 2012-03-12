@@ -5,7 +5,6 @@ import StringIO
 import argparse
 import os
 import random
-import struct
 import sys
 import time
 import signal

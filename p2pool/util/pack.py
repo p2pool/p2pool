@@ -63,7 +63,7 @@ class Type(object):
         
         if p2pool.DEBUG:
             if self._pack(obj) != data:
-                    raise AssertionError()
+                raise AssertionError()
         
         return obj
     

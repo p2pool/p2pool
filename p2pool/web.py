@@ -4,7 +4,6 @@ import cgi
 import json
 import os
 import time
-import types
 
 from twisted.internet import reactor, task
 from twisted.python import log
@@ -334,6 +333,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         reactor.callLater(1, grapher.add_localrate_point, work, dead)
         if user is not None:
             reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
-
+    
     
     return web_root
