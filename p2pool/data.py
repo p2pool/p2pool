@@ -178,7 +178,10 @@ class Share(object):
     
     @classmethod
     def from_share(cls, share, net, peer):
-        if share['type'] == 2:
+        if share['type'] in [0, 1]:
+            from p2pool import p2p
+            raise p2p.PeerMisbehavingError('sent an obsolete share')
+        elif share['type'] == 2:
             return cls(net, peer, other_txs=None, **share1a_type.unpack(share['contents']))
         elif share['type'] == 3:
             share1b = share1b_type.unpack(share['contents'])

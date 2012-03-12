@@ -12,6 +12,9 @@ from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, pack
 
+class PeerMisbehavingError(Exception):
+    pass
+
 class Protocol(bitcoin_p2p.BaseProtocol):
     def __init__(self, node, incoming):
         bitcoin_p2p.BaseProtocol.__init__(self, node.net.PREFIX, 1000000)
@@ -61,11 +64,13 @@ class Protocol(bitcoin_p2p.BaseProtocol):
             self.transport.loseConnection()
     
     def packetReceived(self, command, payload2):
-        if command != 'version' and not self.connected2:
-            self.transport.loseConnection()
-            return
-        
-        bitcoin_p2p.BaseProtocol.packetReceived(self, command, payload2)
+        try:
+            if command != 'version' and not self.connected2:
+                raise PeerMisbehavingError('first message was not version message')
+            bitcoin_p2p.BaseProtocol.packetReceived(self, command, payload2)
+        except PeerMisbehavingError, e:
+            print 'Peer %s:%i misbehaving, will drop and ban. Reason:' % self.addr, e.message
+            self.badPeerHappened()
     
     def badPeerHappened(self):
         self.transport.loseConnection()
@@ -101,17 +106,14 @@ class Protocol(bitcoin_p2p.BaseProtocol):
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         if self.other_version is not None or version < 2:
-            self.transport.loseConnection()
-            return
+            raise PeerMisbehavingError('more than one version message')
         
         self.other_version = version
         self.other_sub_version = sub_version[:512]
         self.other_services = services
         
         if nonce == self.node.nonce:
-            #print 'Detected connection to self, disconnecting from %s:%i' % self.addr
-            self.transport.loseConnection()
-            return
+            raise PeerMisbehavingError('was connected to self')
         if nonce in self.node.peers:
             #print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
