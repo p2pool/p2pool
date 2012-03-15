@@ -11,15 +11,15 @@ import p2pool
 from p2pool.bitcoin import getwork
 from p2pool.util import expiring_dict, jsonrpc, variable
 
-class _Page(jsonrpc.Server):
+class _Provider(object):
     def __init__(self, parent, long_poll):
-        jsonrpc.Server.__init__(self)
         self.parent = parent
         self.long_poll = long_poll
     
     def rpc_getwork(self, request, data=None):
         return self.parent._getwork(request, data, long_poll=self.long_poll)
-    
+
+class _GETableServer(jsonrpc.Server):
     def render_GET(self, request):
         request.content = StringIO.StringIO(json.dumps(dict(id=0, method='getwork')))
         return self.render_POST(request)
@@ -46,8 +46,8 @@ class WorkerInterface(object):
         self.merkle_root_to_handler = expiring_dict.ExpiringDict(300)
     
     def attach_to(self, res):
-        res.putChild('', _Page(self, long_poll=False))
-        res.putChild('long-polling', _Page(self, long_poll=True))
+        res.putChild('', _GETableServer(_Provider(self, long_poll=False)))
+        res.putChild('long-polling', _GETableServer(_Provider(self, long_poll=True)))
     
     @defer.inlineCallbacks
     def _getwork(self, request, data, long_poll):

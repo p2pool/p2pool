@@ -67,6 +67,9 @@ class Proxy(object):
         raise AttributeError('%r object has no attribute %r' % (self.__class__.__name__, attr))
 
 class Server(deferred_resource.DeferredResource):
+    def __init__(self, provider):
+        self._provider = provider
+    
     @defer.inlineCallbacks
     def render_POST(self, request):
         # missing batching, 1.0 notifications
@@ -92,7 +95,7 @@ class Server(deferred_resource.DeferredResource):
             except Exception:
                 raise Error(-32600, u'Invalid Request')
             
-            method_meth = getattr(self, 'rpc_' + method, None)
+            method_meth = getattr(self._provider, 'rpc_' + method, None)
             if method_meth is None:
                 raise Error(-32601, u'Method not found')
             
