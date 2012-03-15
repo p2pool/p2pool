@@ -3,6 +3,7 @@ from __future__ import division
 import ConfigParser
 import StringIO
 import argparse
+import base64
 import os
 import random
 import sys
@@ -53,7 +54,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
-        bitcoind = jsonrpc.Proxy(url, (args.bitcoind_rpc_username, args.bitcoind_rpc_password))
+        bitcoind = jsonrpc.Proxy(url, dict(Authorization='Basic ' + base64.b64encode(args.bitcoind_rpc_username + ':' + args.bitcoind_rpc_password)))
         good = yield deferral.retry('Error while checking bitcoind identity:', 1)(net.PARENT.RPC_CHECK)(bitcoind)
         if not good:
             print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
@@ -212,7 +213,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         @defer.inlineCallbacks
         def set_merged_work(merged_url, merged_userpass):
-            merged_proxy = jsonrpc.Proxy(merged_url, (merged_userpass,))
+            merged_proxy = jsonrpc.Proxy(merged_url, dict(Authorization='Basic ' + base64.b64encode(merged_userpass)))
             while True:
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged_proxy.rpc_getauxblock)()
                 pre_merged_work.set(dict(pre_merged_work.value, **{auxblock['chainid']: dict(

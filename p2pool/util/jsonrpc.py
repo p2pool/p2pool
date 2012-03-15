@@ -1,6 +1,5 @@
 from __future__ import division
 
-import base64
 import json
 
 from twisted.internet import defer
@@ -26,25 +25,20 @@ class Error(Exception):
         }
 
 class Proxy(object):
-    def __init__(self, url, auth=None, timeout=5):
+    def __init__(self, url, headers={}, timeout=5):
         self._url = url
-        self._auth = auth
+        self._headers = headers
         self._timeout = timeout
     
     @defer.inlineCallbacks
     def callRemote(self, method, *params):
         id_ = 0
         
-        headers = {
-            'Content-Type': 'application/json',
-        }
-        if self._auth is not None:
-            headers['Authorization'] = 'Basic ' + base64.b64encode(':'.join(self._auth))
         try:
             data = yield client.getPage(
                 url=self._url,
                 method='POST',
-                headers=headers,
+                headers=dict(self._headers, **{'Content-Type': 'application/json'}),
                 postdata=json.dumps({
                     'jsonrpc': '2.0',
                     'method': method,
