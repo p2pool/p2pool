@@ -1,11 +1,10 @@
 from twisted.internet import defer, task
 from twisted.python import log
 
-from p2pool.bitcoin import data as bitcoin_data, getwork
+from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, forest, variable
 
 class HeaderWrapper(object):
-    target = 2**256 - 1
     __slots__ = 'hash previous_hash'.split(' ')
     
     @classmethod
@@ -18,8 +17,8 @@ class HeaderWrapper(object):
 class HeightTracker(object):
     '''Point this at a factory and let it take care of getting block heights'''
     
-    def __init__(self, rpc_proxy, factory, backlog_needed):
-        self._rpc_proxy = rpc_proxy
+    def __init__(self, best_block_func, factory, backlog_needed):
+        self._best_block_func = best_block_func
         self._factory = factory
         self._backlog_needed = backlog_needed
         
@@ -40,7 +39,6 @@ class HeightTracker(object):
         self._think_task.start(15)
         self._think2_task = task.LoopingCall(self._think2)
         self._think2_task.start(15)
-        self.best_hash = None
     
     def _think(self):
         try:
@@ -53,14 +51,8 @@ class HeightTracker(object):
         except:
             log.err(None, 'Error in HeightTracker._think:')
     
-    @defer.inlineCallbacks
     def _think2(self):
-        try:
-            ba = getwork.BlockAttempt.from_getwork((yield self._rpc_proxy.rpc_getwork()))
-            self._request(ba.previous_block)
-            self.best_hash = ba.previous_block
-        except:
-            log.err(None, 'Error in HeightTracker._think2:')
+        self._request(self._best_block_func())
     
     def _heard_headers(self, headers):
         changed = False
@@ -89,14 +81,14 @@ class HeightTracker(object):
     
     def get_height_rel_highest(self, block_hash):
         # callers: highest height can change during yields!
-        best_height, best_last = self._tracker.get_height_and_last(self.best_hash)
+        best_height, best_last = self._tracker.get_height_and_last(self._best_block_func())
         height, last = self._tracker.get_height_and_last(block_hash)
         if last != best_last:
             return -1000000000 # XXX hack
         return height - best_height
 
 @defer.inlineCallbacks
-def get_height_rel_highest_func(bitcoind, factory, current_work, net):
+def get_height_rel_highest_func(bitcoind, factory, best_block_func, net):
     if '\ngetblock ' in (yield deferral.retry()(bitcoind.rpc_help)()):
         @deferral.DeferredCacher
         @defer.inlineCallbacks
@@ -108,12 +100,12 @@ def get_height_rel_highest_func(bitcoind, factory, current_work, net):
                     raise deferral.RetrySilentlyException()
                 raise
             defer.returnValue(x['blockcount'] if 'blockcount' in x else x['height'])
-        best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(current_work.value['previous_block'])))
+        best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(best_block_func())))
         def get_height_rel_highest(block_hash):
             this_height = height_cacher.call_now(block_hash, 0)
-            best_height = height_cacher.call_now(current_work.value['previous_block'], 0)
+            best_height = height_cacher.call_now(best_block_func(), 0)
             best_height_cached.set(max(best_height_cached.value, this_height, best_height))
             return this_height - best_height_cached.value
     else:
-        get_height_rel_highest = HeightTracker(bitcoind, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height_rel_highest
+        get_height_rel_highest = HeightTracker(best_block_func, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height_rel_highest
     defer.returnValue(get_height_rel_highest)

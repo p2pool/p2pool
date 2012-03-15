@@ -166,7 +166,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             ))
         yield set_real_work1()
         
-        get_height_rel_highest = yield height_tracker.get_height_rel_highest_func(bitcoind, factory, pre_current_work, net)
+        get_height_rel_highest = yield height_tracker.get_height_rel_highest_func(bitcoind, factory, lambda: pre_current_work.value['previous_block'], net)
         
         def set_real_work2():
             best, desired = tracker.think(get_height_rel_highest, pre_current_work.value['previous_block'], pre_current_work.value['bits'])
