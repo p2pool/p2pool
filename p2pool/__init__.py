@@ -5,7 +5,7 @@ import subprocess
 
 def _get_version():
     try:
-        return subprocess.check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(sys.argv[0])).strip()
+        return subprocess.check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0])), shell=True).strip()
     except:
         pass
     try:
