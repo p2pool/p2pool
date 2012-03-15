@@ -77,42 +77,42 @@ class Server(deferred_resource.DeferredResource):
         id_ = None
         
         try:
-            data = request.content.read()
-            
             try:
-                req = json.loads(data)
+                data = request.content.read()
+                
+                try:
+                    req = json.loads(data)
+                except Exception:
+                    raise Error(-32700, u'Parse error')
+                
+                try:
+                    id_ = req.get('id', None)
+                    method = req['method']
+                    if not isinstance(method, basestring):
+                        raise ValueError()
+                    params = req.get('params', [])
+                    if not isinstance(params, list):
+                        raise ValueError()
+                except Exception:
+                    raise Error(-32600, u'Invalid Request')
+                
+                method_meth = getattr(self._provider, 'rpc_' + method, None)
+                if method_meth is None:
+                    raise Error(-32601, u'Method not found')
+                
+                result = yield method_meth(request, *params)
+                error = None
+                
+                if id_ is None:
+                    return
+            except Error:
+                raise
             except Exception:
-                raise Error(-32700, u'Parse error')
-            
-            try:
-                id_ = req.get('id', None)
-                method = req['method']
-                if not isinstance(method, basestring):
-                    raise ValueError()
-                params = req.get('params', [])
-                if not isinstance(params, list):
-                    raise ValueError()
-            except Exception:
-                raise Error(-32600, u'Invalid Request')
-            
-            method_meth = getattr(self._provider, 'rpc_' + method, None)
-            if method_meth is None:
-                raise Error(-32601, u'Method not found')
-            
-            result = yield method_meth(request, *params)
-            
-            if id_ is None:
-                return
-            
-            error = None
+                log.err(None, 'Squelched JSON error:')
+                raise Error(-32099, u'Unknown error')
         except Error, e:
             result = None
             error = e._to_obj()
-        except Exception:
-            log.err(None, 'Squelched JSON error:')
-            
-            result = None
-            error = Error(-32099, u'Unknown error')._to_obj()
         
         data = json.dumps(dict(
             jsonrpc='2.0',
