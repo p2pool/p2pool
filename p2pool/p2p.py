@@ -105,8 +105,10 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         ('best_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
-        if self.other_version is not None or version < 2:
+        if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
+        if version < 2:
+            raise PeerMisbehavingError('peer too old')
         
         self.other_version = version
         self.other_sub_version = sub_version[:512]
