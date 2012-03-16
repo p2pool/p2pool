@@ -126,6 +126,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, d
     weights, total_weight, donation_weight = tracker.get_cumulative_weights(share_data['previous_share_hash'],
         min(height, net.REAL_CHAIN_LENGTH),
         65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
+        True,
     )
     assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
     
@@ -167,7 +168,7 @@ def generate_transaction(tracker, share_data, block_target, desired_timestamp, d
     )
 
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
-    weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
+    weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target), False)
     res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
     res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
     return res
@@ -278,19 +279,22 @@ class WeightsSkipList(forest.TrackerSkipList):
     def combine_deltas(self, (share_count1, weights1, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2)):
         return share_count1 + share_count2, math.add_dicts(weights1, weights2), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
     
-    def initial_solution(self, start, (max_shares, desired_weight)):
+    def initial_solution(self, start, (max_shares, desired_weight, broken_mode)):
         assert desired_weight % 65535 == 0, divmod(desired_weight, 65535)
         return 0, None, 0, 0
     
-    def apply_delta(self, (share_count1, weights_list, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2), (max_shares, desired_weight)):
+    def apply_delta(self, (share_count1, weights_list, total_weight1, total_donation_weight1), (share_count2, weights2, total_weight2, total_donation_weight2), (max_shares, desired_weight, broken_mode)):
         if total_weight1 + total_weight2 > desired_weight and share_count2 == 1:
             assert (desired_weight - total_weight1) % 65535 == 0
             script, = weights2.iterkeys()
-            new_weights = dict(script=(desired_weight - total_weight1)//65535*weights2[script]//(total_weight2//65535))
+            if broken_mode:
+                new_weights = dict(script=(desired_weight - total_weight1)//65535*weights2[script]//(total_weight2//65535))
+            else:
+                new_weights = {script: (desired_weight - total_weight1)//65535*weights2[script]//(total_weight2//65535)}
             return share_count1 + share_count2, (weights_list, new_weights), desired_weight, total_donation_weight1 + (desired_weight - total_weight1)//65535*total_donation_weight2//(total_weight2//65535)
         return share_count1 + share_count2, (weights_list, weights2), total_weight1 + total_weight2, total_donation_weight1 + total_donation_weight2
     
-    def judge(self, (share_count, weights_list, total_weight, total_donation_weight), (max_shares, desired_weight)):
+    def judge(self, (share_count, weights_list, total_weight, total_donation_weight), (max_shares, desired_weight, broken_mode)):
         if share_count > max_shares or total_weight > desired_weight:
             return 1
         elif share_count == max_shares or total_weight == desired_weight:
@@ -298,7 +302,7 @@ class WeightsSkipList(forest.TrackerSkipList):
         else:
             return -1
     
-    def finalize(self, (share_count, weights_list, total_weight, total_donation_weight), (max_shares, desired_weight)):
+    def finalize(self, (share_count, weights_list, total_weight, total_donation_weight), (max_shares, desired_weight, broken_mode)):
         assert share_count <= max_shares and total_weight <= desired_weight
         assert share_count == max_shares or total_weight == desired_weight
         return math.add_dicts(*math.flatten_linked_list(weights_list)), total_weight, total_donation_weight
