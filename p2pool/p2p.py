@@ -8,16 +8,15 @@ from twisted.python import log
 
 import p2pool
 from p2pool import data as p2pool_data
-from p2pool.bitcoin import p2p as bitcoin_p2p
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral, pack
+from p2pool.util import deferral, p2protocol, pack
 
 class PeerMisbehavingError(Exception):
     pass
 
-class Protocol(bitcoin_p2p.BaseProtocol):
+class Protocol(p2protocol.Protocol):
     def __init__(self, node, incoming):
-        bitcoin_p2p.BaseProtocol.__init__(self, node.net.PREFIX, 1000000)
+        p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000)
         self.node = node
         self.incoming = incoming
         
@@ -67,7 +66,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         try:
             if command != 'version' and not self.connected2:
                 raise PeerMisbehavingError('first message was not version message')
-            bitcoin_p2p.BaseProtocol.packetReceived(self, command, payload2)
+            p2protocol.Protocol.packetReceived(self, command, payload2)
         except PeerMisbehavingError, e:
             print 'Peer %s:%i misbehaving, will drop and ban. Reason:' % self.addr, e.message
             self.badPeerHappened()
@@ -206,7 +205,7 @@ class Protocol(bitcoin_p2p.BaseProtocol):
         def att(f, **kwargs):
             try:
                 f(**kwargs)
-            except bitcoin_p2p.TooLong:
+            except p2protocol.TooLong:
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
         if shares:
