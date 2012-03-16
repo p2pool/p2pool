@@ -229,9 +229,7 @@ class Share(object):
         self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.header))
         
         if self.pow_hash > self.target:
-            print 'hash %x' % self.pow_hash
-            print 'targ %x' % self.target
-            raise ValueError('not enough work!')
+            raise p2p.PeerMisbehavingError('share PoW invalid')
         
         if other_txs is not None and not self.pow_hash <= self.header['bits'].target:
             raise ValueError('other_txs provided when not a block solution')
