@@ -2,7 +2,7 @@ from twisted.internet import defer, task
 from twisted.python import log
 
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral, forest, variable
+from p2pool.util import deferral, forest, jsonrpc, variable
 
 class HeaderWrapper(object):
     __slots__ = 'hash previous_hash'.split(' ')
