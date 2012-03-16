@@ -3,10 +3,12 @@ Implementation of Bitcoin's p2p protocol
 '''
 
 import random
+import sys
 import time
 
-from twisted.internet import defer, protocol, reactor, task
+from twisted.internet import protocol, task
 
+import p2pool
 from . import data as bitcoin_data
 from p2pool.util import deferral, p2protocol, pack, variable
 
@@ -143,7 +145,8 @@ class Protocol(p2protocol.Protocol):
             self.factory.gotConnection(None)
         if hasattr(self, 'pinger'):
             self.pinger.stop()
-        print 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
+        if p2pool.DEBUG:
+            print >>sys.stderr, 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol
@@ -168,20 +171,3 @@ class ClientFactory(protocol.ReconnectingClientFactory):
     
     def getProtocol(self):
         return self.conn.get_not_none()
-
-if __name__ == '__main__':
-    from . import networks
-    factory = ClientFactory(networks.BitcoinMainnet)
-    reactor.connectTCP('127.0.0.1', 8333, factory)
-    
-    @repr
-    @apply
-    @defer.inlineCallbacks
-    def think():
-        try:
-            print (yield (yield factory.getProtocol()).get_block(0x000000000000003aaaf7638f9f9c0d0c60e8b0eb817dcdb55fd2b1964efc5175))
-        except defer.TimeoutError:
-            print "timeout"
-        reactor.stop()
-    
-    reactor.run()
