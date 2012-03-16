@@ -492,7 +492,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     mm_data = ''
                     mm_later = []
                 
-                share_info, generate_tx = p2pool_data.generate_transaction(
+                share_info, generate_tx = p2pool_data.Share.generate_transaction(
                     tracker=tracker,
                     share_data=dict(
                         previous_share_hash=current_work.value['best_share_hash'],
@@ -598,7 +598,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     if pow_hash <= share_info['bits'].target:
                         min_header = dict(header);del min_header['merkle_root']
-                        hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.gentx_before_refhash)
+                        hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
                         share = p2pool_data.Share(net, None, min_header, share_info, hash_link=hash_link, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
                         
                         print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
