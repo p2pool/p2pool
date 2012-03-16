@@ -335,17 +335,27 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         if user is not None:
             reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
     
+    hd_path = os.path.join(datadir_path, 'graph_db')
+    hd_obj = {}
+    if os.path.exists(hd_path):
+        try:
+            hd_obj = json.loads(open(hd_path, 'rb').read())
+        except Exception:
+            log.err(None, 'Error reading graph database:')
     dataview_descriptions = {
         'last_hour': graph.DataViewDescription(150, 60*60),
         'last_day': graph.DataViewDescription(300, 60*60*24),
         'last_week': graph.DataViewDescription(300, 60*60*24*7),
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
     }
-    hd = graph.HistoryDatabase.from_file({
+    hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
-    }, os.path.join(datadir_path, 'graph_db'))
-    task.LoopingCall(hd.write, os.path.join(datadir_path, 'graph_db')).start(100)
+    }, hd_obj)
+    def _atomic_write(filename, data):
+        open(filename + '.new', 'w').write(data)
+        os.rename(filename + '.new', filename)
+    task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
     def _(work, dead, user):
         t = time.time()

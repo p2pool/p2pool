@@ -1,16 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 
-import json
 import math
-import os
-
-from twisted.python import log
-
-
-def _atomic_write(filename, data):
-    open(filename + '.new', 'w').write(data)
-    os.rename(filename + '.new', filename)
 
 
 class DataViewDescription(object):
@@ -61,25 +52,10 @@ class DataStream(object):
 
 class HistoryDatabase(object):
     @classmethod
-    def from_nothing(cls, datastream_descriptions):
-        return cls(dict(
-            (ds_name, DataStream(ds_desc, dict(
-                (dv_name, DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[(0, 0)]))
-                for dv_name, dv_desc in ds_desc.dataview_descriptions.iteritems()
-            )))
-            for ds_name, ds_desc in datastream_descriptions.iteritems()
-        ))
-    
-    @classmethod
-    def from_file(cls, datastream_descriptions, filename):
-        try:
-            data = json.loads(open(filename, 'rb').read())
-        except Exception: # XXX
-            log.err()
-            data = {}
+    def from_obj(cls, datastream_descriptions, obj={}):
         def get_dataview(ds_name, ds_desc, dv_name, dv_desc):
-            if ds_name in data:
-                ds_data = data[ds_name]
+            if ds_name in obj:
+                ds_data = obj[ds_name]
                 if dv_name in ds_data:
                     dv_data = ds_data[dv_name]
                     if dv_data['bin_width'] == dv_desc.bin_width and len(dv_data['bins']) == dv_desc.bin_count:
@@ -96,8 +72,6 @@ class HistoryDatabase(object):
     def __init__(self, datastreams):
         self.datastreams = datastreams
     
-    def write(self, filename):
-        _atomic_write(filename, json.dumps(
-            dict((ds_name, dict((dv_name, dict(last_bin_end=dv.last_bin_end, bin_width=dv.desc.bin_width, bins=dv.bins))
-                for dv_name, dv in ds.dataviews.iteritems())) for ds_name, ds in self.datastreams.iteritems())
-        ))
+    def to_obj(self):
+        return dict((ds_name, dict((dv_name, dict(last_bin_end=dv.last_bin_end, bin_width=dv.desc.bin_width, bins=dv.bins))
+            for dv_name, dv in ds.dataviews.iteritems())) for ds_name, ds in self.datastreams.iteritems())
