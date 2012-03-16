@@ -196,7 +196,7 @@ class Protocol(p2protocol.Protocol):
         ('stops', pack.ListType(pack.IntType(256))),
     ])
     def handle_getshares(self, hashes, parents, stops):
-        self.node.handle_get_shares(hashes, parents, stops, self)
+        self.sendShares(self.node.handle_get_shares(hashes, parents, stops, self))
     
     message_shares = pack.ComposedType([
         ('shares', pack.ListType(p2pool_data.share_type)),
@@ -213,6 +213,29 @@ class Protocol(p2protocol.Protocol):
                 att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
         if shares:
             att(self.send_shares, shares=[share.as_share() for share in shares])
+    
+    
+    message_sharereq = pack.ComposedType([
+        ('id', pack.IntType(256)),
+        ('hashes', pack.ListType(pack.IntType(256))),
+        ('parents', pack.VarIntType()),
+        ('stops', pack.ListType(pack.IntType(256))),
+    ])
+    def handle_sharereq(self, id, hashes, parents, stops):
+        shares = self.node.handle_get_shares(hashes, parents, stops, self)
+        try:
+            self.send_sharereply(id=id, result='good', shares=[share.as_share() for share in shares])
+        except p2protocol.TooLong:
+            self.send_sharereply(id=id, result='too long', shares=[])
+    
+    message_sharereply = pack.ComposedType([
+        ('id', pack.IntType(256)),
+        ('result', pack.EnumType(pack.VarIntType(), {'good': 0, 'too long': 1, 'unk2': 2, 'unk2': 3, 'unk2': 4, 'unk2': 5, 'unk2': 6})),
+        ('shares', pack.ListType(p2pool_data.share_type)),
+    ])
+    def handle_sharereply(self, id, result, shares):
+        self.node.handle_share_reply(id, result, shares, self)
+    
     
     def connectionLost(self, reason):
         if self.connected2:
@@ -447,6 +470,9 @@ class Node(object):
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         print 'handle_get_shares', (hashes, parents, stops, peer)
+    
+    def handle_share_reply(self, id, result, shares, peer):
+        raise PeerMisbehavingError('sent share reply without being sent a request')
     
     def get_good_peers(self, max_count):
         t = time.time()

@@ -293,7 +293,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             break
                         shares.append(share)
                 print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
-                peer.sendShares(shares)
+                return shares
         
         @deferral.retry('Error submitting block: (will retry)', 10, 10)
         @defer.inlineCallbacks
