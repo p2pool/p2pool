@@ -72,8 +72,6 @@ class Server(deferred_resource.DeferredResource):
     
     @defer.inlineCallbacks
     def render_POST(self, request):
-        # missing batching, 1.0 notifications
-        
         id_ = None
         
         try:
@@ -85,15 +83,12 @@ class Server(deferred_resource.DeferredResource):
                 except Exception:
                     raise Error(-32700, u'Parse error')
                 
-                try:
-                    id_ = req.get('id', None)
-                    method = req['method']
-                    if not isinstance(method, basestring):
-                        raise ValueError()
-                    params = req.get('params', [])
-                    if not isinstance(params, list):
-                        raise ValueError()
-                except Exception:
+                id_ = req.get('id', None)
+                method = req.get('method', None)
+                if not isinstance(method, basestring):
+                    raise Error(-32600, u'Invalid Request')
+                params = req.get('params', [])
+                if not isinstance(params, list):
                     raise Error(-32600, u'Invalid Request')
                 
                 method_meth = getattr(self._provider, 'rpc_' + method, None)
@@ -102,9 +97,6 @@ class Server(deferred_resource.DeferredResource):
                 
                 result = yield method_meth(request, *params)
                 error = None
-                
-                if id_ is None:
-                    return
             except Error:
                 raise
             except Exception:
