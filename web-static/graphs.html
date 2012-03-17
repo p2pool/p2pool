@@ -96,7 +96,7 @@
                 var x = d3.time.scale().domain([as_date(d3.min(data, itemgetter(0))), as_date(d3.max(data, itemgetter(0)))]).range([0 + margin * 2, w - margin * 2]);
                 var y = d3.scale.linear().domain([0, d3.max(data, itemgetter(1))]).range([h - margin, margin]);
                 
-                var line = d3.svg.line().x(function(d, i) { return x(as_date(d[0])); }).y(function(d) { return y(d[1]); });
+                var line = d3.svg.line().x(function(d, i) { return x(as_date(d[0])); }).y(function(d) { return y(d[1]); }).defined(function(d) { return d[1] != null; });
                 
                 e.selectAll("svg").remove();
                 var g = e.insert("svg:svg").attr("width", w).attr("height", h);
