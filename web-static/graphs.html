@@ -38,17 +38,33 @@
     <body>
         <h1>P2Pool Graphs</h1>
         
-        <h2>Last hour</h1>
-        <div id="graph_hour"></div>
+        <h2>Local rate - Blue=All, Red=Dead</h2>
         
-        <h2>Last day</h1>
-        <div id="graph_day"></div>
+        <h3>Last hour</h3>
+        <div id="local_hour"></div>
         
-        <h2>Last week</h1>
-        <div id="graph_week"></div>
+        <h3>Last day</h3>
+        <div id="local_day"></div>
         
-        <h2>Last month</h1>
-        <div id="graph_month"></div>
+        <h3>Last week</h3>
+        <div id="local_week"></div>
+        
+        <h3>Last month</h3>
+        <div id="local_month"></div>
+        
+        <h2>Pool rate - Blue=All, Red=Stale</h2>
+        
+        <h3>Last hour</h3>
+        <div id="pool_hour"></div>
+        
+        <h3>Last day</h3>
+        <div id="pool_day"></div>
+        
+        <h3>Last week</h3>
+        <div id="pool_week"></div>
+        
+        <h3>Last month</h3>
+        <div id="pool_month"></div>
         
         <script type="text/javascript">
             function getData(url) {
@@ -60,9 +76,9 @@
                 return data;
             }
             
-            function plot(e, url) {
-                data = getData("/web/graph_data/local_hash_rate/" + url);
-                dead_data = getData("/web/graph_data/local_dead_hash_rate/" + url);
+            function plot(e, blue, red) {
+                data = getData("/web/graph_data/" + blue);
+                dead_data = getData("/web/graph_data/" + red);
                 
                 var w = 640;
                 var h = 300;
@@ -141,15 +157,16 @@
                     .attr("text-anchor", "middle");
             }
             
-            function attachGraph(e, url) {
-                plot(e, url);
-                //setInterval(function() { plot(e, url); }, 5000);
+            function attachGraph(e, blue, red) {
+                plot(e, blue, red);
+                setInterval(function() { plot(e, blue, red); }, 5000);
             }
             
-            attachGraph(d3.select("#graph_hour"), "last_hour");
-            attachGraph(d3.select("#graph_day"), "last_day");
-            attachGraph(d3.select("#graph_week"), "last_week");
-            attachGraph(d3.select("#graph_month"), "last_month");
+            periods = ["hour", "day", "week", "month"];
+            for(i = 0; i < periods.length; i++) {
+                attachGraph(d3.select("#local_" + periods[i]), "local_hash_rate/last_" + periods[i], "local_dead_hash_rate/last_" + periods[i]);
+                attachGraph(d3.select("#pool_" + periods[i]), "pool_rate/last_" + periods[i], "pool_stale_rate/last_" + periods[i]);
+            }
         </script>
     </body>
 </html>

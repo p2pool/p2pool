@@ -351,6 +351,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
+        'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
+        'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
     }, hd_obj)
     def _atomic_write(filename, data):
         open(filename + '.new', 'w').write(data)
@@ -362,6 +364,15 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         hd.datastreams['local_hash_rate'].add_datum(t, work)
         if dead:
             hd.datastreams['local_dead_hash_rate'].add_datum(t, work)
+    def add_point():
+        if tracker.get_height(current_work.value['best_share_hash']) < 720:
+            return
+        nonstalerate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
+        poolrate = nonstalerate / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))
+        t = time.time()
+        hd.datastreams['pool_rate'].add_datum(t, poolrate)
+        hd.datastreams['pool_stale_rate'].add_datum(t, poolrate - nonstalerate)
+    task.LoopingCall(add_point).start(5)
     new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data(time.time())), 'application/json'))
     
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
