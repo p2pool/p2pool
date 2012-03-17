@@ -362,7 +362,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         hd.datastreams['local_hash_rate'].add_datum(t, work)
         if dead:
             hd.datastreams['local_dead_hash_rate'].add_datum(t, work)
-    new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data()), 'application/json'))
+    new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data(time.time())), 'application/json'))
     
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
     

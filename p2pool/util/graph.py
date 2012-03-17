@@ -3,11 +3,18 @@ from __future__ import division
 
 import math
 
+from p2pool.util import math as math2
+
 
 class DataViewDescription(object):
     def __init__(self, bin_count, total_width):
         self.bin_count = bin_count
         self.bin_width = total_width/bin_count
+
+def _shift(x, shift, pad_item):
+    left_pad = math2.clip(shift, (0, len(x)))
+    right_pad = math2.clip(-shift, (0, len(x)))
+    return [pad_item]*left_pad + x[right_pad:-left_pad if left_pad else None] + [pad_item]*right_pad
 
 class DataView(object):
     def __init__(self, desc, ds_desc, last_bin_end, bins):
@@ -20,7 +27,7 @@ class DataView(object):
     
     def _add_datum(self, t, value):
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
-        self.bins = [(0, 0)]*min(shift, self.desc.bin_count) + self.bins[:max(0, len(self.bins) - shift)]
+        self.bins = _shift(self.bins, shift, (0, 0))
         self.last_bin_end += shift*self.desc.bin_width
         
         bin = int(math.ceil((self.last_bin_end - self.desc.bin_width - t)/self.desc.bin_width))
@@ -31,8 +38,18 @@ class DataView(object):
         prev_total, prev_count = self.bins[bin]
         self.bins[bin] = prev_total + value, prev_count + 1
     
-    def get_data(self):
-        return [(self.last_bin_end - self.desc.bin_width*(i + 1/2), (total/count if count else None) if self.ds_desc.source_is_cumulative else total/self.desc.bin_width) for i, (total, count) in enumerate(self.bins)]
+    def get_data(self, t):
+        shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
+        bins = _shift(self.bins, shift, (0, 0))
+        last_bin_end = self.last_bin_end + shift*self.desc.bin_width
+        
+        assert last_bin_end - self.desc.bin_width <= t <= last_bin_end
+        
+        return [(
+            last_bin_end - self.desc.bin_width*(i + 1/2),
+            (total/count if count else None) if self.ds_desc.source_is_cumulative
+                else total/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))),
+        ) for i, (total, count) in enumerate(bins)]
 
 
 class DataStreamDescription(object):

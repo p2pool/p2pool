@@ -56,7 +56,6 @@
                 xmlhttp.open("GET",  url, false);
                 xmlhttp.send();
                 var data = JSON.parse(xmlhttp.responseText);
-                data.shift(); // remove current bin
                 
                 return data;
             }
