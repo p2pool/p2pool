@@ -46,9 +46,10 @@ class DataView(object):
         assert last_bin_end - self.desc.bin_width <= t <= last_bin_end
         
         return [(
-            last_bin_end - self.desc.bin_width*(i + 1/2),
+            (min(t, last_bin_end - self.desc.bin_width*i) + (last_bin_end - self.desc.bin_width*(i + 1)))/2, # center time
             (total/count if count else None) if self.ds_desc.source_is_cumulative
-                else total/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))),
+                else total/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))), # value
+            min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1)), # width
         ) for i, (total, count) in enumerate(bins)]
 
 

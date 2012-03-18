@@ -347,12 +347,14 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'last_day': graph.DataViewDescription(300, 60*60*24),
         'last_week': graph.DataViewDescription(300, 60*60*24*7),
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
+        'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
+        'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
     }, hd_obj)
     def _atomic_write(filename, data):
         open(filename + '.new', 'w').write(data)
@@ -372,6 +374,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         t = time.time()
         hd.datastreams['pool_rate'].add_datum(t, poolrate)
         hd.datastreams['pool_stale_rate'].add_datum(t, poolrate - nonstalerate)
+        hd.datastreams['current_payout'].add_datum(t, get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8)
     task.LoopingCall(add_point).start(5)
     new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data(time.time())), 'application/json'))
     
