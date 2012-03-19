@@ -846,7 +846,7 @@ def run():
     parser.add_argument('--disable-upnp',
         help='''don't attempt to use UPnP to forward p2pool's P2P port from the Internet to this computer''',
         action='store_false', default=True, dest='upnp')
-    p2pool_group.add_argument('--max-conns', metavar='PORT',
+    p2pool_group.add_argument('--max-conns', metavar='CONNS',
         help='maximum incoming connections (default: 40)',
         type=int, action='store', default=40, dest='p2pool_conns')
     
