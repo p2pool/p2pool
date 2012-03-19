@@ -23,6 +23,10 @@ from util import expiring_dict, jsonrpc, variable, deferral, math, logging, pack
 from . import p2p, networks, web
 import p2pool, p2pool.data as p2pool_data
 
+def bitcoin_version_good(v):
+   major, minor, patch = v//10000, v//100%100, v%100
+   return (major >= 6) or (major == 5 and minor == 0 and patch >= 6) or (major == 5 and minor >= 4)
+
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
 def getwork(bitcoind):
@@ -54,11 +58,16 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
-        bitcoind = jsonrpc.Proxy(url, dict(Authorization='Basic ' + base64.b64encode(args.bitcoind_rpc_username + ':' + args.bitcoind_rpc_password)))
-        good = yield deferral.retry('Error while checking bitcoind identity:', 1)(net.PARENT.RPC_CHECK)(bitcoind)
-        if not good:
-            print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
-            return
+        bitcoind = jsonrpc.Proxy(url, dict(Authorization='Basic ' + base64.b64encode(args.bitcoind_rpc_username + ':' + args.bitcoind_rpc_password)), timeout=30)
+        @defer.inlineCallbacks
+        def check():
+            if not (yield net.PARENT.RPC_CHECK)(bitcoind):
+                print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
+                raise deferral.RetrySilentlyException()
+            if not bitcoin_version_good((yield bitcoind.rpc_getinfo())['version']):
+                print >>sys.stderr, '    Bitcoin version too old! BIP16 support required! Upgrade to 0.6.0rc4 or greater!'
+                raise deferral.RetrySilentlyException()
+        yield deferral.retry('Error while checking Bitcoin connection:', 1)(check)()
         temp_work = yield getwork(bitcoind)
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
