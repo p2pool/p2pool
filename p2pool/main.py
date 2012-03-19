@@ -341,6 +341,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             net=net,
             addr_store=addrs,
             connect_addrs=connect_addrs,
+            max_incoming_conns=args.p2pool_conns,
         )
         p2p_node.start()
         
@@ -845,6 +846,9 @@ def run():
     parser.add_argument('--disable-upnp',
         help='''don't attempt to use UPnP to forward p2pool's P2P port from the Internet to this computer''',
         action='store_false', default=True, dest='upnp')
+    p2pool_group.add_argument('--max-conns', metavar='PORT',
+        help='maximum incoming connections (default: 40)',
+        type=int, action='store', default=40, dest='p2pool_conns')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
