@@ -5,10 +5,10 @@ import subprocess
 
 def _get_version():
     try:
-        return subprocess.check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0])), shell=True).strip()
-    except:
-        pass
-    try:
+        try:
+            return subprocess.check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
+        except os.error:
+            pass
         root_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
         git_dir = os.path.join(root_dir, '.git')
         if os.path.exists(git_dir):
@@ -23,9 +23,10 @@ def _get_version():
         chars = '0123456789abcdef'
         if len(dir_name) >= 7 and (len(dir_name) == 7 or dir_name[-8] not in chars) and all(c in chars for c in dir_name[-7:]):
             return dir_name[-7:]
+        return 'unknown'
     except Exception, e:
         traceback.print_exc()
-    return 'unknown'
+        return 'unknown %s' % (e.encode('hex'),)
 
 __version__ = _get_version()
 
