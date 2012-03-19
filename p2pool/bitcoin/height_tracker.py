@@ -1,6 +1,7 @@
 from twisted.internet import defer, task
 from twisted.python import log
 
+import p2pool
 from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, forest, jsonrpc, variable
 
