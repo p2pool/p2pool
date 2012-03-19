@@ -94,10 +94,9 @@
                     .attr("d", line(data))
                     .attr("class", "rate");
                 
-                if(dead_data)
-                    g.append("svg:path")
-                        .attr("d", line(dead_data))
-                        .attr("class", "deadrate");
+                g.append("svg:path")
+                    .attr("d", line(dead_data))
+                    .attr("class", "deadrate");
                 
                 
                 g.append("svg:line")
@@ -143,7 +142,7 @@
                     .data(y.ticks(6))
                     .enter().append("svg:text")
                     .text(d3.format(".3s"))
-                    .attr("x", margin - 2.5)
+                    .attr("x", margin)
                     .attr("y", y)
                     .attr("dominant-baseline", "central")
                     .attr("text-anchor", "middle");
