@@ -72,6 +72,8 @@ class Protocol(p2protocol.Protocol):
             self.badPeerHappened()
     
     def badPeerHappened(self):
+        if p2pool.DEBUG:
+            print "Bad peer banned:", self.addr
         self.transport.loseConnection()
         self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
     
@@ -116,7 +118,8 @@ class Protocol(p2protocol.Protocol):
         if nonce == self.node.nonce:
             raise PeerMisbehavingError('was connected to self')
         if nonce in self.node.peers:
-            #print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
+            if p2pool.DEBUG:
+                print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
             self.transport.loseConnection()
             return
         
@@ -216,6 +219,8 @@ class Protocol(p2protocol.Protocol):
             self.factory.proto_disconnected(self, reason)
             self.connected2 = False
         self.factory.proto_lost_connection(self, reason)
+        if p2pool.DEBUG:
+            print "Peer connection lost:", self.addr, reason
 
 class ServerFactory(protocol.ServerFactory):
     def __init__(self, node, max_conns):
@@ -232,6 +237,8 @@ class ServerFactory(protocol.ServerFactory):
             return None
         p = Protocol(self.node, True)
         p.factory = self
+        if p2pool.DEBUG:
+            print "Got peer connection from:", addr
         return p
     
     def _host_to_ident(self, host):
