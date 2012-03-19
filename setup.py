@@ -8,9 +8,11 @@ import py2exe
 
 version = __import__('p2pool').__version__
 
-old_contents = open('p2pool/__init__.py', 'rb').read()
+if os.path.exists('INITBAK'):
+    os.remove('INITBAK')
+os.rename(os.path.join('p2pool', '__init__.py'), 'INITBAK')
 try:
-    open('p2pool/__init__.py', 'wb').write('__version__ = %r%s%sDEBUG = False%s' % (version, os.linesep, os.linesep, os.linesep))
+    open(os.path.join('p2pool', '__init__.py'), 'wb').write('__version__ = %r%s%sDEBUG = False%s' % (version, os.linesep, os.linesep, os.linesep))
     
     sys.argv[1:] = ['py2exe']
     setup(name='p2pool',
@@ -36,7 +38,8 @@ try:
         zipfile=None,
     )
 finally:
-    open('p2pool/__init__.py', 'wb').write(old_contents)
+    os.remove(os.path.join('p2pool', '__init__.py'))
+    os.rename('INITBAK', os.path.join('p2pool', '__init__.py'))
 
 dir_name = 'p2pool_win32_' + version
 
