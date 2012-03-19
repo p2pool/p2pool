@@ -19,7 +19,13 @@ try:
         author='Forrest Voight',
         author_email='forrest@forre.st',
         url='http://p2pool.forre.st/',
-        data_files=[('', ['README'])],
+        data_files=[
+            ('', ['README']),
+            ('web-static', [
+                'web-static/d3.v2.min.js',
+                'web-static/graphs.html',
+            ]),
+        ],
         
         console=['run_p2pool.py'],
         options=dict(py2exe=dict(
