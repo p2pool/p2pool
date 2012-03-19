@@ -1,6 +1,7 @@
 from __future__ import division
 
 import cgi
+import errno
 import json
 import os
 import sys
@@ -13,6 +14,35 @@ from twisted.web import resource, static
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data, graphs
 from util import graph, math
+
+def _atomic_read(filename):
+    try:
+        with open(filename, 'rb') as f:
+            return f.read()
+    except IOError, e:
+        if e.errno != errno.ENOENT:
+            raise
+    try:
+        with open(filename + '.new', 'rb') as f:
+            return f.read()
+    except IOError, e:
+        if e.errno != errno.ENOENT:
+            raise
+    return None
+
+def _atomic_write(filename, data):
+    with open(filename + '.new', 'wb') as f:
+        f.write(data)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except:
+            pass
+    try:
+        os.rename(filename + '.new', filename)
+    except os.error: # windows can't overwrite
+        os.remove(filename)
+        os.rename(filename + '.new', filename)
 
 def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received):
     start_time = time.time()
@@ -336,10 +366,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
     
     hd_path = os.path.join(datadir_path, 'graph_db')
+    hd_data = _atomic_read(hd_path)
     hd_obj = {}
-    if os.path.exists(hd_path):
+    if hd_data is not None:
         try:
-            hd_obj = json.loads(open(hd_path, 'rb').read())
+            hd_obj = json.loads(hd_data)
         except Exception:
             log.err(None, 'Error reading graph database:')
     dataview_descriptions = {
@@ -356,9 +387,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
     }, hd_obj)
-    def _atomic_write(filename, data):
-        open(filename + '.new', 'w').write(data)
-        os.rename(filename + '.new', filename)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
     def _(work, dead, user):
