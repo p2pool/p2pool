@@ -485,7 +485,7 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=Fa
     return attempts/time
 
 def get_average_stale_prop(tracker, share_hash, lookbehind):
-    stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] in [253, 254])
+    stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] != 0)
     return stales/(lookbehind + stales)
 
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
