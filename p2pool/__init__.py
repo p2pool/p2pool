@@ -7,7 +7,11 @@ def _get_version():
     try:
         try:
             return subprocess.check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
-        except os.error:
+        except:
+            pass
+        try:
+            return subprocess.check_output(['git.cmd', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
+        except:
             pass
         root_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
         git_dir = os.path.join(root_dir, '.git')
@@ -26,7 +30,7 @@ def _get_version():
         return 'unknown'
     except Exception, e:
         traceback.print_exc()
-        return 'unknown %s' % (e.encode('hex'),)
+        return 'unknown %s' % (str(e).encode('hex'),)
 
 __version__ = _get_version()
 
