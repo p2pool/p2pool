@@ -696,7 +696,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             from twisted.words.protocols import irc
             class IRCClient(irc.IRCClient):
                 nickname = 'p2pool%02i' % (random.randrange(100),)
-                channel = '#p2pool' if net.NAME == 'bitcoin' else '#p2pool-alt'
+                channel = net.ANNOUNCE_CHANNEL
                 def lineReceived(self, line):
                     print repr(line)
                     irc.IRCClient.lineReceived(self, line)
@@ -704,17 +704,23 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     irc.IRCClient.signedOn(self)
                     self.factory.resetDelay()
                     self.join(self.channel)
-                    self.watch_id = tracker.verified.added.watch(self._new_share)
-                    self.announced_hashes = set()
-                    self.delayed_messages = {}
+                    @defer.inlineCallbacks
+                    def new_share(share):
+                        if share.pow_hash <= share.header['bits'].target and abs(share.timestamp - time.time()) < 10*60:
+                            yield deferral.sleep(random.expovariate(1/60))
+                            message = '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.new_script, net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
+                            if message not in self.recent_messages:
+                                self.say(self.channel, message)
+                                self._remember_message(message)
+                    self.watch_id = tracker.verified.added.watch(new_share)
+                    self.recent_messages = []
+                def _remember_message(self, message):
+                    self.recent_messages.append(message)
+                    while len(self.recent_message) > 100:
+                        self.recent_messages.pop(0)
                 def privmsg(self, user, channel, message):
-                    if channel == self.channel and message in self.delayed_messages:
-                        self.delayed_messages.pop(message).cancel()
-                def _new_share(self, share):
-                    if share.pow_hash <= share.header['bits'].target and share.header_hash not in self.announced_hashes and abs(share.timestamp - time.time()) < 10*60:
-                        self.announced_hashes.add(share.header_hash)
-                        message = '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.new_script, net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
-                        self.delayed_messages[message] = reactor.callLater(random.expovariate(1/60), lambda: (self.say(self.channel, message), self.delayed_messages.pop(message)))
+                    if channel == self.channel:
+                        self._remember_message(message)
                 def connectionLost(self, reason):
                     tracker.verified.added.unwatch(self.watch_id)
                     print 'IRC connection lost:', reason.getErrorMessage()
