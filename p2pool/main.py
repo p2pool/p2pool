@@ -63,8 +63,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 raise deferral.RetrySilentlyException()
             v = (yield bitcoind.rpc_getinfo())['version']
             temp_work = yield getwork(bitcoind)
-            major, minor, patch = v//10000, v//100%100, v%100
-            if not (major >= 7 or (major == 6 and patch >= 3) or (major == 5 and minor >= 4) or '/P2SH/' in temp_work['coinbaseflags']):
+            if not net.VERSION_CHECK((v//10000, v//100%100, v%100), temp_work):
                 print >>sys.stderr, '    Bitcoin version too old! BIP16 support required! Upgrade to 0.6.0rc4 or greater!'
                 raise deferral.RetrySilentlyException()
             defer.returnValue(temp_work)
