@@ -166,7 +166,7 @@ class Share(object):
             lock_time=0,
         )
     
-    __slots__ = 'net min_header share_info hash_link merkle_link other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
+    __slots__ = 'net min_header share_info hash_link merkle_link other_txs hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
     
     def __init__(self, net, peer, min_header, share_info, hash_link, merkle_link, other_txs):
         if len(share_info['share_data']['coinbase']) > 100:
@@ -194,6 +194,7 @@ class Share(object):
         self.timestamp = self.share_info['timestamp']
         self.previous_hash = self.share_data['previous_share_hash']
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
+        self.desired_version = 0
         
         self.gentx_hash = check_hash_link(
             hash_link,
@@ -495,6 +496,12 @@ def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
     weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target), False)
     res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
     res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
+    return res
+
+def get_desired_version_counts(tracker, best_share_hash, dist):
+    res = {}
+    for share in tracker.get_chain(best_share_hash, dist):
+        res[share.desired_version] = res.get(share.desired_version, 0) + bitcoin_data.target_to_average_attempts(share.target)
     return res
 
 def format_hash(x):

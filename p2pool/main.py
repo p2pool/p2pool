@@ -769,6 +769,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             100*stale_prop,
                             math.format_dt(2**256 / current_work.value['bits'].target / real_att_s),
                         )
+                        
+                        desired_version_counts = p2pool_data.get_desired_version_counts(tracker, current_work.value['best_share_hash'], min(720, height))
+                        majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
+                        if majority_desired_version not in [0]:
+                            print >>sys.stderr, '#'*40
+                            print >>sys.stderr, '>>> WARNING: A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)' % (
+                                majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues()))
+                            print >>sys.stderr, '>>> An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.'
+                            print >>sys.stderr, '#'*40
                     
                     if this_str != last_str or time.time() > last_time + 15:
                         print this_str
