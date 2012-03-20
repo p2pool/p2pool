@@ -781,8 +781,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     log.err()
         status_thread()
     except:
-        log.err(None, 'Fatal error:')
         reactor.stop()
+        log.err(None, 'Fatal error:')
 
 def run():
     class FixedArgumentParser(argparse.ArgumentParser):
