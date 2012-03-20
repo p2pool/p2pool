@@ -195,10 +195,14 @@ class IntType(Type):
         self.max = 2**bits
     
     def read(self, file, b2a_hex=binascii.b2a_hex):
+        if self.bytes == 0:
+            return 0, file
         data, file = read(file, self.bytes)
         return int(b2a_hex(data[::self.step]), 16), file
     
     def write(self, file, item, a2b_hex=binascii.a2b_hex):
+        if self.bytes == 0:
+            return file
         if not 0 <= item < self.max:
             raise ValueError('invalid int value - %r' % (item,))
         return file, a2b_hex(self.format_str % (item,))[::self.step]
@@ -263,7 +267,7 @@ class ComposedType(Type):
         return item, file
     
     def write(self, file, item):
-        assert set(item.keys()) == self.field_names
+        assert set(item.keys()) == self.field_names, (set(item.keys()) - self.field_names, self.field_names - set(item.keys()))
         for key, type_ in self.fields:
             file = type_.write(file, item[key])
         return file
