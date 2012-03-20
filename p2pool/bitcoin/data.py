@@ -193,7 +193,7 @@ def calculate_merkle_link(hashes, index):
     
     assert hash_list[0][1]
     if p2pool.DEBUG:
-        assert check_merkle_branch(hashes[index], index, res) == hash_list[0][0]
+        assert check_merkle_link(hashes[index], dict(branch=res, index=index)) == hash_list[0][0]
     assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
     
     return dict(branch=res, index=index)
