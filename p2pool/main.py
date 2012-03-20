@@ -61,9 +61,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             if not (yield net.PARENT.RPC_CHECK)(bitcoind):
                 print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
                 raise deferral.RetrySilentlyException()
-            v = (yield bitcoind.rpc_getinfo())['version']
             temp_work = yield getwork(bitcoind)
-            if not net.VERSION_CHECK((v//10000, v//100%100, v%100), temp_work):
+            if not net.VERSION_CHECK((yield bitcoind.rpc_getinfo())['version'], temp_work):
                 print >>sys.stderr, '    Bitcoin version too old! BIP16 support required! Upgrade to 0.6.0rc4 or greater!'
                 raise deferral.RetrySilentlyException()
             defer.returnValue(temp_work)

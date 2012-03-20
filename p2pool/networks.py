@@ -23,7 +23,7 @@ nets = dict(
         WORKER_PORT=9332,
         BOOTSTRAP_ADDRS='74.220.242.6:9334 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 89.78.212.44 94.23.34.145 168.7.116.243 72.14.191.28 94.174.40.189:9344'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool',
-        VERSION_CHECK=lambda (major, minor, patch), temp_work: major >= 7 or (major == 6 and patch >= 3) or (major == 5 and minor >= 4) or '/P2SH/' in temp_work['coinbaseflags'],
+        VERSION_CHECK=lambda v, temp_work: 50400 <= v < 60000 or 60003 <= v or '/P2SH/' in temp_work['coinbaseflags'],
         SWITCH_TIME=1333238400,
     ),
     bitcoin_testnet=math.Object(
@@ -41,7 +41,7 @@ nets = dict(
         WORKER_PORT=19332,
         BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda (major, minor, patch), temp_work: major >= 7 or (major == 6 and patch >= 3) or (major == 5 and minor >= 4) or '/P2SH/' in temp_work['coinbaseflags'],
+        VERSION_CHECK=lambda v, temp_work: 50400 <= v < 60000 or 60003 <= v or '/P2SH/' in temp_work['coinbaseflags'],
         SWITCH_TIME=1333238400-60*60*24*7,
     ),
     
@@ -79,7 +79,7 @@ nets = dict(
         BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda (major, minor, patch), temp_work: True,
-        SWITCH_TIME=1333238400-60*60*24*7,
+        SWITCH_TIME=1332276298,
     ),
 )
 for net_name, net in nets.iteritems():
