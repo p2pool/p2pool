@@ -104,13 +104,15 @@ tx_type = pack.ComposedType([
     ('lock_time', pack.IntType(32)),
 ])
 
-merkle_branch_type = pack.ListType(pack.IntType(256))
+merkle_link_type = pack.ComposedType([
+    ('branch', pack.ListType(pack.IntType(256))),
+    ('index', pack.IntType(32)),
+])
 
 merkle_tx_type = pack.ComposedType([
     ('tx', tx_type),
     ('block_hash', pack.IntType(256)),
-    ('merkle_branch', merkle_branch_type),
-    ('index', pack.IntType(32)),
+    ('merkle_link', merkle_link_type),
 ])
 
 block_header_type = pack.ComposedType([
@@ -131,8 +133,7 @@ block_type = pack.ComposedType([
 
 aux_pow_type = pack.ComposedType([
     ('merkle_tx', merkle_tx_type),
-    ('merkle_branch', merkle_branch_type),
-    ('index', pack.IntType(32)),
+    ('merkle_link', merkle_link_type),
     ('parent_block_header', block_header_type),
 ])
 
@@ -168,11 +169,11 @@ def merkle_hash(hashes):
         return 0
     hash_list = list(hashes)
     while len(hash_list) > 1:
-        hash_list = [hash256(merkle_record_type.pack(dict(left=left, right=left if right is None else right)))
-            for left, right in zip(hash_list[::2], hash_list[1::2] + [None])]
+        hash_list = [hash256(merkle_record_type.pack(dict(left=left, right=right)))
+            for left, right in zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])]
     return hash_list[0]
 
-def calculate_merkle_branch(hashes, index):
+def calculate_merkle_link(hashes, index):
     # XXX optimize this
     
     hash_list = [(h, i == index, []) for i, h in enumerate(hashes)]
@@ -195,13 +196,15 @@ def calculate_merkle_branch(hashes, index):
         assert check_merkle_branch(hashes[index], index, res) == hash_list[0][0]
     assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
     
-    return res
+    return dict(branch=res, index=index)
 
-def check_merkle_branch(tip_hash, index, merkle_branch):
+def check_merkle_link(tip_hash, link):
+    if link['index'] >= 2**len(link['branch']):
+        raise ValueError('index too large')
     return reduce(lambda c, (i, h): hash256(merkle_record_type.pack(
-        dict(left=h, right=c) if 2**i & index else
+        dict(left=h, right=c) if (link['index'] >> i) & 1 else
         dict(left=c, right=h)
-    )), enumerate(merkle_branch), tip_hash)
+    )), enumerate(link['branch']), tip_hash)
 
 # targets
 

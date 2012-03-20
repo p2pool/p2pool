@@ -38,7 +38,7 @@ def getwork(bitcoind):
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
-        merkle_branch=bitcoin_data.calculate_merkle_branch([0] + map(bitcoin_data.hash256, packed_transactions), 0),
+        merkle_link=bitcoin_data.calculate_merkle_link([0] + map(bitcoin_data.hash256, packed_transactions), 0), # using 0 is a bit of a hack, but will always work when index=0
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
@@ -162,7 +162,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             current_work2.set(dict(
                 time=work['time'],
                 transactions=work['transactions'],
-                merkle_branch=work['merkle_branch'],
+                merkle_link=work['merkle_link'],
                 subsidy=work['subsidy'],
                 clock_offset=time.time() - work['time'],
                 last_update=time.time(),
@@ -535,10 +535,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
                 packed_generate_tx = bitcoin_data.tx_type.pack(generate_tx)
-                merkle_root = bitcoin_data.check_merkle_branch(bitcoin_data.hash256(packed_generate_tx), 0, current_work2.value['merkle_branch'])
+                merkle_root = bitcoin_data.check_merkle_link(bitcoin_data.hash256(packed_generate_tx), current_work2.value['merkle_link'])
                 
                 getwork_time = time.time()
-                merkle_branch = current_work2.value['merkle_branch']
+                merkle_link = current_work2.value['merkle_link']
                 
                 print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
                     bitcoin_data.target_to_difficulty(target),
@@ -585,11 +585,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                         merkle_tx=dict(
                                             tx=transactions[0],
                                             block_hash=header_hash,
-                                            merkle_branch=merkle_branch,
-                                            index=0,
+                                            merkle_link=merkle_link,
                                         ),
-                                        merkle_branch=bitcoin_data.calculate_merkle_branch(hashes, index),
-                                        index=index,
+                                        merkle_link=bitcoin_data.calculate_merkle_link(hashes, index),
                                         parent_block_header=header,
                                     )).encode('hex'),
                                 )
@@ -608,7 +606,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     if pow_hash <= share_info['bits'].target:
                         min_header = dict(header);del min_header['merkle_root']
                         hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
-                        share = p2pool_data.Share(net, None, min_header, share_info, hash_link=hash_link, merkle_branch=merkle_branch, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+                        share = p2pool_data.Share(net, None, min_header, share_info, hash_link=hash_link, merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
                         
                         print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                             request.getUser(),

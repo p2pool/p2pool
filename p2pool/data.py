@@ -50,7 +50,7 @@ def load_share(share, net, peer):
         return Share(net, peer, other_txs=None, **Share.share1a_type.unpack(share['contents']))
     elif share['type'] == 3:
         share1b = Share.share1b_type.unpack(share['contents'])
-        return Share(net, peer, merkle_branch=bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
+        return Share(net, peer, merkle_link=bitcoin_data.calculate_merkle_link([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
@@ -86,7 +86,10 @@ class Share(object):
         ('min_header', small_block_header_type),
         ('share_info', share_info_type),
         ('hash_link', hash_link_type),
-        ('merkle_branch', bitcoin_data.merkle_branch_type),
+        ('merkle_link', pack.ComposedType([
+            ('branch', pack.ListType(pack.IntType(256))),
+            ('index', pack.IntType(0)), # it will always be 0
+        ])),
     ])
     
     share1b_type = pack.ComposedType([
@@ -163,17 +166,17 @@ class Share(object):
             lock_time=0,
         )
     
-    __slots__ = 'net min_header share_info hash_link merkle_branch other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
+    __slots__ = 'net min_header share_info hash_link merkle_link other_txs hash share_data max_target target timestamp previous_hash new_script gentx_hash header pow_hash header_hash time_seen peer'.split(' ')
     
-    def __init__(self, net, peer, min_header, share_info, hash_link, merkle_branch, other_txs):
+    def __init__(self, net, peer, min_header, share_info, hash_link, merkle_link, other_txs):
         if len(share_info['share_data']['coinbase']) > 100:
             raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_data['coinbase']),))
         
-        if len(merkle_branch) > 16:
+        if len(merkle_link['branch']) > 16:
             raise ValueError('merkle_branch too long!')
         
-        if p2pool.DEBUG and other_txs is not None and bitcoin_data.calculate_merkle_branch([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0) != merkle_branch:
-            raise ValueError('merkle_branch and other_txs do not match')
+        if p2pool.DEBUG and other_txs is not None and bitcoin_data.calculate_merkle_link([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in other_txs], 0) != merkle_link:
+            raise ValueError('merkle_link and other_txs do not match')
         
         assert not hash_link['extra_data'], repr(hash_link['extra_data'])
         
@@ -182,7 +185,7 @@ class Share(object):
         self.min_header = min_header
         self.share_info = share_info
         self.hash_link = hash_link
-        self.merkle_branch = merkle_branch
+        self.merkle_link = merkle_link
         self.other_txs = other_txs
         
         self.share_data = self.share_info['share_data']
@@ -200,7 +203,7 @@ class Share(object):
             )))) + pack.IntType(32).pack(0),
             self.gentx_before_refhash,
         )
-        merkle_root = bitcoin_data.check_merkle_branch(self.gentx_hash, 0, merkle_branch)
+        merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, merkle_link)
         self.header = dict(min_header, merkle_root=merkle_root)
         self.pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(self.header))
         self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.header))
@@ -230,7 +233,7 @@ class Share(object):
     
     def as_share(self):
         if not self.pow_hash <= self.header['bits'].target: # share1a
-            return dict(type=2, contents=self.share1a_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, merkle_branch=self.merkle_branch)))
+            return dict(type=2, contents=self.share1a_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, merkle_link=self.merkle_link)))
         else: # share1b
             return dict(type=3, contents=self.share1b_type.pack(dict(min_header=self.min_header, share_info=self.share_info, hash_link=self.hash_link, other_txs=self.other_txs)))
     
