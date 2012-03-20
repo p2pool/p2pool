@@ -267,7 +267,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             
             format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH</p>' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
             
-            request.write('<h1>%s <a href="%x">%s</a></h1>' % (share.__class__, share.hash, p2pool_data.format_hash(share.hash)))
+            request.write('<h1>%s <a href="%x">%s</a></h1>' % (share.__class__.__name__, share.hash, p2pool_data.format_hash(share.hash)))
             if share.previous_hash is not None:
                 request.write('<p>Previous: <a href="%x">%s</a>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
             if tracker.get_height(share.hash) >= 100:
@@ -298,10 +298,10 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             request.write('<p>Nonce: %i</p>' % (share.header['nonce'],))
             if share.other_txs is not None:
                 tx_count = len(share.other_txs)
-            elif len(share.merkle_branch) == 0:
+            elif len(share.merkle_link['branch']) == 0:
                 tx_count = 1
             else:
-                tx_count = 'between %i and %i' % (2**len(share.merkle_branch)//2+1, 2**len(share.merkle_branch))
+                tx_count = 'between %i and %i' % (2**len(share.merkle_link['branch'])//2+1, 2**len(share.merkle_link['branch']))
             request.write('<p>Transactions: %s</p>' % (tx_count,))
             coinbase = share.share_data['coinbase'].ljust(2, '\x00')
             request.write('<p>Coinbase: %s %s</p>' % (cgi.escape(repr(coinbase)), coinbase.encode('hex')))
