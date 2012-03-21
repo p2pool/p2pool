@@ -16,14 +16,7 @@
                 shape-rendering: crispEdges;
             }
             
-            .rate {
-                stroke: #0000FF;
-                stroke-width: 1.4;
-                fill: none;
-            }
-            
-            .deadrate {
-                stroke: #FF0000;
+            .plotline {
                 stroke-width: 1.4;
                 fill: none;
             }
@@ -52,6 +45,9 @@
         <h2>Peers - Blue=Incoming, Red=Outgoing</h2>
         <svg id="peers"></svg>
         
+        <h2>Miners - Blue=All, Red=Dead (hash/second)</h2>
+        <div id="miners"></div>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -65,6 +61,7 @@
             function itemgetter(i) { return function(x) { return x[i]; } }
             function as_date(x) { return new Date(1000*x); }
             function not_null(x) { return x != null; }
+            function identity(x) { return x; }
             
             function getData(url) {
                 var xmlhttp = new XMLHttpRequest();
@@ -73,34 +70,59 @@
                 return JSON.parse(xmlhttp.responseText);
             }
             
-            function plot(g, blue, red) {
-                var data = getData("/web/graph_data/" + blue);
-                if(red)
-                    var dead_data = getData("/web/graph_data/" + red);
-                else
-                    var dead_data = [];
+            function get_avg(data, value_getter) {
+                var top = 0;
+                var bottom = 0;
+                for(var i = 0; i < data.length; i++) {
+                    var value = value_getter(data[i][1]);
+                    if(value == null) continue; // no data for bin
+                    top += value * data[i][2];
+                    bottom += data[i][2];
+                }
+                if(bottom == 0) return null; // no data at all
+                return top/bottom;
+            }
+            
+            function plot(g, lines) {
+                // lines is a list of objects which have attributes data, value_getter, color
                 
                 var w = 640;
                 var h = 300;
                 var margin = 50;
                 var margin_top = 10;
                 
-                var x = d3.time.scale().domain([as_date(d3.min(data, itemgetter(0))), as_date(d3.max(data, itemgetter(0)))]).range([0 + margin * 2, w - margin * 2]);
-                var y = d3.scale.linear().domain([0, d3.max(data.concat(dead_data), itemgetter(1))]).range([h - margin, margin_top]);
+                var x = d3.time.scale().domain([
+                    as_date(d3.min(lines, function(line) { return d3.min(line.data, itemgetter(0)); })),
+                    as_date(d3.max(lines, function(line) { return d3.max(line.data, itemgetter(0)); }))
+                ]).range([0 + margin * 2, w - margin * 2]);
+                var y = d3.scale.linear().domain([
+                    0,
+                    d3.max(lines, function(line) { return d3.max(line.data, compose(line.value_getter, itemgetter(1))); } )
+                ]).range([h - margin, margin_top]);
                 
-                var line = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, itemgetter(1))).defined(compose(not_null, itemgetter(1)));
                 
                 g.attr("width", w).attr("height", h);
                 g.selectAll("*").remove();
                 
-                g.append("svg:path")
-                    .attr("d", line(data))
-                    .attr("class", "rate");
+                for(var i = 0; i < lines.length; ++i) {
+                    var line = lines[i];
+                    var line_type = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, line.value_getter, itemgetter(1))).defined(compose(not_null, line.value_getter, itemgetter(1)));
+                    g.append("svg:path")
+                        .attr("d", line_type(line.data))
+                        .attr("stroke", line.color)
+                        .attr("class", "plotline");
+                    var mean = get_avg(line.data, line.value_getter);
+                    if(mean != null)
+                        g.append("svg:text")
+                            .text("-Mean: " + d3.format(".3s")(mean))
+                            .attr("text-anchor", "start")
+                            .attr("dominant-baseline", "central")
+                            .attr("fill", line.color)
+                            .attr("x", w - 2*margin)
+                            .attr("y", y(mean));
+                }
                 
-                g.append("svg:path")
-                    .attr("d", line(dead_data))
-                    .attr("class", "deadrate");
-                
+                // x axis
                 
                 g.append("svg:line")
                     .attr("x1", margin * 2)
@@ -126,6 +148,7 @@
                     .attr("x2", x)
                     .attr("y2", h - margin + 5);
                 
+                // y axis
                 
                 g.append("svg:line")
                     .attr("x1", margin * 2)
@@ -149,60 +172,50 @@
                     .attr("y", y)
                     .attr("dominant-baseline", "central")
                     .attr("text-anchor", "middle");
-                
-                function get_avg(data) {
-                    var top = 0;
-                    var bottom = 0;
-                    for(var i = 0; i < data.length; i++) {
-                        if(data[i][1] == null) continue; // no data for bin
-                        top += data[i][1] * data[i][2];
-                        bottom += data[i][2];
-                    }
-                    if(bottom == 0) return null; // no data at all
-                    return top/bottom;
-                }
-                
-                var mean = get_avg(data);
-                if(mean != null) {
-                    g.append("svg:text")
-                        .text("-Mean: " + d3.format(".3s")(mean))
-                        .attr("text-anchor", "start")
-                        .attr("dominant-baseline", "central")
-                        .attr("fill", "#0000FF")
-                        .attr("x", w - 2*margin)
-                        .attr("y", y(mean));
-                }
-                
-                var mean2 = get_avg(dead_data);
-                if(mean2 != null) {
-                    g.append("svg:text")
-                        .text("-Mean: " + d3.format(".3s")(mean2))
-                        .attr("text-anchor", "start")
-                        .attr("dominant-baseline", "central")
-                        .attr("fill", "#FF0000")
-                        .attr("x", w - 2*margin)
-                        .attr("y", y(mean2));
-                }
             }
             
-            function attachGraph(e, blue, red) {
-                plot(e, blue, red);
-                //setInterval(function() { plot(e, blue, red); }, 5000);
+            function change_period(period) {
+                d3.select("#period_current").text(period);
+                var lowerperiod = period.toLowerCase();
+                plot(d3.select("#local"), [
+                    {"data": getData("/web/graph_data/local_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"},
+                    {"data": getData("/web/graph_data/local_dead_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000"}
+                ]);
+                plot(d3.select("#payout"), [
+                    {"data": getData("/web/graph_data/current_payout/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"}
+                ]);
+                plot(d3.select("#pool"), [
+                    {"data": getData("/web/graph_data/pool_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"},
+                    {"data": getData("/web/graph_data/pool_stale_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000"}
+                ]);
+                plot(d3.select("#peers"), [
+                    {"data": getData("/web/graph_data/incoming_peers/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"},
+                    {"data": getData("/web/graph_data/outgoing_peers/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000"}
+                ]);
+                
+                var data = getData("/web/graph_data/miner_hash_rates/last_" + lowerperiod);
+                var dead_data = getData("/web/graph_data/miner_dead_hash_rates/last_" + lowerperiod);
+                var users = {}; for(var i = 0; i < data.length; ++i) for(var u in data[i][1]) users[u] = null; for(var i = 0; i < dead_data.length; ++i) for(var u in dead_data[i][1]) users[u] = null;
+                var userlist = []; for(var u in users) userlist.push(u);
+                d3.select("#miners").selectAll("*").remove();
+                var div = d3.select("#miners").selectAll().data(userlist).enter().append("div");
+                d.append("h3").text(identity);
+                d.append("svg:svg").each(function(u) {
+                    function f(d) {
+                        return u in d ? d[u] : 0;
+                    }
+                    plot(d3.select(this), [
+                        {"data": data, "value_getter": f, "color": "#0000FF"},
+                        {"data": dead_data, "value_getter": f, "color": "#FF0000"}
+                    ]);
+                });
             }
             
             periods = ["Hour", "Day", "Week", "Month", "Year"];
             d3.select("#period_chooser").selectAll().data(periods).enter().append("span")
-                .text(function(x){return x;})
+                .text(identity)
                 .on("click", change_period)
                 .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
-            function change_period(period) {
-                var lowerperiod = period.toLowerCase();
-                attachGraph(d3.select("#local"), "local_hash_rate/last_" + lowerperiod, "local_dead_hash_rate/last_" + lowerperiod);
-                attachGraph(d3.select("#payout"), "current_payout/last_" + lowerperiod);
-                attachGraph(d3.select("#pool"), "pool_rate/last_" + lowerperiod, "pool_stale_rate/last_" + lowerperiod);
-                attachGraph(d3.select("#peers"), "incoming_peers/last_" + lowerperiod, "outgoing_peers/last_" + lowerperiod);
-                d3.select("#period_current").text(period);
-            }
             change_period(periods[1]);
         </script>
     </body>

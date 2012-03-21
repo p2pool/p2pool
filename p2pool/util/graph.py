@@ -27,7 +27,7 @@ class DataView(object):
     
     def _add_datum(self, t, value):
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
-        self.bins = _shift(self.bins, shift, (0, 0))
+        self.bins = _shift(self.bins, shift, (self.ds_desc.zero_element, 0))
         self.last_bin_end += shift*self.desc.bin_width
         
         bin = int(math.ceil((self.last_bin_end - self.desc.bin_width - t)/self.desc.bin_width))
@@ -36,27 +36,30 @@ class DataView(object):
             return
         
         prev_total, prev_count = self.bins[bin]
-        self.bins[bin] = prev_total + value, prev_count + 1
+        self.bins[bin] = self.ds_desc.add_operator(prev_total, value), prev_count + 1
     
     def get_data(self, t):
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
-        bins = _shift(self.bins, shift, (0, 0))
+        bins = _shift(self.bins, shift, (self.ds_desc.zero_element, 0))
         last_bin_end = self.last_bin_end + shift*self.desc.bin_width
         
         assert last_bin_end - self.desc.bin_width <= t <= last_bin_end
         
         return [(
             (min(t, last_bin_end - self.desc.bin_width*i) + (last_bin_end - self.desc.bin_width*(i + 1)))/2, # center time
-            (total/count if count else None) if self.ds_desc.source_is_cumulative
-                else total/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))), # value
+            (self.ds_desc.mult_operator(1/count, total) if count else None) if self.ds_desc.source_is_cumulative
+                else self.ds_desc.mult_operator(1/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))), total), # value
             min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1)), # width
         ) for i, (total, count) in enumerate(bins)]
 
 
 class DataStreamDescription(object):
-    def __init__(self, source_is_cumulative, dataview_descriptions):
+    def __init__(self, source_is_cumulative, dataview_descriptions, zero_element=0, add_operator=lambda x, y: x+y, mult_operator=lambda a, x: a*x):
         self.source_is_cumulative = source_is_cumulative
         self.dataview_descriptions = dataview_descriptions
+        self.zero_element = zero_element
+        self.add_operator = add_operator
+        self.mult_operator = mult_operator
 
 class DataStream(object):
     def __init__(self, desc, dataviews):
@@ -78,7 +81,7 @@ class HistoryDatabase(object):
                     dv_data = ds_data[dv_name]
                     if dv_data['bin_width'] == dv_desc.bin_width and len(dv_data['bins']) == dv_desc.bin_count:
                         return DataView(dv_desc, ds_desc, dv_data['last_bin_end'], dv_data['bins'])
-            return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[(0, 0)])
+            return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[(ds_desc.zero_element, 0)])
         return cls(dict(
             (ds_name, DataStream(ds_desc, dict(
                 (dv_name, get_dataview(ds_name, ds_desc, dv_name, dv_desc))

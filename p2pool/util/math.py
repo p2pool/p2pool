@@ -65,6 +65,8 @@ def add_dicts(*dicts):
             res[k] = res.get(k, 0) + v
     return dict((k, v) for k, v in res.iteritems() if v)
 
+mult_dict = lambda c, x: dict((k, c*v) for k, v in x.iteritems())
+
 def format(x):
     prefixes = 'kMGTPEZY'
     count = 0
