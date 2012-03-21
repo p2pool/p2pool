@@ -60,7 +60,7 @@ nets = dict(
         WORKER_PORT=9327,
         BOOTSTRAP_ADDRS='76.26.53.101 124.205.120.178 190.195.79.161 173.167.113.73 82.161.65.210 67.83.108.0 78.101.67.239 78.100.161.252 87.58.117.233 78.100.162.223 216.239.45.4 78.101.131.221 72.14.191.28 97.81.163.217 69.126.183.240 219.84.64.174 78.101.119.27 89.211.228.244 178.152.122.30 172.16.0.3 76.26.53.101:51319'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda (major, minor, patch), temp_work: True,
+        VERSION_CHECK=lambda v, temp_work: True,
         SWITCH_TIME=1333238400-60*60*24*5,
     ),
     litecoin_testnet=math.Object(
@@ -78,7 +78,7 @@ nets = dict(
         WORKER_PORT=19327,
         BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda (major, minor, patch), temp_work: True,
+        VERSION_CHECK=lambda v, temp_work: True,
         SWITCH_TIME=1332276298,
     ),
 )
