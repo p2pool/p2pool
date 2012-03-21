@@ -49,6 +49,9 @@
         <h2>Pool rate - Blue=All, Red=Stale (hash/second)</h2>
         <svg id="pool"></svg>
         
+        <h2>Peers - Blue=Incoming, Red=Outgoing</h2>
+        <svg id="peers"></svg>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -83,7 +86,7 @@
                 var margin_top = 10;
                 
                 var x = d3.time.scale().domain([as_date(d3.min(data, itemgetter(0))), as_date(d3.max(data, itemgetter(0)))]).range([0 + margin * 2, w - margin * 2]);
-                var y = d3.scale.linear().domain([0, d3.max(data, itemgetter(1))]).range([h - margin, margin_top]);
+                var y = d3.scale.linear().domain([0, d3.max(data.concat(dead_data), itemgetter(1))]).range([h - margin, margin_top]);
                 
                 var line = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, itemgetter(1))).defined(compose(not_null, itemgetter(1)));
                 
@@ -197,6 +200,7 @@
                 attachGraph(d3.select("#local"), "local_hash_rate/last_" + lowerperiod, "local_dead_hash_rate/last_" + lowerperiod);
                 attachGraph(d3.select("#payout"), "current_payout/last_" + lowerperiod);
                 attachGraph(d3.select("#pool"), "pool_rate/last_" + lowerperiod, "pool_stale_rate/last_" + lowerperiod);
+                attachGraph(d3.select("#peers"), "incoming_peers/last_" + lowerperiod, "outgoing_peers/last_" + lowerperiod);
                 d3.select("#period_current").text(period);
             }
             change_period(periods[1]);

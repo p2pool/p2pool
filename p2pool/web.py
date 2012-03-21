@@ -389,6 +389,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
+        'incoming_peers': graph.DataStreamDescription(True, dataview_descriptions),
+        'outgoing_peers': graph.DataStreamDescription(True, dataview_descriptions),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
@@ -406,6 +408,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         hd.datastreams['pool_rate'].add_datum(t, poolrate)
         hd.datastreams['pool_stale_rate'].add_datum(t, poolrate - nonstalerate)
         hd.datastreams['current_payout'].add_datum(t, get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8)
+        hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming))
+        hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming))
     task.LoopingCall(add_point).start(5)
     new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data(time.time())), 'application/json'))
     
