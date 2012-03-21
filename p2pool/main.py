@@ -536,7 +536,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         share_data=dict(
                             previous_share_hash=current_work.value['best_share_hash'],
                             coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
-                            nonce=random.randrange(2**32),
+                            nonce=random.randrange(2**31),
                             pubkey_hash=pubkey_hash,
                             subsidy=current_work2.value['subsidy'],
                             donation=math.perfect_round(65535*args.donation_percentage/100),
