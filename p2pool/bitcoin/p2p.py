@@ -138,7 +138,7 @@ class Protocol(p2protocol.Protocol):
         ('signature', pack.VarStrType()),
     ])
     def handle_alert(self, message, signature):
-        print 'ALERT:', (message, signature)
+        pass # print 'ALERT:', (message, signature)
     
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
