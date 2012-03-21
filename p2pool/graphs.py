@@ -18,7 +18,7 @@ except ImportError:
                 request.redirect(request.path + '/')
                 return ''
             request.setHeader('Content-Type', 'text/html')
-            return '<html><head><title>P2Pool Graphs</title></head><body><p>Install python-rrdtool!</p></body></html>'
+            return '<html><head><title>P2Pool Graphs</title></head><body><p>Deprecated. Go to <a href="/static">/static</a>!</p></body></html>'
     
     class Grapher(object):
         def __init__(self, *args): pass
@@ -88,6 +88,7 @@ else:
                 return ''
             request.setHeader('Content-Type', 'text/html')
             return '''<html><head><title>P2Pool Graphs</title></head><body><h1>P2Pool Graphs</h1>
+                <p>Deprecated. Go to <a href="/static">/static</a>!</p>
                 <h2>Pool hash rate:</h2>
                 <p><img style="display:inline" src="poolrate_day"/> <img style="display:inline" src="poolrate_week"/> <img style="display:inline" src="poolrate_month"/></p>
                 <h2>Local hash rate:</h2>
