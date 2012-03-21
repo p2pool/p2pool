@@ -199,14 +199,11 @@
                 var userlist = []; for(var u in users) userlist.push(u);
                 d3.select("#miners").selectAll("*").remove();
                 var div = d3.select("#miners").selectAll().data(userlist).enter().append("div");
-                d.append("h3").text(identity);
-                d.append("svg:svg").each(function(u) {
-                    function f(d) {
-                        return u in d ? d[u] : 0;
-                    }
+                div.append("h3").text(identity);
+                div.append("svg:svg").each(function(u) {
                     plot(d3.select(this), [
-                        {"data": data, "value_getter": f, "color": "#0000FF"},
-                        {"data": dead_data, "value_getter": f, "color": "#FF0000"}
+                        {"data": data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#0000FF"},
+                        {"data": dead_data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#FF0000"}
                     ]);
                 });
             }

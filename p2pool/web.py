@@ -363,9 +363,9 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
     task.LoopingCall(add_point).start(100)
     @pseudoshare_received.watch
-    def _(work, dead, user):
+    def _(work, dead, user, had_vip_pass):
         reactor.callLater(1, grapher.add_localrate_point, work, dead)
-        if user is not None:
+        if user is not None and had_vip_pass:
             reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
     
     hd_path = os.path.join(datadir_path, 'graph_db')
@@ -383,6 +383,12 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
+    def combine_and_keep_largest(*dicts):
+        res = {}
+        for d in dicts:
+            for k, v in d.iteritems():
+                res[k] = res.get(k, 0) + v
+        return dict((k, v) for k, v in sorted(res.iteritems(), key=lambda (k, v): v)[-30:] if v)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
@@ -391,12 +397,12 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
         'incoming_peers': graph.DataStreamDescription(True, dataview_descriptions),
         'outgoing_peers': graph.DataStreamDescription(True, dataview_descriptions),
-        'miner_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, math.add_dicts, math.mult_dict),
-        'miner_dead_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, math.add_dicts, math.mult_dict),
+        'miner_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, combine_and_keep_largest, math.mult_dict),
+        'miner_dead_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, combine_and_keep_largest, math.mult_dict),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
-    def _(work, dead, user):
+    def _(work, dead, user, had_vip_pass):
         t = time.time()
         hd.datastreams['local_hash_rate'].add_datum(t, work)
         if dead:

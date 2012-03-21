@@ -407,7 +407,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             vip_pass = '%016x' % (random.randrange(2**64),)
             with open(os.path.join(datadir_path, 'vip_pass'), 'wb') as f:
                 f.write(vip_pass)
-        print '    Worker password:', vip_pass, '(only required for generating graphs)'
         
         # setup worker logic
         
@@ -678,7 +677,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     else:
                         received_header_hashes.add(header_hash)
                         
-                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser() if request.getPassword() == vip_pass else None)
+                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser(), request.getPassword() == vip_pass)
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
