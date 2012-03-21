@@ -142,6 +142,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             if datum['dead']:
                 miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
         
+        (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
+        
         return json.dumps(dict(
             my_hash_rates_in_last_hour=dict(
                 note="DEPRECATED",
@@ -163,6 +165,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             ),
             miner_hash_rates=miner_hash_rates,
             miner_dead_hash_rates=miner_dead_hash_rates,
+            efficiency_if_miner_perfect=(1 - stale_orphan_shares/shares)/(1 - global_stale_prop) if shares else None, # ignores dead shares because those are miner's fault and indicated by pseudoshare rejection
         ))
     
     def get_peer_addresses():
