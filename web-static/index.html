@@ -1,0 +1,68 @@
+<html>
+    <head>
+        <title>P2Pool Stats</title>
+        <script type="text/javascript" src="jquery-1.7.1.min.js"></script>
+        <script type="text/javascript">
+            // based on goblin's p2pool-stats project
+            $(document).ajaxError(function(event, request, settings, err) {
+	            alert("error: " + settings.url + ": " + err.message);
+            });
+
+            $.get('/rate', function(data) {
+	            $('#hashrate').html(data / 1000000000);
+            });
+            
+            $.getJSON('/current_payouts', function(pays) {
+                $.getJSON('/payout_addr', function(addr) {
+	                $('#payout').html(addr);
+	                $('#amt').html(pays["Address. Address: " + addr]);
+                });
+                
+	            var arr = new Array;
+	            var total = 0;
+	            for(var i in pays) {
+		            arr.push(i);
+	            }
+	            arr.sort(function(a, b) { return (pays[b] - pays[a]); });
+	            for(var j in arr) {
+		            var addr = arr[j];
+		            addr = addr.replace(/^.*: /, "");
+		            $('#payouts tr:last').after('<tr><td><a href="http://blockexplorer.com/address/' + addr + '">' + arr[j] + '</a></td><td>' +
+			            pays[arr[j]] + '</td></tr>');
+		            total += pays[arr[j]];
+	            }
+	            $('#payouts tr:last').after('<tr><td><b>Total:</b></td><td><b>' + total.toFixed(8) + '</b></td></tr>');
+            });
+
+            $.getJSON('/recent_blocks', function(blocks) {
+	            for(var i in blocks) {
+		            var ts = new Date(1000 * blocks[i]['ts']);
+		            var padded_hash = blocks[i]['hash'];
+		            while(padded_hash.length < 64) {
+			            padded_hash = '0' + padded_hash;
+		            }
+		            $('#blocks tr:last').after('<tr><td>' + ts.toString() + 
+			            '</td><td><a href="http://blockexplorer.com/block/'
+			            + padded_hash + '">' + padded_hash + '</a></td></tr>');
+	            }
+            });
+        </script>
+    </head>
+    <body>
+        <h1>P2Pool Stats</h1>
+        <p><a href="graphs.html">Graphs</a></p>
+        <p>Total pool GH/s: <span id="hashrate"></span></p>
+        <p>My payout address: <span id="payout"></span></p>
+        <p>Payout if a block were found NOW: <span id="amt"></span> BTC</p>
+        
+        <h2>Blocks found since program started:</h2>
+        <table border="1" id="blocks">
+	        <tr><th>time</th><th>hash</th></tr>
+        </table>
+        
+        <h2>Payouts if a block were found NOW:</h2>
+        <table border="1" id="payouts">
+	        <tr><th>address</th><th>amount in BTC</th></tr>
+        </table>
+    </body>
+</html>

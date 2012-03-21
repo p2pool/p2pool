@@ -716,6 +716,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         # done!
         print 'Started successfully!'
+        print 'Go to http://127.0.0.1:%i/static to view graphs and statistics.' % (worker_endpoint[1],)
         print
         
         
