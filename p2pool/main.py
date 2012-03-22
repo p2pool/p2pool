@@ -441,6 +441,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         
         pseudoshare_received = variable.Event()
+        share_received = variable.Event()
         local_rate_monitor = math.RateMonitor(10*60)
         
         class WorkerBridge(worker_interface.WorkerBridge):
@@ -667,6 +668,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                 shared_share_hashes.add(share.hash)
                         except:
                             log.err(None, 'Error forwarding block solution:')
+                        
+                        share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time)
                     
                     if pow_hash > target:
                         print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
@@ -689,7 +692,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         
-        web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received)
+        web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received, share_received)
         worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
         
         deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])

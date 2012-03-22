@@ -44,7 +44,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received):
+def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received, share_received):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -392,6 +392,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
+        'local_share_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
+        'local_dead_share_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
@@ -411,6 +413,12 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             hd.datastreams['miner_hash_rates'].add_datum(t, {user: work})
             if dead:
                 hd.datastreams['miner_dead_hash_rates'].add_datum(t, {user: work})
+    @share_received.watch
+    def _(work, dead):
+        t = time.time()
+        hd.datastreams['local_share_hash_rate'].add_datum(t, work)
+        if dead:
+            hd.datastreams['local_dead_share_hash_rate'].add_datum(t, work)
     def add_point():
         if tracker.get_height(current_work.value['best_share_hash']) < 720:
             return

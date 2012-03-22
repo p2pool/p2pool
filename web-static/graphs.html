@@ -36,6 +36,9 @@
         <h2>Local rate - Blue=All, Red=Dead (hash/second)</h2>
         <svg id="local"></svg>
         
+        <h2>Local rate reflected in shares - Blue=All, Red=Dead (hash/second)</h2>
+        <svg id="local_shares"></svg>
+        
         <h2>Current payout (BTC)</h2>
         <svg id="payout"></svg>
         
@@ -180,6 +183,10 @@
                 plot(d3.select("#local"), [
                     {"data": getData("/web/graph_data/local_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"},
                     {"data": getData("/web/graph_data/local_dead_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000"}
+                ]);
+                plot(d3.select("#local_shares"), [
+                    {"data": getData("/web/graph_data/local_share_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"},
+                    {"data": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000"}
                 ]);
                 plot(d3.select("#payout"), [
                     {"data": getData("/web/graph_data/current_payout/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"}
