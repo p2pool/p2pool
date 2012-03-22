@@ -91,12 +91,12 @@
                 var w = 640;
                 var h = 300;
                 var margin_v = 40;
-                var margin_h = 60;
+                var margin_h = 120;
                 
                 var x = d3.time.scale().domain([
                     as_date(d3.min(lines, function(line) { return d3.min(line.data, itemgetter(0)); })),
                     as_date(d3.max(lines, function(line) { return d3.max(line.data, itemgetter(0)); }))
-                ]).range([0 + margin_h * 2, w - margin_h * 2]);
+                ]).range([0 + margin_h, w - margin_h]);
                 var y = d3.scale.linear().domain([
                     0,
                     d3.max(lines, function(line) { return d3.max(line.data, compose(line.value_getter, itemgetter(1))); } )
@@ -120,14 +120,14 @@
                             .attr("text-anchor", "start")
                             .attr("dominant-baseline", "central")
                             .attr("fill", line.color)
-                            .attr("x", w - 2*margin_h + 10)
+                            .attr("x", w - margin_h + 10)
                             .attr("y", y(stats.mean) - 12);
                         g.append("svg:text")
                             .text("-Mean: " + d3.format(".3s")(stats.mean) + unit)
                             .attr("text-anchor", "start")
                             .attr("dominant-baseline", "central")
                             .attr("fill", line.color)
-                            .attr("x", w - 2*margin_h)
+                            .attr("x", w - margin_h)
                             .attr("y", y(stats.mean));
                         if(total_unit != null)
                             g.append("svg:text")
@@ -135,7 +135,7 @@
                                 .attr("text-anchor", "start")
                                 .attr("dominant-baseline", "central")
                                 .attr("fill", line.color)
-                                .attr("x", w - 2*margin_h + 10)
+                                .attr("x", w - margin_h + 10)
                                 .attr("y", y(stats.mean) + 12);
                     }
                 }
@@ -143,9 +143,9 @@
                 // x axis
                 
                 g.append("svg:line")
-                    .attr("x1", margin_h * 2)
+                    .attr("x1", margin_h)
                     .attr("y1", h - margin_v)
-                    .attr("x2", w - margin_h * 2)
+                    .attr("x2", w - margin_h)
                     .attr("y2", h - margin_v);
                 
                 g.selectAll()
@@ -169,24 +169,24 @@
                 // y axis
                 
                 g.append("svg:line")
-                    .attr("x1", margin_h * 2)
+                    .attr("x1", margin_h)
                     .attr("y1", h - margin_v)
-                    .attr("x2", margin_h * 2)
+                    .attr("x2", margin_h)
                     .attr("y2", margin_v);
                 
                 g.selectAll()
                     .data(y.ticks(6))
                     .enter().append("svg:line")
-                    .attr("x1", margin_h * 2 - 5)
+                    .attr("x1", margin_h - 5)
                     .attr("y1", y)
-                    .attr("x2", margin_h * 2)
+                    .attr("x2", margin_h)
                     .attr("y2", y);
                 
                 g.selectAll()
                     .data(y.ticks(6))
                     .enter().append("svg:text")
                     .text(compose(function(x) { return x + unit; }, d3.format(".2s")))
-                    .attr("x", margin_h)
+                    .attr("x", margin_h/2)
                     .attr("y", y)
                     .attr("dominant-baseline", "central")
                     .attr("text-anchor", "middle");
