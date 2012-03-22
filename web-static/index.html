@@ -8,8 +8,8 @@
 	            alert("error: " + settings.url + ": " + err.message);
             });
 
-            $.get('/rate', function(data) {
-	            $('#hashrate').html(data / 1000000000);
+            $.getJSON('/rate', function(rate) {
+	            $('#hashrate').html(rate / 1000000000);
             });
             
             $.getJSON('/current_payouts', function(pays) {
