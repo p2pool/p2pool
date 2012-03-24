@@ -1,6 +1,6 @@
 Requirements:
     Generic:
-        Bitcoin >=0.5.0 or Litecoin
+        Bitcoin >=0.6.0rc4 or Bitcoin >=0.5.4 (for BIP16 support) or Litecoin
         Python
         Twisted
         python-argparse (for Python <=2.6)
