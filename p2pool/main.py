@@ -760,7 +760,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     self.recent_messages = []
                 def _remember_message(self, message):
                     self.recent_messages.append(message)
-                    while len(self.recent_message) > 100:
+                    while len(self.recent_messages) > 100:
                         self.recent_messages.pop(0)
                 def privmsg(self, user, channel, message):
                     if channel == self.channel:
