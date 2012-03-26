@@ -186,12 +186,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     web_root.putChild('recent_blocks', WebInterface(lambda: recent_blocks))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
     
-    try:
-        from . import draw
-        web_root.putChild('chain_img', WebInterface(lambda: draw.get(tracker, current_work.value['best_share_hash']), 'image/png'))
-    except ImportError:
-        print "Install Pygame and PIL to enable visualizations! Visualizations disabled."
-    
     new_root = resource.Resource()
     web_root.putChild('web', new_root)
     
