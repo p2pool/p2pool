@@ -6,12 +6,12 @@ import os
 import sys
 import time
 
-from twisted.internet import reactor, task
+from twisted.internet import task
 from twisted.python import log
 from twisted.web import resource, static
 
 from bitcoin import data as bitcoin_data
-from . import data as p2pool_data, graphs
+from . import data as p2pool_data
 from util import graph, math
 
 def _atomic_read(filename):
@@ -298,21 +298,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         def getChild(self, child, request):
             return self
     new_root.putChild('explorer', Explorer())
-    
-    grapher = graphs.Grapher(os.path.join(datadir_path, 'rrd'))
-    web_root.putChild('graphs', grapher.get_resource())
-    def add_point():
-        if tracker.get_height(current_work.value['best_share_hash']) < 720:
-            return
-        nonstalerate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
-        poolrate = nonstalerate / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))
-        grapher.add_poolrate_point(poolrate, poolrate - nonstalerate)
-    task.LoopingCall(add_point).start(100)
-    @pseudoshare_received.watch
-    def _(work, dead, user, had_vip_pass):
-        reactor.callLater(1, grapher.add_localrate_point, work, dead)
-        if user is not None and had_vip_pass:
-            reactor.callLater(1, grapher.add_localminer_point, user, work, dead)
     
     hd_path = os.path.join(datadir_path, 'graph_db')
     hd_data = _atomic_read(hd_path)
