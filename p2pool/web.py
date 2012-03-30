@@ -188,6 +188,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             return self.func(*self.args)
     
     web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
+    web_root.putChild('difficulty', WebInterface(lambda: json.dumps(bitcoin_data.target_to_difficulty(tracker.shares[current_work.value['best_share_hash']].max_target)), 'application/json'))
     web_root.putChild('users', WebInterface(get_users, 'application/json'))
     web_root.putChild('fee', WebInterface(lambda: json.dumps(worker_fee), 'application/json'))
     web_root.putChild('current_payouts', WebInterface(get_current_payouts, 'application/json'))
