@@ -693,7 +693,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         
         web_root = web.get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, args.worker_fee, p2p_node, my_share_hashes, recent_blocks, pseudoshare_received, share_received)
-        worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root)
+        worker_interface.WorkerInterface(WorkerBridge()).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
         
         deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
         
@@ -718,7 +718,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         # done!
         print 'Started successfully!'
-        print 'Go to http://127.0.0.1:%i/static to view graphs and statistics.' % (worker_endpoint[1],)
+        print 'Go to http://127.0.0.1:%i/ to view graphs and statistics!' % (worker_endpoint[1],)
         if args.donation_percentage > 0.51:
             print '''Donating %.1f%% of work towards P2Pool's development. Thanks for the tip!''' % (args.donation_percentage,)
         elif args.donation_percentage < 0.49:

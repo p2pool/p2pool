@@ -20,9 +20,9 @@ class _Provider(object):
         return self.parent._getwork(request, data, long_poll=self.long_poll)
 
 class _GETableServer(jsonrpc.Server):
-    def render_GET(self, request):
-        request.content = StringIO.StringIO(json.dumps(dict(id=0, method='getwork')))
-        return self.render_POST(request)
+    def __init__(self, provider, render_get_func):
+        jsonrpc.Server.__init__(self, provider)
+        self.render_GET = render_get_func
 
 class WorkerBridge(object):
     def __init__(self):
@@ -45,9 +45,14 @@ class WorkerInterface(object):
         
         self.merkle_root_to_handler = expiring_dict.ExpiringDict(300)
     
-    def attach_to(self, res):
-        res.putChild('', _GETableServer(_Provider(self, long_poll=False)))
-        res.putChild('long-polling', _GETableServer(_Provider(self, long_poll=True)))
+    def attach_to(self, res, get_handler=None):
+        res.putChild('', _GETableServer(_Provider(self, long_poll=False), get_handler))
+        
+        def repost(request):
+            request.content = StringIO.StringIO(json.dumps(dict(id=0, method='getwork')))
+            return s.render_POST(request)
+        s = _GETableServer(_Provider(self, long_poll=True), repost)
+        res.putChild('long-polling', s)
     
     @defer.inlineCallbacks
     def _getwork(self, request, data, long_poll):
