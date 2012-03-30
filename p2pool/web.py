@@ -269,7 +269,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
                 return 'share not known'
             share = tracker.shares[self.share_hash]
             
-            format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH</p>' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
+            format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
             
             request.write('<h1>%s <a href="%x">%s</a></h1>' % (share.__class__.__name__, share.hash, p2pool_data.format_hash(share.hash)))
             if share.previous_hash is not None:
