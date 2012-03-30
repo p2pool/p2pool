@@ -66,13 +66,6 @@
             function not_null(x) { return x != null; }
             function identity(x) { return x; }
             
-            function getData(url) {
-                var xmlhttp = new XMLHttpRequest();
-                xmlhttp.open("GET",  url, false);
-                xmlhttp.send();
-                return JSON.parse(xmlhttp.responseText);
-            }
-            
             function get_area_mean(data, value_getter) {
                 var top = 0;
                 var bottom = 0;
@@ -86,7 +79,7 @@
             }
             
             function plot(g, unit, total_unit, lines) {
-                // lines is a list of objects which have attributes data, value_getter, color
+                // lines is a list of objects which have attributes data, value_getter, color, and optionally label
                 
                 var w = 640;
                 var h = 300;
@@ -191,42 +184,55 @@
                     .attr("dominant-baseline", "central")
                     .attr("text-anchor", "middle");
             }
+            function plot_later(g, unit, total_unit, lines) { // takes lines with url attribute instead of data attribute
+                var callbacks_left = lines.length;
+                lines.map(function(line) {
+                    d3.json(line.url, function(line_data) {
+                        line.data = line_data;
+                        callbacks_left--;
+                        if(callbacks_left == 0)
+                            plot(g, unit, total_unit, lines);
+                    });
+                });
+            }
             
             function change_period(period) {
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
-                plot(d3.select("#local"), "H/s", "H", [
-                    {"data": getData("/web/graph_data/local_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    {"data": getData("/web/graph_data/local_dead_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000", "label": "Dead"}
+                plot_later(d3.select("#local"), "H/s", "H", [
+                    {"url": "/web/graph_data/local_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
+                    {"url": "/web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Dead"}
                 ]);
-                plot(d3.select("#local_shares"), "H/s", "H", [
-                    {"data": getData("/web/graph_data/local_share_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    //{"data": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000", "label": "Dead"}
+                plot_later(d3.select("#local_shares"), "H/s", "H", [
+                    {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
+                    //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Dead"}
                 ]);
-                plot(d3.select("#payout"), "BTC", null, [
-                    {"data": getData("/web/graph_data/current_payout/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF"}
+                plot_later(d3.select("#payout"), "BTC", null, [
+                    {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF"}
                 ]);
-                plot(d3.select("#pool"), "H/s", "H", [
-                    {"data": getData("/web/graph_data/pool_rate/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    {"data": getData("/web/graph_data/pool_stale_rate/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000", "label": "Stale"}
+                plot_later(d3.select("#pool"), "H/s", "H", [
+                    {"url": "/web/graph_data/pool_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
+                    {"url": "/web/graph_data/pool_stale_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Stale"}
                 ]);
-                plot(d3.select("#peers"), "", null, [
-                    {"data": getData("/web/graph_data/incoming_peers/last_" + lowerperiod), "value_getter": identity, "color": "#0000FF", "label": "Incoming"},
-                    {"data": getData("/web/graph_data/outgoing_peers/last_" + lowerperiod), "value_getter": identity, "color": "#FF0000", "label": "Outgoing"}
+                plot_later(d3.select("#peers"), "", null, [
+                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Incoming"},
+                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Outgoing"}
                 ]);
                 
-                var data = getData("/web/graph_data/miner_hash_rates/last_" + lowerperiod);
-                var dead_data = getData("/web/graph_data/miner_dead_hash_rates/last_" + lowerperiod);
-                var users = {}; for(var i = 0; i < data.length; ++i) for(var u in data[i][1]) users[u] = null; for(var i = 0; i < dead_data.length; ++i) for(var u in dead_data[i][1]) users[u] = null;
-                var userlist = []; for(var u in users) userlist.push(u);
-                d3.select("#miners").selectAll("*").remove();
-                var div = d3.select("#miners").selectAll().data(userlist).enter().append("div");
-                div.append("h3").text(identity);
-                div.append("svg:svg").each(function(u) {
-                    plot(d3.select(this), "H/s", "H", [
-                        {"data": data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#0000FF", "label": "Total"},
-                        {"data": dead_data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#FF0000", "label": "Dead"}
-                    ]);
+                d3.json("/web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
+                    d3.json("/web/graph_data/miner_dead_hash_rates/last_" + lowerperiod, function(dead_data) {
+                        var users = {}; for(var i = 0; i < data.length; ++i) for(var u in data[i][1]) users[u] = null; for(var i = 0; i < dead_data.length; ++i) for(var u in dead_data[i][1]) users[u] = null;
+                        var userlist = []; for(var u in users) userlist.push(u);
+                        d3.select("#miners").selectAll("*").remove();
+                        var div = d3.select("#miners").selectAll().data(userlist).enter().append("div");
+                        div.append("h3").text(identity);
+                        div.append("svg:svg").each(function(u) {
+                            plot(d3.select(this), "H/s", "H", [
+                                {"data": data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#0000FF", "label": "Total"},
+                                {"data": dead_data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#FF0000", "label": "Dead"}
+                            ]);
+                        });
+                    });
                 });
             }
             
