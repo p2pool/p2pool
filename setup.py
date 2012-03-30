@@ -27,6 +27,7 @@ try:
                 'web-static/d3.v2.min.js',
                 'web-static/graphs.html',
                 'web-static/index.html',
+                'web-static/share.html',
             ]),
         ],
         

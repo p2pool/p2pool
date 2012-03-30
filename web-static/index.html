@@ -1,51 +1,53 @@
-<html>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
         <title>P2Pool Stats</title>
-        <script type="text/javascript" src="jquery-1.7.1.min.js"></script>
+        <script type="text/javascript" src="d3.v2.min.js"></script>
         <script type="text/javascript">
             // based on goblin's p2pool-stats project
-            $(document).ajaxError(function(event, request, settings, err) {
-                alert("error: " + settings.url + ": " + err.message);
+            
+            d3.json('/rate', function(rate) {
+                d3.select('#hashrate').text(rate / 1e9);
             });
             
-            $.getJSON('/rate', function(rate) {
-                $('#hashrate').html(rate / 1000000000);
-            });
-            
-            $.getJSON('/current_payouts', function(pays) {
-                $.getJSON('/payout_addr', function(addr) {
-                    $('#payout').html(addr);
-                    $('#amt').html(pays["Address. Address: " + addr]);
+            d3.json('/current_payouts', function(pays) {
+                d3.json('/payout_addr', function(addr) {
+                    d3.select('#payout').text(addr);
+                    d3.select('#amt').text(addr in pays ? pays[addr] : 0);
                 });
-                    
-                    var arr = new Array;
-                    var total = 0;
-                    for(var i in pays) {
-                        arr.push(i);
-                    }
-                    arr.sort(function(a, b) { return (pays[b] - pays[a]); });
-                    for(var j in arr) {
-                        var addr = arr[j];
-                        addr = addr.replace(/^.*: /, "");
-                        $('#payouts tr:last').after('<tr><td><a href="http://blockexplorer.com/address/' + addr + '">' + arr[j] + '</a></td><td>' +
-                            pays[arr[j]] + '</td></tr>');
-                        total += pays[arr[j]];
-                    }
-                    $('#payouts tr:last').after('<tr><td><b>Total:</b></td><td><b>' + total.toFixed(8) + '</b></td></tr>');
+                
+                var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
+                
+                var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
+                tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return 'http://blockexplorer.com/address/' + addr});
+                tr.append('td').text(function(addr){return pays[addr]});
+                
+                var total_tr = d3.select('#payouts').append('tr');
+                total_tr.append('td').append('strong').text('Total');
+                total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
             });
             
-            $.getJSON('/recent_blocks', function(blocks) {
-                for(var i in blocks) {
-                    var ts = new Date(1000 * blocks[i]['ts']);
-                    var padded_hash = blocks[i]['hash'];
-                    while(padded_hash.length < 64) {
-                        padded_hash = '0' + padded_hash;
-                    }
-                    $('#blocks tr:last').after('<tr><td>' + ts.toString() +
-                        '</td><td><a href="http://blockexplorer.com/block/'
-                        + padded_hash + '">' + padded_hash + '</a></td></tr>');
-                }
+            d3.json('/recent_blocks', function(blocks) {
+                var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
+                tr.append('td').text(function(block){return new Date(1000*block.ts).toString()})
+                tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return 'http://blockexplorer.com/block/' + block.hash});
             });
+            
+            d3.json('/web/best_share_hash', function(c) {
+                d3.select('#best_share').append('a').attr('href', 'share.html#' + c).text(c.substr(-8));
+            });
+            
+            function fill(url, id) {
+                d3.json(url, function(d) {
+                    d.sort()
+                    d3.select(id).selectAll().data(d).enter().append('span').text(' ').append('a').attr('href', function(c){return 'share.html#' + c}).text(function(c){return c.substr(-8)});
+                });
+            }
+            fill('/web/verified_heads', '#verified_heads');
+            fill('/web/heads', '#heads');
+            fill('/web/verified_tails', '#verified_tails');
+            fill('/web/tails', '#tails');
         </script>
     </head>
     <body>
@@ -54,6 +56,13 @@
         <p>Total pool GH/s: <span id="hashrate"></span></p>
         <p>My payout address: <span id="payout"></span></p>
         <p>Payout if a block were found NOW: <span id="amt"></span> BTC</p>
+        
+        <h2>Share explorer</h2>
+        <p>Best share: <span id="best_share"></span></p>
+        <p>Verified heads: <span id="verified_heads"></span></p>
+        <p>Heads: <span id="heads"></span></p>
+        <p>Verified tails: <span id="verified_tails"></span></p>
+        <p>Tails: <span id="tails"></span></p>
         
         <h2>Blocks found since program started:</h2>
         <table border="1" id="blocks">

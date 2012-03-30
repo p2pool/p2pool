@@ -1,6 +1,5 @@
 from __future__ import division
 
-import cgi
 import errno
 import json
 import os
@@ -177,7 +176,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(tracker.shares[current_work.value['best_share_hash']].max_target)))
     web_root.putChild('users', WebInterface(get_users))
     web_root.putChild('fee', WebInterface(lambda: worker_fee))
-    web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_human(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems())))
+    web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_address(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems())))
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
@@ -246,98 +245,58 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     task.LoopingCall(update_stat_log).start(5*60)
     new_root.putChild('log', WebInterface(lambda: stat_log))
     
-    class ShareExplorer(resource.Resource):
-        def __init__(self, share_hash):
-            self.share_hash = share_hash
-        def render_GET(self, request):
-            request.setHeader('Content-Type', 'text/html')
-            if self.share_hash not in tracker.shares:
-                return 'share not known'
-            share = tracker.shares[self.share_hash]
-            
-            format_bits = lambda bits: '%f (bits=%#8x) Work required: %sH' % (bitcoin_data.target_to_difficulty(bits.target), bits.bits, math.format(bitcoin_data.target_to_average_attempts(bits.target)))
-            
-            request.write('<h1>%s <a href="%x">%s</a></h1>' % (share.__class__.__name__, share.hash, p2pool_data.format_hash(share.hash)))
-            if share.previous_hash is not None:
-                request.write('<p>Previous: <a href="%x">%s</a>' % (share.previous_hash, p2pool_data.format_hash(share.previous_hash)))
-            if tracker.get_height(share.hash) >= 100:
-                jump_hash = tracker.get_nth_parent_hash(share.hash, 100)
-                if jump_hash is not None:
-                    request.write(' (100 jump <a href="%x">%s</a>)' % (jump_hash, p2pool_data.format_hash(jump_hash)))
-            request.write('</p>')
-            request.write('<p>Next: %s</p>' % (', '.join('<a href="%x">%s</a>' % (next, p2pool_data.format_hash(next)) for next in sorted(tracker.reverse_shares.get(share.hash, set()), key=lambda sh: -len(tracker.reverse_shares.get(sh, set())))),))
-            request.write('<p>Verified: %s</p>' % (share.hash in tracker.verified.shares,))
-            request.write('<p>Time first seen: %s</p>' % (time.ctime(start_time if share.time_seen == 0 else share.time_seen),))
-            request.write('<p>Peer first received from: %s</p>' % ('%s:%i' % share.peer.addr if share.peer is not None else 'self or cache',))
-            
-            request.write('<h2>Share data</h2>')
-            request.write('<p>Timestamp: %s (%i)</p>' % (time.ctime(share.timestamp), share.timestamp))
-            request.write('<p>Difficulty: %s</p>' % (format_bits(share.share_info['bits']),))
-            request.write('<p>Minimum difficulty: %s</p>' % (format_bits(share.share_info.get('max_bits', share.share_info['bits'])),))
-            request.write('<p>Payout script: %s</p>' % (bitcoin_data.script2_to_human(share.new_script, share.net.PARENT),))
-            request.write('<p>Donation: %.2f%%</p>' % (share.share_data['donation']/65535*100,))
-            request.write('<p>Stale info: %s</p>' % ({0: 'none', 253: 'had an orphan', 254: 'had a dead'}.get(share.share_data['stale_info'], 'unknown %i' % (share.share_data['stale_info'],)),))
-            request.write('<p>Nonce: %s</p>' % (cgi.escape(repr(share.share_data['nonce'])),))
-            
-            request.write('<h2>Block header</h2>')
-            request.write('<p>Hash: <a href="%s%064x">%064x</a></p>' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash, share.header_hash))
-            request.write('<p>Version: %i</p>' % (share.header['version'],))
-            request.write('<p>Previous block: <a href="%s%064x">%064x</a></p>' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header['previous_block'], share.header['previous_block']))
-            request.write('<p>Timestamp: %s (%i)</p>' % (time.ctime(share.header['timestamp']), share.header['timestamp']))
-            request.write('<p>Difficulty: %f (bits=%#8x) Work: %sH</p>' % (bitcoin_data.target_to_difficulty(share.header['bits'].target), share.header['bits'].bits, math.format(bitcoin_data.target_to_average_attempts(share.header['bits'].target))))
-            request.write('<p>Nonce: %i</p>' % (share.header['nonce'],))
-            if share.other_txs is not None:
-                tx_count = len(share.other_txs)
-            elif len(share.merkle_link['branch']) == 0:
-                tx_count = 1
-            else:
-                tx_count = 'between %i and %i' % (2**len(share.merkle_link['branch'])//2+1, 2**len(share.merkle_link['branch']))
-            request.write('<p>Transactions: %s</p>' % (tx_count,))
-            coinbase = share.share_data['coinbase'].ljust(2, '\x00')
-            request.write('<p>Coinbase: %s %s</p>' % (cgi.escape(repr(coinbase)), coinbase.encode('hex')))
-            request.write('<p>Generation value: %.8f %s</p>' % (share.share_data['subsidy']*1e-8, net.PARENT.SYMBOL))
-            #request.write('<p>Generation txn: %32x</p>' % (share.gentx_hash,))
-            
-            return ''
+    def get_share(share_hash_str):
+        if int(share_hash_str, 16) not in tracker.shares:
+            return None
+        share = tracker.shares[int(share_hash_str, 16)]
+        
+        return dict(
+            parent='%064x' % share.previous_hash,
+            children=['%064x' % x for x in sorted(tracker.reverse_shares.get(share.hash, set()), key=lambda sh: -len(tracker.reverse_shares.get(sh, set())))], # sorted from most children to least children
+            local=dict(
+                verified=share.hash in tracker.verified.shares,
+                time_first_seen=start_time if share.time_seen == 0 else share.time_seen,
+                peer_first_received_from=share.peer.addr if share.peer is not None else None,
+            ),
+            share_data=dict(
+                timestamp=share.timestamp,
+                target=share.target,
+                max_target=share.max_target,
+                payout_address=bitcoin_data.script2_to_address(share.new_script, net.PARENT),
+                donation=share.share_data['donation']/65535,
+                stale_info=share.share_data['stale_info'],
+                nonce=share.share_data['nonce'],
+            ),
+            block=dict(
+                hash='%064x' % share.header_hash,
+                header=dict(
+                    version=share.header['version'],
+                    previous_block='%064x' % share.header['previous_block'],
+                    merkle_root='%064x' % share.header['merkle_root'],
+                    timestamp=share.header['timestamp'],
+                    target=share.header['bits'].target,
+                    nonce=share.header['nonce'],
+                ),
+                gentx=dict(
+                    hash='%064x' % share.gentx_hash,
+                    coinbase=share.share_data['coinbase'].ljust(2, '\x00').encode('hex'),
+                    value=share.share_data['subsidy']*1e-8,
+                ),
+                txn_count_range=[len(share.other_txs), len(share.other_txs)] if share.other_txs is not None else 1 if len(share.merkle_link['branch']) == 0 else [2**len(share.merkle_link['branch'])//2+1, 2**len(share.merkle_link['branch'])],
+            ),
+        )
+    new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
+    new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in tracker.heads]))
+    new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in tracker.verified.heads]))
+    new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in tracker.tails for x in tracker.reverse_shares.get(t, set())]))
+    new_root.putChild('verified_tails', WebInterface(lambda: ['%064x' % x for t in tracker.verified.tails for x in tracker.verified.reverse_shares.get(t, set())]))
+    new_root.putChild('best_share_hash', WebInterface(lambda: '%064x' % current_work.value['best_share_hash']))
+    
     class Explorer(resource.Resource):
         def render_GET(self, request):
-            if not request.path.endswith('/'):
-                request.redirect(request.path + '/')
-                return ''
-            request.setHeader('Content-Type', 'text/html')
-            request.write('<h1>P2Pool share explorer</h1>')
-            
-            request.write('<h2>Verified heads</h2>')
-            request.write('<ul>')
-            for h in tracker.verified.heads:
-                request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
-            request.write('</ul>')
-            
-            request.write('<h2>Verified tails</h2>')
-            request.write('<ul>')
-            for tail in tracker.verified.tails:
-                for h in tracker.reverse_shares.get(tail, set()):
-                    request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
-            request.write('</ul>')
-            
-            request.write('<h2>Heads</h2>')
-            request.write('<ul>')
-            for h in tracker.heads:
-                request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
-            request.write('</ul>')
-            
-            request.write('<h2>Tails</h2>')
-            request.write('<ul>')
-            for tail in tracker.tails:
-                for h in tracker.reverse_shares.get(tail, set()):
-                    request.write('<li><a href="%x">%s%s</a></li>' % (h, p2pool_data.format_hash(h), ' BEST' if h == current_work.value['best_share_hash'] else ''))
-            request.write('</ul>')
-            
-            return ''
+            return 'moved to /static/explorer.html'
         def getChild(self, child, request):
-            if not child:
-                return self
-            return ShareExplorer(int(child, 16))
+            return self
     new_root.putChild('explorer', Explorer())
     
     grapher = graphs.Grapher(os.path.join(datadir_path, 'rrd'))
