@@ -634,7 +634,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         except:
                             log.err(None, 'Error while processing merged mining POW:')
                     
-                    if pow_hash <= share_info['bits'].target:
+                    if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
                         min_header = dict(header);del min_header['merkle_root']
                         hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
                         if new:
