@@ -49,12 +49,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     
     web_root = resource.Resource()
     
-    def get_rate():
-        if tracker.get_height(current_work.value['best_share_hash']) < 720:
-            return json.dumps(None)
-        return json.dumps(p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
-            / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720)))
-    
     def get_users():
         height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256, False)
@@ -84,19 +78,16 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             results[math.weighted_choice(results.iteritems())] += int(scale) - sum(results.itervalues())
         return results
     
-    def get_current_payouts():
-        return json.dumps(dict((bitcoin_data.script2_to_human(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems()))
-    
     def get_patron_sendmany(total=None, trunc='0.01'):
         if total is None:
             return 'need total argument. go to patron_sendmany/<TOTAL>'
         total = int(float(total)*1e8)
         trunc = int(float(trunc)*1e8)
-        return json.dumps(dict(
+        return dict(
             (bitcoin_data.script2_to_address(script, net.PARENT), value/1e8)
             for script, value in get_current_scaled_txouts(total, trunc).iteritems()
             if bitcoin_data.script2_to_address(script, net.PARENT) is not None
-        ))
+        )
     
     def get_global_stats():
         # averaged over last hour
@@ -106,11 +97,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         
         nonstale_hash_rate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], lookbehind)
         stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], lookbehind)
-        return json.dumps(dict(
+        return dict(
             pool_nonstale_hash_rate=nonstale_hash_rate,
             pool_hash_rate=nonstale_hash_rate/(1 - stale_prop),
             pool_stale_prop=stale_prop,
-        ))
+        )
     
     def get_local_stats():
         lookbehind = 3600//net.SHARE_PERIOD
@@ -144,7 +135,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         
         (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
         
-        return json.dumps(dict(
+        return dict(
             my_hash_rates_in_last_hour=dict(
                 note="DEPRECATED",
                 nonstale=share_att_s,
@@ -166,16 +157,10 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             miner_hash_rates=miner_hash_rates,
             miner_dead_hash_rates=miner_dead_hash_rates,
             efficiency_if_miner_perfect=(1 - stale_orphan_shares/shares)/(1 - global_stale_prop) if shares else None, # ignores dead shares because those are miner's fault and indicated by pseudoshare rejection
-        ))
-    
-    def get_peer_addresses():
-        return ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues())
-    
-    def get_uptime():
-        return json.dumps(time.time() - start_time)
+        )
     
     class WebInterface(resource.Resource):
-        def __init__(self, func, mime_type, args=()):
+        def __init__(self, func, mime_type='application/json', args=()):
             resource.Resource.__init__(self)
             self.func, self.mime_type, self.args = func, mime_type, args
         
@@ -185,21 +170,22 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         def render_GET(self, request):
             request.setHeader('Content-Type', self.mime_type)
             request.setHeader('Access-Control-Allow-Origin', '*')
-            return self.func(*self.args)
+            res = self.func(*self.args)
+            return json.dumps(res) if self.mime_type == 'application/json' else res
     
-    web_root.putChild('rate', WebInterface(get_rate, 'application/json'))
-    web_root.putChild('difficulty', WebInterface(lambda: json.dumps(bitcoin_data.target_to_difficulty(tracker.shares[current_work.value['best_share_hash']].max_target)), 'application/json'))
-    web_root.putChild('users', WebInterface(get_users, 'application/json'))
-    web_root.putChild('fee', WebInterface(lambda: json.dumps(worker_fee), 'application/json'))
-    web_root.putChild('current_payouts', WebInterface(get_current_payouts, 'application/json'))
+    web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)/(1-p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))))
+    web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(tracker.shares[current_work.value['best_share_hash']].max_target)))
+    web_root.putChild('users', WebInterface(get_users))
+    web_root.putChild('fee', WebInterface(lambda: worker_fee))
+    web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_human(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems())))
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
-    web_root.putChild('global_stats', WebInterface(get_global_stats, 'application/json'))
-    web_root.putChild('local_stats', WebInterface(get_local_stats, 'application/json'))
-    web_root.putChild('peer_addresses', WebInterface(get_peer_addresses, 'text/plain'))
+    web_root.putChild('global_stats', WebInterface(get_global_stats))
+    web_root.putChild('local_stats', WebInterface(get_local_stats))
+    web_root.putChild('peer_addresses', WebInterface(lambda: ' '.join(peer.transport.getPeer().host + (':' + str(peer.transport.getPeer().port) if peer.transport.getPeer().port != net.P2P_PORT else '') for peer in p2p_node.peers.itervalues()), 'text/plain'))
     web_root.putChild('peer_versions', WebInterface(lambda: ''.join('%s:%i ' % peer.addr + peer.other_sub_version + '\n' for peer in p2p_node.peers.itervalues()), 'text/plain'))
-    web_root.putChild('payout_addr', WebInterface(lambda: json.dumps(bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)), 'application/json'))
-    web_root.putChild('recent_blocks', WebInterface(lambda: json.dumps(recent_blocks), 'application/json'))
-    web_root.putChild('uptime', WebInterface(get_uptime, 'application/json'))
+    web_root.putChild('payout_addr', WebInterface(lambda: bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)))
+    web_root.putChild('recent_blocks', WebInterface(lambda: recent_blocks))
+    web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
     
     try:
         from . import draw
