@@ -500,16 +500,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     mm_data = ''
                     mm_later = []
                 
-                def predict_timestamp():
-                    desired_timestamp = int(time.time() - current_work2.value['clock_offset'])
-                    previous_share = tracker.shares[current_work.value['best_share_hash']] if current_work.value['best_share_hash'] is not None else None
-                    return math.clip(desired_timestamp, (
-                        (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
-                        (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
-                    )) if previous_share is not None else desired_timestamp
-                new = predict_timestamp() >= net.SWITCH_TIME
-                if new:
-                    share_info, generate_tx = p2pool_data.NewShare.generate_transaction(
+                if True:
+                    share_info, generate_tx = p2pool_data.Share.generate_transaction(
                         tracker=tracker,
                         share_data=dict(
                             previous_share_hash=current_work.value['best_share_hash'],
@@ -529,27 +521,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
                         desired_target=desired_share_target,
                         ref_merkle_link=dict(branch=[], index=0),
-                        net=net,
-                    )
-                else:
-                    share_info, generate_tx = p2pool_data.Share.generate_transaction(
-                        tracker=tracker,
-                        share_data=dict(
-                            previous_share_hash=current_work.value['best_share_hash'],
-                            coinbase=(mm_data + current_work.value['coinbaseflags'])[:100],
-                            nonce=random.randrange(2**31),
-                            pubkey_hash=pubkey_hash,
-                            subsidy=current_work2.value['subsidy'],
-                            donation=math.perfect_round(65535*args.donation_percentage/100),
-                            stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
-                                253 if orphans > orphans_recorded_in_chain else
-                                254 if doas > doas_recorded_in_chain else
-                                0
-                            )(*get_stale_counts()),
-                        ),
-                        block_target=current_work.value['bits'].target,
-                        desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
-                        desired_target=desired_share_target,
                         net=net,
                     )
                 
@@ -637,13 +608,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
                         min_header = dict(header);del min_header['merkle_root']
                         hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
-                        if new:
-                            share = p2pool_data.NewShare(net, None, dict(
-                                min_header=min_header, share_info=share_info, hash_link=hash_link,
-                                ref_merkle_link=dict(branch=[], index=0),
-                            ), merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
-                        else:
-                            share = p2pool_data.Share(net, None, min_header, share_info, hash_link=hash_link, merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+                        share = p2pool_data.Share(net, None, dict(
+                            min_header=min_header, share_info=share_info, hash_link=hash_link,
+                            ref_merkle_link=dict(branch=[], index=0),
+                        ), merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
                         
                         print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                             request.getUser(),

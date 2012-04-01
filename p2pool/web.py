@@ -50,7 +50,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     
     def get_users():
         height, last = tracker.get_height_and_last(current_work.value['best_share_hash'])
-        weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256, False)
+        weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
         res = {}
         for script in sorted(weights, key=lambda s: weights[s]):
             res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
