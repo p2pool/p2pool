@@ -108,7 +108,7 @@ class Protocol(p2protocol.Protocol):
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
-        if version < 2:
+        if version < 4:
             raise PeerMisbehavingError('peer too old')
         
         self.other_version = version
