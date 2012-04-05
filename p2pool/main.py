@@ -710,7 +710,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 nickname = 'p2pool%02i' % (random.randrange(100),)
                 channel = net.ANNOUNCE_CHANNEL
                 def lineReceived(self, line):
-                    print repr(line)
+                    if p2pool.DEBUG:
+                        print repr(line)
                     irc.IRCClient.lineReceived(self, line)
                 def signedOn(self):
                     irc.IRCClient.signedOn(self)
