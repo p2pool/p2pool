@@ -244,7 +244,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
             f.write(json.dumps(stat_log))
     task.LoopingCall(update_stat_log).start(5*60)
-    new_root.putChild('log', WebInterface(lambda: json.dumps(stat_log), 'application/json'))
+    new_root.putChild('log', WebInterface(lambda: stat_log))
     
     class ShareExplorer(resource.Resource):
         def __init__(self, share_hash):
@@ -418,7 +418,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming))
         hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming))
     task.LoopingCall(add_point).start(5)
-    new_root.putChild('graph_data', WebInterface(lambda source, view: json.dumps(hd.datastreams[source].dataviews[view].get_data(time.time())), 'application/json'))
+    new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
     
