@@ -288,7 +288,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     
     class Explorer(resource.Resource):
         def render_GET(self, request):
-            return 'moved to /static/explorer.html'
+            return 'moved to /static/'
         def getChild(self, child, request):
             return self
     new_root.putChild('explorer', Explorer())
