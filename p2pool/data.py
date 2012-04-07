@@ -304,9 +304,7 @@ class OkayTracker(forest.Tracker):
             my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
             my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,
             my_dead_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 254 else 0,
-        )))
-        self.verified.get_nth_parent_hash = self.get_nth_parent_hash # self is a superset of self.verified
-        
+        )), subset_of=self)
         self.get_cumulative_weights = WeightsSkipList(self)
     
     def attempt_verify(self, share):
@@ -416,9 +414,9 @@ class OkayTracker(forest.Tracker):
                 if not to_remove:
                     break
                 for share_hash in to_remove:
-                    self.remove(share_hash)
                     if share_hash in self.verified.shares:
                         self.verified.remove(share_hash)
+                    self.remove(share_hash)
                 #print "_________", to_remove
         
         # drop tails
@@ -440,9 +438,9 @@ class OkayTracker(forest.Tracker):
                 if self.shares[aftertail].previous_hash not in self.tails:
                     print "erk", aftertail, self.shares[aftertail].previous_hash
                     continue
-                self.remove(aftertail)
                 if aftertail in self.verified.shares:
                     self.verified.remove(aftertail)
+                self.remove(aftertail)
             #end = time.time()
             #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
         

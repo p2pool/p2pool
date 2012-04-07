@@ -88,7 +88,7 @@ AttributeDelta = get_attributedelta_type(dict(
 ))
 
 class Tracker(object):
-    def __init__(self, shares=[], delta_type=AttributeDelta):
+    def __init__(self, shares=[], delta_type=AttributeDelta, subset_of=None):
         self.shares = {} # hash -> share
         self.reverse_shares = {} # delta.tail -> set of share_hashes
         
@@ -105,9 +105,13 @@ class Tracker(object):
         self.added = variable.Event()
         self.removed = variable.Event()
         
-        self.get_nth_parent_hash = DistanceSkipList(self)
+        if subset_of is None:
+            self.get_nth_parent_hash = DistanceSkipList(self)
+        else:
+            self.get_nth_parent_hash = subset_of.get_nth_parent_hash
         
         self.delta_type = delta_type
+        self.subset_of = subset_of
         
         for share in shares:
             self.add(share)
@@ -115,6 +119,8 @@ class Tracker(object):
     def add(self, share):
         assert not isinstance(share, (int, long, type(None)))
         delta = self.delta_type.from_element(share)
+        if self.subset_of is not None:
+            assert delta.head in self.subset_of.shares
         
         if delta.head in self.shares:
             raise ValueError('share already present')
@@ -145,6 +151,8 @@ class Tracker(object):
         assert isinstance(share_hash, (int, long, type(None)))
         if share_hash not in self.shares:
             raise KeyError()
+        if self.subset_of is not None:
+            assert share_hash in self.subset_of.shares
         
         share = self.shares[share_hash]
         del share_hash
