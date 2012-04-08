@@ -400,14 +400,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        if os.path.exists(os.path.join(datadir_path, 'vip_pass')):
-            with open(os.path.join(datadir_path, 'vip_pass'), 'rb') as f:
-                vip_pass = f.read().strip('\r\n')
-        else:
-            vip_pass = '%016x' % (random.randrange(2**64),)
-            with open(os.path.join(datadir_path, 'vip_pass'), 'wb') as f:
-                f.write(vip_pass)
-        
         # setup worker logic
         
         removed_unstales_var = variable.Variable((0, 0, 0))
@@ -648,7 +640,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     else:
                         received_header_hashes.add(header_hash)
                         
-                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser(), request.getPassword() == vip_pass)
+                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser())
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)

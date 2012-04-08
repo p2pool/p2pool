@@ -329,7 +329,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
-    def _(work, dead, user, had_vip_pass):
+    def _(work, dead, user):
         t = time.time()
         hd.datastreams['local_hash_rate'].add_datum(t, work)
         if dead:
