@@ -516,6 +516,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         net=net,
                     )
                 
+                mm_later = [(dict(aux_work, target=aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target), index, hashes) for aux_work, index, hashes in mm_later]
+                
                 target = net.PARENT.SANE_MAX_TARGET
                 if desired_pseudoshare_target is None:
                     if len(self.recent_shares_ts_work) == 50:
@@ -572,7 +574,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     for aux_work, index, hashes in mm_later:
                         try:
-                            if pow_hash <= (aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target) or p2pool.DEBUG:
+                            if pow_hash <= aux_work['target'] or p2pool.DEBUG:
                                 df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(aux_work['merged_proxy'].rpc_getauxblock)(
                                     pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                                     bitcoin_data.aux_pow_type.pack(dict(
