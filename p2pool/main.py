@@ -526,7 +526,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 else:
                     target = min(target, desired_pseudoshare_target)
                 target = max(target, share_info['bits'].target)
-                for aux_work in current_work.value['mm_chains'].itervalues():
+                for aux_work, index, hashes in mm_later:
                     target = max(target, aux_work['target'])
                 
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
