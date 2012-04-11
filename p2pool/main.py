@@ -225,7 +225,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged_proxy.rpc_getauxblock)()
                 pre_merged_work.set(dict(pre_merged_work.value, **{auxblock['chainid']: dict(
                     hash=int(auxblock['hash'], 16),
-                    target=pack.IntType(256).unpack(auxblock['target'].decode('hex')),
+                    target='p2pool' if auxblock['target'] == 'p2pool' else pack.IntType(256).unpack(auxblock['target'].decode('hex')),
                     merged_proxy=merged_proxy,
                 )}))
                 yield deferral.sleep(1)
@@ -572,7 +572,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     for aux_work, index, hashes in mm_later:
                         try:
-                            if pow_hash <= aux_work['target'] or p2pool.DEBUG:
+                            if pow_hash <= (aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target) or p2pool.DEBUG:
                                 df = deferral.retry('Error submitting merged block: (will retry)', 10, 10)(aux_work['merged_proxy'].rpc_getauxblock)(
                                     pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                                     bitcoin_data.aux_pow_type.pack(dict(
