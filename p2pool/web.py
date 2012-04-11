@@ -285,6 +285,12 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in tracker.tails for x in tracker.reverse_shares.get(t, set())]))
     new_root.putChild('verified_tails', WebInterface(lambda: ['%064x' % x for t in tracker.verified.tails for x in tracker.verified.reverse_shares.get(t, set())]))
     new_root.putChild('best_share_hash', WebInterface(lambda: '%064x' % current_work.value['best_share_hash']))
+    def get_share_data(share_hash_str):
+        if int(share_hash_str, 16) not in tracker.shares:
+            return ''
+        share = tracker.shares[int(share_hash_str, 16)]
+        return p2pool_data.share_type.pack(share.as_share())
+    new_root.putChild('share_data', WebInterface(lambda share_hash_str: get_share_data(share_hash_str), 'application/octet-stream'))
     
     class Explorer(resource.Resource):
         def render_GET(self, request):
