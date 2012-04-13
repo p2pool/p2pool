@@ -53,7 +53,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(current_work.value['best_share_hash'], min(height, 720), 65535*2**256)
         res = {}
         for script in sorted(weights, key=lambda s: weights[s]):
-            res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
+            res[bitcoin_data.script2_to_address(script, net.PARENT)] = weights[script]/total_weight
         return res
     
     def get_current_scaled_txouts(scale, trunc=0):
