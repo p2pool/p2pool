@@ -54,7 +54,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         res = {}
         for script in sorted(weights, key=lambda s: weights[s]):
             res[bitcoin_data.script2_to_human(script, net.PARENT)] = weights[script]/total_weight
-        return json.dumps(res)
+        return res
     
     def get_current_scaled_txouts(scale, trunc=0):
         txouts = get_current_txouts()
