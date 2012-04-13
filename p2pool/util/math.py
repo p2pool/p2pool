@@ -45,6 +45,8 @@ def clip(x, (low, high)):
     else:
         return x
 
+add_to_range = lambda x, (low, high): (min(low, x), max(high, x))
+
 def nth(i, n=0):
     i = iter(i)
     for _ in xrange(n):
@@ -131,7 +133,7 @@ except ImportError:
         topa = p + z**2/2/n
         topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
         bottom = 1 + z**2/n
-        return (topa - topb)/bottom, (topa + topb)/bottom
+        return [clip(x, (0, 1)) for x in add_to_range(x/n, [(topa - topb)/bottom, (topa + topb)/bottom])]
 else:
     def binomial_conf_interval(x, n, conf=0.95):
         assert 0 <= x <= n and 0 <= conf < 1
