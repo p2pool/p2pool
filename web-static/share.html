@@ -2,7 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
-        <title>P2Pool Share Explorer</title>
+        <title>P2Pool Share</title>
         <script type="text/javascript" src="d3.v2.min.js"></script>
     </head>
     <body>
@@ -27,13 +27,14 @@
                     current_hash = share_hash;
                     var b = d3.select('body');
                     b.selectAll('*').remove();
+                    var h1 = b.append('h1');
+                        h1.append('a').attr('href', '/static/').text('P2Pool');
+                        h1.append('span').text(' > Share ');
+                        h1.append('a').attr('href', '#' + share_hash).text(share_hash.substr(-8));
                     if(share == null) {
                         b.append('p').text('share not found');
                         return;
                     }
-                    var h1 = b.append('h1');
-                        h1.append('span').text('Share ');
-                        h1.append('a').attr('href', '#' + share_hash).text(share_hash.substr(-8));
                     var parent = b.append('p')
                         parent.append('span').text('Parent: ');
                         parent.append('a').attr('href', '#' + share.parent).text(share.parent.substr(-8));
