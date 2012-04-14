@@ -12,6 +12,13 @@ import signal
 import traceback
 import urlparse
 
+try:
+    from twisted.internet import iocpreactor
+    iocpreactor.install()
+except:
+    raise
+else:
+    print 'Using IOCP reactor!'
 from twisted.internet import defer, reactor, protocol, task
 from twisted.web import server
 from twisted.python import log
