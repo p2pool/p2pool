@@ -88,6 +88,16 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             if bitcoin_data.script2_to_address(script, net.PARENT) is not None
         )
     
+    def get_local_rates():
+        miner_hash_rates = {}
+        miner_dead_hash_rates = {}
+        datums, dt = local_rate_monitor.get_datums_in_last()
+        for datum in datums:
+            miner_hash_rates[datum['user']] = miner_hash_rates.get(datum['user'], 0) + datum['work']/dt
+            if datum['dead']:
+                miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
+        return miner_hash_rates, miner_dead_hash_rates
+    
     def get_global_stats():
         # averaged over last hour
         lookbehind = 3600//net.SHARE_PERIOD
@@ -124,14 +134,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             tracker.shares[tracker.get_nth_parent_hash(current_work.value['best_share_hash'], lookbehind - 1)].timestamp)
         share_att_s = my_work / actual_time
         
-        miner_hash_rates = {}
-        miner_dead_hash_rates = {}
-        datums, dt = local_rate_monitor.get_datums_in_last()
-        for datum in datums:
-            miner_hash_rates[datum['user']] = miner_hash_rates.get(datum['user'], 0) + datum['work']/dt
-            if datum['dead']:
-                miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
-        
+        miner_hash_rates, miner_dead_hash_rates = get_local_rates()
         (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
         
         return dict(
@@ -206,14 +209,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         
         global_stale_prop = p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], lookbehind)
         (stale_orphan_shares, stale_doa_shares), shares, _ = get_stale_counts()
-        
-        miner_hash_rates = {}
-        miner_dead_hash_rates = {}
-        datums, dt = local_rate_monitor.get_datums_in_last()
-        for datum in datums:
-            miner_hash_rates[datum['user']] = miner_hash_rates.get(datum['user'], 0) + datum['work']/dt
-            if datum['dead']:
-                miner_dead_hash_rates[datum['user']] = miner_dead_hash_rates.get(datum['user'], 0) + datum['work']/dt
+        miner_hash_rates, miner_dead_hash_rates = get_local_rates()
         
         stat_log.append(dict(
             time=time.time(),
@@ -308,12 +304,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
-    def combine_and_keep_largest(*dicts):
-        res = {}
-        for d in dicts:
-            for k, v in d.iteritems():
-                res[k] = res.get(k, 0) + v
-        return dict((k, v) for k, v in sorted(res.iteritems(), key=lambda (k, v): v)[-30:] if v)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
         'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
@@ -322,10 +312,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
         'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
+        'current_payouts': graph.DataStreamDescription(True, dataview_descriptions, multivalues=True),
         'incoming_peers': graph.DataStreamDescription(True, dataview_descriptions),
         'outgoing_peers': graph.DataStreamDescription(True, dataview_descriptions),
-        'miner_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, combine_and_keep_largest, math.mult_dict),
-        'miner_dead_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, {}, combine_and_keep_largest, math.mult_dict),
+        'miner_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, multivalues=True),
+        'miner_dead_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, multivalues=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
@@ -352,7 +343,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         t = time.time()
         hd.datastreams['pool_rate'].add_datum(t, poolrate)
         hd.datastreams['pool_stale_rate'].add_datum(t, poolrate - nonstalerate)
-        hd.datastreams['current_payout'].add_datum(t, get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8)
+        current_txouts = get_current_txouts()
+        hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8)
+        miner_hash_rates, miner_dead_hash_rates = get_local_rates()
+        current_txouts_by_address = dict((bitcoin_data.script2_to_address(script, net.PARENT), amount) for script, amount in current_txouts.iteritems())
+        hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-8) for user in miner_hash_rates if user in current_txouts_by_address))
         hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming))
         hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming))
     task.LoopingCall(add_point).start(5)

@@ -447,7 +447,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 self.new_work_event = current_work.changed
                 self.recent_shares_ts_work = []
             
-            def preprocess_request(self, request):
+            def get_user_details(self, request):
                 user = request.getUser() if request.getUser() is not None else ''
                 
                 desired_pseudoshare_target = None
@@ -474,6 +474,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     except: # XXX blah
                         pubkey_hash = my_pubkey_hash
                 
+                return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
+            
+            def preprocess_request(self, request):
+                user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(request)
                 return pubkey_hash, desired_share_target, desired_pseudoshare_target
             
             def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
@@ -558,6 +562,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 received_header_hashes = set()
                 
                 def got_response(header, request):
+                    user, _, _, _ = self.get_user_details(request)
                     assert header['merkle_root'] == merkle_root
                     
                     header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
@@ -644,11 +649,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     else:
                         received_header_hashes.add(header_hash)
                         
-                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, request.getUser())
+                        pseudoshare_received.happened(bitcoin_data.target_to_average_attempts(target), not on_time, user)
                         self.recent_shares_ts_work.append((time.time(), bitcoin_data.target_to_average_attempts(target)))
                         while len(self.recent_shares_ts_work) > 50:
                             self.recent_shares_ts_work.pop(0)
-                        local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=request.getUser()))
+                        local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=user))
                     
                     return on_time
                 

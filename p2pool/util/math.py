@@ -60,12 +60,15 @@ def geometric(p):
         return 1
     return int(math.log1p(-random.random()) / math.log1p(-p)) + 1
 
-def add_dicts(*dicts):
-    res = {}
-    for d in dicts:
-        for k, v in d.iteritems():
-            res[k] = res.get(k, 0) + v
-    return dict((k, v) for k, v in res.iteritems() if v)
+def add_dicts_ext(add_func=lambda a, b: a+b, zero=0):
+    def add_dicts(*dicts):
+        res = {}
+        for d in dicts:
+            for k, v in d.iteritems():
+                res[k] = add_func(res.get(k, zero), v)
+        return dict((k, v) for k, v in res.iteritems() if v != zero)
+    return add_dicts
+add_dicts = add_dicts_ext()
 
 mult_dict = lambda c, x: dict((k, c*v) for k, v in x.iteritems())
 

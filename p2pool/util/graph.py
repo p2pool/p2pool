@@ -16,6 +16,19 @@ def _shift(x, shift, pad_item):
     right_pad = math2.clip(-shift, (0, len(x)))
     return [pad_item]*left_pad + x[right_pad:-left_pad if left_pad else None] + [pad_item]*right_pad
 
+combine_bins = math2.add_dicts_ext(lambda (a1, b1), (a2, b2): (a1+a2, b1+b2), (0, 0))
+
+nothing = object()
+def keep_largest(n, squash_key=nothing, key=lambda x: x, add_func=lambda a, b: a+b):
+    def _(d):
+        items = sorted(d.iteritems(), key=lambda (k, v): (k != squash_key, key(v)), reverse=True)
+        while len(items) > n:
+            k, v = items.pop()
+            if squash_key is not nothing:
+                items[-1] = squash_key, add_func(items[-1][1], v)
+        return dict(items)
+    return _
+
 class DataView(object):
     def __init__(self, desc, ds_desc, last_bin_end, bins):
         assert len(bins) == desc.bin_count
@@ -26,40 +39,42 @@ class DataView(object):
         self.bins = bins
     
     def _add_datum(self, t, value):
+        if not self.ds_desc.multivalues:
+            value = {None: value}
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
-        self.bins = _shift(self.bins, shift, (self.ds_desc.zero_element, 0))
+        self.bins = _shift(self.bins, shift, {})
         self.last_bin_end += shift*self.desc.bin_width
         
         bin = int(math.ceil((self.last_bin_end - self.desc.bin_width - t)/self.desc.bin_width))
-        
-        if bin >= self.desc.bin_count:
-            return
-        
-        prev_total, prev_count = self.bins[bin]
-        self.bins[bin] = self.ds_desc.add_operator(prev_total, value), prev_count + 1
+        if bin < self.desc.bin_count:
+            self.bins[bin] = self.ds_desc.keep_largest_func(combine_bins(self.bins[bin], dict((k, (v, 1)) for k, v in value.iteritems())))
     
     def get_data(self, t):
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
-        bins = _shift(self.bins, shift, (self.ds_desc.zero_element, 0))
+        bins = _shift(self.bins, shift, {})
         last_bin_end = self.last_bin_end + shift*self.desc.bin_width
         
         assert last_bin_end - self.desc.bin_width <= t <= last_bin_end
         
-        return [(
-            (min(t, last_bin_end - self.desc.bin_width*i) + (last_bin_end - self.desc.bin_width*(i + 1)))/2, # center time
-            (self.ds_desc.mult_operator(1/count, total) if count else None) if self.ds_desc.source_is_cumulative
-                else self.ds_desc.mult_operator(1/(min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1))), total), # value
-            min(t, last_bin_end - self.desc.bin_width*i) - (last_bin_end - self.desc.bin_width*(i + 1)), # width
-        ) for i, (total, count) in enumerate(bins)]
+        def _((i, bin)):
+            left, right = last_bin_end - self.desc.bin_width*(i + 1), min(t, last_bin_end - self.desc.bin_width*i)
+            center, width = (left+right)/2, right-left
+            if self.ds_desc.source_is_cumulative:
+                val = dict((k, total/count) for k, (total, count) in bin.iteritems())
+            else:
+                val = dict((k, total/width) for k, (total, count) in bin.iteritems())
+            if not self.ds_desc.multivalues:
+                val = val.get(None, None if self.ds_desc.source_is_cumulative else 0)
+            return center, val, width
+        return map(_, enumerate(bins))
 
 
 class DataStreamDescription(object):
-    def __init__(self, source_is_cumulative, dataview_descriptions, zero_element=0, add_operator=lambda x, y: x+y, mult_operator=lambda a, x: a*x):
+    def __init__(self, source_is_cumulative, dataview_descriptions, multivalues=False):
         self.source_is_cumulative = source_is_cumulative
         self.dataview_descriptions = dataview_descriptions
-        self.zero_element = zero_element
-        self.add_operator = add_operator
-        self.mult_operator = mult_operator
+        self.multivalues = multivalues
+        self.keep_largest_func = keep_largest(20, None, key=lambda (t, c): t/c if self.source_is_cumulative else t, add_func=lambda (a1, b1), (a2, b2): (a1+a2, b1+b2))
 
 class DataStream(object):
     def __init__(self, desc, dataviews):
@@ -74,14 +89,21 @@ class DataStream(object):
 class HistoryDatabase(object):
     @classmethod
     def from_obj(cls, datastream_descriptions, obj={}):
+        def convert_bin(bin):
+            if isinstance(bin, dict):
+                return bin
+            total, count = bin
+            if not isinstance(total, dict):
+                total = {None: total}
+            return dict((k, (v, count)) for k, v in total.iteritems()) if count else {}
         def get_dataview(ds_name, ds_desc, dv_name, dv_desc):
             if ds_name in obj:
                 ds_data = obj[ds_name]
                 if dv_name in ds_data:
                     dv_data = ds_data[dv_name]
                     if dv_data['bin_width'] == dv_desc.bin_width and len(dv_data['bins']) == dv_desc.bin_count:
-                        return DataView(dv_desc, ds_desc, dv_data['last_bin_end'], dv_data['bins'])
-            return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[(ds_desc.zero_element, 0)])
+                        return DataView(dv_desc, ds_desc, dv_data['last_bin_end'], map(convert_bin, dv_data['bins']))
+            return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[{}])
         return cls(dict(
             (ds_name, DataStream(ds_desc, dict(
                 (dv_name, get_dataview(ds_name, ds_desc, dv_name, dv_desc))
