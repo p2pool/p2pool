@@ -16,7 +16,7 @@ try:
     from twisted.internet import iocpreactor
     iocpreactor.install()
 except:
-    raise
+    pass
 else:
     print 'Using IOCP reactor!'
 from twisted.internet import defer, reactor, protocol, task
