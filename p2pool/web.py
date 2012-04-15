@@ -305,18 +305,18 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
     hd = graph.HistoryDatabase.from_obj({
-        'local_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
-        'local_dead_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
-        'local_share_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
-        'local_dead_share_hash_rate': graph.DataStreamDescription(False, dataview_descriptions),
-        'pool_rate': graph.DataStreamDescription(True, dataview_descriptions),
-        'pool_stale_rate': graph.DataStreamDescription(True, dataview_descriptions),
-        'current_payout': graph.DataStreamDescription(True, dataview_descriptions),
-        'current_payouts': graph.DataStreamDescription(True, dataview_descriptions, multivalues=True),
-        'incoming_peers': graph.DataStreamDescription(True, dataview_descriptions),
-        'outgoing_peers': graph.DataStreamDescription(True, dataview_descriptions),
-        'miner_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, multivalues=True),
-        'miner_dead_hash_rates': graph.DataStreamDescription(False, dataview_descriptions, multivalues=True),
+        'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'local_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'local_dead_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'pool_rate': graph.DataStreamDescription(dataview_descriptions),
+        'pool_stale_rate': graph.DataStreamDescription(dataview_descriptions),
+        'current_payout': graph.DataStreamDescription(dataview_descriptions),
+        'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
+        'incoming_peers': graph.DataStreamDescription(dataview_descriptions),
+        'outgoing_peers': graph.DataStreamDescription(dataview_descriptions),
+        'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
+        'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch

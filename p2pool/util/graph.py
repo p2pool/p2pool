@@ -59,22 +59,22 @@ class DataView(object):
         def _((i, bin)):
             left, right = last_bin_end - self.desc.bin_width*(i + 1), min(t, last_bin_end - self.desc.bin_width*i)
             center, width = (left+right)/2, right-left
-            if self.ds_desc.source_is_cumulative:
+            if self.ds_desc.is_gauge:
                 val = dict((k, total/count) for k, (total, count) in bin.iteritems())
             else:
                 val = dict((k, total/width) for k, (total, count) in bin.iteritems())
             if not self.ds_desc.multivalues:
-                val = val.get(None, None if self.ds_desc.source_is_cumulative else 0)
+                val = val.get(None, None if self.ds_desc.is_gauge else 0)
             return center, val, width
         return map(_, enumerate(bins))
 
 
 class DataStreamDescription(object):
-    def __init__(self, source_is_cumulative, dataview_descriptions, multivalues=False):
-        self.source_is_cumulative = source_is_cumulative
+    def __init__(self, dataview_descriptions, is_gauge=True, multivalues=False, multivalues_keep=20, multivalues_squash_key=None):
         self.dataview_descriptions = dataview_descriptions
+        self.is_gauge = is_gauge
         self.multivalues = multivalues
-        self.keep_largest_func = keep_largest(20, None, key=lambda (t, c): t/c if self.source_is_cumulative else t, add_func=lambda (a1, b1), (a2, b2): (a1+a2, b1+b2))
+        self.keep_largest_func = keep_largest(multivalues_keep, multivalues_squash_key, key=lambda (t, c): t/c if self.is_gauge else t, add_func=lambda (a1, b1), (a2, b2): (a1+a2, b1+b2))
 
 class DataStream(object):
     def __init__(self, desc, dataviews):
