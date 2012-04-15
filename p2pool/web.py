@@ -110,6 +110,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             pool_nonstale_hash_rate=nonstale_hash_rate,
             pool_hash_rate=nonstale_hash_rate/(1 - stale_prop),
             pool_stale_prop=stale_prop,
+            min_difficulty=bitcoin_data.target_to_difficulty(tracker.shares[current_work.value['best_share_hash']].max_target),
         )
     
     def get_local_stats():
@@ -159,6 +160,18 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             miner_hash_rates=miner_hash_rates,
             miner_dead_hash_rates=miner_dead_hash_rates,
             efficiency_if_miner_perfect=(1 - stale_orphan_shares/shares)/(1 - global_stale_prop) if shares else None, # ignores dead shares because those are miner's fault and indicated by pseudoshare rejection
+            efficiency=(1 - (stale_orphan_shares+stale_doa_shares)/shares)/(1 - global_stale_prop) if shares else None,
+            peers=dict(
+                incoming=sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming),
+                outgoing=sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming),
+            ),
+            shares=dict(
+                total=shares,
+                orphan=stale_orphan_shares,
+                dead=stale_doa_shares,
+            ),
+            uptime=time.time() - start_time,
+            block_value=current_work2.value['subsidy']*1e-8,
         )
     
     class WebInterface(resource.Resource):
