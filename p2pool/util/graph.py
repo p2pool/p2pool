@@ -40,7 +40,7 @@ class DataView(object):
     
     def _add_datum(self, t, value):
         if not self.ds_desc.multivalues:
-            value = {None: value}
+            value = {'null': value}
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
         self.bins = _shift(self.bins, shift, {})
         self.last_bin_end += shift*self.desc.bin_width
@@ -64,7 +64,7 @@ class DataView(object):
             else:
                 val = dict((k, total/width) for k, (total, count) in bin.iteritems())
             if not self.ds_desc.multivalues:
-                val = val.get(None, None if self.ds_desc.is_gauge else 0)
+                val = val.get('null', None if self.ds_desc.is_gauge else 0)
             return center, val, width
         return map(_, enumerate(bins))
 
@@ -94,7 +94,7 @@ class HistoryDatabase(object):
                 return bin
             total, count = bin
             if not isinstance(total, dict):
-                total = {None: total}
+                total = {'null': total}
             return dict((k, (v, count)) for k, v in total.iteritems()) if count else {}
         def get_dataview(ds_name, ds_desc, dv_name, dv_desc):
             if ds_name in obj:
