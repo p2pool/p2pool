@@ -235,11 +235,17 @@ class Share(object):
     def __repr__(self):
         return '<Share %s>' % (' '.join('%s=%r' % (k, getattr(self, k)) for k in self.__slots__),)
     
+    def as_share1a(self):
+        return dict(type=4, contents=self.share1a_type.pack(dict(common=self.common, merkle_link=self.merkle_link)))
+
+    def as_share1b(self):
+        return dict(type=5, contents=self.share1b_type.pack(dict(common=self.common, other_txs=self.other_txs)))
+    
     def as_share(self):
         if not self.pow_hash <= self.header['bits'].target: # share1a
-            return dict(type=4, contents=self.share1a_type.pack(dict(common=self.common, merkle_link=self.merkle_link)))
-        else: # share1b
-            return dict(type=5, contents=self.share1b_type.pack(dict(common=self.common, other_txs=self.other_txs)))
+            return self.as_share1a()
+        else:
+            return self.as_share1b()
     
     def check(self, tracker):
         share_info, gentx = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], self.net)
