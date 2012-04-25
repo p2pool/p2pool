@@ -162,7 +162,7 @@ class Share(object):
                 sequence=None,
                 script=share_data['coinbase'].ljust(2, '\x00'),
             )],
-            tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script]] + [dict(
+            tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script] or script == DONATION_SCRIPT] + [dict(
                 value=0,
                 script='\x20' + cls.get_ref_hash(net, share_info, ref_merkle_link),
             )],
