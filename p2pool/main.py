@@ -315,6 +315,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
+                if current_work.value['previous_block'] in [share.header['previous_block'], share.header_hash]:
+                    broadcast_share(share.hash)
         
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
@@ -359,11 +361,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         task.LoopingCall(lambda: open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in p2p_node.addr_store.iteritems())).start(60)
         
-        # send share when the chain changes to their chain
-        def work_changed(new_work):
-            #print 'Work changed:', new_work
+        def broadcast_share(share_hash):
             shares = []
-            for share in tracker.get_chain(new_work['best_share_hash'], min(5, tracker.get_height(new_work['best_share_hash']))):
+            for share in tracker.get_chain(share_hash, min(5, tracker.get_height(share_hash))):
                 if share.hash in shared_share_hashes:
                     break
                 shared_share_hashes.add(share.hash)
@@ -372,7 +372,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             for peer in p2p_node.peers.itervalues():
                 peer.sendShares([share for share in shares if share.peer is not peer])
         
-        current_work.changed.watch(work_changed)
+        # send share when the chain changes to their chain
+        current_work.changed.watch(lambda new_work: broadcast_share(new_work['best_share_hash']))
         
         def save_shares():
             for share in tracker.get_chain(current_work.value['best_share_hash'], min(tracker.get_height(current_work.value['best_share_hash']), 2*net.CHAIN_LENGTH)):
