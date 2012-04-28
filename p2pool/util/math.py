@@ -243,9 +243,10 @@ class RateMonitor(object):
     def add_datum(self, datum):
         self._prune()
         t = time.time()
-        self.datums.append((t, datum))
         if self.first_timestamp is None:
             self.first_timestamp = t
+        else:
+            self.datums.append((t, datum))
 
 if __name__ == '__main__':
     import random
