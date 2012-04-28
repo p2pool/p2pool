@@ -426,7 +426,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''
             my_shares = len(my_share_hashes)
             my_doa_shares = len(my_doa_share_hashes)
-            delta = tracker.verified.get_delta(current_work.value['best_share_hash'])
+            delta = tracker.verified.get_delta_to_last(current_work.value['best_share_hash'])
             my_shares_in_chain = delta.my_count + removed_unstales_var.value[0]
             my_doa_shares_in_chain = delta.my_doa_count + removed_doa_unstales_var.value
             orphans_recorded_in_chain = delta.my_orphan_announce_count + removed_unstales_var.value[1]

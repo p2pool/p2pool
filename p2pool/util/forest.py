@@ -217,20 +217,20 @@ class Tracker(object):
         self.removed.happened(share)
     
     def get_height(self, share_hash):
-        return self.get_delta(share_hash).height
+        return self.get_delta_to_last(share_hash).height
     
     def get_work(self, share_hash):
-        return self.get_delta(share_hash).work
+        return self.get_delta_to_last(share_hash).work
     
     def get_last(self, share_hash):
-        return self.get_delta(share_hash).tail
+        return self.get_delta_to_last(share_hash).tail
     
     def get_height_and_last(self, share_hash):
-        delta = self.get_delta(share_hash)
+        delta = self.get_delta_to_last(share_hash)
         return delta.height, delta.tail
     
     def get_height_work_and_last(self, share_hash):
-        delta = self.get_delta(share_hash)
+        delta = self.get_delta_to_last(share_hash)
         return delta.height, delta.work, delta.tail
     
     def _get_delta(self, share_hash):
@@ -266,7 +266,7 @@ class Tracker(object):
         self.deltas[share_hash] = delta - ref_delta, ref
         self.reverse_deltas.setdefault(ref, set()).add(share_hash)
     
-    def get_delta(self, share_hash):
+    def get_delta_to_last(self, share_hash):
         assert isinstance(share_hash, (int, long, type(None)))
         delta = self.delta_type.get_none(share_hash)
         updates = []
@@ -277,6 +277,10 @@ class Tracker(object):
         for update_hash, delta_then in updates:
             self._set_delta(update_hash, delta - delta_then)
         return delta
+    
+    def get_delta(self, item, ancestor):
+        assert self.is_child_of(ancestor, item)
+        return self.get_delta_to_last(item) - self.get_delta_to_last(ancestor)
     
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
