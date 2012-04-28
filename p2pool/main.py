@@ -4,6 +4,7 @@ import ConfigParser
 import StringIO
 import argparse
 import base64
+import json
 import os
 import random
 import sys
@@ -340,11 +341,17 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 defer.returnValue(((yield reactor.resolve(x)), net.P2P_PORT))
         
         addrs = {}
-        if os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
+        if os.path.exists(os.path.join(datadir_path, 'addrs')):
+            try:
+                with open(os.path.join(datadir_path, 'addrs'), 'rb') as f:
+                    addrs.update(dict((tuple(k), v) for k, v in json.loads(f.read())))
+            except:
+                print >>sys.stderr, 'error parsing addrs'
+        elif os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
             try:
                 addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
             except:
-                print >>sys.stderr, "error reading addrs"
+                print >>sys.stderr, "error reading addrs.txt"
         for addr_df in map(parse, net.BOOTSTRAP_ADDRS):
             try:
                 addr = yield addr_df
@@ -370,7 +377,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         )
         p2p_node.start()
         
-        task.LoopingCall(lambda: open(os.path.join(datadir_path, 'addrs.txt'), 'w').writelines(repr(x) + '\n' for x in p2p_node.addr_store.iteritems())).start(60)
+        def save_addrs():
+            with open(os.path.join(datadir_path, 'addrs'), 'wb') as f:
+                f.write(json.dumps(p2p_node.addr_store.items()))
+        task.LoopingCall(save_addrs).start(60)
         
         def broadcast_share(share_hash):
             shares = []
