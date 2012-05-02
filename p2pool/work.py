@@ -183,8 +183,21 @@ class WorkerBridge(worker_interface.WorkerBridge):
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
         
+        share_type = p2pool_data.NewShare
+        if self.best_share_var.value is not None:
+            previous_share = self.tracker.items[self.best_share_var.value]
+            if isinstance(previous_share, p2pool_data.Share):
+                # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
+                if self.tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
+                    share_type = p2pool_data.Share
+                else:
+                    counts = p2pool_data.get_desired_version_counts(self.tracker,
+                        self.tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
+                    if counts.get(p2pool_data.NewShare.VERSION, 0) < sum(counts.itervalues())*95//100:
+                        share_type = p2pool_data.Share
+        
         if True:
-            share_info, gentx, other_transaction_hashes, get_share = p2pool_data.Share.generate_transaction(
+            share_info, gentx, other_transaction_hashes, get_share = share_type.generate_transaction(
                 tracker=self.tracker,
                 share_data=dict(
                     previous_share_hash=self.best_share_var.value,
@@ -201,7 +214,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=5,
+                    desired_version=p2pool_data.NewShare.VERSION,
                 ),
                 block_target=self.current_work.value['bits'].target,
                 desired_timestamp=int(time.time() + 0.5),
