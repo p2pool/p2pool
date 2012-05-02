@@ -590,13 +590,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 received_header_hashes = set()
                 
                 def got_response(header, request):
-                    user, _, _, _ = self.get_user_details(request)
-                    assert header['merkle_root'] == merkle_root
-                    
                     header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
                     pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
-                    on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
-                    
                     try:
                         if pow_hash <= header['bits'].target or p2pool.DEBUG:
                             submit_block(dict(header=header, txs=transactions), ignore_failure=False)
@@ -606,6 +601,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                 print
                     except:
                         log.err(None, 'Error while processing potential block:')
+                    
+                    user, _, _, _ = self.get_user_details(request)
+                    assert header['merkle_root'] == merkle_root
+                    
+                    on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
                     
                     for aux_work, index, hashes in mm_later:
                         try:
