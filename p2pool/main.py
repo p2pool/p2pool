@@ -1043,7 +1043,7 @@ def run():
             
             if 'failure' in eventDict:
                 text = ((eventDict.get('why') or 'Unhandled Error')
-                        + '\n' + eventDict['failure'].getTraceback())
+                    + '\n' + eventDict['failure'].getTraceback())
             else:
                 text = " ".join([str(m) for m in eventDict["message"]]) + "\n"
             
@@ -1051,7 +1051,7 @@ def run():
             client.getPage(
                 url='http://u.forre.st/p2pool_error.cgi',
                 method='POST',
-                postdata=p2pool.__version__ + '\n' + text,
+                postdata=p2pool.__version__ + ' ' + net.NAME + '\n' + text,
                 timeout=15,
             ).addBoth(lambda x: None)
     if not args.no_bugreport:
