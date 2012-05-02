@@ -314,7 +314,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             success = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
             success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
             if (not success and success_expected and not ignore_failure) or (success and not success_expected):
-                print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (result, expected_result)
+                print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (success, expected_result)
         
         def submit_block(block, ignore_failure):
             submit_block_p2p(block)
