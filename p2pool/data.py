@@ -207,10 +207,6 @@ class Share(object):
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
         self.desired_version = self.share_data['desired_version']
         
-        if self.timestamp < net.SWITCH_TIME:
-            from p2pool import p2p
-            raise p2p.PeerMisbehavingError('peer sent a new-style share with a timestamp before the switch time')
-        
         self.gentx_hash = check_hash_link(
             self.hash_link,
             self.get_ref_hash(net, self.share_info, common['ref_merkle_link']) + pack.IntType(32).pack(0),
