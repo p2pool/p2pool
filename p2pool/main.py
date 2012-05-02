@@ -327,8 +327,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
-                if current_work.value['previous_block'] in [share.header['previous_block'], share.header_hash]:
-                    broadcast_share(share.hash)
+                def spread():
+                    if (get_height_rel_highest(share.header['previous_block']) > -5 or
+                        current_work.value['previous_block'] in [share.header['previous_block'], share.header_hash]):
+                        broadcast_share(share.hash)
+                spread()
+                reactor.callLater(5, spread) # so get_height_rel_highest can update
         
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
