@@ -503,6 +503,19 @@ def get_desired_version_counts(tracker, best_share_hash, dist):
         res[share.desired_version] = res.get(share.desired_version, 0) + bitcoin_data.target_to_average_attempts(share.target)
     return res
 
+def get_warnings(tracker, current_work):
+    res = []
+    
+    height = tracker.get_height(current_work.value['best_share_hash'])
+    desired_version_counts = get_desired_version_counts(tracker, current_work.value['best_share_hash'], min(720, height))
+    majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
+    if majority_desired_version not in [0, 1] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+        res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
+            'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
+                majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
+    
+    return res
+
 def format_hash(x):
     if x is None:
         return 'xxxxxxxx'

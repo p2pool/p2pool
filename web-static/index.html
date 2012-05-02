@@ -31,6 +31,10 @@
                 d3.select('#efficiency').text(local_stats.efficiency != null ? d3.format('.4p')(local_stats.efficiency) : '???')
                 d3.select('#uptime_days').text(d3.format('.3f')(local_stats.uptime / 60 / 60 / 24));
                 d3.select('#block_value').text(local_stats.block_value);
+                
+                d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
+                    .text(function(w){ return 'Warning: ' + w })
+                    .attr('style', 'color:red;border:1px solid red;padding:5px');
             });
             
             d3.json('/current_payouts', function(pays) {
@@ -81,6 +85,7 @@
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
         <p>Payout if a block were found NOW: <span id="payout_amount"></span> BTC to <span id="payout_addr"></span></p>
         <p>Current block value: <span id="block_value"></span> BTC</p>
+        <div id="warnings"></div>
         
         <h2>Share explorer</h2>
         <p>Best share: <span id="best_share"></span></p>
