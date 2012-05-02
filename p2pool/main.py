@@ -811,7 +811,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         
                         desired_version_counts = p2pool_data.get_desired_version_counts(tracker, current_work.value['best_share_hash'], min(720, height))
                         majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-                        if majority_desired_version not in [0, 1]:
+                        if majority_desired_version not in [0, 1] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
                             print >>sys.stderr, '#'*40
                             print >>sys.stderr, '>>> WARNING: A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)' % (
                                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues()))
