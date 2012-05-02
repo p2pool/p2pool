@@ -172,7 +172,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             ),
             uptime=time.time() - start_time,
             block_value=current_work2.value['subsidy']*1e-8,
-            warnings=p2pool_data.get_warnings(tracker, current_work),
+            warnings=p2pool_data.get_warnings(tracker, current_work, net),
         )
     
     class WebInterface(resource.Resource):
