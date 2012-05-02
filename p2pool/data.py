@@ -218,6 +218,7 @@ class Share(object):
         self.hash = self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.header))
         
         if self.pow_hash > self.target:
+            from p2pool import p2p
             raise p2p.PeerMisbehavingError('share PoW invalid')
         
         if other_txs is not None and not self.pow_hash <= self.header['bits'].target:
