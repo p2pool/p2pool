@@ -891,6 +891,9 @@ def run():
     parser.add_argument('--irc-announce',
         help='announce any blocks found on irc://irc.freenode.net/#p2pool',
         action='store_true', default=False, dest='irc_announce')
+    parser.add_argument('--no-bugreport',
+        help='disable submitting caught exceptions to the author',
+        action='store_true', default=False, dest='no_bugreport')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',
@@ -1019,6 +1022,34 @@ def run():
             print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
         signal.signal(signal.SIGUSR1, sigusr1)
     task.LoopingCall(logfile.reopen).start(5)
+    
+    class ErrorReporter(object):
+        def __init__(self):
+            self.last_sent = None
+        
+        def emit(self, eventDict):
+            if not eventDict["isError"]:
+                return
+            
+            if self.last_sent is not None and time.time() < self.last_sent + 5:
+                return
+            self.last_sent = time.time()
+            
+            if 'failure' in eventDict:
+                text = ((eventDict.get('why') or 'Unhandled Error')
+                        + '\n' + eventDict['failure'].getTraceback())
+            else:
+                text = " ".join([str(m) for m in eventDict["message"]]) + "\n"
+            
+            from twisted.web import client
+            client.getPage(
+                url='http://u.forre.st/p2pool_error.cgi',
+                method='POST',
+                postdata=p2pool.__version__ + '\n' + text,
+                timeout=15,
+            ).addBoth(lambda x: None)
+    if not args.no_bugreport:
+        log.addObserver(ErrorReporter().emit)
     
     reactor.callWhenRunning(main, args, net, datadir_path, merged_urls, worker_endpoint)
     reactor.run()
