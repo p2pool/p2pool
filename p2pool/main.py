@@ -527,8 +527,21 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     mm_data = ''
                     mm_later = []
                 
+                share_type = p2pool_data.NewShare
+                if current_work.value['best_share_hash'] is not None:
+                    previous_share = tracker.shares[current_work.value['best_share_hash']]
+                    if isinstance(previous_share, p2pool_data.Share):
+                        # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
+                        if tracker.get_height(previous_share.hash) < net.CHAIN_LENGTH:
+                            share_type = p2pool_data.Share
+                        else:
+                            counts = p2pool_data.get_desired_version_counts(tracker,
+                                tracker.get_nth_parent_hash(previous_share.hash, net.CHAIN_LENGTH*9//10), net.CHAIN_LENGTH//10)
+                            if counts.get(2, 0) < sum(counts.itervalues())*95//100:
+                                share_type = p2pool_data.Share
+                
                 if True:
-                    share_info, generate_tx = p2pool_data.Share.generate_transaction(
+                    share_info, generate_tx = share_type.generate_transaction(
                         tracker=tracker,
                         share_data=dict(
                             previous_share_hash=current_work.value['best_share_hash'],
@@ -542,7 +555,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                 254 if doas > doas_recorded_in_chain else
                                 0
                             )(*get_stale_counts()),
-                            desired_version=1,
+                            desired_version=2,
                         ),
                         block_target=current_work.value['bits'].target,
                         desired_timestamp=int(time.time() - current_work2.value['clock_offset']),
@@ -636,8 +649,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
                         min_header = dict(header);del min_header['merkle_root']
-                        hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
-                        share = p2pool_data.Share(net, None, dict(
+                        hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], share_type.gentx_before_refhash)
+                        share = share_type(net, None, dict(
                             min_header=min_header, share_info=share_info, hash_link=hash_link,
                             ref_merkle_link=dict(branch=[], index=0),
                         ), merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
