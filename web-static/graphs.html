@@ -98,37 +98,42 @@
                 g.attr("width", w).attr("height", h);
                 g.selectAll("*").remove();
                 
+                var text_boxes = [];
                 for(var i = 0; i < lines.length; ++i) {
                     var line = lines[i];
                     var line_type = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, line.value_getter, itemgetter(1))).defined(compose(not_null, line.value_getter, itemgetter(1)));
                     g.append("svg:path")
                         .attr("d", line_type(line.data))
                         .attr("stroke", line.color)
-                        .attr("class", "plotline");
+                        .attr("class", "plotline")
+                        .on("mouseover", function(i) { return function() {
+                            for(var j = 0; j < text_boxes.length; j++)
+                                text_boxes[j][1].attr("opacity", text_boxes[j][0] == i ? 1 : 0.3);
+                        }}(i));
                     var stats = get_area_mean(line.data, line.value_getter);
                     if(stats.mean != null) {
-                        g.append("svg:text")
+                        text_boxes.push([i, g.append("svg:text")
                             .text(line.label)
                             .attr("text-anchor", "start")
                             .attr("dominant-baseline", "central")
                             .attr("fill", line.color)
                             .attr("x", w - margin_h + 10)
-                            .attr("y", y(stats.mean) - 12);
-                        g.append("svg:text")
+                            .attr("y", y(stats.mean) - 12)]);
+                        text_boxes.push([i, g.append("svg:text")
                             .text("-Mean: " + d3.format(".3s")(stats.mean) + unit)
                             .attr("text-anchor", "start")
                             .attr("dominant-baseline", "central")
                             .attr("fill", line.color)
                             .attr("x", w - margin_h)
-                            .attr("y", y(stats.mean));
+                            .attr("y", y(stats.mean))]);
                         if(total_unit != null)
-                            g.append("svg:text")
+                            text_boxes.push([i, g.append("svg:text")
                                 .text("Area: " + d3.format(".3s")(stats.area) + total_unit)
                                 .attr("text-anchor", "start")
                                 .attr("dominant-baseline", "central")
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h + 10)
-                                .attr("y", y(stats.mean) + 12);
+                                .attr("y", y(stats.mean) + 12)]);
                     }
                 }
                 
