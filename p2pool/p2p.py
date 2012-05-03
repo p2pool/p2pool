@@ -180,7 +180,7 @@ class Protocol(p2protocol.Protocol):
             count = 100
         self.send_addrs(addrs=[
             dict(
-                timestamp=self.node.addr_store[host, port][2],
+                timestamp=int(self.node.addr_store[host, port][2]),
                 address=dict(
                     services=self.node.addr_store[host, port][0],
                     address=host,
