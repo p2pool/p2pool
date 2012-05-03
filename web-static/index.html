@@ -50,7 +50,7 @@
                     var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
                     
                     var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
-                    tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return currency_info.block_explorer_url_prefix + addr});
+                    tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return currency_info.address_explorer_url_prefix + addr});
                     tr.append('td').text(function(addr){return pays[addr]});
                     
                     var total_tr = d3.select('#payouts').append('tr');
