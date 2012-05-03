@@ -195,7 +195,7 @@
                 });
             }
             
-            function change_period(period) {
+            function change_period(period, currency_info) {
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
                 plot_later(d3.select("#local"), "H/s", "H", [
@@ -206,7 +206,7 @@
                     {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
                     //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Dead"}
                 ]);
-                plot_later(d3.select("#payout"), "BTC", null, [
+                plot_later(d3.select("#payout"), currency_info.symbol, null, [
                     {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF"}
                 ]);
                 plot_later(d3.select("#pool"), "H/s", "H", [
@@ -234,7 +234,7 @@
                                 ]);
                             });
                             div.append("svg:svg").each(function(u) {
-                                plot(d3.select(this), "BTC", null, [
+                                plot(d3.select(this), currency_info.symbol, null, [
                                     {"data": current_payouts, "value_getter": function(d) { return u in d ? d[u] : null; }, "color": "#0000FF"}
                                 ]);
                             });
@@ -260,12 +260,14 @@
                 });
             }
             
-            periods = ["Hour", "Day", "Week", "Month", "Year"];
-            d3.select("#period_chooser").selectAll().data(periods).enter().append("span")
-                .text(identity)
-                .on("click", change_period)
-                .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
-            change_period(periods[1]);
+            d3.json('/web/currency_info', function(currency_info) {
+                periods = ["Hour", "Day", "Week", "Month", "Year"];
+                d3.select("#period_chooser").selectAll().data(periods).enter().append("span")
+                    .text(identity)
+                    .on("click", function(period){ change_period(period, currency_info) })
+                    .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
+                change_period(periods[1], currency_info);
+            });
         </script>
     </body>
 </html>

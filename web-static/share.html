@@ -20,7 +20,7 @@
             function target_to_difficulty(target) { return (0xffff0000 * Math.pow(2, 256-64) + 1)/(target + 1); }
             
             var current_hash = null;
-            function reload() {
+            function reload(currency_info) {
                 var share_hash = document.location.hash.substr(1);
                 if(share_hash == current_hash) return;
                 d3.json('/web/share/' + share_hash, function(share) {
@@ -56,13 +56,13 @@
                     b.append('h2').text('Block');
                     var block = b.append('p')
                         block.append('span').text('Hash: ')
-                        block.append('a').attr('href', 'http://blockexplorer.com/block/' + share.block.hash).text(share.block.hash);
+                        block.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.hash).text(share.block.hash);
                     b.append('p').text('Transaction count: ' + share.block.txn_count_range);
                     b.append('h2').text('Header');
                     b.append('p').text('Version: ' + share.block.header.version);
                     var prevblock = b.append('p')
                         prevblock.append('span').text('Previous block: ');
-                        prevblock.append('a').attr('href', 'http://blockexplorer.com/block/' + share.block.header.previous_block).text(share.block.header.previous_block);
+                        prevblock.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.header.previous_block).text(share.block.header.previous_block);
                     b.append('p').text('Merkle root: ' + share.block.header.merkle_root);
                     b.append('p').text('Timestamp: ' + share.block.header.timestamp);
                     b.append('p').text('Difficulty: ' + target_to_difficulty(share.block.header.target));
@@ -70,12 +70,15 @@
                     b.append('h2').text('Generation transaction');
                     b.append('p').text('Hash: ' + share.block.gentx.hash);
                     b.append('p').text('Coinbase: ' + share.block.gentx.coinbase + ' ' + hex2a(share.block.gentx.coinbase));
-                    b.append('p').text('Value: ' + share.block.gentx.value + ' BTC');
+                    b.append('p').text('Value: ' + share.block.gentx.value + ' ' + currency_info.symbol);
                     return true;
                 });
             }
-            reload();
-            setInterval(reload, 100);
+            
+            d3.json('/web/currency_info', function(currency_info) {
+                reload(currency_info);
+                setInterval(function(){ reload(currency_info) }, 100);
+            });
         </script>
     </body>
 </html>

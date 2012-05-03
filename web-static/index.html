@@ -37,27 +37,32 @@
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
             });
             
-            d3.json('/current_payouts', function(pays) {
-                d3.json('/payout_addr', function(addr) {
-                    d3.select('#payout_addr').text(addr);
-                    d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
+            
+            d3.json('/web/currency_info', function(currency_info) {
+                d3.selectAll('.symbol').text(currency_info.symbol);
+                
+                d3.json('/current_payouts', function(pays) {
+                    d3.json('/payout_addr', function(addr) {
+                        d3.select('#payout_addr').text(addr);
+                        d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
+                    });
+                    
+                    var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
+                    
+                    var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
+                    tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return currency_info.block_explorer_url_prefix + addr});
+                    tr.append('td').text(function(addr){return pays[addr]});
+                    
+                    var total_tr = d3.select('#payouts').append('tr');
+                    total_tr.append('td').append('strong').text('Total');
+                    total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
                 });
                 
-                var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
-                
-                var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
-                tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return 'http://blockexplorer.com/address/' + addr});
-                tr.append('td').text(function(addr){return pays[addr]});
-                
-                var total_tr = d3.select('#payouts').append('tr');
-                total_tr.append('td').append('strong').text('Total');
-                total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
-            });
-            
-            d3.json('/recent_blocks', function(blocks) {
-                var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
-                tr.append('td').text(function(block){return new Date(1000*block.ts).toString()})
-                tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return 'http://blockexplorer.com/block/' + block.hash});
+                d3.json('/recent_blocks', function(blocks) {
+                    var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
+                    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()})
+                    tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return currency_info.block_explorer_url_prefix + block.hash});
+                });
             });
             
             d3.json('/web/best_share_hash', function(c) {
@@ -83,8 +88,8 @@
         <p>Node uptime: <span id="uptime_days"></span> days Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA)</p>
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
-        <p>Payout if a block were found NOW: <span id="payout_amount"></span> BTC to <span id="payout_addr"></span></p>
-        <p>Current block value: <span id="block_value"></span> BTC</p>
+        <p>Payout if a block were found NOW: <span id="payout_amount"></span> <span class="symbol"></span> to <span id="payout_addr"></span></p>
+        <p>Current block value: <span id="block_value"></span> <span class="symbol"></span></p>
         <div id="warnings"></div>
         
         <h2>Share explorer</h2>
@@ -102,7 +107,7 @@
         
         <h2>Payouts if a block were found NOW:</h2>
         <table border="1" id="payouts">
-            <tr><th>address</th><th>amount in BTC</th></tr>
+            <tr><th>address</th><th>amount in <span class="symbol"></span></th></tr>
         </table>
     </body>
 </html>

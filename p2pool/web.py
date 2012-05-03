@@ -295,6 +295,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in tracker.tails for x in tracker.reverse_shares.get(t, set())]))
     new_root.putChild('verified_tails', WebInterface(lambda: ['%064x' % x for t in tracker.verified.tails for x in tracker.verified.reverse_shares.get(t, set())]))
     new_root.putChild('best_share_hash', WebInterface(lambda: '%064x' % current_work.value['best_share_hash']))
+    new_root.putChild('currency_info', WebInterface(lambda: dict(symbol=net.PARENT.SYMBOL, block_explorer_url_prefix=net.PARENT.BLOCK_EXPLORER_URL_PREFIX)))
     
     class Explorer(resource.Resource):
         def render_GET(self, request):
