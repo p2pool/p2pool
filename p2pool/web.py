@@ -331,6 +331,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'outgoing_peers': graph.DataStreamDescription(dataview_descriptions),
         'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
+        'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
@@ -364,6 +365,10 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-8) for user in miner_hash_rates if user in current_txouts_by_address))
         hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if peer.incoming))
         hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming))
+        
+        vs = p2pool_data.get_desired_version_counts(tracker, current_work.value['best_share_hash'], 720)
+        vs_total = sum(vs.itervalues())
+        hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
     task.LoopingCall(add_point).start(5)
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     

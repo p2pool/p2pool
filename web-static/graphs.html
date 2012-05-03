@@ -47,6 +47,9 @@
         <h2>Miners</h2>
         <div id="miners"></div>
         
+        <h2>Desired versions</h2>
+        <svg id="desired_versions"></svg>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -237,6 +240,23 @@
                             });
                         });
                     });
+                });
+                
+                d3.json("/web/graph_data/desired_versions/last_" + lowerperiod, function(data) {
+                    var vers = {}; for(var i = 0; i < data.length; ++i) for(var v in data[i][1]) vers[v] = null;
+                    var verlist = []; for(var v in vers) verlist.push(v);
+                    verlist.sort();
+                    
+                    lines = [];
+                    for(var i = 0; i < verlist.length; i++) {
+                        lines.push({
+                            data: data,
+                            value_getter: function(v){ return function(d) { return v in d ? d[v] : null; } }(verlist[i]),
+                            color: "#0000FF",
+                            label: verlist[i]
+                        });
+                    }
+                    plot(d3.select('#desired_versions'), '', null, lines);
                 });
             }
             
