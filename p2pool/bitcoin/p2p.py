@@ -65,7 +65,7 @@ class Protocol(p2protocol.Protocol):
     
     message_inv = pack.ComposedType([
         ('invs', pack.ListType(pack.ComposedType([
-            ('type', pack.EnumType(pack.IntType(32), {'tx': 1, 'block': 2})),
+            ('type', pack.EnumType(pack.IntType(32), {1: 'tx', 2: 'block'})),
             ('hash', pack.IntType(256)),
         ]))),
     ])
@@ -80,7 +80,7 @@ class Protocol(p2protocol.Protocol):
     
     message_getdata = pack.ComposedType([
         ('requests', pack.ListType(pack.ComposedType([
-            ('type', pack.EnumType(pack.IntType(32), {'tx': 1, 'block': 2})),
+            ('type', pack.EnumType(pack.IntType(32), {1: 'tx', 2: 'block'})),
             ('hash', pack.IntType(256)),
         ]))),
     ])

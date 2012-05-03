@@ -119,27 +119,26 @@ class VarStrType(Type):
         return self._inner_size.write(file, len(item)), item
 
 class EnumType(Type):
-    def __init__(self, inner, values):
+    def __init__(self, inner, pack_to_unpack):
         self.inner = inner
-        self.values = values
+        self.pack_to_unpack = pack_to_unpack
         
-        keys = {}
-        for k, v in values.iteritems():
-            if v in keys:
-                raise ValueError('duplicate value in values')
-            keys[v] = k
-        self.keys = keys
+        self.unpack_to_pack = {}
+        for k, v in pack_to_unpack.iteritems():
+            if v in self.unpack_to_pack:
+                raise ValueError('duplicate value in pack_to_unpack')
+            self.unpack_to_pack[v] = k
     
     def read(self, file):
         data, file = self.inner.read(file)
-        if data not in self.keys:
-            raise ValueError('enum data (%r) not in values (%r)' % (data, self.values))
-        return self.keys[data], file
+        if data not in self.pack_to_unpack:
+            raise ValueError('enum data (%r) not in pack_to_unpack (%r)' % (data, self.pack_to_unpack))
+        return self.pack_to_unpack[data], file
     
     def write(self, file, item):
-        if item not in self.values:
-            raise ValueError('enum item (%r) not in values (%r)' % (item, self.values))
-        return self.inner.write(file, self.values[item])
+        if item not in self.unpack_to_pack:
+            raise ValueError('enum item (%r) not in unpack_to_pack (%r)' % (item, self.unpack_to_pack))
+        return self.inner.write(file, self.unpack_to_pack[item])
 
 class ListType(Type):
     _inner_size = VarIntType()
