@@ -73,7 +73,7 @@ class Share(object):
         ('pubkey_hash', pack.IntType(160)),
         ('subsidy', pack.IntType(64)),
         ('donation', pack.IntType(16)),
-        ('stale_info', pack.IntType(8)), # 0 nothing, 253 orphan, 254 doa
+        ('stale_info', pack.EnumType(pack.IntType(8), dict((k, {0: None, 253: 'orphan', 254: 'doa'}.get(k, 'unk%i' % (k,))) for k in xrange(256)))),
         ('desired_version', pack.VarIntType()),
     ])
     
@@ -338,8 +338,8 @@ class OkayTracker(forest.Tracker):
             work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
             my_count=lambda share: 1 if share.hash in my_share_hashes else 0,
             my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
-            my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 253 else 0,
-            my_dead_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 254 else 0,
+            my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 'orphan' else 0,
+            my_dead_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 'doa' else 0,
         )), subset_of=self)
         self.get_cumulative_weights = WeightsSkipList(self)
     
@@ -527,7 +527,7 @@ def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=Fa
     return attempts/time
 
 def get_average_stale_prop(tracker, share_hash, lookbehind):
-    stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] != 0)
+    stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] is not None)
     return stales/(lookbehind + stales)
 
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):

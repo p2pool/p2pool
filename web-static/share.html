@@ -51,7 +51,7 @@
                     b.append('p').text('Minimum difficulty: ' + target_to_difficulty(share.share_data.max_target));
                     b.append('p').text('Payout address: ' + share.share_data.payout_address);
                     b.append('p').text('Donation amount: ' + d3.format('.3p')(share.share_data.donation));
-                    b.append('p').text('Stale info: ' + (share.share_data.stale_info == 0 ? 'none' : share.share_data.stale_info == 253 ? 'had an orphan' : share.share_data.stale_info == 254 ? 'had a dead' : 'unknown'));
+                    b.append('p').text('Last stale: ' + share.share_data.stale_info);
                     b.append('p').text('Nonce: ' + share.share_data.nonce);
                     b.append('p').text('Desired version: ' + share.share_data.desired_version);
                     b.append('h2').text('Block');

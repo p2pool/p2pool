@@ -434,11 +434,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @tracker.verified.removed.watch
         def _(share):
             if share.hash in my_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                assert share.share_data['stale_info'] in [0, 253, 254] # we made these shares in this instance
+                assert share.share_data['stale_info'] in [None, 'orphan', 'doa'] # we made these shares in this instance
                 removed_unstales_var.set((
                     removed_unstales_var.value[0] + 1,
-                    removed_unstales_var.value[1] + (1 if share.share_data['stale_info'] == 253 else 0),
-                    removed_unstales_var.value[2] + (1 if share.share_data['stale_info'] == 254 else 0),
+                    removed_unstales_var.value[1] + (1 if share.share_data['stale_info'] == 'orphan' else 0),
+                    removed_unstales_var.value[2] + (1 if share.share_data['stale_info'] == 'doa' else 0),
                 ))
             if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
                 removed_doa_unstales.set(removed_doa_unstales.value + 1)
@@ -547,9 +547,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             subsidy=current_work2.value['subsidy'],
                             donation=math.perfect_round(65535*args.donation_percentage/100),
                             stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
-                                253 if orphans > orphans_recorded_in_chain else
-                                254 if doas > doas_recorded_in_chain else
-                                0
+                                'orphan' if orphans > orphans_recorded_in_chain else
+                                'doa' if doas > doas_recorded_in_chain else
+                                None
                             )(*get_stale_counts()),
                             desired_version=2,
                         ),
