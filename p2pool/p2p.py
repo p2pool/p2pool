@@ -230,7 +230,7 @@ class Protocol(p2protocol.Protocol):
     
     message_sharereply = pack.ComposedType([
         ('id', pack.IntType(256)),
-        ('result', pack.EnumType(pack.VarIntType(), {'good': 0, 'too long': 1, 'unk2': 2, 'unk2': 3, 'unk2': 4, 'unk2': 5, 'unk2': 6})),
+        ('result', pack.EnumType(pack.VarIntType(), {'good': 0, 'too long': 1, 'unk2': 2, 'unk3': 3, 'unk4': 4, 'unk5': 5, 'unk6': 6})),
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_sharereply(self, id, result, shares):
