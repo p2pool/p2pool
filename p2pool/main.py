@@ -13,13 +13,9 @@ import signal
 import traceback
 import urlparse
 
-try:
+if '--iocp' in sys.argv:
     from twisted.internet import iocpreactor
     iocpreactor.install()
-except:
-    pass
-else:
-    print 'Using IOCP reactor!'
 from twisted.internet import defer, reactor, protocol, task
 from twisted.web import server
 from twisted.python import log
@@ -907,6 +903,9 @@ def run():
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
         help='donate this percentage of work towards the development of p2pool (default: 0.5)',
         type=float, action='store', default=0.5, dest='donation_percentage')
+    parser.add_argument('--iocp',
+        help='use Windows IOCP API in order to avoid errors due to large number of sockets being open',
+        action='store_true', default=False, dest='iocp')
     parser.add_argument('--irc-announce',
         help='announce any blocks found on irc://irc.freenode.net/#p2pool',
         action='store_true', default=False, dest='irc_announce')
