@@ -270,6 +270,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
                 donation=share.share_data['donation']/65535,
                 stale_info=share.share_data['stale_info'],
                 nonce=share.share_data['nonce'],
+                desired_version=share.share_data['desired_version'],
             ),
             block=dict(
                 hash='%064x' % share.header_hash,

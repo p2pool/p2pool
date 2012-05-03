@@ -53,6 +53,7 @@
                     b.append('p').text('Donation amount: ' + d3.format('.3p')(share.share_data.donation));
                     b.append('p').text('Stale info: ' + (share.share_data.stale_info == 0 ? 'none' : share.share_data.stale_info == 253 ? 'had an orphan' : share.share_data.stale_info == 254 ? 'had a dead' : 'unknown'));
                     b.append('p').text('Nonce: ' + share.share_data.nonce);
+                    b.append('p').text('Desired version: ' + share.share_data.desired_version);
                     b.append('h2').text('Block');
                     var block = b.append('p')
                         block.append('span').text('Hash: ')
