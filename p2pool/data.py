@@ -530,6 +530,18 @@ def get_average_stale_prop(tracker, share_hash, lookbehind):
     stales = sum(1 for share in tracker.get_chain(share_hash, lookbehind) if share.share_data['stale_info'] is not None)
     return stales/(lookbehind + stales)
 
+def get_stale_counts(tracker, share_hash, lookbehind, rates=False):
+    res = {}
+    for share in tracker.get_chain(share_hash, lookbehind - 1):
+        res['good'] = res.get('good', 0) + bitcoin_data.target_to_average_attempts(share.target)
+        s = share.share_data['stale_info']
+        if s is not None:
+            res[s] = res.get(s, 0) + bitcoin_data.target_to_average_attempts(share.target)
+    if rates:
+        dt = tracker.shares[share_hash].timestamp - tracker.shares[tracker.get_nth_parent_hash(share_hash, lookbehind - 1)].timestamp
+        res = dict((k, v/dt) for k, v in res.iteritems())
+    return res
+
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
     weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
     res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())

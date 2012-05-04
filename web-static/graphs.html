@@ -199,14 +199,14 @@
             }
             
             function data_to_lines(data, sort_key) {
-                var vers = {}; for(var i = 0; i < data.length; ++i) for(var v in data[i][1]) vers[v] = null;
+                var vers = {}; for(var i = 0; i < data.length; ++i) if(data[i][1] != null) for(var v in data[i][1]) vers[v] = null;
                 var verlist = []; for(var v in vers) verlist.push(v);
                 verlist.sort();
                 
                 lines = [];
                 for(var i = 0; i < verlist.length; i++) {
                     lines.push({
-                        data: data.map(function(d){ return [d[0], verlist[i] in d[1] ? d[1][verlist[i]] : null, d[2]] }),
+                        data: data.map(function(d){ return [d[0], d[1] == null ? null : (verlist[i] in d[1] ? d[1][verlist[i]] : d[3]), d[2]] }),
                         color: d3.hsl(i/verlist.length*360, 0.5, 0.5),
                         label: verlist[i]
                     });
@@ -231,10 +231,9 @@
                 plot_later(d3.select("#payout"), currency_info.symbol, null, [
                     {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
                 ]);
-                plot_later(d3.select("#pool"), "H/s", "H", [
-                    {"url": "/web/graph_data/pool_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
-                    {"url": "/web/graph_data/pool_stale_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Stale"}
-                ]);
+                d3.json("/web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
+                    plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data));
+                });
                 plot_later(d3.select("#peers"), "", null, [
                     {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"},
                     {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"}
@@ -251,13 +250,13 @@
                             div.append("h3").text(function(u) { return u });
                             div.append("svg:svg").each(function(u) {
                                 plot(d3.select(this), "H/s", "H", [
-                                    {"data": data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : 0, d[2]] }), "color": "#0000FF", "label": "Total"},
-                                    {"data": dead_data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : 0, d[2]] }), "color": "#FF0000", "label": "Dead"}
+                                    {"data": data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : d[3], d[2]] }), "color": "#0000FF", "label": "Total"},
+                                    {"data": dead_data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : d[3], d[2]] }), "color": "#FF0000", "label": "Dead"}
                                 ]);
                             });
                             div.append("svg:svg").each(function(u) {
                                 plot(d3.select(this), currency_info.symbol, null, [
-                                    {"data": current_payouts.map(function(d){ return [d[0], u in d[1] ? d[1][u] : null, d[2]] }), "color": "#0000FF"}
+                                    {"data": current_payouts.map(function(d){ return [d[0], u in d[1] ? d[1][u] : d[3], d[2]] }), "color": "#0000FF"}
                                 ]);
                             });
                         });

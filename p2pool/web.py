@@ -202,6 +202,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     web_root.putChild('payout_addr', WebInterface(lambda: bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)))
     web_root.putChild('recent_blocks', WebInterface(lambda: [dict(ts=s.timestamp, hash='%064x' % s.header_hash) for s in tracker.get_chain(current_work.value['best_share_hash'], 24*60*60//net.SHARE_PERIOD) if s.pow_hash <= s.header['bits'].target]))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
+    web_root.putChild('stale_rates', WebInterface(lambda: p2pool_data.get_stale_counts(tracker, current_work.value['best_share_hash'], 720, rates=True)))
     
     new_root = resource.Resource()
     web_root.putChild('web', new_root)
@@ -317,20 +318,46 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
+    def build_pool_rates(ds_name, ds_desc, dv_name, dv_desc, obj):
+        if not obj:
+            last_bin_end = 0
+            bins = dv_desc.bin_count*[{}]
+        else:
+            pool_rate = obj['pool_rate'][dv_name]
+            pool_stale_rate = obj['pool_stale_rate'][dv_name]
+            last_bin_end = max(pool_rate['last_bin_end'], pool_stale_rate['last_bin_end'])
+            bins = dv_desc.bin_count*[{}]
+            def get_value(obj, t):
+                n = int((obj['last_bin_end'] - t)/dv_desc.bin_width)
+                if n < 0 or n >= dv_desc.bin_count:
+                    return None
+                total, count = obj['bins'][n].get('null', [0, 0])
+                if count == 0:
+                    return None
+                return total/count
+            def get_bin(t):
+                total = get_value(pool_rate, t)
+                bad = get_value(pool_stale_rate, t)
+                if total is None or bad is None:
+                    return {}
+                return dict(good=[total-bad, 1], bad=[bad, 1])
+            bins = [get_bin(last_bin_end - (i+1/2)*dv_desc.bin_width) for i in xrange(dv_desc.bin_count)]
+        return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'pool_rate': graph.DataStreamDescription(dataview_descriptions),
-        'pool_stale_rate': graph.DataStreamDescription(dataview_descriptions),
+        'pool_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
+            multivalue_undefined_means_0=True, default_func=build_pool_rates),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
         'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
         'incoming_peers': graph.DataStreamDescription(dataview_descriptions),
         'outgoing_peers': graph.DataStreamDescription(dataview_descriptions),
         'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
-        'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
+        'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
+            multivalue_undefined_means_0=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
@@ -352,11 +379,8 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
     def add_point():
         if tracker.get_height(current_work.value['best_share_hash']) < 720:
             return
-        nonstalerate = p2pool_data.get_pool_attempts_per_second(tracker, current_work.value['best_share_hash'], 720)
-        poolrate = nonstalerate / (1 - p2pool_data.get_average_stale_prop(tracker, current_work.value['best_share_hash'], 720))
         t = time.time()
-        hd.datastreams['pool_rate'].add_datum(t, poolrate)
-        hd.datastreams['pool_stale_rate'].add_datum(t, poolrate - nonstalerate)
+        hd.datastreams['pool_rates'].add_datum(t, p2pool_data.get_stale_counts(tracker, current_work.value['best_share_hash'], 720, rates=True))
         current_txouts = get_current_txouts()
         hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8)
         miner_hash_rates, miner_dead_hash_rates = get_local_rates()

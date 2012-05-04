@@ -41,6 +41,8 @@ class DataView(object):
     def _add_datum(self, t, value):
         if not self.ds_desc.multivalues:
             value = {'null': value}
+        elif self.ds_desc.multivalue_undefined_means_0 and 'null' not in value:
+            value = dict(value, null=0) # use null to hold sample counter
         shift = max(0, int(math.ceil((t - self.last_bin_end)/self.desc.bin_width)))
         self.bins = _shift(self.bins, shift, {})
         self.last_bin_end += shift*self.desc.bin_width
@@ -59,22 +61,33 @@ class DataView(object):
         def _((i, bin)):
             left, right = last_bin_end - self.desc.bin_width*(i + 1), min(t, last_bin_end - self.desc.bin_width*i)
             center, width = (left+right)/2, right-left
-            if self.ds_desc.is_gauge:
+            if self.ds_desc.is_gauge and self.ds_desc.multivalue_undefined_means_0:
+                real_count = max([0] + [count for total, count in bin.itervalues()])
+                if real_count == 0:
+                    val = None
+                else:
+                    val = dict((k, total/real_count) for k, (total, count) in bin.iteritems())
+                default = 0
+            elif self.ds_desc.is_gauge and not self.ds_desc.multivalue_undefined_means_0:
                 val = dict((k, total/count) for k, (total, count) in bin.iteritems())
+                default = None
             else:
                 val = dict((k, total/width) for k, (total, count) in bin.iteritems())
+                default = 0
             if not self.ds_desc.multivalues:
-                val = val.get('null', None if self.ds_desc.is_gauge else 0)
-            return center, val, width
+                val = None if val is None else val.get('null', default)
+            return center, val, width, default
         return map(_, enumerate(bins))
 
 
 class DataStreamDescription(object):
-    def __init__(self, dataview_descriptions, is_gauge=True, multivalues=False, multivalues_keep=20, multivalues_squash_key=None):
+    def __init__(self, dataview_descriptions, is_gauge=True, multivalues=False, multivalues_keep=20, multivalues_squash_key=None, multivalue_undefined_means_0=False, default_func=None):
         self.dataview_descriptions = dataview_descriptions
         self.is_gauge = is_gauge
         self.multivalues = multivalues
         self.keep_largest_func = keep_largest(multivalues_keep, multivalues_squash_key, key=lambda (t, c): t/c if self.is_gauge else t, add_func=lambda (a1, b1), (a2, b2): (a1+a2, b1+b2))
+        self.multivalue_undefined_means_0 = multivalue_undefined_means_0
+        self.default_func = default_func
 
 class DataStream(object):
     def __init__(self, desc, dataviews):
@@ -103,7 +116,10 @@ class HistoryDatabase(object):
                     dv_data = ds_data[dv_name]
                     if dv_data['bin_width'] == dv_desc.bin_width and len(dv_data['bins']) == dv_desc.bin_count:
                         return DataView(dv_desc, ds_desc, dv_data['last_bin_end'], map(convert_bin, dv_data['bins']))
-            return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[{}])
+            elif ds_desc.default_func is None:
+                return DataView(dv_desc, ds_desc, 0, dv_desc.bin_count*[{}])
+            else:
+                return ds_desc.default_func(ds_name, ds_desc, dv_name, dv_desc, obj)
         return cls(dict(
             (ds_name, DataStream(ds_desc, dict(
                 (dv_name, get_dataview(ds_name, ds_desc, dv_name, dv_desc))
