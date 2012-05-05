@@ -198,6 +198,24 @@
                 });
             }
             
+            function data_to_lines(data) {
+                var vers = {}; for(var i = 0; i < data.length; ++i) for(var v in data[i][1]) vers[v] = null;
+                var verlist = []; for(var v in vers) verlist.push(v);
+                verlist.sort();
+                
+                lines = [];
+                for(var i = 0; i < verlist.length; i++) {
+                    lines.push({
+                        data: data.map(function(d){ return [d[0], verlist[i] in d[1] ? d[1][verlist[i]] : null, d[2]] }),
+                        color: d3.hsl(i/verlist.length*360, 0.5, 0.5),
+                        label: verlist[i]
+                    });
+                }
+                function m(x) { return d3.max(x.data, function(d){ return d[1] }) }
+                lines.sort(function(a, b){ return m(a) - m(b) });
+                return lines;
+            }
+            
             function change_period(period, currency_info) {
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
@@ -246,19 +264,7 @@
                 });
                 
                 d3.json("/web/graph_data/desired_versions/last_" + lowerperiod, function(data) {
-                    var vers = {}; for(var i = 0; i < data.length; ++i) for(var v in data[i][1]) vers[v] = null;
-                    var verlist = []; for(var v in vers) verlist.push(v);
-                    verlist.sort();
-                    
-                    lines = [];
-                    for(var i = 0; i < verlist.length; i++) {
-                        lines.push({
-                            data: data.map(function(d){ return [d[0], verlist[i] in d[1] ? d[1][verlist[i]] : null, d[2]] }),
-                            color: "#0000FF",
-                            label: verlist[i]
-                        });
-                    }
-                    plot(d3.select('#desired_versions'), '', null, lines);
+                    plot(d3.select('#desired_versions'), '', null, data_to_lines(data));
                 });
             }
             
