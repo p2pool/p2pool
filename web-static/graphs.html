@@ -63,22 +63,20 @@
             function itemgetter(i) { return function(x) { return x[i]; } }
             function as_date(x) { return new Date(1000*x); }
             function not_null(x) { return x != null; }
-            function identity(x) { return x; }
             
-            function get_area_mean(data, value_getter) {
+            function get_area_mean(data) {
                 var top = 0;
                 var bottom = 0;
                 for(var i = 0; i < data.length; i++) {
-                    var value = value_getter(data[i][1]);
-                    if(value == null) continue; // no data for bin
-                    top += value * data[i][2];
+                    if(data[i][1] == null) continue; // no data for bin
+                    top += data[i][1] * data[i][2];
                     bottom += data[i][2];
                 }
                 return {"area": top, "mean": bottom==0?null:top/bottom};
             }
             
             function plot(g, unit, total_unit, lines) {
-                // lines is a list of objects which have attributes data, value_getter, color, and optionally label
+                // lines is a list of objects which have attributes data, color, and label
                 
                 var w = 640;
                 var h = 300;
@@ -91,7 +89,7 @@
                 ]).range([0 + margin_h, w - margin_h]);
                 var y = d3.scale.linear().domain([
                     0,
-                    d3.max(lines, function(line) { return d3.max(line.data, compose(line.value_getter, itemgetter(1))); } )
+                    d3.max(lines, function(line) { return d3.max(line.data, itemgetter(1)); } )
                 ]).range([h - margin_v, margin_v]);
                 
                 
@@ -101,7 +99,7 @@
                 var text_boxes = [];
                 for(var i = 0; i < lines.length; ++i) {
                     var line = lines[i];
-                    var line_type = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, line.value_getter, itemgetter(1))).defined(compose(not_null, line.value_getter, itemgetter(1)));
+                    var line_type = d3.svg.line().x(compose(x, as_date, itemgetter(0))).y(compose(y, itemgetter(1))).defined(compose(not_null, itemgetter(1)));
                     g.append("svg:path")
                         .attr("d", line_type(line.data))
                         .attr("stroke", line.color)
@@ -110,7 +108,7 @@
                             for(var j = 0; j < text_boxes.length; j++)
                                 text_boxes[j][1].attr("opacity", text_boxes[j][0] == i ? 1 : 0.3);
                         }}(i));
-                    var stats = get_area_mean(line.data, line.value_getter);
+                    var stats = get_area_mean(line.data);
                     if(stats.mean != null) {
                         text_boxes.push([i, g.append("svg:text")
                             .text(line.label)
@@ -204,23 +202,23 @@
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
                 plot_later(d3.select("#local"), "H/s", "H", [
-                    {"url": "/web/graph_data/local_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    {"url": "/web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Dead"}
+                    {"url": "/web/graph_data/local_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
+                    {"url": "/web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
                 ]);
                 plot_later(d3.select("#local_shares"), "H/s", "H", [
-                    {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Dead"}
+                    {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
+                    //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
                 ]);
                 plot_later(d3.select("#payout"), currency_info.symbol, null, [
-                    {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF"}
+                    {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
                 ]);
                 plot_later(d3.select("#pool"), "H/s", "H", [
-                    {"url": "/web/graph_data/pool_rate/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Total"},
-                    {"url": "/web/graph_data/pool_stale_rate/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Stale"}
+                    {"url": "/web/graph_data/pool_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
+                    {"url": "/web/graph_data/pool_stale_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Stale"}
                 ]);
                 plot_later(d3.select("#peers"), "", null, [
-                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "value_getter": identity, "color": "#0000FF", "label": "Incoming"},
-                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "value_getter": identity, "color": "#FF0000", "label": "Outgoing"}
+                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"},
+                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"}
                 ]);
                 
                 d3.json("/web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
@@ -231,16 +229,16 @@
                             userlist.sort();
                             d3.select("#miners").selectAll("*").remove();
                             var div = d3.select("#miners").selectAll().data(userlist).enter().append("div");
-                            div.append("h3").text(identity);
+                            div.append("h3").text(function(u) { return u });
                             div.append("svg:svg").each(function(u) {
                                 plot(d3.select(this), "H/s", "H", [
-                                    {"data": data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#0000FF", "label": "Total"},
-                                    {"data": dead_data, "value_getter": function(d) { return u in d ? d[u] : 0; }, "color": "#FF0000", "label": "Dead"}
+                                    {"data": data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : 0, d[2]] }), "color": "#0000FF", "label": "Total"},
+                                    {"data": dead_data.map(function(d){ return [d[0], u in d[1] ? d[1][u] : 0, d[2]] }), "color": "#FF0000", "label": "Dead"}
                                 ]);
                             });
                             div.append("svg:svg").each(function(u) {
                                 plot(d3.select(this), currency_info.symbol, null, [
-                                    {"data": current_payouts, "value_getter": function(d) { return u in d ? d[u] : null; }, "color": "#0000FF"}
+                                    {"data": current_payouts.map(function(d){ return [d[0], u in d[1] ? d[1][u] : null, d[2]] }), "color": "#0000FF"}
                                 ]);
                             });
                         });
@@ -255,8 +253,7 @@
                     lines = [];
                     for(var i = 0; i < verlist.length; i++) {
                         lines.push({
-                            data: data,
-                            value_getter: function(v){ return function(d) { return v in d ? d[v] : null; } }(verlist[i]),
+                            data: data.map(function(d){ return [d[0], verlist[i] in d[1] ? d[1][verlist[i]] : null, d[2]] }),
                             color: "#0000FF",
                             label: verlist[i]
                         });
@@ -268,7 +265,7 @@
             d3.json('/web/currency_info', function(currency_info) {
                 periods = ["Hour", "Day", "Week", "Month", "Year"];
                 d3.select("#period_chooser").selectAll().data(periods).enter().append("span")
-                    .text(identity)
+                    .text(function(period) { return period })
                     .on("click", function(period){ change_period(period, currency_info) })
                     .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
                 change_period(periods[1], currency_info);
