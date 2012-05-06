@@ -198,7 +198,7 @@
                 });
             }
             
-            function data_to_lines(data) {
+            function data_to_lines(data, sort_key) {
                 var vers = {}; for(var i = 0; i < data.length; ++i) for(var v in data[i][1]) vers[v] = null;
                 var verlist = []; for(var v in vers) verlist.push(v);
                 verlist.sort();
@@ -211,8 +211,9 @@
                         label: verlist[i]
                     });
                 }
-                function m(x) { return d3.max(x.data, function(d){ return d[1] }) }
-                lines.sort(function(a, b){ return m(a) - m(b) });
+                if(sort_key == undefined)
+                    var sort_key = function(x) { return d3.max(x.data, function(d){ return d[1] }) }
+                lines.sort(function(a, b){ return sort_key(a) - sort_key(b) });
                 return lines;
             }
             
@@ -264,7 +265,7 @@
                 });
                 
                 d3.json("/web/graph_data/desired_versions/last_" + lowerperiod, function(data) {
-                    plot(d3.select('#desired_versions'), '', null, data_to_lines(data));
+                    plot(d3.select('#desired_versions'), '', null, data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
             }
             
