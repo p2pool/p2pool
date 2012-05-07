@@ -302,13 +302,6 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
         address_explorer_url_prefix=net.PARENT.ADDRESS_EXPLORER_URL_PREFIX,
     )))
     
-    class Explorer(resource.Resource):
-        def render_GET(self, request):
-            return 'moved to /static/'
-        def getChild(self, child, request):
-            return self
-    new_root.putChild('explorer', Explorer())
-    
     hd_path = os.path.join(datadir_path, 'graph_db')
     hd_data = _atomic_read(hd_path)
     hd_obj = {}
