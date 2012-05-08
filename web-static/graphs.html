@@ -132,8 +132,8 @@
                             for(var j = 0; j < line.data.length; j++)
                                 if(line.data[j] != null) {
                                     var d = line.data[j];
-                                    num += d.y*((d.y0 + d.y) + (d.y0))/2;
-                                    denom += d.y;
+                                    num += (d.y+1)*((d.y0 + d.y) + (d.y0))/2;
+                                    denom += (d.y+1);
                                 }
                             text_boxes.push([i, g.append("svg:text")
                                 .text(line.label + " (mean: " + d3.format(".3s")(stats.mean) + unit + ")")
@@ -304,8 +304,8 @@
                     plot(d3.select('#pool'), 'H/s', null, data_to_lines(data), true);
                 });
                 plot_later(d3.select("#peers"), "", null, [
-                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"},
-                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"}
+                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"},
+                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"}
                 ], true);
                 
                 d3.json("/web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
