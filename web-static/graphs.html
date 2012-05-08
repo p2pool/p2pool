@@ -122,6 +122,7 @@
                         });
                     
                     var text_boxes = [];
+                    var total = 0;
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
@@ -141,8 +142,16 @@
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h + 10)
                                 .attr("y", y(num/denom))]);
+                            total += stats.mean;
                         }
                     }
+                    text_boxes.push([i, g.append("svg:text")
+                        .text("- Total (mean: " + d3.format(".3s")(total) + unit + ")")
+                        .attr("text-anchor", "start")
+                        .attr("dominant-baseline", "central")
+                        .attr("fill", "black")
+                        .attr("x", w - margin_h + 2)
+                        .attr("y", y(total))]);
                 } else {
                     var y = d3.scale.linear().domain([
                         0,
