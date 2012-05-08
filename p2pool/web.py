@@ -82,11 +82,11 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             return 'need total argument. go to patron_sendmany/<TOTAL>'
         total = int(float(total)*1e8)
         trunc = int(float(trunc)*1e8)
-        return dict(
+        return json.dumps(dict(
             (bitcoin_data.script2_to_address(script, net.PARENT), value/1e8)
             for script, value in get_current_scaled_txouts(total, trunc).iteritems()
             if bitcoin_data.script2_to_address(script, net.PARENT) is not None
-        )
+        ))
     
     def get_local_rates():
         miner_hash_rates = {}
