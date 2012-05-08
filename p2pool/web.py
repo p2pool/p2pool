@@ -330,17 +330,18 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             def get_value(obj, t):
                 n = int((obj['last_bin_end'] - t)/dv_desc.bin_width)
                 if n < 0 or n >= dv_desc.bin_count:
-                    return None
+                    return None, 0
                 total, count = obj['bins'][n].get('null', [0, 0])
                 if count == 0:
-                    return None
-                return total/count
+                    return None, 0
+                return total/count, count
             def get_bin(t):
-                total = get_value(pool_rate, t)
-                bad = get_value(pool_stale_rate, t)
+                total, total_count = get_value(pool_rate, t)
+                bad, bad_count = get_value(pool_stale_rate, t)
                 if total is None or bad is None:
                     return {}
-                return dict(good=[total-bad, 1], bad=[bad, 1])
+                count = int((total_count+bad_count)/2+1/2)
+                return dict(good=[(total-bad)*count, count], bad=[bad*count, count], null=[0, count])
             bins = [get_bin(last_bin_end - (i+1/2)*dv_desc.bin_width) for i in xrange(dv_desc.bin_count)]
         return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
