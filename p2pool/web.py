@@ -39,7 +39,7 @@ def _atomic_write(filename, data):
             pass
     try:
         os.rename(filename + '.new', filename)
-    except os.error: # windows can't overwrite
+    except: # XXX windows can't overwrite
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
