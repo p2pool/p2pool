@@ -561,11 +561,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     )
                 
                 if desired_pseudoshare_target is None:
+                    target = 2**256-1
                     if len(self.recent_shares_ts_work) == 50:
                         hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-                        target = min(2**256-1, int(4*2**256/hash_rate))
-                    else:
-                        target = 2**256-1
+                        if hash_rate:
+                            target = min(target, int(4*2**256/hash_rate))
                 else:
                     target = desired_pseudoshare_target
                 target = max(target, share_info['bits'].target)
