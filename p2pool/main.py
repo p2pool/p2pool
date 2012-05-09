@@ -441,7 +441,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     removed_unstales_var.value[2] + (1 if share.share_data['stale_info'] == 'doa' else 0),
                 ))
             if share.hash in my_doa_share_hashes and tracker.is_child_of(share.hash, current_work.value['best_share_hash']):
-                removed_doa_unstales.set(removed_doa_unstales.value + 1)
+                removed_doa_unstales_var.set(removed_doa_unstales_var.value + 1)
         
         def get_stale_counts():
             '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''
