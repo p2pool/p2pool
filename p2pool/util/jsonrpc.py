@@ -68,6 +68,7 @@ class Proxy(object):
 
 class Server(deferred_resource.DeferredResource):
     def __init__(self, provider):
+        deferred_resource.DeferredResource.__init__(self)
         self._provider = provider
     
     @defer.inlineCallbacks
