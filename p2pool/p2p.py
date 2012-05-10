@@ -477,14 +477,3 @@ class Node(object):
     def get_good_peers(self, max_count):
         t = time.time()
         return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -max(3600, last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
-
-if __name__ == '__main__':
-    p = random.randrange(2**15, 2**16)
-    for i in xrange(5):
-        p2 = random.randrange(2**15, 2**16)
-        print p, p2
-        n = Node(p2, True, {addrdb_key.pack(dict(address='127.0.0.1', port=p)): addrdb_value.pack(dict(services=0, first_seen=int(time.time())-10, last_seen=int(time.time())))})
-        n.start()
-        p = p2
-    
-    reactor.run()

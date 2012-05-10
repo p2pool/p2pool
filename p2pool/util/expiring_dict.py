@@ -178,23 +178,3 @@ class ExpiringDict(object):
     def itervalues(self):
         for node, value in self.d.itervalues():
             yield value
-
-if __name__ == '__main__':
-    x = ExpiringDict(5)
-    print x
-    
-    time.sleep(1)
-    
-    x[1] = 2
-    print 'x[1] = 2'
-    print x
-    
-    time.sleep(1)
-    
-    x[1] = 3
-    print 'x[1] = 3'
-    print x
-    
-    time.sleep(5)
-    
-    print x

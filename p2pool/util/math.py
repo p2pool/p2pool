@@ -247,10 +247,3 @@ class RateMonitor(object):
             self.first_timestamp = t
         else:
             self.datums.append((t, datum))
-
-if __name__ == '__main__':
-    import random
-    a = 1
-    while True:
-        print a, format(a) + 'H/s'
-        a = a * random.randrange(2, 5)
