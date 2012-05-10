@@ -1,5 +1,6 @@
 from __future__ import division
 
+import math
 import random
 import time
 
@@ -476,4 +477,6 @@ class Node(object):
     
     def get_good_peers(self, max_count):
         t = time.time()
-        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)): -max(3600, last_seen - first_seen)/max(3600, t - last_seen)*random.expovariate(1))][:max_count]
+        return [x[0] for x in sorted(self.addr_store.iteritems(), key=lambda (k, (services, first_seen, last_seen)):
+            -math.log(max(3600, last_seen - first_seen))/math.log(max(3600, t - last_seen))*random.expovariate(1)
+        )][:max_count]
