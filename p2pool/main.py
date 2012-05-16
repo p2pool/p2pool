@@ -587,6 +587,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     len(current_work2.value['transactions']),
                 )
                 
+                bits = current_work.value['bits']
+                previous_block = current_work.value['previous_block']
                 ba = bitcoin_getwork.BlockAttempt(
                     version=current_work.value['version'],
                     previous_block=current_work.value['previous_block'],
@@ -613,6 +615,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     user, _, _, _ = self.get_user_details(request)
                     assert header['merkle_root'] == merkle_root
+                    assert header['previous_block'] == previous_block
+                    assert header['bits'] == bits
                     
                     on_time = current_work.value['best_share_hash'] == share_info['share_data']['previous_share_hash']
                     
