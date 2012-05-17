@@ -89,16 +89,18 @@ class WorkerInterface(object):
             self.work_cache_times = self.worker_bridge.new_work_event.times
         
         if key in self.work_cache:
-            res, orig_timestamp, handler = self.work_cache.pop(key)
+            res_list = self.work_cache.pop(key)
         else:
-            res, handler = self.worker_bridge.get_work(*key)
-            assert res.merkle_root not in self.merkle_root_to_handler
-            orig_timestamp = res.timestamp
+            res_list = list(self.worker_bridge.get_work(*key))
+            assert all(res.merkle_root not in self.merkle_root_to_handler for res, handler in res_list)
+        res, handler = res_list.pop()
+        if res_list:
+            self.work_cache[key] = res_list
         
-        self.merkle_root_to_handler[res.merkle_root] = handler
-        
-        if res.timestamp + 12 < orig_timestamp + 600:
-            self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp, handler
+        if res.merkle_root in self.merkle_root_to_handler:
+            assert self.merkle_root_to_handler[res.merkle_root] is handler
+        else:
+            self.merkle_root_to_handler[res.merkle_root] = handler
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)

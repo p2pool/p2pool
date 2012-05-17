@@ -589,14 +589,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 
                 bits = current_work.value['bits']
                 previous_block = current_work.value['previous_block']
-                ba = bitcoin_getwork.BlockAttempt(
-                    version=current_work.value['version'],
-                    previous_block=current_work.value['previous_block'],
-                    merkle_root=merkle_root,
-                    timestamp=current_work2.value['time'],
-                    bits=current_work.value['bits'],
-                    share_target=target,
-                )
                 
                 received_header_hashes = set()
                 
@@ -698,7 +690,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     return on_time
                 
-                return ba, got_response
+                return tuple((bitcoin_getwork.BlockAttempt(
+                    version=current_work.value['version'],
+                    previous_block=current_work.value['previous_block'],
+                    merkle_root=merkle_root,
+                    timestamp=current_work2.value['time']+12*i,
+                    bits=current_work.value['bits'],
+                    share_target=target,
+                ), got_response) for i in xrange(50))
         
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         
