@@ -468,6 +468,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 worker_interface.WorkerBridge.__init__(self)
                 self.new_work_event = current_work.changed
                 self.recent_shares_ts_work = []
+                self.okay_user_agents = set()
+                self.got_resp = self.got_resp
             
             def get_user_details(self, request):
                 user = request.getUser() if request.getUser() is not None else ''
@@ -499,10 +501,31 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
             
             def preprocess_request(self, request):
+                if request.getHeader('User-Agent') not in self.okay_user_agents:
+                    print "Testing", request.getHeader('User-Agent')
+                    return None, 0, 0
                 user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(request)
                 return pubkey_hash, desired_share_target, desired_pseudoshare_target
             
+            def got_resp(self, header, request):
+                if net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header)) == 0x000000000000084ac774944c084fe671558f217e29e277b11780771e0a86a680:
+                    print request.getHeader('User-Agent'), "okay"
+                    self.okay_user_agents.add(request.getHeader('User-Agent'))
+                return True
+            
+            @defer.inlineCallbacks
             def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
+                if (pubkey_hash, desired_share_target, desired_pseudoshare_target) == (None, 0, 0):
+                    ba = bitcoin_getwork.BlockAttempt(
+                        version=1,
+                        previous_block=0x00000000000007da8abb36a33bb79136998620edc862ce7ecde30fad3352e026,
+                        merkle_root=0x268e290e2195d91716f00176fd99b5ad5fecdb203baa4e61435771f3e431c5ce,
+                        timestamp=1337225116,
+                        bits=bitcoin_data.FloatingInteger(436841986),
+                        share_target=2**(256-32)-1,
+                    )
+                    defer.returnValue(((ba, self.got_resp),))
+                    yield 5
                 if len(p2p_node.peers) == 0 and net.PERSIST:
                     raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
                 if current_work.value['best_share_hash'] is None and net.PERSIST:
@@ -690,14 +713,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     
                     return on_time
                 
-                return tuple((bitcoin_getwork.BlockAttempt(
+                defer.returnValue(tuple((bitcoin_getwork.BlockAttempt(
                     version=current_work.value['version'],
                     previous_block=current_work.value['previous_block'],
                     merkle_root=merkle_root,
                     timestamp=current_work2.value['time']+12*i,
                     bits=current_work.value['bits'],
                     share_target=target,
-                ), got_response) for i in xrange(50))
+                ), got_response) for i in xrange(50)))
         
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, current_work.value['best_share_hash'], current_work.value['bits'].target, current_work2.value['subsidy'], net)
         

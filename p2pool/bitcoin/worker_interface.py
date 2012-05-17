@@ -82,17 +82,13 @@ class WorkerInterface(object):
                 yield self.worker_bridge.new_work_event.get_deferred()
             self.worker_views[request_id] = self.worker_bridge.new_work_event.times
         
-        key = self.worker_bridge.preprocess_request(request)
+        key = yield self.worker_bridge.preprocess_request(request)
         
         if self.work_cache_times != self.worker_bridge.new_work_event.times:
             self.work_cache = {}
             self.work_cache_times = self.worker_bridge.new_work_event.times
         
-        if key in self.work_cache:
-            res_list = self.work_cache.pop(key)
-        else:
-            res_list = list(self.worker_bridge.get_work(*key))
-            assert all(res.merkle_root not in self.merkle_root_to_handler for res, handler in res_list)
+        res_list = self.work_cache.pop(key) if key in self.work_cache else list((yield self.worker_bridge.get_work(*key)))
         res, handler = res_list.pop()
         if res_list:
             self.work_cache[key] = res_list
