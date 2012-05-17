@@ -565,13 +565,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     if len(self.recent_shares_ts_work) == 50:
                         hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
                         if hash_rate:
-                            target = min(target, int(4*2**256/hash_rate))
+                            target = min(target, int(2**256/hash_rate))
                 else:
                     target = desired_pseudoshare_target
                 target = max(target, share_info['bits'].target)
                 for aux_work in current_work.value['mm_chains'].itervalues():
                     target = max(target, aux_work['target'])
-                target = min(target, net.PARENT.SANE_MAX_TARGET)
+                target = math.clip(target, net.PARENT.SANE_TARGET_RANGE)
                 
                 transactions = [generate_tx] + list(current_work2.value['transactions'])
                 packed_generate_tx = bitcoin_data.tx_type.pack(generate_tx)
