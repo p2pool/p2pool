@@ -205,7 +205,7 @@ class Protocol(p2protocol.Protocol):
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
-        self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares], self)
+        self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] not in [6, 7]], self)
     
     def sendShares(self, shares):
         def att(f, **kwargs):
