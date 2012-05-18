@@ -69,6 +69,7 @@ class Protocol(p2protocol.Protocol):
                 raise PeerMisbehavingError('first message was not version message')
             p2protocol.Protocol.packetReceived(self, command, payload2)
         except PeerMisbehavingError, e:
+            return
             print 'Peer %s:%i misbehaving, will drop and ban. Reason:' % self.addr, e.message
             self.badPeerHappened()
     
