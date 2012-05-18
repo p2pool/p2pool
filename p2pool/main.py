@@ -526,7 +526,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 share_type = p2pool_data.NewShare
                 if current_work.value['best_share_hash'] is not None:
                     previous_share = tracker.shares[current_work.value['best_share_hash']]
-                    if isinstance(previous_share, p2pool_data.Share):
+                    if not isinstance(previous_share, p2pool_data.NewShare):
                         # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
                         if tracker.get_height(previous_share.hash) < net.CHAIN_LENGTH:
                             share_type = p2pool_data.Share
