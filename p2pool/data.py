@@ -521,7 +521,7 @@ def get_warnings(tracker, current_work, net):
     desired_version_counts = get_desired_version_counts(tracker, current_work.value['best_share_hash'],
         min(60*60//net.SHARE_PERIOD, tracker.get_height(current_work.value['best_share_hash'])))
     majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-    if majority_desired_version not in [0, 1] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+    if majority_desired_version not in [0, 1, 2] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
         res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
