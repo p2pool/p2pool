@@ -33,6 +33,10 @@ def check_hash_link(hash_link, data, const_ending=''):
 
 # shares
 
+# type:
+# 2: share1a
+# 3: share1b
+
 share_type = pack.ComposedType([
     ('type', pack.VarIntType()),
     ('contents', pack.VarStrType()),
@@ -47,11 +51,6 @@ def load_share(share, net, peer):
     elif share['type'] == 5:
         share1b = Share.share1b_type.unpack(share['contents'])
         return Share(net, peer, merkle_link=bitcoin_data.calculate_merkle_link([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
-    elif share['type'] == 6:
-        return NewShare(net, peer, other_txs=None, **NewShare.share1a_type.unpack(share['contents']))
-    elif share['type'] == 7:
-        share1b = NewShare.share1b_type.unpack(share['contents'])
-        return NewShare(net, peer, merkle_link=bitcoin_data.calculate_merkle_link([0] + [bitcoin_data.hash256(bitcoin_data.tx_type.pack(x)) for x in share1b['other_txs']], 0), **share1b)
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
@@ -240,11 +239,6 @@ class Share(object):
             return dict(type=5, contents=self.share1b_type.pack(dict(common=self.common, other_txs=self.other_txs)))
     
     def check(self, tracker):
-        if self.share_data['previous_share_hash'] is not None:
-            previous_share = tracker.shares[self.share_data['previous_share_hash']]
-            if isinstance(previous_share, NewShare):
-                from p2pool import p2p
-                raise p2p.PeerMisbehavingError('''Share can't follow NewShare''')
         share_info, gentx = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], self.net)
         if share_info != self.share_info:
             raise ValueError('share_info invalid')
@@ -256,39 +250,6 @@ class Share(object):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         return dict(header=self.header, txs=[self.check(tracker)] + self.other_txs)
-
-class NewShare(Share):
-    def __init__(self, *args, **kwargs):
-        Share.__init__(self, *args, **kwargs)
-        self.hash = bitcoin_data.hash256(share_type.pack(self.as_share()))
-    
-    def check(self, tracker):
-        if self.share_data['previous_share_hash'] is not None:
-            previous_share = tracker.shares[self.share_data['previous_share_hash']]
-            if isinstance(previous_share, Share):
-                if tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
-                    from p2pool import p2p
-                    raise p2p.PeerMisbehavingError('NewShare without enough history')
-                else:
-                    # Share -> NewShare only valid if 85% of hashes in [self.net.CHAIN_LENGTH*9//10, self.net.CHAIN_LENGTH] for new version
-                    counts = get_desired_version_counts(tracker,
-                        tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
-                    if counts.get(2, 0) < sum(counts.itervalues())*85//100:
-                        from p2pool import p2p
-                        raise p2p.PeerMisbehavingError('NewShare without enough hash power upgraded')
-        share_info, gentx = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], self.net)
-        if share_info != self.share_info:
-            raise ValueError('share_info invalid')
-        if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:
-            raise ValueError('''gentx doesn't match hash_link''')
-        return gentx # only used by as_block
-    
-    def as_share(self):
-        if not self.pow_hash <= self.header['bits'].target: # share1a
-            return dict(type=6, contents=self.share1a_type.pack(dict(common=self.common, merkle_link=self.merkle_link)))
-        else: # share1b
-            return dict(type=7, contents=self.share1b_type.pack(dict(common=self.common, other_txs=self.other_txs)))
-
 
 class WeightsSkipList(forest.TrackerSkipList):
     # share_count, weights, total_weight
@@ -560,7 +521,7 @@ def get_warnings(tracker, current_work, net):
     desired_version_counts = get_desired_version_counts(tracker, current_work.value['best_share_hash'],
         min(60*60//net.SHARE_PERIOD, tracker.get_height(current_work.value['best_share_hash'])))
     majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-    if majority_desired_version not in [0, 1, 2] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+    if majority_desired_version not in [0, 1] and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
         res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
