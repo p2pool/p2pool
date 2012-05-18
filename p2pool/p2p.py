@@ -74,6 +74,7 @@ class Protocol(p2protocol.Protocol):
             self.badPeerHappened()
     
     def badPeerHappened(self):
+        return
         if p2pool.DEBUG:
             print "Bad peer banned:", self.addr
         self.transport.loseConnection()
