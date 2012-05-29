@@ -38,7 +38,7 @@ nets = dict(
         MAX_TARGET=2**256//2**32 - 1,
         PERSIST=False,
         WORKER_PORT=19332,
-        BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
+        BOOTSTRAP_ADDRS='72.14.191.28 liteco.in'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v, temp_work: 50400 <= v < 60000 or 60003 <= v or '/P2SH/' in temp_work['coinbaseflags'],
     ),
