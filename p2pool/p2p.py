@@ -239,6 +239,11 @@ class Protocol(p2protocol.Protocol):
     def handle_sharereply(self, id, result, shares):
         self.node.handle_share_reply(id, result, shares, self)
     
+    message_bestblock = pack.ComposedType([
+        ('header', bitcoin_data.block_header_type),
+    ])
+    def handle_bestblock(self, header):
+        pass
     
     def connectionLost(self, reason):
         if self.connected2:

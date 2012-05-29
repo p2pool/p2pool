@@ -382,6 +382,17 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 f.write(json.dumps(p2p_node.addr_store.items()))
         task.LoopingCall(save_addrs).start(60)
         
+        best_block = variable.Variable(None)
+        @pre_current_work.changed.watch
+        def _(work):
+            best_block.set(work['previous_block'])
+        @best_block.changed.watch
+        @defer.inlineCallbacks
+        def _(block_hash):
+            header = yield factory.conn.value.get_block_header(block_hash)
+            for peer in p2p_node.peers.itervalues():
+                peer.send_bestblock(header=header)
+        
         def broadcast_share(share_hash):
             shares = []
             for share in tracker.get_chain(share_hash, min(5, tracker.get_height(share_hash))):
