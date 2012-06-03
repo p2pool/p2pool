@@ -459,7 +459,7 @@ class OkayTracker(forest.Tracker):
             for peer, hash, ts, targ in desired:
                 print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
         
-        return best, [(peer, hash) for peer, hash, ts, targ in desired]
+        return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff]
     
     def score(self, share_hash, block_rel_height_func):
         # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time
