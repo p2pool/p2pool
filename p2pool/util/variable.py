@@ -55,13 +55,16 @@ class Variable(object):
     def __init__(self, value):
         self.value = value
         self.changed = Event()
+        self.transitioned = Event()
     
     def set(self, value):
         if value == self.value:
             return
         
+        oldvalue = self.value
         self.value = value
         self.changed.happened(value)
+        self.transitioned.happened(oldvalue, value)
     
     def get_not_none(self):
         if self.value is not None:

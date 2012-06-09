@@ -43,7 +43,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(tracker, current_work, current_work2, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received):
+def get_web_root(tracker, current_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -171,7 +171,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
                 dead=stale_doa_shares,
             ),
             uptime=time.time() - start_time,
-            block_value=current_work2.value['subsidy']*1e-8,
+            block_value=current_work.value['subsidy']*1e-8,
             warnings=p2pool_data.get_warnings(tracker, current_work, net),
         )
     
@@ -242,7 +242,7 @@ def get_web_root(tracker, current_work, current_work2, get_current_txouts, datad
             ),
             attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.shares[current_work.value['best_share_hash']].max_target),
             attempts_to_block=bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
-            block_value=current_work2.value['subsidy']*1e-8,
+            block_value=current_work.value['subsidy']*1e-8,
         ))
         
         with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
