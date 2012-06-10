@@ -248,6 +248,8 @@ def get_record(fields):
                     return dict(self) == other
                 elif isinstance(other, _Record):
                     return all(self[k] == other[k] for k in self.keys())
+                elif other is None:
+                    return False
                 raise TypeError()
             def __ne__(self, other):
                 return not (self == other)

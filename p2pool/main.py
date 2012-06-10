@@ -181,6 +181,31 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
         work_poller()
         
+        # PEER WORK
+        
+        best_block_header = variable.Variable(None)
+        def handle_header(header):
+            # check that header matches current target
+            if not (net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header)) <= bitcoind_work.value['bits'].target):
+                return
+            if (best_block_header.value is None
+                or (
+                    header['previous_block'] == current_work.value['previous_block'] and
+                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(best_block_header.value)) == current_work.value['previous_block']
+                ) # new is child of current and previous is current
+                or (
+                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)) == current_work.value['previous_block'] and
+                    best_block_header.value['previous_block'] != current_work.value['previous_block'])
+                ): # new is current and previous is not child of current
+                best_block_header.set(header)
+        @bitcoind_work.changed.watch
+        @defer.inlineCallbacks
+        def _(work):
+            handle_header((yield factory.conn.value.get_block_header(work['previous_block'])))
+        @best_block_header.changed.watch
+        def _(header):
+            compute_work()
+        
         # MERGED WORK
         
         merged_work = variable.Variable({})
@@ -214,6 +239,25 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             best, desired = tracker.think(get_height_rel_highest, bitcoind_work.value['previous_block'], bitcoind_work.value['bits'])
             
             t = dict(bitcoind_work.value)
+            
+            if (best_block_header.value is not None and
+            best_block_header.value['previous_block'] == t['previous_block'] and
+            net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(best_block_header.value)) <= t['bits'].target):
+                print 'Skipping from block %x to block %x!' % (best_block_header.value['previous_block'],
+                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(best_block_header.value)))
+                t = dict(
+                    version=best_block_header.value['version'],
+                    previous_block=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(best_block_header.value)),
+                    bits=best_block_header.value['bits'], # not always true
+                    coinbaseflags='',
+                    time=best_block_header.value['timestamp'] + 600, # better way?
+                    transactions=[],
+                    merkle_link=bitcoin_data.calculate_merkle_link([0], 0),
+                    subsidy=5000000000, # XXX fix this
+                    clock_offset=current_work.value['clock_offset'],
+                    last_update=current_work.value['last_update'],
+                )
+            
             t['best_share_hash'] = best
             t['mm_chains'] = merged_work.value
             current_work.set(t)
@@ -319,6 +363,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         shares.append(share)
                 print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
                 return shares
+            
+            def handle_bestblock(self, header, peer):
+                if net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header)) > header['bits'].target:
+                    raise p2p.PeerMisbehavingError('received block header fails PoW test')
+                handle_header(header)
         
         @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
         def submit_block_p2p(block):
@@ -405,14 +454,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 f.write(json.dumps(p2p_node.addr_store.items()))
         task.LoopingCall(save_addrs).start(60)
         
-        best_block = variable.Variable(None)
-        @bitcoind_work.changed.watch
-        def _(work):
-            best_block.set(work['previous_block'])
-        @best_block.changed.watch
-        @defer.inlineCallbacks
-        def _(block_hash):
-            header = yield factory.conn.value.get_block_header(block_hash)
+        @best_block_header.changed.watch
+        def _(header):
             for peer in p2p_node.peers.itervalues():
                 peer.send_bestblock(header=header)
         

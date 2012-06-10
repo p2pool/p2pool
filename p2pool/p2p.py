@@ -243,7 +243,7 @@ class Protocol(p2protocol.Protocol):
         ('header', bitcoin_data.block_header_type),
     ])
     def handle_bestblock(self, header):
-        pass
+        self.node.handle_bestblock(header, self)
     
     def connectionLost(self, reason):
         if self.connected2:
@@ -481,6 +481,9 @@ class Node(object):
     
     def handle_share_reply(self, id, result, shares, peer):
         raise PeerMisbehavingError('sent share reply without being sent a request')
+    
+    def handle_bestblock(self, header, peer):
+        print 'handle_bestblock', header
     
     def get_good_peers(self, max_count):
         t = time.time()
