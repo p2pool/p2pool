@@ -300,7 +300,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @current_work.transitioned.watch
         def _(before, after):
             # trigger LP if version/previous_block/bits changed or transactions changed from nothing
-            if any(before[x] != after[x] for x in ['version', 'previous_block', 'bits']) or (not before['transactions'] and after['transactions']):
+            if any(before[x] != after[x] for x in ['version', 'previous_block', 'bits', 'best_share_hash', 'mm_chains']) or (not before['transactions'] and after['transactions']):
                 lp_signal.happened()
         
         
