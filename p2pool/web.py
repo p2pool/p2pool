@@ -10,6 +10,7 @@ from twisted.internet import task
 from twisted.python import log
 from twisted.web import resource, static
 
+import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
 from util import graph, math
@@ -302,6 +303,7 @@ def get_web_root(tracker, current_work, get_current_txouts, datadir_path, net, g
         block_explorer_url_prefix=net.PARENT.BLOCK_EXPLORER_URL_PREFIX,
         address_explorer_url_prefix=net.PARENT.ADDRESS_EXPLORER_URL_PREFIX,
     )))
+    new_root.putChild('version', WebInterface(lambda: p2pool.__version__))
     
     hd_path = os.path.join(datadir_path, 'graph_db')
     hd_data = _atomic_read(hd_path)

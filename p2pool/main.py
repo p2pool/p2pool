@@ -38,10 +38,14 @@ def getwork(bitcoind):
             raise deferral.RetrySilentlyException()
         raise
     packed_transactions = [x.decode('hex') for x in work['transactions']]
+    s = time.time()
+    unpacked = map(bitcoin_data.tx_type.unpack, packed_transactions)
+    e = time.time()
+    print (e-s)*1000, "ms"
     defer.returnValue(dict(
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
-        transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
+        transactions=unpacked,
         merkle_link=bitcoin_data.calculate_merkle_link([0] + map(bitcoin_data.hash256, packed_transactions), 0), # using 0 is a bit of a hack, but will always work when index=0
         subsidy=work['coinbasevalue'],
         time=work['time'],

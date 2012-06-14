@@ -38,6 +38,9 @@
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
             });
             
+            d3.json('/web/version', function(version) {
+                d3.selectAll('#version').text(version);
+            });
             
             d3.json('/web/currency_info', function(currency_info) {
                 d3.selectAll('.symbol').text(currency_info.symbol);
@@ -85,6 +88,7 @@
     <body>
         <h1>P2Pool</h1>
         <p><a href="graphs.html">Graphs</a></p>
+        <p>Version: <span id="version"></span></p>
         <p>Pool rate: <span id="pool_rate"></span> (<span id="pool_stale"></span> stale) Share difficulty: <span id="difficulty"></span></p>
         <p>Node uptime: <span id="uptime_days"></span> days Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA)</p>
