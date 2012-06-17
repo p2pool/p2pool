@@ -16,6 +16,7 @@ nets = dict(
             'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='BTC',
@@ -33,6 +34,7 @@ nets = dict(
             'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='tBTC',
@@ -51,6 +53,7 @@ nets = dict(
             'namecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='NMC',
@@ -68,6 +71,7 @@ nets = dict(
             'namecoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='tNMC',
@@ -86,6 +90,7 @@ nets = dict(
             'litecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=150, # s
         SYMBOL='LTC',
@@ -103,6 +108,7 @@ nets = dict(
             'litecoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=150, # s
         SYMBOL='tLTC',

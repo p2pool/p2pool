@@ -71,8 +71,17 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 raise deferral.RetrySilentlyException()
             defer.returnValue(temp_work)
         temp_work = yield check()
+        
+        block_height_var = variable.Variable(None)
+        @defer.inlineCallbacks
+        def poll_height():
+            block_height_var.set((yield deferral.retry('Error while calling getblockcount:')(bitcoind.rpc_getblockcount)()))
+        yield poll_height()
+        task.LoopingCall(poll_height).start(60*60)
+        
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
+        print '    Current block height: %i' % (block_height_var.value,)
         print
         
         # connect to bitcoind over bitcoin-p2p
@@ -253,7 +262,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     time=best_block_header.value['timestamp'] + 600, # better way?
                     transactions=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([0], 0),
-                    subsidy=5000000000, # XXX fix this
+                    subsidy=net.PARENT.SUBSIDY_FUNC(block_height_var.value),
                     clock_offset=current_work.value['clock_offset'],
                     last_update=current_work.value['last_update'],
                 )
