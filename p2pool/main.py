@@ -625,7 +625,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                 'doa' if doas > doas_recorded_in_chain else
                                 None
                             )(*get_stale_counts()),
-                            desired_version=1,
+                            desired_version=3,
                         ),
                         block_target=current_work.value['bits'].target,
                         desired_timestamp=int(time.time() - current_work.value['clock_offset']),
