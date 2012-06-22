@@ -1,6 +1,7 @@
 from __future__ import division
 
 import hashlib
+import random
 
 import p2pool
 from p2pool.util import math, pack
@@ -178,12 +179,12 @@ def merkle_hash(hashes):
 def calculate_merkle_link(hashes, index):
     # XXX optimize this
     
-    hash_list = [(h, i == index, []) for i, h in enumerate(hashes)]
+    hash_list = [(lambda _h=h: _h, i == index, []) for i, h in enumerate(hashes)]
     
     while len(hash_list) > 1:
         hash_list = [
             (
-                hash256(merkle_record_type.pack(dict(left=left, right=right))),
+                lambda _left=left, _right=right: hash256(merkle_record_type.pack(dict(left=_left(), right=_right()))),
                 left_f or right_f,
                 (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
             )
@@ -191,11 +192,13 @@ def calculate_merkle_link(hashes, index):
                 zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
         ]
     
-    res = [x['hash'] for x in hash_list[0][2]]
+    res = [x['hash']() for x in hash_list[0][2]]
     
     assert hash_list[0][1]
     if p2pool.DEBUG:
-        assert check_merkle_link(hashes[index], dict(branch=res, index=index)) == hash_list[0][0]
+        new_hashes = [random.randrange(2**256) if x is None else x
+            for x in hashes]
+        assert check_merkle_link(new_hashes[index], dict(branch=res, index=index)) == merkle_hash(new_hashes)
     assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
     
     return dict(branch=res, index=index)

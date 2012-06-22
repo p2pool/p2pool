@@ -41,7 +41,7 @@ def getwork(bitcoind):
         version=work['version'],
         previous_block_hash=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
-        merkle_link=bitcoin_data.calculate_merkle_link([0] + map(bitcoin_data.hash256, packed_transactions), 0), # using 0 is a bit of a hack, but will always work when index=0
+        merkle_link=bitcoin_data.calculate_merkle_link([None] + map(bitcoin_data.hash256, packed_transactions), 0),
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
@@ -259,7 +259,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     coinbaseflags='',
                     time=best_block_header.value['timestamp'] + 600, # better way?
                     transactions=[],
-                    merkle_link=bitcoin_data.calculate_merkle_link([0], 0),
+                    merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
                     subsidy=net.PARENT.SUBSIDY_FUNC(block_height_var.value),
                     clock_offset=current_work.value['clock_offset'],
                     last_update=current_work.value['last_update'],
