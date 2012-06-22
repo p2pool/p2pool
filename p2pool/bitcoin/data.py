@@ -222,11 +222,6 @@ def target_to_difficulty(target):
 def difficulty_to_target(difficulty):
     return (0xffff0000 * 2**(256-64) + 1)/difficulty - 1
 
-# tx
-
-def tx_get_sigop_count(tx):
-    return sum(script.get_sigop_count(txin['script']) for txin in tx['tx_ins']) + sum(script.get_sigop_count(txout['script']) for txout in tx['tx_outs'])
-
 # human addresses
 
 base58_alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
