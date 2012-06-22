@@ -2,7 +2,6 @@ from __future__ import division
 
 import ConfigParser
 import StringIO
-import argparse
 import base64
 import json
 import os
@@ -23,7 +22,7 @@ from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import worker_interface, height_tracker
-from util import expiring_dict, jsonrpc, variable, deferral, math, logging, pack
+from util import expiring_dict, fixargparse, jsonrpc, variable, deferral, math, logging, pack
 from . import p2p, networks, web
 import p2pool, p2pool.data as p2pool_data
 
@@ -907,43 +906,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         log.err(None, 'Fatal error:')
 
 def run():
-    class FixedArgumentParser(argparse.ArgumentParser):
-        def _read_args_from_files(self, arg_strings):
-            # expand arguments referencing files
-            new_arg_strings = []
-            for arg_string in arg_strings:
-                
-                # for regular arguments, just add them back into the list
-                if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
-                    new_arg_strings.append(arg_string)
-                
-                # replace arguments referencing files with the file content
-                else:
-                    try:
-                        args_file = open(arg_string[1:])
-                        try:
-                            arg_strings = []
-                            for arg_line in args_file.read().splitlines():
-                                for arg in self.convert_arg_line_to_args(arg_line):
-                                    arg_strings.append(arg)
-                            arg_strings = self._read_args_from_files(arg_strings)
-                            new_arg_strings.extend(arg_strings)
-                        finally:
-                            args_file.close()
-                    except IOError:
-                        err = sys.exc_info()[1]
-                        self.error(str(err))
-            
-            # return the modified argument list
-            return new_arg_strings
-        
-        def convert_arg_line_to_args(self, arg_line):
-            return [arg for arg in arg_line.split() if arg.strip()]
-    
-    
     realnets=dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
     
-    parser = FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
+    parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
         help='use specified network (default: bitcoin)',
