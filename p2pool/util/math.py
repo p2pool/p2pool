@@ -122,35 +122,18 @@ def find_root(y_over_dy, start, steps=10, bounds=(None, None)):
 def ierf(z):
     return find_root(lambda x: (erf(x) - z)/(2*math.e**(-x**2)/math.sqrt(math.pi)), 0)
 
-try:
-    from scipy import special
-except ImportError:
-    def binomial_conf_interval(x, n, conf=0.95):
-        assert 0 <= x <= n and 0 <= conf < 1
-        if n == 0:
-            left = random.random()*(1 - conf)
-            return left, left + conf
-        # approximate - Wilson score interval
-        z = math.sqrt(2)*ierf(conf)
-        p = x/n
-        topa = p + z**2/2/n
-        topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
-        bottom = 1 + z**2/n
-        return [clip(x, (0, 1)) for x in add_to_range(x/n, [(topa - topb)/bottom, (topa + topb)/bottom])]
-else:
-    def binomial_conf_interval(x, n, conf=0.95):
-        assert 0 <= x <= n and 0 <= conf < 1
-        if n == 0:
-            left = random.random()*(1 - conf)
-            return left, left + conf
-        bl = float(special.betaln(x+1, n-x+1))
-        def f(left_a):
-            left, right = max(1e-8, float(special.betaincinv(x+1, n-x+1, left_a))), min(1-1e-8, float(special.betaincinv(x+1, n-x+1, left_a + conf)))
-            top = math.exp(math.log(right)*(x+1) + math.log(1-right)*(n-x+1) + math.log(left) + math.log(1-left) - bl) - math.exp(math.log(left)*(x+1) + math.log(1-left)*(n-x+1) + math.log(right) + math.log(1-right) - bl)
-            bottom = (x - n*right)*left*(1-left) - (x - n*left)*right*(1-right)
-            return top/bottom
-        left_a = find_root(f, (1-conf)/2, bounds=(0, 1-conf))
-        return float(special.betaincinv(x+1, n-x+1, left_a)), float(special.betaincinv(x+1, n-x+1, left_a + conf))
+def binomial_conf_interval(x, n, conf=0.95):
+    assert 0 <= x <= n and 0 <= conf < 1
+    if n == 0:
+        left = random.random()*(1 - conf)
+        return left, left + conf
+    # approximate - Wilson score interval
+    z = math.sqrt(2)*ierf(conf)
+    p = x/n
+    topa = p + z**2/2/n
+    topb = z * math.sqrt(p*(1-p)/n + z**2/4/n**2)
+    bottom = 1 + z**2/n
+    return [clip(x, (0, 1)) for x in add_to_range(x/n, [(topa - topb)/bottom, (topa + topb)/bottom])]
 
 minmax = lambda x: (min(x), max(x))
 
