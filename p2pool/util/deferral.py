@@ -7,9 +7,19 @@ from twisted.internet import defer, reactor
 from twisted.python import failure, log
 
 def sleep(t):
-    d = defer.Deferred()
-    reactor.callLater(t, d.callback, None)
+    d = defer.Deferred(canceller=lambda d_: dc.cancel())
+    dc = reactor.callLater(t, d.callback, None)
     return d
+
+def run_repeatedly(f, *args, **kwargs):
+    current_dc = [None]
+    def step():
+        delay = f(*args, **kwargs)
+        current_dc[0] = reactor.callLater(delay, step)
+    step()
+    def stop():
+        current_dc[0].cancel()
+    return stop
 
 class RetrySilentlyException(Exception):
     pass

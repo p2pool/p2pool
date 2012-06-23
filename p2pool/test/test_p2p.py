@@ -33,4 +33,4 @@ class Test(unittest.TestCase):
         try:
             yield df
         finally:
-            n.stop()
+            yield n.stop()
