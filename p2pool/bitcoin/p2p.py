@@ -76,7 +76,7 @@ class Protocol(p2protocol.Protocol):
             elif inv['type'] == 'block':
                 self.factory.new_block.happened(inv['hash'])
             else:
-                print 'Unknown inv type', item
+                print 'Unknown inv type', inv
     
     message_getdata = pack.ComposedType([
         ('requests', pack.ListType(pack.ComposedType([

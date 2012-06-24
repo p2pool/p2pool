@@ -586,7 +586,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         log.err(None, 'Fatal error:')
 
 def run():
-    realnets=dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
+    realnets = dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
     
     parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
     parser.add_argument('--version', action='version', version=p2pool.__version__)

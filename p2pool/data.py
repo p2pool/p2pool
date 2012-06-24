@@ -189,7 +189,7 @@ class Share(object):
         self.other_txs = other_txs
         
         if len(self.share_info['share_data']['coinbase']) > 100:
-            raise ValueError('''coinbase too large! %i bytes''' % (len(self.self.share_data['coinbase']),))
+            raise ValueError('''coinbase too large! %i bytes''' % (len(self.share_info['share_data']['coinbase']),))
         
         if len(merkle_link['branch']) > 16:
             raise ValueError('merkle branch too long!')
