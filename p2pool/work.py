@@ -61,7 +61,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         def set_merged_work(merged_url, merged_userpass):
             merged_proxy = jsonrpc.Proxy(merged_url, dict(Authorization='Basic ' + base64.b64encode(merged_userpass)))
             while True:
-                auxblock = yield deferral.retry('Error while calling merged getauxblock:', 1)(merged_proxy.rpc_getauxblock)()
+                auxblock = yield deferral.retry('Error while calling merged getauxblock:', 30)(merged_proxy.rpc_getauxblock)()
                 self.merged_work.set(dict(self.merged_work.value, **{auxblock['chainid']: dict(
                     hash=int(auxblock['hash'], 16),
                     target=pack.IntType(256).unpack(auxblock['target'].decode('hex')),
