@@ -39,13 +39,15 @@ def getwork(bitcoind):
     packed_transactions = [x.decode('hex') for x in work['transactions']]
     defer.returnValue(dict(
         version=work['version'],
-        previous_block_hash=int(work['previousblockhash'], 16),
+        previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
         merkle_link=bitcoin_data.calculate_merkle_link([None] + map(bitcoin_data.hash256, packed_transactions), 0),
         subsidy=work['coinbasevalue'],
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
+        clock_offset=time.time() - work['time'],
+        last_update=time.time(),
     ))
 
 @defer.inlineCallbacks
@@ -79,7 +81,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         task.LoopingCall(poll_height).start(60*60)
         
         print '    ...success!'
-        print '    Current block hash: %x' % (temp_work['previous_block_hash'],)
+        print '    Current block hash: %x' % (temp_work['previous_block'],)
         print '    Current block height: %i' % (block_height_var.value,)
         print
         
@@ -159,31 +161,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         # BITCOIND WORK
         
-        bitcoind_work = variable.Variable(None)
-        
-        @defer.inlineCallbacks
-        def poll_bitcoind():
-            work = yield getwork(bitcoind)
-            bitcoind_work.set(dict(
-                version=work['version'],
-                previous_block=work['previous_block_hash'],
-                bits=work['bits'],
-                coinbaseflags=work['coinbaseflags'],
-                time=work['time'],
-                transactions=work['transactions'],
-                merkle_link=work['merkle_link'],
-                subsidy=work['subsidy'],
-                clock_offset=time.time() - work['time'],
-                last_update=time.time(),
-            ))
-        yield poll_bitcoind()
-        
+        bitcoind_work = variable.Variable((yield getwork(bitcoind)))
         @defer.inlineCallbacks
         def work_poller():
             while True:
                 flag = factory.new_block.get_deferred()
                 try:
-                    yield poll_bitcoind()
+                    bitcoind_work.set((yield getwork(bitcoind)))
                 except:
                     log.err()
                 yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
