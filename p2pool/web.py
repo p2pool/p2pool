@@ -44,7 +44,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(tracker, current_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var):
+def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -172,7 +172,7 @@ def get_web_root(tracker, current_work, get_current_txouts, datadir_path, net, g
                 dead=stale_doa_shares,
             ),
             uptime=time.time() - start_time,
-            block_value=current_work.value['subsidy']*1e-8,
+            block_value=bitcoind_work.value['subsidy']*1e-8,
             warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net),
         )
     
@@ -242,8 +242,8 @@ def get_web_root(tracker, current_work, get_current_txouts, datadir_path, net, g
                 outgoing=sum(1 for peer in p2p_node.peers.itervalues() if not peer.incoming),
             ),
             attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.shares[best_share_var.value].max_target),
-            attempts_to_block=bitcoin_data.target_to_average_attempts(current_work.value['bits'].target),
-            block_value=current_work.value['subsidy']*1e-8,
+            attempts_to_block=bitcoin_data.target_to_average_attempts(bitcoind_work.value['bits'].target),
+            block_value=bitcoind_work.value['subsidy']*1e-8,
         ))
         
         with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
