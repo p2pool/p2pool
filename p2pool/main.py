@@ -708,11 +708,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     addrs.update(dict((tuple(k), v) for k, v in json.loads(f.read())))
             except:
                 print >>sys.stderr, 'error parsing addrs'
-        elif os.path.exists(os.path.join(datadir_path, 'addrs.txt')):
-            try:
-                addrs.update(dict(eval(x) for x in open(os.path.join(datadir_path, 'addrs.txt'))))
-            except:
-                print >>sys.stderr, "error reading addrs.txt"
         for addr_df in map(parse, net.BOOTSTRAP_ADDRS):
             try:
                 addr = yield addr_df
