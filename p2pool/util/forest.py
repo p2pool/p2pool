@@ -229,10 +229,6 @@ class Tracker(object):
         delta = self.get_delta_to_last(share_hash)
         return delta.height, delta.tail
     
-    def get_height_work_and_last(self, share_hash):
-        delta = self.get_delta_to_last(share_hash)
-        return delta.height, delta.work, delta.tail
-    
     def _get_delta(self, share_hash):
         if share_hash in self.deltas:
             delta1, ref = self.deltas[share_hash]
