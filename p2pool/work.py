@@ -223,6 +223,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         merkle_root = bitcoin_data.check_merkle_link(bitcoin_data.hash256(packed_generate_tx), self.current_work.value['merkle_link'])
         
         getwork_time = time.time()
+        lp_count = self.new_work_event.times
         merkle_link = self.current_work.value['merkle_link']
         
         print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
@@ -263,7 +264,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             assert header['previous_block'] == previous_block
             assert header['bits'] == bits
             
-            on_time = self.best_share_var.value == share_info['share_data']['previous_share_hash']
+            on_time = self.new_work_event.times == lp_count
             
             for aux_work, index, hashes in mm_later:
                 try:
