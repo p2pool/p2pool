@@ -1,4 +1,5 @@
 from __future__ import division
+from threading import Thread
 
 import ConfigParser
 import StringIO
@@ -392,6 +393,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 peer.send_bestblock(header=header)
         
         def broadcast_share(share_hash):
+            def threadSend(peer,share):
+                peer.sendShares(share)
+                
             shares = []
             for share in tracker.get_chain(share_hash, min(5, tracker.get_height(share_hash))):
                 if share.hash in shared_share_hashes:
@@ -400,7 +404,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares.append(share)
             
             for peer in p2p_node.peers.itervalues():
-                peer.sendShares([share for share in shares if share.peer is not peer])
+                ttt=Thread(target=threadSend, args=(peer,[share for share in shares if share.peer is not peer]))
+                ttt.start()
         
         # send share when the chain changes to their chain
         best_share_var.changed.watch(broadcast_share)
