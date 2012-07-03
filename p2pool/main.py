@@ -404,7 +404,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares.append(share)
             
             for peer in p2p_node.peers.itervalues():
-                reactor.callInThread(threadSend(peer,[share for share in shares if share.peer is not peer]))
+                reactor.callInThread(threadSend, (peer,[share for share in shares if share.peer is not peer]))
                 reactor.run()
         
         # send share when the chain changes to their chain
