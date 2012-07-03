@@ -403,7 +403,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares.append(share)
             
             for peer in p2p_node.peers.itervalues():
-                reactor.callFromThread(threadSend, (peer,[share for share in shares if share.peer is not peer]))
+                reactor.callLater(0,threadSend, (peer,[share for share in shares if share.peer is not peer]))
                         
         # send share when the chain changes to their chain
         best_share_var.changed.watch(broadcast_share)
