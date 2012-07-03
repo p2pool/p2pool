@@ -63,7 +63,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @deferral.retry('Error while checking Bitcoin connection:', 1)
         @defer.inlineCallbacks
         def check():
-            if not (yield net.PARENT.RPC_CHECK)(bitcoind):
+            if not (yield net.PARENT.RPC_CHECK(bitcoind)):
                 print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
                 raise deferral.RetrySilentlyException()
             temp_work = yield getwork(bitcoind)
