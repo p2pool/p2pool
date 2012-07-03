@@ -1,5 +1,4 @@
 from __future__ import division
-from twisted.internet import reactor
 
 import ConfigParser
 import StringIO
@@ -405,8 +404,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             
             for peer in p2p_node.peers.itervalues():
                 reactor.callInThread(threadSend, (peer,[share for share in shares if share.peer is not peer]))
-                reactor.run()
-        
+                        
         # send share when the chain changes to their chain
         best_share_var.changed.watch(broadcast_share)
         
