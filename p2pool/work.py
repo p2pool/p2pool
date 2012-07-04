@@ -14,7 +14,7 @@ from util import jsonrpc, variable, deferral, math, pack
 import p2pool, p2pool.data as p2pool_data
 
 class WorkerBridge(worker_interface.WorkerBridge):
-    def __init__(self, my_pubkey_hash, net, donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, worker_fee, p2p_node, submit_block, set_best_share, shared_share_hashes, block_height_var):
+    def __init__(self, my_pubkey_hash, net, donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, worker_fee, p2p_node, submit_block, set_best_share, broadcast_share, block_height_var):
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
@@ -31,7 +31,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.p2p_node = p2p_node
         self.submit_block = submit_block
         self.set_best_share = set_best_share
-        self.shared_share_hashes = shared_share_hashes
+        self.broadcast_share = broadcast_share
         self.block_height_var = block_height_var
         
         self.pseudoshare_received = variable.Event()
@@ -319,9 +319,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 
                 try:
                     if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                        for peer in self.p2p_node.peers.itervalues():
-                            peer.sendShares([share])
-                        self.shared_share_hashes.add(share.hash)
+                        self.broadcast_share(share.hash)
                 except:
                     log.err(None, 'Error forwarding block solution:')
                 
