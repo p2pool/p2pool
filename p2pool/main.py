@@ -649,6 +649,7 @@ def run():
     
     if args.debug:
         p2pool.DEBUG = True
+        defer.setDebugging(True)
     
     net_name = args.net_name + ('_testnet' if args.testnet else '')
     net = networks.nets[net_name]
