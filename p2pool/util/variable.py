@@ -66,10 +66,12 @@ class Variable(object):
         self.changed.happened(value)
         self.transitioned.happened(oldvalue, value)
     
+    @defer.inlineCallbacks
+    def get_when_satisfies(self, func):
+        while True:
+            if func(self.value):
+                defer.returnValue(self.value)
+            yield self.changed.once.get_deferred()
+    
     def get_not_none(self):
-        if self.value is not None:
-            return defer.succeed(self.value)
-        else:
-            df = defer.Deferred()
-            self.changed.once.watch(df.callback)
-            return df
+        return self.get_when_satisfies(lambda val: val is not None)

@@ -9,7 +9,7 @@ from twisted.internet import protocol
 from twisted.python import log
 
 import p2pool
-from p2pool.util import datachunker
+from p2pool.util import datachunker, variable
 
 class TooLong(Exception):
     pass
@@ -19,6 +19,19 @@ class Protocol(protocol.Protocol):
         self._message_prefix = message_prefix
         self._max_payload_length = max_payload_length
         self.dataReceived = datachunker.DataChunker(self.dataReceiver())
+        self.paused_var = variable.Variable(False)
+    
+    def connectionMade(self):
+        self.transport.registerProducer(self, True)
+    
+    def pauseProducing(self):
+        self.paused_var.set(True)
+    
+    def resumeProducing(self):
+        self.paused_var.set(False)
+    
+    def stopProducing(self):
+        pass
     
     def dataReceiver(self):
         while True:
@@ -74,6 +87,7 @@ class Protocol(protocol.Protocol):
         if len(payload) > self._max_payload_length:
             raise TooLong('payload too long')
         self.transport.write(self._message_prefix + struct.pack('<12sI', command, len(payload)) + hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] + payload)
+        return self.paused_var.get_when_satisfies(lambda paused: not paused)
     
     def __getattr__(self, attr):
         prefix = 'send_'

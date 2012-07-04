@@ -391,6 +391,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             for peer in p2p_node.peers.itervalues():
                 peer.send_bestblock(header=header)
         
+        @defer.inlineCallbacks
         def broadcast_share(share_hash):
             shares = []
             for share in tracker.get_chain(share_hash, min(5, tracker.get_height(share_hash))):
@@ -399,8 +400,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shared_share_hashes.add(share.hash)
                 shares.append(share)
             
-            for peer in p2p_node.peers.itervalues():
-                peer.sendShares([share for share in shares if share.peer is not peer])
+            for peer in list(p2p_node.peers.itervalues()):
+                yield peer.sendShares([share for share in shares if share.peer is not peer])
         
         # send share when the chain changes to their chain
         best_share_var.changed.watch(broadcast_share)

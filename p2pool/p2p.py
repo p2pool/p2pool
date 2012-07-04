@@ -25,6 +25,8 @@ class Protocol(p2protocol.Protocol):
         self.connected2 = False
     
     def connectionMade(self):
+        p2protocol.Protocol.connectionMade(self)
+        
         self.factory.proto_made_connection(self)
         
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
@@ -205,12 +207,14 @@ class Protocol(p2protocol.Protocol):
     def sendShares(self, shares):
         def att(f, **kwargs):
             try:
-                f(**kwargs)
+                return f(**kwargs)
             except p2protocol.TooLong:
                 att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-                att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+                return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
         if shares:
-            att(self.send_shares, shares=[share.as_share() for share in shares])
+            return att(self.send_shares, shares=[share.as_share() for share in shares])
+        else:
+            return defer.succeed(None)
     
     
     message_sharereq = pack.ComposedType([
