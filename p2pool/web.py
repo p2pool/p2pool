@@ -6,14 +6,14 @@ import os
 import sys
 import time
 
-from twisted.internet import task
+from twisted.internet import defer, task
 from twisted.python import log
 from twisted.web import resource, static
 
 import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
-from util import graph, math
+from util import deferred_resource, graph, math
 
 def _atomic_read(filename):
     try:
@@ -176,19 +176,20 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
             warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net),
         )
     
-    class WebInterface(resource.Resource):
+    class WebInterface(deferred_resource.DeferredResource):
         def __init__(self, func, mime_type='application/json', args=()):
-            resource.Resource.__init__(self)
+            deferred_resource.DeferredResource.__init__(self)
             self.func, self.mime_type, self.args = func, mime_type, args
         
         def getChild(self, child, request):
             return WebInterface(self.func, self.mime_type, self.args + (child,))
         
+        @defer.inlineCallbacks
         def render_GET(self, request):
             request.setHeader('Content-Type', self.mime_type)
             request.setHeader('Access-Control-Allow-Origin', '*')
-            res = self.func(*self.args)
-            return json.dumps(res) if self.mime_type == 'application/json' else res
+            res = yield self.func(*self.args)
+            defer.returnValue(json.dumps(res) if self.mime_type == 'application/json' else res)
     
     web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(tracker, best_share_var.value, 720)/(1-p2pool_data.get_average_stale_prop(tracker, best_share_var.value, 720))))
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(tracker.items[best_share_var.value].max_target)))
@@ -199,6 +200,16 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
     web_root.putChild('peer_addresses', WebInterface(lambda: ['%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port) for peer in p2p_node.peers.itervalues()]))
+    web_root.putChild('pings', WebInterface(defer.inlineCallbacks(lambda: defer.returnValue(
+        dict([(a, (yield b)) for a, b in
+            [(
+                '%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port),
+                defer.inlineCallbacks(lambda peer=peer: defer.returnValue(
+                    min([(yield peer.do_ping().addCallback(lambda x: x/0.001).addErrback(lambda fail: None)) for i in xrange(3)])
+                ))()
+            ) for peer in list(p2p_node.peers.itervalues())]
+        ])
+    ))))
     web_root.putChild('peer_versions', WebInterface(lambda: dict(('%s:%i' % peer.addr, peer.other_sub_version) for peer in p2p_node.peers.itervalues())))
     web_root.putChild('payout_addr', WebInterface(lambda: bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)))
     web_root.putChild('recent_blocks', WebInterface(lambda: [dict(ts=s.timestamp, hash='%064x' % s.header_hash) for s in tracker.get_chain(best_share_var.value, 24*60*60//net.SHARE_PERIOD) if s.pow_hash <= s.header['bits'].target]))

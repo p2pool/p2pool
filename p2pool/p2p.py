@@ -5,7 +5,7 @@ import random
 import time
 
 from twisted.internet import defer, protocol, reactor
-from twisted.python import log
+from twisted.python import failure, log
 
 import p2pool
 from p2pool import data as p2pool_data
@@ -23,6 +23,8 @@ class Protocol(p2protocol.Protocol):
         
         self.other_version = None
         self.connected2 = False
+        
+        self.get_shares = deferral.GenericDeferrer(2**256, lambda id, hashes, parents, stops: self.send_sharereq(id=id, hashes=hashes, parents=parents, stops=stops))
     
     def connectionMade(self):
         p2protocol.Protocol.connectionMade(self)
@@ -236,7 +238,11 @@ class Protocol(p2protocol.Protocol):
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_sharereply(self, id, result, shares):
-        self.node.handle_share_reply(id, result, shares, self)
+        if result == 'good':
+            res = shares
+        else:
+            res = failure.Failure("sharereply result: " + result)
+        self.get_shares.got_response(id, res)
     
     message_bestblock = pack.ComposedType([
         ('header', bitcoin_data.block_header_type),
@@ -255,6 +261,14 @@ class Protocol(p2protocol.Protocol):
         self.factory.proto_lost_connection(self, reason)
         if p2pool.DEBUG:
             print "Peer connection lost:", self.addr, reason
+        self.get_shares.respond_all(reason)
+    
+    @defer.inlineCallbacks
+    def do_ping(self):
+        start = reactor.seconds()
+        yield self.get_shares(hashes=[0], parents=0, stops=[])
+        end = reactor.seconds()
+        defer.returnValue(end - start)
 
 class ServerFactory(protocol.ServerFactory):
     def __init__(self, node, max_conns):
@@ -481,9 +495,6 @@ class Node(object):
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         print 'handle_get_shares', (hashes, parents, stops, peer)
-    
-    def handle_share_reply(self, id, result, shares, peer):
-        raise PeerMisbehavingError('sent share reply without being sent a request')
     
     def handle_bestblock(self, header, peer):
         print 'handle_bestblock', header

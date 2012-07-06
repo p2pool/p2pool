@@ -114,6 +114,12 @@ class GenericDeferrer(object):
         df, timer = self.map.pop(id)
         timer.cancel()
         df.callback(resp)
+    
+    def respond_all(self, resp):
+        while self.map:
+            df, timer = self.map.popitem()
+            timer.cancel()
+            df.errback(resp)
 
 class NotNowError(Exception):
     pass
