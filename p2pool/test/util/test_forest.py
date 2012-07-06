@@ -76,9 +76,6 @@ class FakeShare(object):
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
         self._attrs = kwargs
-    
-    def __repr__(self):
-        return 'FakeShare(' + ', '.join('%s=%r' % (k, v) for k, v in self._attrs.iteritems()) + ')'
 
 def test_tracker(self):
     t = DumbTracker(self.items.itervalues())

@@ -20,10 +20,7 @@ class Test(unittest.TestCase):
             test = random_str(length)
             a = sha256.sha256(test).hexdigest()
             b = hashlib.sha256(test).hexdigest()
-            #print length, a, b
-            if a != b:
-                print 'ERROR!'
-                raise ValueError()
+            assert a == b
         for i in xrange(100):
             test = random_str(int(random.expovariate(1/100)))
             test2 = random_str(int(random.expovariate(1/100)))
@@ -37,7 +34,4 @@ class Test(unittest.TestCase):
             b = b.copy()
             b.update(test2)
             b = b.hexdigest()
-            #print a, b
-            if a != b:
-                print 'ERROR!'
-                raise ValueError()
+            assert a == b
