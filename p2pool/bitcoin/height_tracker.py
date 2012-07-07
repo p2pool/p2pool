@@ -59,7 +59,7 @@ class HeightTracker(object):
         changed = False
         for header in headers:
             hw = HeaderWrapper.from_header(header)
-            if hw.hash in self._tracker.shares:
+            if hw.hash in self._tracker.items:
                 continue
             changed = True
             self._tracker.add(hw)
@@ -67,13 +67,13 @@ class HeightTracker(object):
             self.updated.happened()
         self._think()
         
-        if len(self._tracker.shares) >= self._last_notified_size + 100:
-            print 'Have %i/%i block headers' % (len(self._tracker.shares), self._backlog_needed)
-            self._last_notified_size = len(self._tracker.shares)
+        if len(self._tracker.items) >= self._last_notified_size + 100:
+            print 'Have %i/%i block headers' % (len(self._tracker.items), self._backlog_needed)
+            self._last_notified_size = len(self._tracker.items)
     
     @defer.inlineCallbacks
     def _request(self, last):
-        if last in self._tracker.shares:
+        if last in self._tracker.items:
             return
         if last in self._requested:
             return

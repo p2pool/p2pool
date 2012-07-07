@@ -114,7 +114,7 @@ class Share(object):
     
     @classmethod
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, net):
-        previous_share = tracker.shares[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
+        previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
         assert height >= net.REAL_CHAIN_LENGTH or last is None
@@ -256,7 +256,7 @@ class WeightsSkipList(forest.TrackerSkipList):
     
     def get_delta(self, element):
         from p2pool.bitcoin import data as bitcoin_data
-        share = self.tracker.shares[element]
+        share = self.tracker.items[element]
         att = bitcoin_data.target_to_average_attempts(share.target)
         return 1, {share.new_script: att*(65535-share.share_data['donation'])}, att*65535, att*share.share_data['donation']
     
@@ -305,7 +305,7 @@ class OkayTracker(forest.Tracker):
         self.get_cumulative_weights = WeightsSkipList(self)
     
     def attempt_verify(self, share):
-        if share.hash in self.verified.shares:
+        if share.hash in self.verified.items:
             return True
         height, last = self.get_height_and_last(share.hash)
         if height < self.net.CHAIN_LENGTH + 1 and last is not None:
@@ -339,13 +339,13 @@ class OkayTracker(forest.Tracker):
             else:
                 if last is not None:
                     desired.add((
-                        self.shares[random.choice(list(self.reverse_shares[last]))].peer,
+                        self.items[random.choice(list(self.reverse[last]))].peer,
                         last,
                         max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
                         min(x.target for x in self.get_chain(head, min(head_height, 5))),
                     ))
         for bad in bads:
-            assert bad not in self.verified.shares
+            assert bad not in self.verified.items
             assert bad in self.heads
             if p2pool.DEBUG:
                 print "BAD", bad
@@ -365,7 +365,7 @@ class OkayTracker(forest.Tracker):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((
-                    self.shares[random.choice(list(self.verified.reverse_shares[last_hash]))].peer,
+                    self.items[random.choice(list(self.verified.reverse[last_hash]))].peer,
                     last_last_hash,
                     max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
                     min(x.target for x in self.get_chain(head, min(head_height, 5))),
@@ -382,15 +382,15 @@ class OkayTracker(forest.Tracker):
         # decide best verified head
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-            #self.shares[h].peer is None,
-            self.shares[h].pow_hash <= self.shares[h].header['bits'].target, # is block solution
-            (self.shares[h].header['previous_block'], self.shares[h].header['bits']) == (previous_block, bits) or self.shares[h].peer is None,
-            -self.shares[h].time_seen,
+            #self.items[h].peer is None,
+            self.items[h].pow_hash <= self.items[h].header['bits'].target, # is block solution
+            (self.items[h].header['previous_block'], self.items[h].header['bits']) == (previous_block, bits) or self.items[h].peer is None,
+            -self.items[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
             print len(decorated_heads), 'heads. Top 10:'
             for score, head_hash in decorated_heads[-10:]:
-                print '   ', format_hash(head_hash), format_hash(self.shares[head_hash].previous_hash), score
+                print '   ', format_hash(head_hash), format_hash(self.items[head_hash].previous_hash), score
         best_head_score, best = decorated_heads[-1] if decorated_heads else (None, None)
         
         # eat away at heads
@@ -401,17 +401,17 @@ class OkayTracker(forest.Tracker):
                     if share_hash in [head_hash for score, head_hash in decorated_heads[-5:]]:
                         #print 1
                         continue
-                    if self.shares[share_hash].time_seen > time.time() - 300:
+                    if self.items[share_hash].time_seen > time.time() - 300:
                         #print 2
                         continue
-                    if share_hash not in self.verified.shares and max(self.shares[after_tail_hash].time_seen for after_tail_hash in self.reverse_shares.get(tail)) > time.time() - 120: # XXX stupid
+                    if share_hash not in self.verified.items and max(self.items[after_tail_hash].time_seen for after_tail_hash in self.reverse.get(tail)) > time.time() - 120: # XXX stupid
                         #print 3
                         continue
                     to_remove.add(share_hash)
                 if not to_remove:
                     break
                 for share_hash in to_remove:
-                    if share_hash in self.verified.shares:
+                    if share_hash in self.verified.items:
                         self.verified.remove(share_hash)
                     self.remove(share_hash)
                 #print "_________", to_remove
@@ -422,8 +422,8 @@ class OkayTracker(forest.Tracker):
             for tail, heads in self.tails.iteritems():
                 if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
                     continue
-                for aftertail in self.reverse_shares.get(tail, set()):
-                    if len(self.reverse_shares[self.shares[aftertail].previous_hash]) > 1: # XXX
+                for aftertail in self.reverse.get(tail, set()):
+                    if len(self.reverse[self.items[aftertail].previous_hash]) > 1: # XXX
                         print "raw"
                         continue
                     to_remove.add(aftertail)
@@ -432,17 +432,17 @@ class OkayTracker(forest.Tracker):
             # if removed from this, it must be removed from verified
             #start = time.time()
             for aftertail in to_remove:
-                if self.shares[aftertail].previous_hash not in self.tails:
-                    print "erk", aftertail, self.shares[aftertail].previous_hash
+                if self.items[aftertail].previous_hash not in self.tails:
+                    print "erk", aftertail, self.items[aftertail].previous_hash
                     continue
-                if aftertail in self.verified.shares:
+                if aftertail in self.verified.items:
                     self.verified.remove(aftertail)
                 self.remove(aftertail)
             #end = time.time()
             #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
         
         if best is not None:
-            best_share = self.shares[best]
+            best_share = self.items[best]
             if (best_share.header['previous_block'], best_share.header['bits']) != (previous_block, bits) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
@@ -477,8 +477,8 @@ class OkayTracker(forest.Tracker):
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False, integer=False):
     assert dist >= 2
-    near = tracker.shares[previous_share_hash]
-    far = tracker.shares[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
+    near = tracker.items[previous_share_hash]
+    far = tracker.items[tracker.get_nth_parent_hash(previous_share_hash, dist - 1)]
     attempts = tracker.get_delta(near.hash, far.hash).work if not min_work else tracker.get_delta(near.hash, far.hash).min_work
     time = near.timestamp - far.timestamp
     if time <= 0:
@@ -499,7 +499,7 @@ def get_stale_counts(tracker, share_hash, lookbehind, rates=False):
         if s is not None:
             res[s] = res.get(s, 0) + bitcoin_data.target_to_average_attempts(share.target)
     if rates:
-        dt = tracker.shares[share_hash].timestamp - tracker.shares[tracker.get_nth_parent_hash(share_hash, lookbehind - 1)].timestamp
+        dt = tracker.items[share_hash].timestamp - tracker.items[tracker.get_nth_parent_hash(share_hash, lookbehind - 1)].timestamp
         res = dict((k, v/dt) for k, v in res.iteritems())
     return res
 

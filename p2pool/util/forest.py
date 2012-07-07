@@ -14,10 +14,10 @@ class TrackerSkipList(skiplist.SkipList):
         self.tracker = tracker
         
         self_ref = weakref.ref(self, lambda _: tracker.removed.unwatch(watch_id))
-        watch_id = self.tracker.removed.watch(lambda share: self_ref().forget_item(share.hash))
+        watch_id = self.tracker.removed.watch(lambda item: self_ref().forget_item(item.hash))
     
     def previous(self, element):
-        return self.tracker.delta_type.from_element(self.tracker.shares[element]).tail
+        return self.tracker.delta_type.from_element(self.tracker.items[element]).tail
 
 
 class DistanceSkipList(TrackerSkipList):
@@ -58,8 +58,8 @@ def get_attributedelta_type(attrs): # attrs: {name: func}
             return cls(element_id, element_id, **dict((k, 0) for k in attrs))
         
         @classmethod
-        def from_element(cls, share):
-            return cls(share.hash, share.previous_hash, **dict((k, v(share)) for k, v in attrs.iteritems()))
+        def from_element(cls, item):
+            return cls(item.hash, item.previous_hash, **dict((k, v(item)) for k, v in attrs.iteritems()))
         
         def __init__(self, head, tail, **kwargs):
             self.head, self.tail = head, tail
@@ -88,15 +88,15 @@ AttributeDelta = get_attributedelta_type(dict(
 ))
 
 class Tracker(object):
-    def __init__(self, shares=[], delta_type=AttributeDelta, subset_of=None):
-        self.shares = {} # hash -> share
-        self.reverse_shares = {} # delta.tail -> set of share_hashes
+    def __init__(self, items=[], delta_type=AttributeDelta, subset_of=None):
+        self.items = {} # hash -> item
+        self.reverse = {} # delta.tail -> set of item_hashes
         
         self.heads = {} # head hash -> tail_hash
         self.tails = {} # tail hash -> set of head hashes
         
-        self.deltas = {} # share_hash -> delta, ref
-        self.reverse_deltas = {} # ref -> set of share_hashes
+        self.deltas = {} # item_hash -> delta, ref
+        self.reverse_deltas = {} # ref -> set of item_hashes
         
         self.ref_generator = itertools.count()
         self.delta_refs = {} # ref -> delta
@@ -113,17 +113,17 @@ class Tracker(object):
         self.delta_type = delta_type
         self.subset_of = subset_of
         
-        for share in shares:
-            self.add(share)
+        for item in items:
+            self.add(item)
     
-    def add(self, share):
-        assert not isinstance(share, (int, long, type(None)))
-        delta = self.delta_type.from_element(share)
+    def add(self, item):
+        assert not isinstance(item, (int, long, type(None)))
+        delta = self.delta_type.from_element(item)
         if self.subset_of is not None:
-            assert delta.head in self.subset_of.shares
+            assert delta.head in self.subset_of.items
         
-        if delta.head in self.shares:
-            raise ValueError('share already present')
+        if delta.head in self.items:
+            raise ValueError('item already present')
         
         if delta.head in self.tails:
             heads = self.tails.pop(delta.head)
@@ -135,8 +135,8 @@ class Tracker(object):
         else:
             tail = self.get_last(delta.tail)
         
-        self.shares[delta.head] = share
-        self.reverse_shares.setdefault(delta.tail, set()).add(delta.head)
+        self.items[delta.head] = item
+        self.reverse.setdefault(delta.tail, set()).add(delta.head)
         
         self.tails.setdefault(tail, set()).update(heads)
         if delta.tail in self.tails[tail]:
@@ -145,21 +145,21 @@ class Tracker(object):
         for head in heads:
             self.heads[head] = tail
         
-        self.added.happened(share)
+        self.added.happened(item)
     
-    def remove(self, share_hash):
-        assert isinstance(share_hash, (int, long, type(None)))
-        if share_hash not in self.shares:
+    def remove(self, item_hash):
+        assert isinstance(item_hash, (int, long, type(None)))
+        if item_hash not in self.items:
             raise KeyError()
         if self.subset_of is not None:
-            assert share_hash in self.subset_of.shares
+            assert item_hash in self.subset_of.items
         
-        share = self.shares[share_hash]
-        del share_hash
+        item = self.items[item_hash]
+        del item_hash
         
-        delta = self.delta_type.from_element(share)
+        delta = self.delta_type.from_element(item)
         
-        children = self.reverse_shares.get(delta.head, set())
+        children = self.reverse.get(delta.head, set())
         
         if delta.head in self.heads and delta.tail in self.tails:
             tail = self.heads.pop(delta.head)
@@ -169,12 +169,12 @@ class Tracker(object):
         elif delta.head in self.heads:
             tail = self.heads.pop(delta.head)
             self.tails[tail].remove(delta.head)
-            if self.reverse_shares[delta.tail] != set([delta.head]):
+            if self.reverse[delta.tail] != set([delta.head]):
                 pass # has sibling
             else:
                 self.tails[tail].add(delta.tail)
                 self.heads[delta.tail] = tail
-        elif delta.tail in self.tails and len(self.reverse_shares[delta.tail]) <= 1:
+        elif delta.tail in self.tails and len(self.reverse[delta.tail]) <= 1:
             # move delta refs referencing children down to this, so they can be moved up in one step
             if delta.tail in self.reverse_delta_refs:
                 for x in list(self.reverse_deltas.get(self.reverse_delta_refs.get(delta.head, object()), set())):
@@ -193,7 +193,7 @@ class Tracker(object):
                 ref = self.reverse_delta_refs[delta.tail]
                 cur_delta = self.delta_refs[ref]
                 assert cur_delta.tail == delta.tail
-                self.delta_refs[ref] = cur_delta - self.delta_type.from_element(share)
+                self.delta_refs[ref] = cur_delta - self.delta_type.from_element(item)
                 assert self.delta_refs[ref].tail == delta.head
                 del self.reverse_delta_refs[delta.tail]
                 self.reverse_delta_refs[delta.head] = ref
@@ -209,64 +209,64 @@ class Tracker(object):
                 delta2 = self.delta_refs.pop(ref)
                 del self.reverse_delta_refs[delta2.tail]
         
-        self.shares.pop(delta.head)
-        self.reverse_shares[delta.tail].remove(delta.head)
-        if not self.reverse_shares[delta.tail]:
-            self.reverse_shares.pop(delta.tail)
+        self.items.pop(delta.head)
+        self.reverse[delta.tail].remove(delta.head)
+        if not self.reverse[delta.tail]:
+            self.reverse.pop(delta.tail)
         
-        self.removed.happened(share)
+        self.removed.happened(item)
     
-    def get_height(self, share_hash):
-        return self.get_delta_to_last(share_hash).height
+    def get_height(self, item_hash):
+        return self.get_delta_to_last(item_hash).height
     
-    def get_work(self, share_hash):
-        return self.get_delta_to_last(share_hash).work
+    def get_work(self, item_hash):
+        return self.get_delta_to_last(item_hash).work
     
-    def get_last(self, share_hash):
-        return self.get_delta_to_last(share_hash).tail
+    def get_last(self, item_hash):
+        return self.get_delta_to_last(item_hash).tail
     
-    def get_height_and_last(self, share_hash):
-        delta = self.get_delta_to_last(share_hash)
+    def get_height_and_last(self, item_hash):
+        delta = self.get_delta_to_last(item_hash)
         return delta.height, delta.tail
     
-    def _get_delta(self, share_hash):
-        if share_hash in self.deltas:
-            delta1, ref = self.deltas[share_hash]
+    def _get_delta(self, item_hash):
+        if item_hash in self.deltas:
+            delta1, ref = self.deltas[item_hash]
             delta2 = self.delta_refs[ref]
             res = delta1 + delta2
         else:
-            res = self.delta_type.from_element(self.shares[share_hash])
-        assert res.head == share_hash
+            res = self.delta_type.from_element(self.items[item_hash])
+        assert res.head == item_hash
         return res
     
-    def _set_delta(self, share_hash, delta):
-        other_share_hash = delta.tail
-        if other_share_hash not in self.reverse_delta_refs:
+    def _set_delta(self, item_hash, delta):
+        other_item_hash = delta.tail
+        if other_item_hash not in self.reverse_delta_refs:
             ref = self.ref_generator.next()
             assert ref not in self.delta_refs
-            self.delta_refs[ref] = self.delta_type.get_none(other_share_hash)
-            self.reverse_delta_refs[other_share_hash] = ref
+            self.delta_refs[ref] = self.delta_type.get_none(other_item_hash)
+            self.reverse_delta_refs[other_item_hash] = ref
             del ref
         
-        ref = self.reverse_delta_refs[other_share_hash]
+        ref = self.reverse_delta_refs[other_item_hash]
         ref_delta = self.delta_refs[ref]
-        assert ref_delta.tail == other_share_hash
+        assert ref_delta.tail == other_item_hash
         
-        if share_hash in self.deltas:
-            prev_ref = self.deltas[share_hash][1]
-            self.reverse_deltas[prev_ref].remove(share_hash)
+        if item_hash in self.deltas:
+            prev_ref = self.deltas[item_hash][1]
+            self.reverse_deltas[prev_ref].remove(item_hash)
             if not self.reverse_deltas[prev_ref] and prev_ref != ref:
                 self.reverse_deltas.pop(prev_ref)
                 x = self.delta_refs.pop(prev_ref)
                 self.reverse_delta_refs.pop(x.tail)
-        self.deltas[share_hash] = delta - ref_delta, ref
-        self.reverse_deltas.setdefault(ref, set()).add(share_hash)
+        self.deltas[item_hash] = delta - ref_delta, ref
+        self.reverse_deltas.setdefault(ref, set()).add(item_hash)
     
-    def get_delta_to_last(self, share_hash):
-        assert isinstance(share_hash, (int, long, type(None)))
-        delta = self.delta_type.get_none(share_hash)
+    def get_delta_to_last(self, item_hash):
+        assert isinstance(item_hash, (int, long, type(None)))
+        delta = self.delta_type.get_none(item_hash)
         updates = []
-        while delta.tail in self.shares:
+        while delta.tail in self.items:
             updates.append((delta.tail, delta))
             this_delta = self._get_delta(delta.tail)
             delta += this_delta
@@ -281,13 +281,13 @@ class Tracker(object):
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
         for i in xrange(length):
-            yield self.shares[start_hash]
-            start_hash = self.delta_type.from_element(self.shares[start_hash]).tail
+            yield self.items[start_hash]
+            start_hash = self.delta_type.from_element(self.items[start_hash]).tail
     
-    def is_child_of(self, share_hash, possible_child_hash):
-        height, last = self.get_height_and_last(share_hash)
+    def is_child_of(self, item_hash, possible_child_hash):
+        height, last = self.get_height_and_last(item_hash)
         child_height, child_last = self.get_height_and_last(possible_child_hash)
         if child_last != last:
             return None # not connected, so can't be determined
         height_up = child_height - height
-        return height_up >= 0 and self.get_nth_parent_hash(possible_child_hash, height_up) == share_hash
+        return height_up >= 0 and self.get_nth_parent_hash(possible_child_hash, height_up) == item_hash
