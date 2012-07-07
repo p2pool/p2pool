@@ -503,6 +503,17 @@ def get_stale_counts(tracker, share_hash, lookbehind, rates=False):
         res = dict((k, v/dt) for k, v in res.iteritems())
     return res
 
+def get_user_stale_props(tracker, share_hash, lookbehind):
+    res = {}
+    for share in tracker.get_chain(share_hash, lookbehind - 1):
+        stale, total = res.get(share.share_data['pubkey_hash'], (0, 0))
+        total += 1
+        if share.share_data['stale_info'] is not None:
+            stale += 1
+            total += 1
+        res[share.share_data['pubkey_hash']] = stale, total
+    return dict((pubkey_hash, stale/total) for pubkey_hash, (stale, total) in res.iteritems())
+
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
     weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
     res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())

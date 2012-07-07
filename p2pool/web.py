@@ -194,6 +194,8 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(tracker, best_share_var.value, 720)/(1-p2pool_data.get_average_stale_prop(tracker, best_share_var.value, 720))))
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(tracker.items[best_share_var.value].max_target)))
     web_root.putChild('users', WebInterface(get_users))
+    web_root.putChild('user_stales', WebInterface(lambda: dict((bitcoin_data.pubkey_hash_to_address(ph, net.PARENT), prop) for ph, prop in
+        p2pool_data.get_user_stale_props(tracker, best_share_var.value, tracker.get_height(best_share_var.value)).iteritems())))
     web_root.putChild('fee', WebInterface(lambda: worker_fee))
     web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_address(script, net.PARENT), value/1e8) for script, value in get_current_txouts().iteritems())))
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
