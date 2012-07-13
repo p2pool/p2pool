@@ -97,8 +97,8 @@ class WorkerInterface(object):
         
         self.merkle_root_to_handler[res.merkle_root] = handler
         
-        if res.timestamp + 12 < orig_timestamp + 600:
-            self.work_cache[key] = res.update(timestamp=res.timestamp + 12), orig_timestamp, handler
+        if res.timestamp + 120 < orig_timestamp + 1800:
+            self.work_cache[key] = res.update(timestamp=res.timestamp + 120), orig_timestamp, handler
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
