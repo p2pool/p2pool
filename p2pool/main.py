@@ -80,6 +80,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         yield poll_height()
         task.LoopingCall(poll_height).start(60*60)
         
+        bitcoind_warning_var = variable.Variable(None)
+        @defer.inlineCallbacks
+        def poll_warnings():
+            errors = (yield deferral.retry('Error while calling getmininginfo:')(bitcoind.rpc_getmininginfo)())['errors']
+            bitcoind_warning_var.set(errors if errors != '' else None)
+        yield poll_warnings()
+        task.LoopingCall(poll_warnings).start(20*60)
+        
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block'],)
         print '    Current block height: %i' % (block_height_var.value,)
@@ -440,7 +448,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, best_share_var.value, bitcoind_work.value['bits'].target, bitcoind_work.value['subsidy'], net)
         
         wb = work.WorkerBridge(my_pubkey_hash, net, args.donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, args.worker_fee, p2p_node, submit_block, set_best_share, broadcast_share, block_height_var)
-        web_root = web.get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, wb.get_stale_counts, my_pubkey_hash, wb.local_rate_monitor, args.worker_fee, p2p_node, wb.my_share_hashes, wb.pseudoshare_received, wb.share_received, best_share_var)
+        web_root = web.get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, wb.get_stale_counts, my_pubkey_hash, wb.local_rate_monitor, args.worker_fee, p2p_node, wb.my_share_hashes, wb.pseudoshare_received, wb.share_received, best_share_var, bitcoind_warning_var)
         worker_interface.WorkerInterface(wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
         
         deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], server.Site(web_root), interface=worker_endpoint[0])
@@ -554,7 +562,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             math.format_dt(2**256 / bitcoind_work.value['bits'].target / real_att_s),
                         )
                         
-                        for warning in p2pool_data.get_warnings(tracker, best_share_var.value, net):
+                        for warning in p2pool_data.get_warnings(tracker, best_share_var.value, net, bitcoind_warning_var.value):
                             print >>sys.stderr, '#'*40
                             print >>sys.stderr, '>>> Warning: ' + warning
                             print >>sys.stderr, '#'*40
