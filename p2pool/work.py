@@ -64,7 +64,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 30)(merged_proxy.rpc_getauxblock)()
                 self.merged_work.set(dict(self.merged_work.value, **{auxblock['chainid']: dict(
                     hash=int(auxblock['hash'], 16),
-                    target=pack.IntType(256).unpack(auxblock['target'].decode('hex')),
+                    target='p2pool' if auxblock['target'] == 'p2pool' else pack.IntType(256).unpack(auxblock['target'].decode('hex')),
                     merged_proxy=merged_proxy,
                 )}))
                 yield deferral.sleep(1)
@@ -205,6 +205,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 net=self.net,
             )
         
+        mm_later = [(dict(aux_work, target=aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target), index, hashes) for aux_work, index, hashes in mm_later]
+        
         if desired_pseudoshare_target is None:
             target = 2**256-1
             if len(self.recent_shares_ts_work) == 50:
@@ -214,7 +216,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         else:
             target = desired_pseudoshare_target
         target = max(target, share_info['bits'].target)
-        for aux_work in self.merged_work.value.itervalues():
+        for aux_work, index, hashes in mm_later:
             target = max(target, aux_work['target'])
         target = math.clip(target, self.net.PARENT.SANE_TARGET_RANGE)
         

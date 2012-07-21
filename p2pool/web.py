@@ -311,6 +311,12 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in tracker.tails for x in tracker.reverse.get(t, set())]))
     new_root.putChild('verified_tails', WebInterface(lambda: ['%064x' % x for t in tracker.verified.tails for x in tracker.verified.reverse.get(t, set())]))
     new_root.putChild('best_share_hash', WebInterface(lambda: '%064x' % best_share_var.value))
+    def get_share_data(share_hash_str):
+        if int(share_hash_str, 16) not in tracker.items:
+            return ''
+        share = tracker.items[int(share_hash_str, 16)]
+        return p2pool_data.share_type.pack(share.as_share1a())
+    new_root.putChild('share_data', WebInterface(lambda share_hash_str: get_share_data(share_hash_str), 'application/octet-stream'))
     new_root.putChild('currency_info', WebInterface(lambda: dict(
         symbol=net.PARENT.SYMBOL,
         block_explorer_url_prefix=net.PARENT.BLOCK_EXPLORER_URL_PREFIX,
