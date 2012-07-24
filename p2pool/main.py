@@ -203,7 +203,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         def poll_header():
             handle_header((yield factory.conn.value.get_block_header(bitcoind_work.value['previous_block'])))
         bitcoind_work.changed.watch(lambda _: poll_header())
-        yield poll_header()
+        yield deferral.retry('Error while requesting best block header:')(poll_header)()
         
         # BEST SHARE
         
