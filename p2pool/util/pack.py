@@ -209,15 +209,18 @@ class IntType(Type):
 class IPV6AddressType(Type):
     def read(self, file):
         data, file = read(file, 16)
-        if data[:12] != '00000000000000000000ffff'.decode('hex'):
-            raise ValueError('ipv6 addresses not supported yet')
-        return '.'.join(str(ord(x)) for x in data[12:]), file
+        if data[:12] == '00000000000000000000ffff'.decode('hex'):
+            return '.'.join(str(ord(x)) for x in data[12:]), file
+        return ':'.join(data[i*2:(i+1)*2].encode('hex') for i in xrange(8)), file
     
     def write(self, file, item):
-        bits = map(int, item.split('.'))
-        if len(bits) != 4:
-            raise ValueError('invalid address: %r' % (bits,))
-        data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
+        if ':' in item:
+            data = ''.join(item.replace(':', '')).decode('hex')
+        else:
+            bits = map(int, item.split('.'))
+            if len(bits) != 4:
+                raise ValueError('invalid address: %r' % (bits,))
+            data = '00000000000000000000ffff'.decode('hex') + ''.join(chr(x) for x in bits)
         assert len(data) == 16, len(data)
         return file, data
 
