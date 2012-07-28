@@ -284,7 +284,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                             )).encode('hex'),
                         )
                         @df.addCallback
-                        def _(result):
+                        def _(result, aux_work=aux_work):
                             if result != (pow_hash <= aux_work['target']):
                                 print >>sys.stderr, 'Merged block submittal result: %s Expected: %s' % (result, pow_hash <= aux_work['target'])
                             else:
