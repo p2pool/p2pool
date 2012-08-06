@@ -38,7 +38,6 @@ def getwork(bitcoind):
         raise
     packed_transactions = [x.decode('hex') for x in work['transactions']]
     defer.returnValue(dict(
-        version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
         merkle_link=bitcoin_data.calculate_merkle_link([None] + map(bitcoin_data.hash256, packed_transactions), 0),
