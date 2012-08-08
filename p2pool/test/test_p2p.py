@@ -13,16 +13,11 @@ class MyNode(p2p.Node):
         self.df = df
     
     def handle_share_hashes(self, hashes, peer):
-        peer.send_sharereq(
-            id=self.id_to_use,
+        peer.get_shares(
             hashes=[hashes[0]],
             parents=5,
             stops=[],
-        )
-    
-    def handle_share_reply(self, id, result, shares, peer):
-        if id == self.id_to_use:
-            self.df.callback(None)
+        ).chainDeferred(self.df)
 
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
