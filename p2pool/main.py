@@ -37,6 +37,8 @@ def getwork(bitcoind):
             raise deferral.RetrySilentlyException()
         raise
     packed_transactions = [x.decode('hex') for x in work['transactions']]
+    if 'height' not in work:
+        work['height'] = (yield bitcoind.rpc_getblock(work['previousblockhash']))['height'] + 1
     defer.returnValue(dict(
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
@@ -45,6 +47,7 @@ def getwork(bitcoind):
         time=work['time'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
+        height=work['height'],
         clock_offset=time.time() - work['time'],
         last_update=time.time(),
     ))

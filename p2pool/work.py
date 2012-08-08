@@ -9,7 +9,7 @@ from twisted.internet import defer
 from twisted.python import log
 
 import bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
-from bitcoin import worker_interface
+from bitcoin import script, worker_interface
 from util import jsonrpc, variable, deferral, math, pack
 import p2pool, p2pool.data as p2pool_data
 
@@ -79,8 +79,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         self.current_work = variable.Variable(None)
         def compute_work():
-            t = dict(self.bitcoind_work.value)
-            
+            t = self.bitcoind_work.value
             bb = self.best_block_header.value
             if bb is not None and bb['previous_block'] == t['previous_block'] and net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(bb)) <= t['bits'].target:
                 print 'Skipping from block %x to block %x!' % (bb['previous_block'],
@@ -89,6 +88,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     previous_block=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(bb)),
                     bits=bb['bits'], # not always true
                     coinbaseflags='',
+                    height=t['height'] + 1,
                     time=bb['timestamp'] + 600, # better way?
                     transactions=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
@@ -185,7 +185,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 tracker=self.tracker,
                 share_data=dict(
                     previous_share_hash=self.best_share_var.value,
-                    coinbase=(mm_data + self.current_work.value['coinbaseflags'])[:100],
+                    coinbase=(script.create_push_script([
+                        self.current_work.value['height'],
+                        mm_data,
+                    ]) + self.current_work.value['coinbaseflags'])[:100],
                     nonce=random.randrange(2**32),
                     pubkey_hash=pubkey_hash,
                     subsidy=self.current_work.value['subsidy'],
@@ -237,7 +240,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         bits = self.current_work.value['bits']
         previous_block = self.current_work.value['previous_block']
         ba = bitcoin_getwork.BlockAttempt(
-            version=1,
+            version=2,
             previous_block=self.current_work.value['previous_block'],
             merkle_root=merkle_root,
             timestamp=self.current_work.value['time'],
