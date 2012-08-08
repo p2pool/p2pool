@@ -179,7 +179,7 @@ def natural_to_string(n, alphabet=None):
     if n < 0:
         raise TypeError('n must be a natural')
     if alphabet is None:
-        s = '%x' % (n,)
+        s = ('%x' % (n,)).lstrip('0')
         if len(s) % 2:
             s = '0' + s
         return s.decode('hex')

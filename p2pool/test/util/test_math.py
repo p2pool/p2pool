@@ -21,7 +21,11 @@ class Test(unittest.TestCase):
         for i in xrange(10):
             alphabet = generate_alphabet()
             for i in xrange(100):
-                n = random.randrange(100000000000000000000000000000)
+                n = random.choice([
+                    random.randrange(3),
+                    random.randrange(300),
+                    random.randrange(100000000000000000000000000000),
+                ])
                 s = math.natural_to_string(n, alphabet)
                 n2 = math.string_to_natural(s, alphabet)
                 #print n, s.encode('hex'), n2
