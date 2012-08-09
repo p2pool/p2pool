@@ -173,7 +173,7 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
             ),
             uptime=time.time() - start_time,
             block_value=bitcoind_work.value['subsidy']*1e-8,
-            warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net, bitcoin_warning_var.value),
+            warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net, bitcoin_warning_var.value, bitcoind_work.value),
         )
     
     class WebInterface(deferred_resource.DeferredResource):

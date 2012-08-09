@@ -532,7 +532,7 @@ def get_desired_version_counts(tracker, best_share_hash, dist):
         res[share.desired_version] = res.get(share.desired_version, 0) + bitcoin_data.target_to_average_attempts(share.target)
     return res
 
-def get_warnings(tracker, best_share, net, bitcoind_warning):
+def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value):
     res = []
     
     desired_version_counts = get_desired_version_counts(tracker, best_share,
@@ -545,6 +545,9 @@ def get_warnings(tracker, best_share, net, bitcoind_warning):
     
     if bitcoind_warning is not None:
         res.append('(from bitcoind) %s' % (bitcoind_warning,))
+    
+    if time.time() > bitcoind_work_value['last_update'] + 60:
+        res.append('''LOST CONTACT WITH BITCOIND for %s! Check that it isn't frozen or dead!''' % (math.format_dt(time.time() - bitcoind_work_value['last_update']),))
     
     return res
 
