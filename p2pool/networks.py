@@ -56,7 +56,7 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=True,
         WORKER_PORT=9327,
-        BOOTSTRAP_ADDRS='forre.st liteco.in 219.84.64.174 190.195.79.161 83.104.131.111'.split(' '),
+        BOOTSTRAP_ADDRS='forre.st 178.33.28.54 219.84.64.174 190.195.79.161 83.104.131.111'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v, temp_work: True,
     ),
