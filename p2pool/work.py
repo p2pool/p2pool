@@ -85,6 +85,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 print 'Skipping from block %x to block %x!' % (bb['previous_block'],
                     bitcoin_data.hash256(bitcoin_data.block_header_type.pack(bb)))
                 t = dict(
+                    version=bb['version'],
                     previous_block=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(bb)),
                     bits=bb['bits'], # not always true
                     coinbaseflags='',
@@ -105,8 +106,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.new_work_event = variable.Event()
         @self.current_work.transitioned.watch
         def _(before, after):
-            # trigger LP if previous_block/bits changed or transactions changed from nothing
-            if any(before[x] != after[x] for x in ['previous_block', 'bits']) or (not before['transactions'] and after['transactions']):
+            # trigger LP if version/previous_block/bits changed or transactions changed from nothing
+            if any(before[x] != after[x] for x in ['version', 'previous_block', 'bits']) or (not before['transactions'] and after['transactions']):
                 self.new_work_event.happened()
         self.merged_work.changed.watch(lambda _: self.new_work_event.happened())
         self.best_share_var.changed.watch(lambda _: self.new_work_event.happened())
@@ -240,7 +241,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         bits = self.current_work.value['bits']
         previous_block = self.current_work.value['previous_block']
         ba = bitcoin_getwork.BlockAttempt(
-            version=2,
+            version=min(self.current_work.value['version'], 2),
             previous_block=self.current_work.value['previous_block'],
             merkle_root=merkle_root,
             timestamp=self.current_work.value['time'],
