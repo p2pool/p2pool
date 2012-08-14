@@ -28,27 +28,39 @@ import p2pool, p2pool.data as p2pool_data
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
-def getwork(bitcoind):
+def getwork(bitcoind, use_getblocktemplate=False):
+    def go():
+        if use_getblocktemplate:
+            return bitcoind.rpc_getblocktemplate({})
+        else:
+            return bitcoind.rpc_getmemorypool()
     try:
-        work = yield bitcoind.rpc_getmemorypool()
+        work = yield go()
     except jsonrpc.Error_for_code(-32601): # Method not found
-        print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
-        raise deferral.RetrySilentlyException()
-    packed_transactions = [x.decode('hex') for x in work['transactions']]
+        use_getblocktemplate = not use_getblocktemplate
+        try:
+            work = yield go()
+        except jsonrpc.Error_for_code(-32601): # Method not found
+            print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
+            raise deferral.RetrySilentlyException()
+    packed_transactions = [(x['data'] if isinstance(x, dict) else x).decode('hex') for x in work['transactions']]
     if 'height' not in work:
         work['height'] = (yield bitcoind.rpc_getblock(work['previousblockhash']))['height'] + 1
+    elif p2pool.DEBUG:
+        assert work['height'] == (yield bitcoind.rpc_getblock(work['previousblockhash']))['height'] + 1
     defer.returnValue(dict(
         version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
         merkle_link=bitcoin_data.calculate_merkle_link([None] + map(bitcoin_data.hash256, packed_transactions), 0),
         subsidy=work['coinbasevalue'],
-        time=work['time'],
+        time=work['time'] if 'time' in work else work['curtime'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
         height=work['height'],
-        clock_offset=time.time() - work['time'],
+        clock_offset=time.time() - (work['curtime'] if 'curtime' in work else work['time']),
         last_update=time.time(),
+        use_getblocktemplate=use_getblocktemplate,
     ))
 
 @defer.inlineCallbacks
@@ -176,7 +188,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             while True:
                 flag = factory.new_block.get_deferred()
                 try:
-                    bitcoind_work.set((yield getwork(bitcoind)))
+                    bitcoind_work.set((yield getwork(bitcoind, bitcoind_work.value['use_getblocktemplate'])))
                 except:
                     log.err()
                 yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
@@ -325,7 +337,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @deferral.retry('Error submitting block: (will retry)', 10, 10)
         @defer.inlineCallbacks
         def submit_block_rpc(block, ignore_failure):
-            success = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
+            if bitcoind_work.value['use_getblocktemplate']:
+                success = yield bitcoind.rpc_getblocktemplate(dict(data=bitcoin_data.block_type.pack(block).encode('hex')))
+            else:
+                success = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
             success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
             if (not success and success_expected and not ignore_failure) or (success and not success_expected):
                 print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (success, success_expected)
