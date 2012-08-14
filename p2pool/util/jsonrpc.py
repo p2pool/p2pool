@@ -1,15 +1,18 @@
 from __future__ import division
 
 import json
+import weakref
 
 from twisted.internet import defer
 from twisted.python import log
 from twisted.web import client, error
 
-import deferred_resource
+from p2pool.util import deferred_resource, memoize
 
 class Error(Exception):
     def __init__(self, code, message, data=None):
+        if type(self) is Error:
+            raise TypeError("can't directly instantiate Error class; use Error_for_code")
         if not isinstance(code, int):
             raise TypeError('code must be an int')
         #if not isinstance(message, unicode):
@@ -23,6 +26,13 @@ class Error(Exception):
             'message': self.message,
             'data': self.data,
         }
+
+@memoize.memoize_with_backing(weakref.WeakValueDictionary())
+def Error_for_code(code):
+    class NarrowError(Error):
+        def __init__(self, *args, **kwargs):
+            Error.__init__(self, code, *args, **kwargs)
+    return NarrowError
 
 class Proxy(object):
     def __init__(self, url, headers={}, timeout=5):
@@ -58,7 +68,7 @@ class Proxy(object):
         if resp['id'] != id_:
             raise ValueError('invalid id')
         if 'error' in resp and resp['error'] is not None:
-            raise Error(**resp['error'])
+            raise Error_for_code(resp['error']['code'])(resp['error']['message'], resp['error'].get('data', None))
         defer.returnValue(resp['result'])
     
     def __getattr__(self, attr):
@@ -82,19 +92,19 @@ class Server(deferred_resource.DeferredResource):
                 try:
                     req = json.loads(data)
                 except Exception:
-                    raise Error(-32700, u'Parse error')
+                    raise Error_for_code(-32700)(u'Parse error')
                 
                 id_ = req.get('id', None)
                 method = req.get('method', None)
                 if not isinstance(method, basestring):
-                    raise Error(-32600, u'Invalid Request')
+                    raise Error_for_code(-32600)(u'Invalid Request')
                 params = req.get('params', [])
                 if not isinstance(params, list):
-                    raise Error(-32600, u'Invalid Request')
+                    raise Error_for_code(-32600)(u'Invalid Request')
                 
                 method_meth = getattr(self._provider, 'rpc_' + method, None)
                 if method_meth is None:
-                    raise Error(-32601, u'Method not found')
+                    raise Error_for_code(-32601)(u'Method not found')
                 
                 result = yield method_meth(request, *params)
                 error = None
@@ -102,7 +112,7 @@ class Server(deferred_resource.DeferredResource):
                 raise
             except Exception:
                 log.err(None, 'Squelched JSON error:')
-                raise Error(-32099, u'Unknown error')
+                raise Error_for_code(-32099)(u'Unknown error')
         except Error, e:
             result = None
             error = e._to_obj()

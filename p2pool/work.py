@@ -162,11 +162,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
     
     def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
         if len(self.p2p_node.peers) == 0 and self.net.PERSIST:
-            raise jsonrpc.Error(-12345, u'p2pool is not connected to any peers')
+            raise jsonrpc.Error_for_code(-12345)(u'p2pool is not connected to any peers')
         if self.best_share_var.value is None and self.net.PERSIST:
-            raise jsonrpc.Error(-12345, u'p2pool is downloading shares')
+            raise jsonrpc.Error_for_code(-12345)(u'p2pool is downloading shares')
         if time.time() > self.current_work.value['last_update'] + 60:
-            raise jsonrpc.Error(-12345, u'lost contact with bitcoind')
+            raise jsonrpc.Error_for_code(-12345)(u'lost contact with bitcoind')
         
         if self.merged_work.value:
             tree, size = bitcoin_data.make_auxpow_tree(self.merged_work.value)
