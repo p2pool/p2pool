@@ -94,7 +94,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     transactions=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
                     subsidy=net.PARENT.SUBSIDY_FUNC(self.block_height_var.value),
-                    clock_offset=self.bitcoind_work.value['clock_offset'],
                     last_update=self.bitcoind_work.value['last_update'],
                 )
             
@@ -202,7 +201,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     desired_version=3,
                 ),
                 block_target=self.current_work.value['bits'].target,
-                desired_timestamp=int(time.time() - self.current_work.value['clock_offset']),
+                desired_timestamp=int(time.time() + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
                 net=self.net,

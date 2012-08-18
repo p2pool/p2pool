@@ -58,7 +58,6 @@ def getwork(bitcoind, use_getblocktemplate=False):
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
         height=work['height'],
-        clock_offset=time.time() - (work['curtime'] if 'curtime' in work else work['time']),
         last_update=time.time(),
         use_getblocktemplate=use_getblocktemplate,
     ))
