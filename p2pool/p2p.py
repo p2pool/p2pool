@@ -23,8 +23,6 @@ class Protocol(p2protocol.Protocol):
         
         self.other_version = None
         self.connected2 = False
-        
-        self.get_shares = deferral.GenericDeferrer(2**256, lambda id, hashes, parents, stops: self.send_sharereq(id=id, hashes=hashes, parents=parents, stops=stops))
     
     def connectionMade(self):
         p2protocol.Protocol.connectionMade(self)
@@ -53,6 +51,13 @@ class Protocol(p2protocol.Protocol):
         )
         
         self.timeout_delayed = reactor.callLater(10, self._connect_timeout)
+        
+        self.get_shares = deferral.GenericDeferrer(
+            max_id=2**256,
+            func=lambda id, hashes, parents, stops: self.send_sharereq(id=id, hashes=hashes, parents=parents, stops=stops),
+            timeout=15,
+            on_timeout=self.transport.loseConnection,
+        )
     
     def _connect_timeout(self):
         self.timeout_delayed = None
@@ -239,7 +244,7 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = shares
+            res = [p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] not in [6, 7]]
         else:
             res = failure.Failure("sharereply result: " + result)
         self.get_shares.got_response(id, res)

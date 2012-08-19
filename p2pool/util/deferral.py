@@ -88,10 +88,11 @@ class GenericDeferrer(object):
     Converts query with identifier/got response interface to deferred interface
     '''
     
-    def __init__(self, max_id, func, timeout=5):
+    def __init__(self, max_id, func, timeout=5, on_timeout=lambda: None):
         self.max_id = max_id
         self.func = func
         self.timeout = timeout
+        self.on_timeout = on_timeout
         self.map = {}
     
     def __call__(self, *args, **kwargs):
@@ -103,6 +104,7 @@ class GenericDeferrer(object):
         def timeout():
             self.map.pop(id)
             df.errback(failure.Failure(defer.TimeoutError('in GenericDeferrer')))
+            self.on_timeout()
         timer = reactor.callLater(self.timeout, timeout)
         self.func(id, *args, **kwargs)
         self.map[id] = df, timer
@@ -117,7 +119,7 @@ class GenericDeferrer(object):
     
     def respond_all(self, resp):
         while self.map:
-            df, timer = self.map.popitem()
+            id, (df, timer) = self.map.popitem()
             timer.cancel()
             df.errback(resp)
 
