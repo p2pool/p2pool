@@ -26,7 +26,7 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
     ),
     bitcoin_testnet=math.Object(
-        P2P_PREFIX='fabfb5da'.decode('hex'),
+        P2P_PREFIX='0b110907'.decode('hex'),
         P2P_PORT=18333,
         ADDRESS_VERSION=111,
         RPC_PORT=8332,
