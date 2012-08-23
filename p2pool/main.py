@@ -295,7 +295,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
         def submit_block_p2p(block):
             if factory.conn.value is None:
-                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%32x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header'])))
+                print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header'])))
                 raise deferral.RetrySilentlyException()
             factory.conn.value.send_block(block=block)
         
