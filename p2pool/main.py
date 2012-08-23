@@ -302,11 +302,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @deferral.retry('Error submitting block: (will retry)', 10, 10)
         @defer.inlineCallbacks
         def submit_block_rpc(block, ignore_failure):
-            success = yield (bitcoind.rpc_submitblock if bitcoind_work.value['use_getblocktemplate']
-                else bitcoind.rpc_getmemorypool)(bitcoin_data.block_type.pack(block).encode('hex'))
+            if bitcoind_work.value['use_getblocktemplate']:
+                result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
+                success = result is None
+            else:
+                result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
+                success = result
             success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
             if (not success and success_expected and not ignore_failure) or (success and not success_expected):
-                print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (success, success_expected)
+                print >>sys.stderr, 'Block submittal result: %s (%r) Expected: %s' % (success, result, success_expected)
         
         def submit_block(block, ignore_failure):
             submit_block_p2p(block)
