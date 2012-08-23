@@ -31,7 +31,7 @@ import p2pool, p2pool.data as p2pool_data
 def getwork(bitcoind, use_getblocktemplate=False):
     def go():
         if use_getblocktemplate:
-            return bitcoind.rpc_getblocktemplate({})
+            return bitcoind.rpc_getblocktemplate(dict(mode='template'))
         else:
             return bitcoind.rpc_getmemorypool()
     try:
@@ -302,10 +302,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @deferral.retry('Error submitting block: (will retry)', 10, 10)
         @defer.inlineCallbacks
         def submit_block_rpc(block, ignore_failure):
-            if bitcoind_work.value['use_getblocktemplate']:
-                success = yield bitcoind.rpc_getblocktemplate(dict(data=bitcoin_data.block_type.pack(block).encode('hex')))
-            else:
-                success = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
+            success = yield (bitcoind.rpc_submitblock if bitcoind_work.value['use_getblocktemplate']
+                else bitcoind.rpc_getmemorypool)(bitcoin_data.block_type.pack(block).encode('hex'))
             success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
             if (not success and success_expected and not ignore_failure) or (success and not success_expected):
                 print >>sys.stderr, 'Block submittal result: %s Expected: %s' % (success, success_expected)
