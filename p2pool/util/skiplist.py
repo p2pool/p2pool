@@ -1,4 +1,4 @@
-from p2pool.util import math
+from p2pool.util import math, memoize
 
 class SkipList(object):
     def __init__(self, p=0.5):
@@ -9,6 +9,7 @@ class SkipList(object):
     def forget_item(self, item):
         self.skips.pop(item, None)
     
+    @memoize.memoize_with_backing(memoize.LRUDict(5))
     def __call__(self, start, *args):
         updates = {}
         pos = start
