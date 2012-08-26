@@ -23,7 +23,7 @@ nets = dict(
         WORKER_PORT=9332,
         BOOTSTRAP_ADDRS='74.220.242.6:9334 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 94.23.34.145 168.7.116.243 72.14.191.28 94.174.40.189:9344 89.79.79.195 portals94.ns01.us'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool',
-        VERSION_CHECK=lambda v, temp_work: 50400 <= v < 60000 or 60003 <= v or '/P2SH/' in temp_work['coinbaseflags'],
+        VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
     ),
     bitcoin_testnet=math.Object(
         PARENT=networks.nets['bitcoin_testnet'],
@@ -40,7 +40,7 @@ nets = dict(
         WORKER_PORT=19332,
         BOOTSTRAP_ADDRS='72.14.191.28 liteco.in'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v, temp_work: 50400 <= v < 60000 or 60003 <= v or '/P2SH/' in temp_work['coinbaseflags'],
+        VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
     ),
     
     litecoin=math.Object(
@@ -58,7 +58,7 @@ nets = dict(
         WORKER_PORT=9327,
         BOOTSTRAP_ADDRS='forre.st 178.33.28.54 219.84.64.174 190.195.79.161 83.104.131.111'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v, temp_work: True,
+        VERSION_CHECK=lambda v: True,
     ),
     litecoin_testnet=math.Object(
         PARENT=networks.nets['litecoin_testnet'],
@@ -75,7 +75,7 @@ nets = dict(
         WORKER_PORT=19327,
         BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v, temp_work: True,
+        VERSION_CHECK=lambda v: True,
     ),
 )
 for net_name, net in nets.iteritems():
