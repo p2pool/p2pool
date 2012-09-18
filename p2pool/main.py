@@ -427,8 +427,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     )
                 except:
                     log.err(None, 'in download_shares:')
-                else:
-                    p2p_node.handle_shares(shares, peer)
+                    continue
+                
+                if not shares:
+                    yield deferral.sleep(1) # sleep so we don't keep rerequesting the same share nobody has
+                    continue
+                p2p_node.handle_shares(shares, peer)
         
         print '    ...success!'
         print
