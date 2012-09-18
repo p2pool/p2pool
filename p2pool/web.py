@@ -44,7 +44,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var, bitcoin_warning_var):
+def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var, bitcoin_warning_var, traffic_happened):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -380,6 +380,7 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
+        'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @pseudoshare_received.watch
@@ -398,6 +399,9 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
         hd.datastreams['local_share_hash_rate'].add_datum(t, work)
         if dead:
             hd.datastreams['local_dead_share_hash_rate'].add_datum(t, work)
+    @traffic_happened.watch
+    def _(name, bytes):
+        hd.datastreams['traffic_rate'].add_datum(time.time(), {name: bytes})
     def add_point():
         if tracker.get_height(best_share_var.value) < 720:
             return

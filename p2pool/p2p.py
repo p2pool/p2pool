@@ -10,14 +10,14 @@ from twisted.python import failure, log
 import p2pool
 from p2pool import data as p2pool_data
 from p2pool.bitcoin import data as bitcoin_data
-from p2pool.util import deferral, p2protocol, pack
+from p2pool.util import deferral, p2protocol, pack, variable
 
 class PeerMisbehavingError(Exception):
     pass
 
 class Protocol(p2protocol.Protocol):
     def __init__(self, node, incoming):
-        p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000)
+        p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
         self.node = node
         self.incoming = incoming
         
@@ -417,13 +417,14 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event()):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
         self.addr_store = dict(addr_store)
         self.connect_addrs = connect_addrs
         self.preferred_storage = preferred_storage
+        self.traffic_happened = traffic_happened
         
         self.nonce = random.randrange(2**64)
         self.peers = {}

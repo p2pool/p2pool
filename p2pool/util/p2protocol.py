@@ -15,11 +15,12 @@ class TooLong(Exception):
     pass
 
 class Protocol(protocol.Protocol):
-    def __init__(self, message_prefix, max_payload_length):
+    def __init__(self, message_prefix, max_payload_length, traffic_happened=variable.Event()):
         self._message_prefix = message_prefix
         self._max_payload_length = max_payload_length
-        self.dataReceived = datachunker.DataChunker(self.dataReceiver())
+        self.dataReceived2 = datachunker.DataChunker(self.dataReceiver())
         self.paused_var = variable.Variable(False)
+        self.traffic_happened = traffic_happened
     
     def connectionMade(self):
         self.transport.registerProducer(self, True)
@@ -32,6 +33,10 @@ class Protocol(protocol.Protocol):
     
     def stopProducing(self):
         pass
+    
+    def dataReceived(self, data):
+        self.traffic_happened.happened('p2p/in', len(data))
+        self.dataReceived2(data)
     
     def dataReceiver(self):
         while True:
@@ -86,7 +91,9 @@ class Protocol(protocol.Protocol):
         payload = type_.pack(payload2)
         if len(payload) > self._max_payload_length:
             raise TooLong('payload too long')
-        self.transport.write(self._message_prefix + struct.pack('<12sI', command, len(payload)) + hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] + payload)
+        data = self._message_prefix + struct.pack('<12sI', command, len(payload)) + hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] + payload
+        self.traffic_happened.happened('p2p/out', len(data))
+        self.transport.write(data)
         return self.paused_var.get_when_satisfies(lambda paused: not paused)
     
     def __getattr__(self, attr):

@@ -51,6 +51,9 @@
         <h2>Desired versions</h2>
         <svg id="desired_versions"></svg>
         
+        <h2>Traffic rate</h2>
+        <svg id="traffic_rate"></svg>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -124,6 +127,7 @@
                     
                     var text_boxes = [];
                     var total = 0;
+                    var total_area = 0;
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
@@ -143,7 +147,16 @@
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h + 10)
                                 .attr("y", y(num/denom))]);
+                            if(total_unit != null)
+                                text_boxes.push([i, g.append("svg:text")
+                                    .text("Area: " + d3.format(".3s")(stats.area) + total_unit)
+                                    .attr("text-anchor", "start")
+                                    .attr("dominant-baseline", "central")
+                                    .attr("fill", line.color)
+                                    .attr("x", w - margin_h + 10)
+                                    .attr("y", y(num/denom) + 12)]);
                             total += stats.mean;
+                            total_area += stats.area;
                         }
                     }
                     text_boxes.push([i, g.append("svg:text")
@@ -153,6 +166,14 @@
                         .attr("fill", "black")
                         .attr("x", w - margin_h)
                         .attr("y", y(total))]);
+                    if(total_unit != null)
+                        text_boxes.push([i, g.append("svg:text")
+                            .text("Area: " + d3.format(".3s")(total_area) + total_unit)
+                            .attr("text-anchor", "start")
+                            .attr("dominant-baseline", "central")
+                            .attr("fill", "black")
+                            .attr("x", w - margin_h + 10)
+                            .attr("y", y(total) + 12)]);
                 } else {
                     var y = d3.scale.linear().domain([
                         0,
@@ -335,6 +356,10 @@
                 
                 d3.json("/web/graph_data/desired_versions/last_" + lowerperiod, function(data) {
                     plot(d3.select('#desired_versions'), '', null, data_to_lines(data, function(line){ return parseInt(line.label) }), true);
+                });
+                
+                d3.json("/web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {
+                    plot(d3.select('#traffic_rate'), 'B/s', 'B', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
             }
             
