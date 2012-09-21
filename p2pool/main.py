@@ -67,6 +67,20 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         traffic_happened = variable.Event()
         
+        @defer.inlineCallbacks
+        def connect_p2p():
+            # connect to bitcoind over bitcoin-p2p
+            print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
+            factory = bitcoin_p2p.ClientFactory(net.PARENT)
+            reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
+            yield factory.getProtocol() # waits until handshake is successful
+            print '    ...success!'
+            print
+            defer.returnValue(factory)
+        
+        if args.testnet: # establish p2p connection first if testnet so bitcoind can work without connections
+            factory = yield connect_p2p()
+        
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = '%s://%s:%i/' % ('https' if args.bitcoind_rpc_ssl else 'http', args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
@@ -82,6 +96,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 raise deferral.RetrySilentlyException()
         yield check()
         temp_work = yield getwork(bitcoind)
+        
+        if not args.testnet:
+            factory = yield connect_p2p()
         
         block_height_var = variable.Variable(None)
         @defer.inlineCallbacks
@@ -101,14 +118,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block'],)
         print '    Current block height: %i' % (block_height_var.value,)
-        print
-        
-        # connect to bitcoind over bitcoin-p2p
-        print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
-        factory = bitcoin_p2p.ClientFactory(net.PARENT)
-        reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
-        yield factory.getProtocol() # waits until handshake is successful
-        print '    ...success!'
         print
         
         print 'Determining payout address...'
