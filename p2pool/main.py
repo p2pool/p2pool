@@ -71,7 +71,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         traffic_happened = variable.Event()
         
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
-        url = 'http://%s:%i/' % (args.bitcoind_address, args.bitcoind_rpc_port)
+        url = '%s://%s:%i/' % ('https' if args.bitcoind_rpc_ssl else 'http', args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.Proxy(url, dict(Authorization='Basic ' + base64.b64encode(args.bitcoind_rpc_username + ':' + args.bitcoind_rpc_password)), timeout=30)
         @deferral.retry('Error while checking Bitcoin connection:', 1)
@@ -656,6 +656,9 @@ def run():
     bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
         help='''connect to JSON-RPC interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.RPC_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
+    bitcoind_group.add_argument('--bitcoind-rpc-ssl',
+        help='connect to JSON-RPC interface using SSL',
+        action='store_true', default=False, dest='bitcoind_rpc_ssl')
     bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
         help='''connect to P2P interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.P2P_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
