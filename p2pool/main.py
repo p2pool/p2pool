@@ -1,7 +1,5 @@
 from __future__ import division
 
-import ConfigParser
-import StringIO
 import base64
 import json
 import os
@@ -694,17 +692,23 @@ def run():
                 '''rpcpassword=%x\r\n'''
                 '''\r\n'''
                 '''Keep that password secret! After creating the file, restart Bitcoin.''' % (conf_path, random.randrange(2**128)))
-        with open(conf_path, 'rb') as f:
-            cp = ConfigParser.RawConfigParser()
-            cp.readfp(StringIO.StringIO('[x]\r\n' + f.read()))
-            for conf_name, var_name, var_type in [
-                ('rpcuser', 'bitcoind_rpc_username', str),
-                ('rpcpassword', 'bitcoind_rpc_password', str),
-                ('rpcport', 'bitcoind_rpc_port', int),
-                ('port', 'bitcoind_p2p_port', int),
-            ]:
-                if getattr(args, var_name) is None and cp.has_option('x', conf_name):
-                    setattr(args, var_name, var_type(cp.get('x', conf_name)))
+        conf = open(conf_path, 'rb').read()
+        contents = {}
+        for line in conf.splitlines(True):
+            if '#' in line:
+                line = line[:line.index('#')]
+            if '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            contents[k.strip()] = v.strip()
+        for conf_name, var_name, var_type in [
+            ('rpcuser', 'bitcoind_rpc_username', str),
+            ('rpcpassword', 'bitcoind_rpc_password', str),
+            ('rpcport', 'bitcoind_rpc_port', int),
+            ('port', 'bitcoind_p2p_port', int),
+        ]:
+            if getattr(args, var_name) is None and conf_name in contents:
+                setattr(args, var_name, var_type(contents[conf_name]))
         if args.bitcoind_rpc_password is None:
             parser.error('''Bitcoin configuration file didn't contain an rpcpassword= line! Add one!''')
     
