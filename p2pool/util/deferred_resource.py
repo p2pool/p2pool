@@ -7,14 +7,14 @@ from twisted.python import log
 class DeferredResource(resource.Resource):
     def render(self, request):
         def finish(x):
-            if request._disconnected:
+            if request.channel is None: # disconnected
                 return
             if x is not None:
                 request.write(x)
             request.finish()
         
         def finish_error(fail):
-            if request._disconnected:
+            if request.channel is None: # disconnected
                 return
             request.setResponseCode(500) # won't do anything if already written to
             request.write('---ERROR---')
