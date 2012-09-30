@@ -595,7 +595,7 @@ class ShareStore(object):
                         else:
                             raise NotImplementedError("share type %i" % (type_id,))
                     except Exception:
-                        log.err(None, "Error while reading saved shares, continuing where left off:")
+                        log.err(None, "HARMLESS error while reading saved shares, continuing where left off:")
         self.known = known
         self.known_desired = dict((k, (set(a), set(b))) for k, (a, b) in known.iteritems())
     
