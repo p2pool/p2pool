@@ -100,14 +100,17 @@ class GenericDeferrer(object):
             id = random.randrange(self.max_id)
             if id not in self.map:
                 break
-        df = defer.Deferred()
+        def cancel(df):
+            df, timer = self.map.pop(id)
+            timer.cancel()
+        df = defer.Deferred(cancel)
         def timeout():
             self.map.pop(id)
             df.errback(failure.Failure(defer.TimeoutError('in GenericDeferrer')))
             self.on_timeout()
         timer = reactor.callLater(self.timeout, timeout)
-        self.func(id, *args, **kwargs)
         self.map[id] = df, timer
+        self.func(id, *args, **kwargs)
         return df
     
     def got_response(self, id, resp):
