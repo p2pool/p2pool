@@ -207,7 +207,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_timestamp=int(time.time() + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
-                other_transaction_hashes=tx_hashes,
+                desired_other_transaction_hashes=tx_hashes,
                 net=self.net,
             )
         
