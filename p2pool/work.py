@@ -180,8 +180,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
             mm_data = ''
             mm_later = []
         
+        tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
+        tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
+        
         if True:
-            share_info, transactions, get_share = p2pool_data.Share.generate_transaction(
+            share_info, gentx, other_transaction_hashes, get_share = p2pool_data.Share.generate_transaction(
                 tracker=self.tracker,
                 share_data=dict(
                     previous_share_hash=self.best_share_var.value,
@@ -204,9 +207,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_timestamp=int(time.time() + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
-                other_transactions=list(self.current_work.value['transactions']),
+                other_transaction_hashes=tx_hashes,
                 net=self.net,
             )
+        
+        transactions = [gentx] + [tx_map[tx_hash] for tx_hash in other_transaction_hashes]
         
         mm_later = [(dict(aux_work, target=aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target), index, hashes) for aux_work, index, hashes in mm_later]
         
@@ -293,7 +298,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     log.err(None, 'Error while processing merged mining POW:')
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
-                share = get_share(header)
+                share = get_share(header, transactions)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                     request.getUser(),
