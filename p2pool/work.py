@@ -181,7 +181,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             mm_later = []
         
         if True:
-            share_info, generate_tx = p2pool_data.Share.generate_transaction(
+            share_info, transactions, get_share = p2pool_data.Share.generate_transaction(
                 tracker=self.tracker,
                 share_data=dict(
                     previous_share_hash=self.best_share_var.value,
@@ -204,6 +204,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_timestamp=int(time.time() + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
+                other_transactions=list(self.current_work.value['transactions']),
                 net=self.net,
             )
         
@@ -222,13 +223,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
             target = max(target, aux_work['target'])
         target = math.clip(target, self.net.PARENT.SANE_TARGET_RANGE)
         
-        transactions = [generate_tx] + list(self.current_work.value['transactions'])
-        packed_generate_tx = bitcoin_data.tx_type.pack(generate_tx)
-        merkle_root = bitcoin_data.check_merkle_link(bitcoin_data.hash256(packed_generate_tx), self.current_work.value['merkle_link'])
-        
         getwork_time = time.time()
         lp_count = self.new_work_event.times
-        merkle_link = self.current_work.value['merkle_link']
+        merkle_link = bitcoin_data.calculate_merkle_link([bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions], 0)
         
         print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
             bitcoin_data.target_to_difficulty(target),
@@ -237,12 +234,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
             len(self.current_work.value['transactions']),
         )
         
-        bits = self.current_work.value['bits']
-        previous_block = self.current_work.value['previous_block']
         ba = bitcoin_getwork.BlockAttempt(
             version=min(self.current_work.value['version'], 2),
             previous_block=self.current_work.value['previous_block'],
-            merkle_root=merkle_root,
+            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(bitcoin_data.tx_type.pack(transactions[0])), merkle_link),
             timestamp=self.current_work.value['time'],
             bits=self.current_work.value['bits'],
             share_target=target,
@@ -264,9 +259,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 log.err(None, 'Error while processing potential block:')
             
             user, _, _, _ = self.get_user_details(request)
-            assert header['merkle_root'] == merkle_root
-            assert header['previous_block'] == previous_block
-            assert header['bits'] == bits
+            assert header['previous_block'] == ba.previous_block
+            assert header['merkle_root'] == ba.merkle_root
+            assert header['bits'] == ba.bits
             
             on_time = self.new_work_event.times == lp_count
             
@@ -298,12 +293,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     log.err(None, 'Error while processing merged mining POW:')
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
-                min_header = dict(header);del min_header['merkle_root']
-                hash_link = p2pool_data.prefix_to_hash_link(packed_generate_tx[:-32-4], p2pool_data.Share.gentx_before_refhash)
-                share = p2pool_data.Share(self.net, None, dict(
-                    min_header=min_header, share_info=share_info, hash_link=hash_link,
-                    ref_merkle_link=dict(branch=[], index=0),
-                ), merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+                share = get_share(header)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                     request.getUser(),

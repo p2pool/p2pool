@@ -113,7 +113,7 @@ class Share(object):
     gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x20' + pack.IntType(256).pack(0))[:2]
     
     @classmethod
-    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, net):
+    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, other_transactions, net):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
@@ -155,7 +155,7 @@ class Share(object):
             )) if previous_share is not None else desired_timestamp,
         )
         
-        return share_info, dict(
+        gentx = dict(
             version=1,
             tx_ins=[dict(
                 previous_output=None,
@@ -168,6 +168,20 @@ class Share(object):
             )],
             lock_time=0,
         )
+        
+        transactions = [gentx] + list(other_transactions)
+        
+        def get_share(header):
+            min_header = dict(header);del min_header['merkle_root']
+            hash_link = prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4], cls.gentx_before_refhash)
+            merkle_link = bitcoin_data.calculate_merkle_link([bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions], 0)
+            pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
+            return cls(net, None, dict(
+                min_header=min_header, share_info=share_info, hash_link=hash_link,
+                ref_merkle_link=dict(branch=[], index=0),
+            ), merkle_link=merkle_link, other_txs=transactions[1:] if pow_hash <= header['bits'].target else None)
+        
+        return share_info, transactions, get_share
     
     @classmethod
     def get_ref_hash(cls, net, share_info, ref_merkle_link):
@@ -245,7 +259,7 @@ class Share(object):
             return self.as_share1b()
     
     def check(self, tracker):
-        share_info, gentx = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], self.net)
+        share_info, [gentx], get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], [], self.net)
         if share_info != self.share_info:
             raise ValueError('share_info invalid')
         if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:

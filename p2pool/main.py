@@ -50,7 +50,6 @@ def getwork(bitcoind, use_getblocktemplate=False):
         version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
-        merkle_link=bitcoin_data.calculate_merkle_link([None] + map(bitcoin_data.hash256, packed_transactions), 0),
         subsidy=work['coinbasevalue'],
         time=work['time'] if 'time' in work else work['curtime'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
