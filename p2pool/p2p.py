@@ -197,14 +197,6 @@ class Protocol(p2protocol.Protocol):
             self.node.get_good_peers(count)
         ])
     
-    message_getshares = pack.ComposedType([
-        ('hashes', pack.ListType(pack.IntType(256))),
-        ('parents', pack.VarIntType()),
-        ('stops', pack.ListType(pack.IntType(256))),
-    ])
-    def handle_getshares(self, hashes, parents, stops):
-        self.sendShares(self.node.handle_get_shares(hashes, parents, stops, self))
-    
     message_shares = pack.ComposedType([
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
