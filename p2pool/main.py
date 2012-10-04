@@ -243,6 +243,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         # setup p2p logic and join p2pool network
         
+        known_txs_var = variable.Variable({}) # hash -> tx
+        mining_txs_var = variable.Variable({}) # hash -> tx
+        @bitcoind_work.changed.watch
+        def _(work):
+            new_mining_txs = {}
+            for tx in work['transactions']:
+                new_mining_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
+            mining_txs_var.set(new_mining_txs)
+        
         class Node(p2p.Node):
             def handle_shares(self, shares, peer):
                 if len(shares) > 5:
@@ -377,6 +386,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             connect_addrs=connect_addrs,
             max_incoming_conns=args.p2pool_conns,
             traffic_happened=traffic_happened,
+            known_txs_var=known_txs_var,
+            mining_txs_var=mining_txs_var,
         )
         p2p_node.start()
         

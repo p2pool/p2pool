@@ -275,6 +275,8 @@ class Share(object):
         return dict(header=self.header, txs=[self.check(tracker)] + self.other_txs)
 
 class NewShare(object):
+    other_txs = None
+    
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()),
         ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
@@ -421,7 +423,7 @@ class NewShare(object):
             share_info=share_info,
         ))), ref_merkle_link))
     
-    __slots__ = 'net peer contents min_header share_info hash_link merkle_link other_txs hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen'.split(' ')
+    __slots__ = 'net peer contents min_header share_info hash_link merkle_link hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen'.split(' ')
     
     def __init__(self, net, peer, contents):
         self.net = net
@@ -450,7 +452,9 @@ class NewShare(object):
         self.desired_version = self.share_data['desired_version']
         
         for x in self.share_info['transaction_hash_refs']:
-            assert x['share_count'] < net.CHAIN_LENGTH
+            assert x['share_count'] < 110
+        for i, x in enumerate(self.share_info['new_transaction_hashes']):
+            assert dict(share_count=0, tx_count=i) in self.share_info['transaction_hash_refs']
         
         self.gentx_hash = check_hash_link(
             self.hash_link,
@@ -494,11 +498,18 @@ class NewShare(object):
         if bitcoin_data.calculate_merkle_link([None] + other_tx_hashes, 0) != self.merkle_link:
             raise ValueError('merkle_link and other_tx_hashes do not match')
         
-        #return [gentx] + other_txs # only used by as_block
+        return gentx # only used by as_block
     
     def as_block(self, tracker):
-        assert False
-        return dict(header=self.header, txs=self.check(tracker))
+        other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+        
+        
+        print [tx_hash in self.peer.remembered_txs for tx_hash in other_tx_hashes]
+        txs = [self.check(tracker)] + [self.peer.remembered_txs[tx_hash] for tx_hash in other_tx_hashes]
+        print
+        print 'SUCCESS'
+        print
+        return dict(header=self.header, txs=txs)
 
 
 class WeightsSkipList(forest.TrackerSkipList):
