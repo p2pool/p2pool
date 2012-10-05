@@ -172,6 +172,8 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
                 dead=stale_doa_shares,
             ),
             uptime=time.time() - start_time,
+            attempts_to_share=bitcoin_data.target_to_average_attempts(tracker.items[best_share_var.value].max_target),
+            attempts_to_block=bitcoin_data.target_to_average_attempts(bitcoind_work.value['bits'].target),
             block_value=bitcoind_work.value['subsidy']*1e-8,
             warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net, bitcoin_warning_var.value, bitcoind_work.value),
         )
