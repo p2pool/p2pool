@@ -245,12 +245,18 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         known_txs_var = variable.Variable({}) # hash -> tx
         mining_txs_var = variable.Variable({}) # hash -> tx
+        # update mining_txs according to getwork results
         @bitcoind_work.changed.watch
         def _(work):
             new_mining_txs = {}
             for tx in work['transactions']:
                 new_mining_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
             mining_txs_var.set(new_mining_txs)
+        # forward transactions seen to bitcoind
+        @known_txs_var.transitioned.watch
+        def _(before, after):
+            for tx_hash in set(after) - set(before):
+                factory.conn.value.send_tx(tx=after[tx_hash])
         
         class Node(p2p.Node):
             def handle_shares(self, shares, peer):

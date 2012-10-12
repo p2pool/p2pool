@@ -297,10 +297,13 @@ class Protocol(p2protocol.Protocol):
         for tx_hash in tx_hashes:
             if tx_hash not in self.remembered_txs:
                 self.remembered_txs[tx_hash] = self.node.known_txs_var.value[tx_hash]
+        new_known_txs = dict(self.node.known_txs_var.value)
         for tx in txs:
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
             if tx_hash not in self.remembered_txs:
                 self.remembered_txs[tx_hash] = tx
+            new_known_txs[tx_hash] = tx
+        self.node.known_txs_var.set(new_known_txs)
     message_forget_tx = pack.ComposedType([
         ('tx_hashes', pack.ListType(pack.IntType(256))),
     ])
