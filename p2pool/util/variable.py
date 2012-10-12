@@ -10,6 +10,9 @@ class Event(object):
         self._once = None
         self.times = 0
     
+    def run_and_watch(self, func):
+        func()
+        return self.watch(func)
     def watch(self, func):
         id = self.id_generator.next()
         self.observers[id] = func

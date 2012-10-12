@@ -15,6 +15,14 @@ from p2pool.util import deferral, p2protocol, pack, variable
 class PeerMisbehavingError(Exception):
     pass
 
+
+def fragment(f, **kwargs):
+    try:
+        return f(**kwargs)
+    except p2protocol.TooLong:
+        att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
+        return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+
 class Protocol(p2protocol.Protocol):
     def __init__(self, node, incoming):
         p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
@@ -160,13 +168,13 @@ class Protocol(p2protocol.Protocol):
             added = set(after) - set(before)
             removed = set(before) - set(after)
             if added:
-                self.send_remember_tx(tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
+                fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
             if removed:
                 self.send_forget_tx(tx_hashes=removed)
         watch_id2 = self.node.mining_txs_var.transitioned.watch(update_remote_view_of_my_mining_txs)
         self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
         
-        self.send_remember_tx(tx_hashes=[], txs=self.node.mining_txs_var.value.values())
+        fragment(self.send_remember_tx, tx_hashes=[], txs=self.node.mining_txs_var.value.values())
     
     message_ping = pack.ComposedType([])
     def handle_ping(self):
@@ -231,17 +239,22 @@ class Protocol(p2protocol.Protocol):
     def handle_shares(self, shares):
         self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] not in [6, 7]], self)
     
-    def sendShares(self, shares):
-        def att(f, **kwargs):
-            try:
-                return f(**kwargs)
-            except p2protocol.TooLong:
-                att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-                return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
-        if shares:
-            return att(self.send_shares, shares=[share.as_share() for share in shares])
-        else:
+    def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
+        if not shares:
             return defer.succeed(None)
+        
+        tx_hashes = set()
+        for share in shares:
+            if share.hash in include_txs_with:
+                tx_hashes.update(share.get_other_tx_hashes(tracker))
+        
+        hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value]
+        
+        fragment(self.send_remember_tx, tx_hashes=[x for x in hashes_to_send if x in self.remote_tx_hashes], txs=[known_txs[x] for x in hashes_to_send if x not in self.remote_tx_hashes and x in known_txs]) # last one required?
+        fragment(self.send_shares, shares=[share.as_share() for share in shares])
+        res = self.send_forget_tx(tx_hashes=hashes_to_send)
+        
+        return res
     
     
     message_sharereq = pack.ComposedType([
@@ -475,16 +488,16 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({}), addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event()):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event(), known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({})):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
-        self.known_txs_var = known_txs_var
-        self.mining_txs_var = mining_txs_var
         self.addr_store = dict(addr_store)
         self.connect_addrs = connect_addrs
         self.preferred_storage = preferred_storage
         self.traffic_happened = traffic_happened
+        self.known_txs_var = known_txs_var
+        self.mining_txs_var = mining_txs_var
         
         self.nonce = random.randrange(2**64)
         self.peers = {}

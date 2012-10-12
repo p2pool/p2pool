@@ -269,7 +269,19 @@ class Share(object):
             raise ValueError('''gentx doesn't match hash_link''')
         return gentx # only used by as_block
     
-    def as_block(self, tracker):
+    def get_other_tx_hashes(self, tracker):
+        return []
+    
+    def get_other_txs(self, tracker, known_txs):
+        return []
+    
+    def get_other_txs_size(self, tracker, known_txs):
+        return 0
+    
+    def get_new_txs_size(self, known_txs):
+        return 0
+    
+    def as_block(self, tracker, known_txs):
         if self.other_txs is None:
             raise ValueError('share does not contain all txs')
         return dict(header=self.header, txs=[self.check(tracker)] + self.other_txs)
@@ -500,16 +512,16 @@ class NewShare(object):
         
         return gentx # only used by as_block
     
-    def as_block(self, tracker):
-        other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+    def get_other_tx_hashes(self, tracker):
+        return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+    
+    def as_block(self, tracker, known_txs):
+        other_tx_hashes = self.get_other_tx_hashes(tracker)
         
+        if not all(tx_hash in known_txs for tx_hash in other_tx_hashes):
+            return None # not all txs present
         
-        print [tx_hash in self.peer.remembered_txs for tx_hash in other_tx_hashes]
-        txs = [self.check(tracker)] + [self.peer.remembered_txs[tx_hash] for tx_hash in other_tx_hashes]
-        print
-        print 'SUCCESS'
-        print
-        return dict(header=self.header, txs=txs)
+        return dict(header=self.header, txs=[self.check(tracker)] + [known_txs[tx_hash] for tx_hash in other_tx_hashes])
 
 
 class WeightsSkipList(forest.TrackerSkipList):
@@ -580,7 +592,7 @@ class OkayTracker(forest.Tracker):
             self.verified.add(share)
             return True
     
-    def think(self, block_rel_height_func, previous_block, bits):
+    def think(self, block_rel_height_func, previous_block, bits, known_txs):
         desired = set()
         
         # O(len(self.heads))
@@ -646,6 +658,7 @@ class OkayTracker(forest.Tracker):
             #self.items[h].peer is None,
             self.items[h].pow_hash <= self.items[h].header['bits'].target, # is block solution
             (self.items[h].header['previous_block'], self.items[h].header['bits']) == (previous_block, bits) or self.items[h].peer is None,
+            self.items[h].as_block(self, known_txs) is not None,
             -self.items[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
@@ -707,6 +720,9 @@ class OkayTracker(forest.Tracker):
             if (best_share.header['previous_block'], best_share.header['bits']) != (previous_block, bits) and best_share.header_hash != previous_block and best_share.peer is not None:
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
+                best = best_share.previous_hash
+            elif best_share.as_block(self, known_txs) is None:
+                print 'Share with incomplete transactions detected! Jumping from %s to %s!' % (format_hash(best), format_hash(best_share.previous_hash))
                 best = best_share.previous_hash
             
             timestamp_cutoff = min(int(time.time()), best_share.timestamp) - 3600
