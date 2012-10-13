@@ -411,6 +411,18 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         )
         p2p_node.start()
         
+        def forget_old_txs():
+            new_known_txs = {}
+            for peer in p2p_node.peers.itervalues():
+                new_known_txs.update(peer.remembered_txs)
+            new_known_txs.update(mining_txs_var.value)
+            for share in tracker.get_chain(best_share_var.value, min(120, tracker.get_height(best_share_var.value))):
+                for tx_hash in share.share_info['new_transaction_hashes']:
+                    if tx_hash in known_txs_var.value:
+                        new_known_txs[tx_hash] = known_txs_var.value[tx_hash]
+            known_txs_var.set(new_known_txs)
+        task.LoopingCall(forget_old_txs).start(10)
+        
         def save_addrs():
             with open(os.path.join(datadir_path, 'addrs'), 'wb') as f:
                 f.write(json.dumps(p2p_node.addr_store.items()))
