@@ -76,6 +76,7 @@ class Protocol(p2protocol.Protocol):
         
         self.remembered_txs = {} # view of peer's mining_txs
         self.remembered_txs_size = 0
+        self.known_txs_cache = {}
     
     def _connect_timeout(self):
         self.timeout_delayed = None
@@ -163,7 +164,11 @@ class Protocol(p2protocol.Protocol):
                 self.send_have_tx(tx_hashes=list(added))
             if removed:
                 self.send_losing_tx(tx_hashes=list(removed))
-                # XXX cache locally
+                
+                # cache forgotten txs here for a little while so latency of "losing_tx" packets doesn't cause problems
+                key = max(self.known_txs_cache) + 1 if self.known_txs_cache else 0
+                self.known_txs_cache[key] = dict((h, before[h]) for h in removed)
+                reactor.callLater(20, self.known_txs_cache.pop, key)
         watch_id = self.node.known_txs_var.transitioned.watch(update_remote_view_of_my_known_txs)
         self.connection_lost_event.watch(lambda: self.node.known_txs_var.transitioned.unwatch(watch_id))
         
@@ -326,8 +331,21 @@ class Protocol(p2protocol.Protocol):
     def handle_remember_tx(self, tx_hashes, txs):
         for tx_hash in tx_hashes:
             if tx_hash not in self.remembered_txs:
-                self.remembered_txs[tx_hash] = self.node.known_txs_var.value[tx_hash]
-                self.remembered_txs_size += len(bitcoin_data.tx_type.pack(self.node.known_txs_var.value[tx_hash]))
+                if tx_hash in self.node.known_txs_var.value:
+                    tx = self.node.known_txs_var.value[tx_hash]
+                else:
+                    for cache in self.known_txs_cache.itervalues():
+                        if tx_hash in cache:
+                            tx = cache[tx_hash]
+                            print 'Transaction rescued from peer latency cache!'
+                            break
+                    else:
+                        print >>sys.stderr, 'Peer referenced unknown transaction, disconnecting'
+                        self.transport.loseConnection()
+                        return
+                
+                self.remembered_txs[tx_hash] = tx
+                self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
         new_known_txs = dict(self.node.known_txs_var.value)
         for tx in txs:
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
