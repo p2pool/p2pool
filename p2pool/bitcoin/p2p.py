@@ -53,7 +53,6 @@ class Protocol(p2protocol.Protocol):
     def handle_verack(self):
         self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
         self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getheaders(version=1, have=[], last=hash))
-        self.get_tx = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='tx', hash=hash)]))
         
         if hasattr(self.factory, 'resetDelay'):
             self.factory.resetDelay()
@@ -72,7 +71,7 @@ class Protocol(p2protocol.Protocol):
     def handle_inv(self, invs):
         for inv in invs:
             if inv['type'] == 'tx':
-                self.factory.new_tx.happened(inv['hash'])
+                self.send_getdata(requests=[inv])
             elif inv['type'] == 'block':
                 self.factory.new_block.happened(inv['hash'])
             else:
@@ -110,7 +109,7 @@ class Protocol(p2protocol.Protocol):
         ('tx', bitcoin_data.tx_type),
     ])
     def handle_tx(self, tx):
-        self.get_tx.got_response(bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)), tx)
+        self.factory.new_tx.happened(tx)
     
     message_block = pack.ComposedType([
         ('block', bitcoin_data.block_type),

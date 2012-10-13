@@ -256,6 +256,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 new_known_txs[tx_hash] = tx
             mining_txs_var.set(new_mining_txs)
             known_txs_var.set(new_known_txs)
+        # add p2p transactions from bitcoind to known_txs
+        @factory.new_tx.watch
+        def _(tx):
+            new_known_txs = dict(known_txs_var.value)
+            new_known_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
+            known_txs_var.set(new_known_txs)
         # forward transactions seen to bitcoind
         @known_txs_var.transitioned.watch
         def _(before, after):
