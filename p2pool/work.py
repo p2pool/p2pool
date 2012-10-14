@@ -209,6 +209,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 ref_merkle_link=dict(branch=[], index=0),
                 desired_other_transaction_hashes=tx_hashes,
                 net=self.net,
+                known_txs=tx_map,
             )
         
         transactions = [gentx] + [tx_map[tx_hash] for tx_hash in other_transaction_hashes]

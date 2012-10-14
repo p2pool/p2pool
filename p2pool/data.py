@@ -115,7 +115,7 @@ class Share(object):
     gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x20' + pack.IntType(256).pack(0))[:2]
     
     @classmethod
-    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes, net):
+    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes, net, known_txs=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
@@ -341,7 +341,7 @@ class NewShare(object):
     gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x20' + pack.IntType(256).pack(0))[:2]
     
     @classmethod
-    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes, net):
+    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes, net, known_txs=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
@@ -373,6 +373,7 @@ class NewShare(object):
         dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
         
         new_transaction_hashes = []
+        new_transaction_size = 0
         transaction_hash_refs = []
         other_transaction_hashes = []
         
@@ -382,8 +383,11 @@ class NewShare(object):
                     this = dict(share_count=i+1, tx_count=share.new_transaction_hashes.index(tx_hash))
                     break
             else:
-                if len(new_transaction_hashes) == 10: # only allow 10 new txns/share
-                    break
+                if known_txs is not None:
+                    this_size = len(bitcoin_data.tx_type.pack(known_txs[tx_hash]))
+                    if new_transaction_size + this_size > 50000: # only allow 50 kB of new txns/share
+                        break
+                    new_transaction_size += this_size
                 new_transaction_hashes.append(tx_hash)
                 this = dict(share_count=0, tx_count=len(new_transaction_hashes)-1)
             transaction_hash_refs.append(this)
@@ -515,13 +519,30 @@ class NewShare(object):
     def get_other_tx_hashes(self, tracker):
         return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
-    def as_block(self, tracker, known_txs):
+    def get_other_txs(self, tracker, known_txs):
         other_tx_hashes = self.get_other_tx_hashes(tracker)
         
         if not all(tx_hash in known_txs for tx_hash in other_tx_hashes):
             return None # not all txs present
         
-        return dict(header=self.header, txs=[self.check(tracker)] + [known_txs[tx_hash] for tx_hash in other_tx_hashes])
+        return [known_txs[tx_hash] for tx_hash in other_tx_hashes]
+    
+    def get_other_txs_size(self, tracker, known_txs):
+        other_txs = self.get_other_txs(tracker, known_txs)
+        if other_txs is None:
+            return None # not all txs present
+        size = sum(len(bitcoin_data.tx_type.pack(tx)) for tx in other_txs)
+    
+    def get_new_txs_size(self, known_txs):
+        if not all(tx_hash in known_txs for tx_hash in self.share_info['new_transaction_hashes']):
+            return None # not all txs present
+        return sum(len(bitcoin_data.tx_type.pack(known_txs[tx_hash])) for tx_hash in self.share_info['new_transaction_hashes'])
+    
+    def as_block(self, tracker, known_txs):
+        other_txs = self.get_other_txs(tracker, known_txs)
+        if other_txs is None:
+            return None # not all txs present
+        return dict(header=self.header, txs=[self.check(tracker)] + other_txs)
 
 
 class WeightsSkipList(forest.TrackerSkipList):
@@ -658,7 +679,9 @@ class OkayTracker(forest.Tracker):
             #self.items[h].peer is None,
             self.items[h].pow_hash <= self.items[h].header['bits'].target, # is block solution
             (self.items[h].header['previous_block'], self.items[h].header['bits']) == (previous_block, bits) or self.items[h].peer is None,
-            self.items[h].as_block(self, known_txs) is not None,
+            self.items[h].get_other_txs(self, known_txs) is not None,
+            self.items[h].get_other_txs_size(self, known_txs) < 1000000,
+            self.items[h].get_new_txs_size(known_txs) < 50000,
             -self.items[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
         if p2pool.DEBUG:
@@ -721,8 +744,14 @@ class OkayTracker(forest.Tracker):
                 if p2pool.DEBUG:
                     print 'Stale detected! %x < %x' % (best_share.header['previous_block'], previous_block)
                 best = best_share.previous_hash
-            elif best_share.as_block(self, known_txs) is None:
+            elif best_share.get_other_txs(self, known_txs) is None:
                 print 'Share with incomplete transactions detected! Jumping from %s to %s!' % (format_hash(best), format_hash(best_share.previous_hash))
+                best = best_share.previous_hash
+            elif best_share.get_other_txs_size(self, known_txs) > 1000000:
+                print >>sys.stderr, 'Share with too many transactions detected! Jumping from %s to %s!' % (format_hash(best), format_hash(best_share.previous_hash))
+                best = best_share.previous_hash
+            elif best_share.get_new_txs_size(known_txs) > 50000:
+                print >>sys.stderr, 'Share with too many new transactions detected! Jumping from %s to %s!' % (format_hash(best), format_hash(best_share.previous_hash))
                 best = best_share.previous_hash
             
             timestamp_cutoff = min(int(time.time()), best_share.timestamp) - 3600
