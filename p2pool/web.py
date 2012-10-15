@@ -407,7 +407,7 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     def add_point():
         if tracker.get_height(best_share_var.value) < 10:
             return None
-        lookbehind = min(tracker.get_height(best_share_var.value), 3600//net.SHARE_PERIOD)
+        lookbehind = min(net.CHAIN_LENGTH, 60*60//net.SHARE_PERIOD, tracker.get_height(best_share_var.value))
         t = time.time()
         
         hd.datastreams['pool_rates'].add_datum(t, p2pool_data.get_stale_counts(tracker, best_share_var.value, lookbehind, rates=True))
