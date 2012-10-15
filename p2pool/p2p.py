@@ -323,11 +323,13 @@ class Protocol(p2protocol.Protocol):
         ('tx_hashes', pack.ListType(pack.IntType(256))),
     ])
     def handle_have_tx(self, tx_hashes):
+        assert self.remote_tx_hashes.isdisjoint(tx_hashes)
         self.remote_tx_hashes.update(tx_hashes)
     message_losing_tx = pack.ComposedType([
         ('tx_hashes', pack.ListType(pack.IntType(256))),
     ])
     def handle_losing_tx(self, tx_hashes):
+        assert self.remote_tx_hashes.issuperset(tx_hashes)
         self.remote_tx_hashes.difference_update(tx_hashes)
     
     
@@ -337,28 +339,41 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_remember_tx(self, tx_hashes, txs):
         for tx_hash in tx_hashes:
-            if tx_hash not in self.remembered_txs:
-                if tx_hash in self.node.known_txs_var.value:
-                    tx = self.node.known_txs_var.value[tx_hash]
+            if tx_hash in self.remembered_txs:
+                print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
+                self.transport.loseConnection()
+                return
+            
+            if tx_hash in self.node.known_txs_var.value:
+                tx = self.node.known_txs_var.value[tx_hash]
+            else:
+                for cache in self.known_txs_cache.itervalues():
+                    if tx_hash in cache:
+                        tx = cache[tx_hash]
+                        print 'Transaction rescued from peer latency cache!'
+                        break
                 else:
-                    for cache in self.known_txs_cache.itervalues():
-                        if tx_hash in cache:
-                            tx = cache[tx_hash]
-                            print 'Transaction rescued from peer latency cache!'
-                            break
-                    else:
-                        print >>sys.stderr, 'Peer referenced unknown transaction, disconnecting'
-                        self.transport.loseConnection()
-                        return
-                
-                self.remembered_txs[tx_hash] = tx
-                self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+                    print >>sys.stderr, 'Peer referenced unknown transaction, disconnecting'
+                    self.transport.loseConnection()
+                    return
+            
+            self.remembered_txs[tx_hash] = tx
+            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
         new_known_txs = dict(self.node.known_txs_var.value)
+        warned = False
         for tx in txs:
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
-            if tx_hash not in self.remembered_txs:
-                self.remembered_txs[tx_hash] = tx
-                self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+            if tx_hash in self.remembered_txs:
+                print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
+                self.transport.loseConnection()
+                return
+            
+            if tx_hash in self.node.known_txs_var.value and not warned:
+                print 'Peer sent entire transaction that was already received'
+                warned = True
+            
+            self.remembered_txs[tx_hash] = tx
+            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
             new_known_txs[tx_hash] = tx
         self.node.known_txs_var.set(new_known_txs)
         if self.remembered_txs_size >= self.max_remembered_txs_size:
