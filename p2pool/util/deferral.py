@@ -103,7 +103,10 @@ class GenericDeferrer(object):
         def cancel(df):
             df, timer = self.map.pop(id)
             timer.cancel()
-        df = defer.Deferred(cancel)
+        try:
+            df = defer.Deferred(cancel)
+        except TypeError:
+            df = defer.Deferred() # handle older versions of Twisted
         def timeout():
             self.map.pop(id)
             df.errback(failure.Failure(defer.TimeoutError('in GenericDeferrer')))
