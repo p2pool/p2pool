@@ -264,7 +264,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             known_txs_var.set(new_known_txs)
         # forward transactions seen to bitcoind
         @known_txs_var.transitioned.watch
+        @defer.inlineCallbacks
         def _(before, after):
+            yield deferral.sleep(random.expovariate(1/1))
             for tx_hash in set(after) - set(before):
                 factory.conn.value.send_tx(tx=after[tx_hash])
         
