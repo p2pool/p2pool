@@ -50,6 +50,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
+        transaction_hashes=map(bitcoin_data.hash256, packed_transactions),
         subsidy=work['coinbasevalue'],
         time=work['time'] if 'time' in work else work['curtime'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
@@ -250,8 +251,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         def _(_=None):
             new_mining_txs = {}
             new_known_txs = dict(known_txs_var.value)
-            for tx in bitcoind_work.value['transactions']:
-                tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
+            for tx_hash, tx in zip(bitcoind_work.value['transaction_hashes'], bitcoind_work.value['transactions']):
                 new_mining_txs[tx_hash] = tx
                 new_known_txs[tx_hash] = tx
             mining_txs_var.set(new_mining_txs)
@@ -417,7 +417,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 new_known_txs.update(peer.remembered_txs)
             new_known_txs.update(mining_txs_var.value)
             for share in tracker.get_chain(best_share_var.value, min(120, tracker.get_height(best_share_var.value))):
-                for tx_hash in share.share_info['new_transaction_hashes']:
+                for tx_hash in share.new_transaction_hashes:
                     if tx_hash in known_txs_var.value:
                         new_known_txs[tx_hash] = known_txs_var.value[tx_hash]
             known_txs_var.set(new_known_txs)
