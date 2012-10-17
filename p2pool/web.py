@@ -13,7 +13,7 @@ from twisted.web import resource, static
 import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
-from util import deferred_resource, graph, math
+from util import deferred_resource, graph, math, pack
 
 def _atomic_read(filename):
     try:
@@ -216,7 +216,12 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     ))))
     web_root.putChild('peer_versions', WebInterface(lambda: dict(('%s:%i' % peer.addr, peer.other_sub_version) for peer in p2p_node.peers.itervalues())))
     web_root.putChild('payout_addr', WebInterface(lambda: bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)))
-    web_root.putChild('recent_blocks', WebInterface(lambda: [dict(ts=s.timestamp, hash='%064x' % s.header_hash) for s in tracker.get_chain(best_share_var.value, min(tracker.get_height(best_share_var.value), 24*60*60//net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
+    web_root.putChild('recent_blocks', WebInterface(lambda: [dict(
+        ts=s.timestamp,
+        hash='%064x' % s.header_hash,
+        number=pack.IntType(24).unpack(s.share_data['coinbase'][1:4]),
+        share='%064x' % s.hash,
+    ) for s in tracker.get_chain(best_share_var.value, min(tracker.get_height(best_share_var.value), 24*60*60//net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
     web_root.putChild('stale_rates', WebInterface(lambda: p2pool_data.get_stale_counts(tracker, best_share_var.value, 720, rates=True)))
     

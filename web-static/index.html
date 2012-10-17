@@ -2,6 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
     <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
         <title>P2Pool</title>
         <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
         <script type="text/javascript" src="d3.v2.min.js"></script>
@@ -72,8 +73,10 @@
                 
                 d3.json('/recent_blocks', function(blocks) {
                     var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
-                    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()})
+                    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
+                    tr.append('td').text(function(block){return block.number});
                     tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return currency_info.block_explorer_url_prefix + block.hash});
+                    tr.append('td').append('a').text('→').attr('href', function(block){return 'share.html#' + block.share});
                 });
             });
             
@@ -115,7 +118,7 @@
         <h2>Blocks found in last day:</h2>
         <p>Note that blocks may have been orphaned from the P2Pool chain and so not be here.</p>
         <table border="1" id="blocks">
-            <tr><th>time</th><th>hash</th></tr>
+            <tr><th>time</th><th>number</th><th>hash/explorer link</th><th>share</th></tr>
         </table>
         
         <h2>Payouts if a block were found NOW:</h2>
