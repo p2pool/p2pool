@@ -44,7 +44,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var, bitcoin_warning_var, traffic_happened):
+def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, get_stale_counts, my_pubkey_hash, local_rate_monitor, worker_fee, p2p_node, my_share_hashes, pseudoshare_received, share_received, best_share_var, bitcoin_warning_var, traffic_happened, donation_percentage):
     start_time = time.time()
     
     web_root = resource.Resource()
@@ -176,6 +176,7 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
             attempts_to_block=bitcoin_data.target_to_average_attempts(bitcoind_work.value['bits'].target),
             block_value=bitcoind_work.value['subsidy']*1e-8,
             warnings=p2pool_data.get_warnings(tracker, best_share_var.value, net, bitcoin_warning_var.value, bitcoind_work.value),
+            donation_proportion=donation_percentage/100,
         )
     
     class WebInterface(deferred_resource.DeferredResource):
