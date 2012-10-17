@@ -509,11 +509,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         print repr(line)
                     irc.IRCClient.lineReceived(self, line)
                 def signedOn(self):
+                    self.in_channel = False
                     irc.IRCClient.signedOn(self)
                     self.factory.resetDelay()
                     self.join(self.channel)
                     @defer.inlineCallbacks
                     def new_share(share):
+                        if not self.in_channel:
+                            return
                         if share.pow_hash <= share.header['bits'].target and abs(share.timestamp - time.time()) < 10*60:
                             yield deferral.sleep(random.expovariate(1/60))
                             message = '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.new_script, net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
@@ -522,6 +525,10 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                                 self._remember_message(message)
                     self.watch_id = tracker.verified.added.watch(new_share)
                     self.recent_messages = []
+                def joined(self, channel):
+                    self.in_channel = True
+                def left(self, channel):
+                    self.in_channel = False
                 def _remember_message(self, message):
                     self.recent_messages.append(message)
                     while len(self.recent_messages) > 100:
