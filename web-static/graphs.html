@@ -102,10 +102,10 @@
                     first_tr.append('th').text(line.label + '/(' + unit + ')');
                     
                     var new_data = []
-                    for(var j = 0; j < lines.length; ++j)
+                    for(var j = 0; j < line.data.length; ++j)
                         if(j % 7 == 3)
                             new_data.push(line.data[j]);
-                    var tr = table_sel.selectAll().data(line.data).enter().append('tr');
+                    var tr = table_sel.selectAll().data(new_data).enter().append('tr');
                     tr.append('td').text(function(datum){return new Date(1000*datum[0]).toString()});
                     tr.append('td').text(function(datum){return d3.format(".3s")(datum[1])});
                 }
