@@ -50,6 +50,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
+        transaction_hashes=map(bitcoin_data.hash256, packed_transactions),
         subsidy=work['coinbasevalue'],
         time=work['time'] if 'time' in work else work['curtime'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
@@ -226,12 +227,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         # BEST SHARE
         
+        known_txs_var = variable.Variable({}) # hash -> tx
+        mining_txs_var = variable.Variable({}) # hash -> tx
         get_height_rel_highest = yield height_tracker.get_height_rel_highest_func(bitcoind, factory, lambda: bitcoind_work.value['previous_block'], net)
         
         best_share_var = variable.Variable(None)
         desired_var = variable.Variable(None)
         def set_best_share():
-            best, desired = tracker.think(get_height_rel_highest, bitcoind_work.value['previous_block'], bitcoind_work.value['bits'])
+            best, desired = tracker.think(get_height_rel_highest, bitcoind_work.value['previous_block'], bitcoind_work.value['bits'], known_txs_var.value)
             
             best_share_var.set(best)
             desired_var.set(desired)
@@ -242,6 +245,30 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print
         
         # setup p2p logic and join p2pool network
+        
+        # update mining_txs according to getwork results
+        @bitcoind_work.changed.run_and_watch
+        def _(_=None):
+            new_mining_txs = {}
+            new_known_txs = dict(known_txs_var.value)
+            for tx_hash, tx in zip(bitcoind_work.value['transaction_hashes'], bitcoind_work.value['transactions']):
+                new_mining_txs[tx_hash] = tx
+                new_known_txs[tx_hash] = tx
+            mining_txs_var.set(new_mining_txs)
+            known_txs_var.set(new_known_txs)
+        # add p2p transactions from bitcoind to known_txs
+        @factory.new_tx.watch
+        def _(tx):
+            new_known_txs = dict(known_txs_var.value)
+            new_known_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
+            known_txs_var.set(new_known_txs)
+        # forward transactions seen to bitcoind
+        @known_txs_var.transitioned.watch
+        @defer.inlineCallbacks
+        def _(before, after):
+            yield deferral.sleep(random.expovariate(1/1))
+            for tx_hash in set(after) - set(before):
+                factory.conn.value.send_tx(tx=after[tx_hash])
         
         class Node(p2p.Node):
             def handle_shares(self, shares, peer):
@@ -326,7 +353,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         @tracker.verified.added.watch
         def _(share):
             if share.pow_hash <= share.header['bits'].target:
-                submit_block(share.as_block(tracker), ignore_failure=True)
+                block = share.as_block(tracker, known_txs_var.value)
+                if block is None:
+                    print >>sys.stderr, 'GOT INCOMPLETE BLOCK FROM PEER! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
+                    return
+                submit_block(block, ignore_failure=True)
                 print
                 print 'GOT BLOCK FROM PEER! Passing to bitcoind! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
                 print
@@ -377,8 +408,22 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             connect_addrs=connect_addrs,
             max_incoming_conns=args.p2pool_conns,
             traffic_happened=traffic_happened,
+            known_txs_var=known_txs_var,
+            mining_txs_var=mining_txs_var,
         )
         p2p_node.start()
+        
+        def forget_old_txs():
+            new_known_txs = {}
+            for peer in p2p_node.peers.itervalues():
+                new_known_txs.update(peer.remembered_txs)
+            new_known_txs.update(mining_txs_var.value)
+            for share in tracker.get_chain(best_share_var.value, min(120, tracker.get_height(best_share_var.value))):
+                for tx_hash in share.new_transaction_hashes:
+                    if tx_hash in known_txs_var.value:
+                        new_known_txs[tx_hash] = known_txs_var.value[tx_hash]
+            known_txs_var.set(new_known_txs)
+        task.LoopingCall(forget_old_txs).start(10)
         
         def save_addrs():
             with open(os.path.join(datadir_path, 'addrs'), 'wb') as f:
@@ -400,7 +445,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 shares.append(share)
             
             for peer in list(p2p_node.peers.itervalues()):
-                yield peer.sendShares([share for share in shares if share.peer is not peer])
+                yield peer.sendShares([share for share in shares if share.peer is not peer], tracker, known_txs_var.value, include_txs_with=[share_hash])
         
         # send share when the chain changes to their chain
         best_share_var.changed.watch(broadcast_share)

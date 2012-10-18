@@ -205,6 +205,7 @@ def get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, 
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
     web_root.putChild('peer_addresses', WebInterface(lambda: ['%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port) for peer in p2p_node.peers.itervalues()]))
+    web_root.putChild('peer_txpool_sizes', WebInterface(lambda: dict(('%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port), peer.remembered_txs_size) for peer in p2p_node.peers.itervalues())))
     web_root.putChild('pings', WebInterface(defer.inlineCallbacks(lambda: defer.returnValue(
         dict([(a, (yield b)) for a, b in
             [(

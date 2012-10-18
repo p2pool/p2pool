@@ -15,7 +15,17 @@ from p2pool.util import deferral, p2protocol, pack, variable
 class PeerMisbehavingError(Exception):
     pass
 
+
+def fragment(f, **kwargs):
+    try:
+        return f(**kwargs)
+    except p2protocol.TooLong:
+        att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
+        return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+
 class Protocol(p2protocol.Protocol):
+    max_remembered_txs_size = 2500000
+    
     def __init__(self, node, incoming):
         p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
         self.node = node
@@ -29,10 +39,12 @@ class Protocol(p2protocol.Protocol):
         
         self.factory.proto_made_connection(self)
         
+        self.connection_lost_event = variable.Event()
+        
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=4,
+            version=8,
             services=0,
             addr_to=dict(
                 services=0,
@@ -58,6 +70,13 @@ class Protocol(p2protocol.Protocol):
             timeout=15,
             on_timeout=self.transport.loseConnection,
         )
+        
+        self.remote_tx_hashes = set() # view of peer's known_txs # not actually initially empty, but sending txs instead of tx hashes won't hurt
+        self.remote_remembered_txs_size = 0
+        
+        self.remembered_txs = {} # view of peer's mining_txs
+        self.remembered_txs_size = 0
+        self.known_txs_cache = {}
     
     def _connect_timeout(self):
         self.timeout_delayed = None
@@ -137,6 +156,43 @@ class Protocol(p2protocol.Protocol):
         
         if best_share_hash is not None:
             self.node.handle_share_hashes([best_share_hash], self)
+        
+        if self.other_version < 8:
+            return
+        
+        def update_remote_view_of_my_known_txs(before, after):
+            added = set(after) - set(before)
+            removed = set(before) - set(after)
+            if added:
+                self.send_have_tx(tx_hashes=list(added))
+            if removed:
+                self.send_losing_tx(tx_hashes=list(removed))
+                
+                # cache forgotten txs here for a little while so latency of "losing_tx" packets doesn't cause problems
+                key = max(self.known_txs_cache) + 1 if self.known_txs_cache else 0
+                self.known_txs_cache[key] = dict((h, before[h]) for h in removed)
+                reactor.callLater(20, self.known_txs_cache.pop, key)
+        watch_id = self.node.known_txs_var.transitioned.watch(update_remote_view_of_my_known_txs)
+        self.connection_lost_event.watch(lambda: self.node.known_txs_var.transitioned.unwatch(watch_id))
+        
+        self.send_have_tx(tx_hashes=self.node.known_txs_var.value.keys())
+        
+        def update_remote_view_of_my_mining_txs(before, after):
+            added = set(after) - set(before)
+            removed = set(before) - set(after)
+            if added:
+                self.remote_remembered_txs_size += sum(len(bitcoin_data.tx_type.pack(after[x])) for x in added)
+                assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
+                fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
+            if removed:
+                self.send_forget_tx(tx_hashes=removed)
+                self.remote_remembered_txs_size -= sum(len(bitcoin_data.tx_type.pack(before[x])) for x in removed)
+        watch_id2 = self.node.mining_txs_var.transitioned.watch(update_remote_view_of_my_mining_txs)
+        self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
+        
+        self.remote_remembered_txs_size += sum(len(bitcoin_data.tx_type.pack(x)) for x in self.node.mining_txs_var.value.values())
+        assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
+        fragment(self.send_remember_tx, tx_hashes=[], txs=self.node.mining_txs_var.value.values())
     
     message_ping = pack.ComposedType([])
     def handle_ping(self):
@@ -201,17 +257,33 @@ class Protocol(p2protocol.Protocol):
     def handle_shares(self, shares):
         self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] not in [6, 7]], self)
     
-    def sendShares(self, shares):
-        def att(f, **kwargs):
-            try:
-                return f(**kwargs)
-            except p2protocol.TooLong:
-                att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-                return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
-        if shares:
-            return att(self.send_shares, shares=[share.as_share() for share in shares])
-        else:
+    def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
+        if not shares:
             return defer.succeed(None)
+        
+        if self.other_version >= 8:
+            tx_hashes = set()
+            for share in shares:
+                if share.hash in include_txs_with:
+                    tx_hashes.update(share.get_other_tx_hashes(tracker))
+            
+            hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
+            
+            new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(len(bitcoin_data.tx_type.pack(known_txs[x])) for x in hashes_to_send)
+            if new_remote_remembered_txs_size > self.max_remembered_txs_size:
+                raise ValueError('shares have too many txs')
+            self.remote_remembered_txs_size = new_remote_remembered_txs_size
+            
+            fragment(self.send_remember_tx, tx_hashes=[x for x in hashes_to_send if x in self.remote_tx_hashes], txs=[known_txs[x] for x in hashes_to_send if x not in self.remote_tx_hashes])
+        
+        res = fragment(self.send_shares, shares=[share.as_share() for share in shares])
+        
+        if self.other_version >= 8:
+            res = self.send_forget_tx(tx_hashes=hashes_to_send)
+            
+            self.remote_remembered_txs_size -= sum(len(bitcoin_data.tx_type.pack(known_txs[x])) for x in hashes_to_send)
+        
+        return res
     
     
     message_sharereq = pack.ComposedType([
@@ -239,13 +311,85 @@ class Protocol(p2protocol.Protocol):
             res = failure.Failure("sharereply result: " + result)
         self.get_shares.got_response(id, res)
     
+    
     message_bestblock = pack.ComposedType([
         ('header', bitcoin_data.block_header_type),
     ])
     def handle_bestblock(self, header):
         self.node.handle_bestblock(header, self)
     
+    
+    message_have_tx = pack.ComposedType([
+        ('tx_hashes', pack.ListType(pack.IntType(256))),
+    ])
+    def handle_have_tx(self, tx_hashes):
+        assert self.remote_tx_hashes.isdisjoint(tx_hashes)
+        self.remote_tx_hashes.update(tx_hashes)
+    message_losing_tx = pack.ComposedType([
+        ('tx_hashes', pack.ListType(pack.IntType(256))),
+    ])
+    def handle_losing_tx(self, tx_hashes):
+        assert self.remote_tx_hashes.issuperset(tx_hashes)
+        self.remote_tx_hashes.difference_update(tx_hashes)
+    
+    
+    message_remember_tx = pack.ComposedType([
+        ('tx_hashes', pack.ListType(pack.IntType(256))),
+        ('txs', pack.ListType(bitcoin_data.tx_type)),
+    ])
+    def handle_remember_tx(self, tx_hashes, txs):
+        for tx_hash in tx_hashes:
+            if tx_hash in self.remembered_txs:
+                print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
+                self.transport.loseConnection()
+                return
+            
+            if tx_hash in self.node.known_txs_var.value:
+                tx = self.node.known_txs_var.value[tx_hash]
+            else:
+                for cache in self.known_txs_cache.itervalues():
+                    if tx_hash in cache:
+                        tx = cache[tx_hash]
+                        print 'Transaction rescued from peer latency cache!'
+                        break
+                else:
+                    print >>sys.stderr, 'Peer referenced unknown transaction, disconnecting'
+                    self.transport.loseConnection()
+                    return
+            
+            self.remembered_txs[tx_hash] = tx
+            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+        new_known_txs = dict(self.node.known_txs_var.value)
+        warned = False
+        for tx in txs:
+            tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
+            if tx_hash in self.remembered_txs:
+                print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
+                self.transport.loseConnection()
+                return
+            
+            if tx_hash in self.node.known_txs_var.value and not warned:
+                print 'Peer sent entire transaction that was already received'
+                warned = True
+            
+            self.remembered_txs[tx_hash] = tx
+            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+            new_known_txs[tx_hash] = tx
+        self.node.known_txs_var.set(new_known_txs)
+        if self.remembered_txs_size >= self.max_remembered_txs_size:
+            raise PeerMisbehavingError('too much transaction data stored')
+    message_forget_tx = pack.ComposedType([
+        ('tx_hashes', pack.ListType(pack.IntType(256))),
+    ])
+    def handle_forget_tx(self, tx_hashes):
+        for tx_hash in tx_hashes:
+            self.remembered_txs_size -= len(bitcoin_data.tx_type.pack(self.remembered_txs[tx_hash]))
+            assert self.remembered_txs_size >= 0
+            del self.remembered_txs[tx_hash]
+    
+    
     def connectionLost(self, reason):
+        self.connection_lost_event.happened()
         if self.timeout_delayed is not None:
             self.timeout_delayed.cancel()
         if self.connected2:
@@ -407,7 +551,7 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event()):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event(), known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({})):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
@@ -415,6 +559,8 @@ class Node(object):
         self.connect_addrs = connect_addrs
         self.preferred_storage = preferred_storage
         self.traffic_happened = traffic_happened
+        self.known_txs_var = known_txs_var
+        self.mining_txs_var = mining_txs_var
         
         self.nonce = random.randrange(2**64)
         self.peers = {}
