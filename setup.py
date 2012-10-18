@@ -34,7 +34,7 @@ try:
         console=['run_p2pool.py'],
         options=dict(py2exe=dict(
             bundle_files=1,
-            dll_excludes=['w9xpopen.exe'],
+            dll_excludes=['w9xpopen.exe', "mswsock.dll", "MSWSOCK.dll"],
             includes=['twisted.web.resource', 'ltc_scrypt'],
         )),
         zipfile=None,
