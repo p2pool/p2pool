@@ -190,6 +190,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
                 if self.tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
                     share_type = p2pool_data.Share
+                elif time.time() < 1351383661 and self.net.NAME == 'bitcoin':
+                    share_type = p2pool_data.Share
                 else:
                     counts = p2pool_data.get_desired_version_counts(self.tracker,
                         self.tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
