@@ -82,6 +82,41 @@
             function plot(g, unit, total_unit, lines, stack) {
                 // lines is a list of objects which have attributes data, color, and label
                 
+                var table_div = document.createElement("div");
+                g.node().parentNode.insertBefore(table_div, g.node().nextSibling);
+                table_div.style.display = "none";
+                
+                var showhide = document.createElement("p");
+                g.node().parentNode.insertBefore(showhide, g.node().nextSibling);
+                d3.select(showhide).append("a")
+                    .text('Show/hide table')
+                    .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
+                    .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
+                
+                for(var i = 0; i < lines.length; ++i) {
+                    var line = lines[i];
+                    var table_sel = d3.select(table_div).append('table').attr('border', 1).attr('style', 'float:left');
+                    
+                    var first_tr = table_sel.insert('tr');
+                    first_tr.append('th').text('Date');
+                    first_tr.append('th').text(line.label + '/(' + unit + ')');
+                    
+                    var new_data = []
+                    for(var j = 0; j < lines.length; ++j)
+                        if(j % 7 == 3)
+                            new_data.push(line.data[j]);
+                    var tr = table_sel.selectAll().data(line.data).enter().append('tr');
+                    tr.append('td').text(function(datum){return new Date(1000*datum[0]).toString()});
+                    tr.append('td').text(function(datum){return d3.format(".3s")(datum[1])});
+                }
+                d3.select(table_div).append('div').attr('style', 'clear:both');
+                
+                d3.select(table_div).append('p').append("a")
+                    .text('Show/hide table')
+                    .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
+                    .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
+                
+                
                 var w = 700;
                 var h = 300;
                 var margin_v = 40;
