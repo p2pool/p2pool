@@ -185,7 +185,7 @@ class Protocol(p2protocol.Protocol):
                 assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
                 fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
             if removed:
-                self.send_forget_tx(tx_hashes=removed)
+                self.send_forget_tx(tx_hashes=list(removed))
                 self.remote_remembered_txs_size -= sum(len(bitcoin_data.tx_type.pack(before[x])) for x in removed)
         watch_id2 = self.node.mining_txs_var.transitioned.watch(update_remote_view_of_my_mining_txs)
         self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
