@@ -363,13 +363,17 @@
                 });
             }
             
+            periods = ["Hour", "Day", "Week", "Month", "Year"];
+            d3.select("#period_chooser").selectAll().data(periods).enter().append("a")
+                .text(function(period) { return period })
+                .attr('href', function(period){ return "?" + period })
+                .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
+            period = window.location.search.substr(1);
+            if(period == "") {
+                window.location.search = "Day";
+            }
             d3.json('/web/currency_info', function(currency_info) {
-                periods = ["Hour", "Day", "Week", "Month", "Year"];
-                d3.select("#period_chooser").selectAll().data(periods).enter().append("span")
-                    .text(function(period) { return period })
-                    .on("click", function(period){ change_period(period, currency_info) })
-                    .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
-                change_period(periods[1], currency_info);
+                change_period(period, currency_info);
             });
         </script>
     </body>
