@@ -85,13 +85,10 @@ AttributeDelta = get_attributedelta_type(dict(
     height=lambda item: 1,
 ))
 
-class Tracker(object):
-    def __init__(self, items=[], delta_type=AttributeDelta):
-        self.items = {} # hash -> item
-        self.reverse = {} # delta.tail -> set of item_hashes
-        
-        self.heads = {} # head hash -> tail_hash
-        self.tails = {} # tail hash -> set of head hashes
+class TrackerView(object):
+    def __init__(self, tracker, delta_type):
+        self._tracker = tracker
+        self._delta_type = delta_type
         
         self._deltas = {} # item_hash -> delta, ref
         self._reverse_deltas = {} # ref -> set of item_hashes
@@ -100,15 +97,134 @@ class Tracker(object):
         self._delta_refs = {} # ref -> delta
         self._reverse_delta_refs = {} # delta.tail -> ref
         
+        self._tracker.preremove_special.watch_weakref(self, lambda self, item: self._handle_preremove_special(item))
+        self._tracker.postremove_special.watch_weakref(self, lambda self, item: self._handle_postremove_special(item))
+        self._tracker.removed.watch_weakref(self, lambda self, item: self._handle_removed(item))
+    
+    def _handle_preremove_special(self, item):
+        delta = self._delta_type.from_element(item)
+        
+        # move delta refs referencing children down to this, so they can be moved up in one step
+        if delta.tail in self._reverse_delta_refs:
+            for x in list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set())):
+                self.get_last(x)
+            assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, None), set()))
+    
+    def _handle_postremove_special(self, item):
+        delta = self._delta_type.from_element(item)
+        
+        # move ref pointing to this up
+        if delta.tail in self._reverse_delta_refs:
+            assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set()))
+            
+            ref = self._reverse_delta_refs[delta.tail]
+            cur_delta = self._delta_refs[ref]
+            assert cur_delta.tail == delta.tail
+            self._delta_refs[ref] = cur_delta - self._delta_type.from_element(item)
+            assert self._delta_refs[ref].tail == delta.head
+            del self._reverse_delta_refs[delta.tail]
+            self._reverse_delta_refs[delta.head] = ref
+    
+    def _handle_removed(self, item):
+        delta = self._delta_type.from_element(item)
+        
+        # delete delta entry and ref if it is empty
+        if delta.head in self._deltas:
+            delta1, ref = self._deltas.pop(delta.head)
+            self._reverse_deltas[ref].remove(delta.head)
+            if not self._reverse_deltas[ref]:
+                del self._reverse_deltas[ref]
+                delta2 = self._delta_refs.pop(ref)
+                del self._reverse_delta_refs[delta2.tail]
+    
+    
+    def get_height(self, item_hash):
+        return self.get_delta_to_last(item_hash).height
+    
+    def get_work(self, item_hash):
+        return self.get_delta_to_last(item_hash).work
+    
+    def get_last(self, item_hash):
+        return self.get_delta_to_last(item_hash).tail
+    
+    def get_height_and_last(self, item_hash):
+        delta = self.get_delta_to_last(item_hash)
+        return delta.height, delta.tail
+    
+    def _get_delta(self, item_hash):
+        if item_hash in self._deltas:
+            delta1, ref = self._deltas[item_hash]
+            delta2 = self._delta_refs[ref]
+            res = delta1 + delta2
+        else:
+            res = self._delta_type.from_element(self._tracker.items[item_hash])
+        assert res.head == item_hash
+        return res
+    
+    def _set_delta(self, item_hash, delta):
+        other_item_hash = delta.tail
+        if other_item_hash not in self._reverse_delta_refs:
+            ref = self._ref_generator.next()
+            assert ref not in self._delta_refs
+            self._delta_refs[ref] = self._delta_type.get_none(other_item_hash)
+            self._reverse_delta_refs[other_item_hash] = ref
+            del ref
+        
+        ref = self._reverse_delta_refs[other_item_hash]
+        ref_delta = self._delta_refs[ref]
+        assert ref_delta.tail == other_item_hash
+        
+        if item_hash in self._deltas:
+            prev_ref = self._deltas[item_hash][1]
+            self._reverse_deltas[prev_ref].remove(item_hash)
+            if not self._reverse_deltas[prev_ref] and prev_ref != ref:
+                self._reverse_deltas.pop(prev_ref)
+                x = self._delta_refs.pop(prev_ref)
+                self._reverse_delta_refs.pop(x.tail)
+        self._deltas[item_hash] = delta - ref_delta, ref
+        self._reverse_deltas.setdefault(ref, set()).add(item_hash)
+    
+    def get_delta_to_last(self, item_hash):
+        assert isinstance(item_hash, (int, long, type(None)))
+        delta = self._delta_type.get_none(item_hash)
+        updates = []
+        while delta.tail in self._tracker.items:
+            updates.append((delta.tail, delta))
+            this_delta = self._get_delta(delta.tail)
+            delta += this_delta
+        for update_hash, delta_then in updates:
+            self._set_delta(update_hash, delta - delta_then)
+        return delta
+    
+    def get_delta(self, item, ancestor):
+        assert self._tracker.is_child_of(ancestor, item)
+        return self.get_delta_to_last(item) - self.get_delta_to_last(ancestor)
+
+class Tracker(object):
+    def __init__(self, items=[], delta_type=AttributeDelta):
+        self.items = {} # hash -> item
+        self.reverse = {} # delta.tail -> set of item_hashes
+        
+        self.heads = {} # head hash -> tail_hash
+        self.tails = {} # tail hash -> set of head hashes
+        
         self.added = variable.Event()
+        self.preremove_special = variable.Event()
+        self.postremove_special = variable.Event()
         self.removed = variable.Event()
         
         self.get_nth_parent_hash = DistanceSkipList(self)
         
         self._delta_type = delta_type
+        self._default_view = TrackerView(self, delta_type)
         
         for item in items:
             self.add(item)
+    
+    def __getattr__(self, name):
+        attr = getattr(self._default_view, name)
+        setattr(self, name, attr)
+        return attr
     
     def add(self, item):
         assert not isinstance(item, (int, long, type(None)))
@@ -165,39 +281,16 @@ class Tracker(object):
                 self.tails[tail].add(delta.tail)
                 self.heads[delta.tail] = tail
         elif delta.tail in self.tails and len(self.reverse[delta.tail]) <= 1:
-            # move delta refs referencing children down to this, so they can be moved up in one step
-            if delta.tail in self._reverse_delta_refs:
-                for x in list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set())):
-                    self.get_last(x)
-                assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, None), set()))
+            self.preremove_special.happened(item)
             
             heads = self.tails.pop(delta.tail)
             for head in heads:
                 self.heads[head] = delta.head
             self.tails[delta.head] = set(heads)
             
-            # move ref pointing to this up
-            if delta.tail in self._reverse_delta_refs:
-                assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set()))
-                
-                ref = self._reverse_delta_refs[delta.tail]
-                cur_delta = self._delta_refs[ref]
-                assert cur_delta.tail == delta.tail
-                self._delta_refs[ref] = cur_delta - self._delta_type.from_element(item)
-                assert self._delta_refs[ref].tail == delta.head
-                del self._reverse_delta_refs[delta.tail]
-                self._reverse_delta_refs[delta.head] = ref
+            self.postremove_special.happened(item)
         else:
             raise NotImplementedError()
-        
-        # delete delta entry and ref if it is empty
-        if delta.head in self._deltas:
-            delta1, ref = self._deltas.pop(delta.head)
-            self._reverse_deltas[ref].remove(delta.head)
-            if not self._reverse_deltas[ref]:
-                del self._reverse_deltas[ref]
-                delta2 = self._delta_refs.pop(ref)
-                del self._reverse_delta_refs[delta2.tail]
         
         self.items.pop(delta.head)
         self.reverse[delta.tail].remove(delta.head)
@@ -205,68 +298,6 @@ class Tracker(object):
             self.reverse.pop(delta.tail)
         
         self.removed.happened(item)
-    
-    def get_height(self, item_hash):
-        return self.get_delta_to_last(item_hash).height
-    
-    def get_work(self, item_hash):
-        return self.get_delta_to_last(item_hash).work
-    
-    def get_last(self, item_hash):
-        return self.get_delta_to_last(item_hash).tail
-    
-    def get_height_and_last(self, item_hash):
-        delta = self.get_delta_to_last(item_hash)
-        return delta.height, delta.tail
-    
-    def _get_delta(self, item_hash):
-        if item_hash in self._deltas:
-            delta1, ref = self._deltas[item_hash]
-            delta2 = self._delta_refs[ref]
-            res = delta1 + delta2
-        else:
-            res = self._delta_type.from_element(self.items[item_hash])
-        assert res.head == item_hash
-        return res
-    
-    def _set_delta(self, item_hash, delta):
-        other_item_hash = delta.tail
-        if other_item_hash not in self._reverse_delta_refs:
-            ref = self._ref_generator.next()
-            assert ref not in self._delta_refs
-            self._delta_refs[ref] = self._delta_type.get_none(other_item_hash)
-            self._reverse_delta_refs[other_item_hash] = ref
-            del ref
-        
-        ref = self._reverse_delta_refs[other_item_hash]
-        ref_delta = self._delta_refs[ref]
-        assert ref_delta.tail == other_item_hash
-        
-        if item_hash in self._deltas:
-            prev_ref = self._deltas[item_hash][1]
-            self._reverse_deltas[prev_ref].remove(item_hash)
-            if not self._reverse_deltas[prev_ref] and prev_ref != ref:
-                self._reverse_deltas.pop(prev_ref)
-                x = self._delta_refs.pop(prev_ref)
-                self._reverse_delta_refs.pop(x.tail)
-        self._deltas[item_hash] = delta - ref_delta, ref
-        self._reverse_deltas.setdefault(ref, set()).add(item_hash)
-    
-    def get_delta_to_last(self, item_hash):
-        assert isinstance(item_hash, (int, long, type(None)))
-        delta = self._delta_type.get_none(item_hash)
-        updates = []
-        while delta.tail in self.items:
-            updates.append((delta.tail, delta))
-            this_delta = self._get_delta(delta.tail)
-            delta += this_delta
-        for update_hash, delta_then in updates:
-            self._set_delta(update_hash, delta - delta_then)
-        return delta
-    
-    def get_delta(self, item, ancestor):
-        assert self.is_child_of(ancestor, item)
-        return self.get_delta_to_last(item) - self.get_delta_to_last(ancestor)
     
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
