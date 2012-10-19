@@ -1,4 +1,5 @@
 import itertools
+import weakref
 
 from twisted.internet import defer, reactor
 from twisted.python import failure, log
@@ -13,6 +14,10 @@ class Event(object):
     def run_and_watch(self, func):
         func()
         return self.watch(func)
+    def watch_weakref(self, obj, func):
+        # func must not contain a reference to obj!
+        watch_id = self.watch(lambda *args: func(obj_ref(), *args))
+        obj_ref = weakref.ref(obj, lambda _: self.unwatch(watch_id))
     def watch(self, func):
         id = self.id_generator.next()
         self.observers[id] = func

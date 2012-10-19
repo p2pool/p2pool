@@ -3,7 +3,6 @@ forest data structure
 '''
 
 import itertools
-import weakref
 
 from p2pool.util import skiplist, variable
 
@@ -13,8 +12,7 @@ class TrackerSkipList(skiplist.SkipList):
         skiplist.SkipList.__init__(self)
         self.tracker = tracker
         
-        self_ref = weakref.ref(self, lambda _: tracker.removed.unwatch(watch_id))
-        watch_id = self.tracker.removed.watch(lambda item: self_ref().forget_item(item.hash))
+        self.tracker.removed.watch_weakref(self, lambda self, item: self.forget_item(item.hash))
     
     def previous(self, element):
         return self.tracker._delta_type.from_element(self.tracker.items[element]).tail
