@@ -98,9 +98,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         yield check()
         temp_work = yield getwork(bitcoind)
         
-        if not args.testnet:
-            factory = yield connect_p2p()
-        
         bitcoind_warning_var = variable.Variable(None)
         @defer.inlineCallbacks
         def poll_warnings():
@@ -113,6 +110,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print '    Current block hash: %x' % (temp_work['previous_block'],)
         print '    Current block height: %i' % (temp_work['height'] - 1,)
         print
+        
+        if not args.testnet:
+            factory = yield connect_p2p()
         
         print 'Determining payout address...'
         if args.pubkey_hash is None:
