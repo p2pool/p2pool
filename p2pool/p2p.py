@@ -2,6 +2,7 @@ from __future__ import division
 
 import math
 import random
+import sys
 import time
 
 from twisted.internet import defer, protocol, reactor
@@ -20,8 +21,8 @@ def fragment(f, **kwargs):
     try:
         return f(**kwargs)
     except p2protocol.TooLong:
-        att(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-        return att(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+        fragment(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
+        return fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
     max_remembered_txs_size = 2500000

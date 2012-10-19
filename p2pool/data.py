@@ -3,6 +3,7 @@ from __future__ import division
 import hashlib
 import os
 import random
+import sys
 import time
 
 from twisted.python import log
