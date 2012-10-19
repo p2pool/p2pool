@@ -88,7 +88,7 @@ AttributeDelta = get_attributedelta_type(dict(
 ))
 
 class Tracker(object):
-    def __init__(self, items=[], delta_type=AttributeDelta, subset_of=None):
+    def __init__(self, items=[], delta_type=AttributeDelta):
         self.items = {} # hash -> item
         self.reverse = {} # delta.tail -> set of item_hashes
         
@@ -105,13 +105,9 @@ class Tracker(object):
         self.added = variable.Event()
         self.removed = variable.Event()
         
-        if subset_of is None:
-            self.get_nth_parent_hash = DistanceSkipList(self)
-        else:
-            self.get_nth_parent_hash = subset_of.get_nth_parent_hash
+        self.get_nth_parent_hash = DistanceSkipList(self)
         
         self._delta_type = delta_type
-        self._subset_of = subset_of
         
         for item in items:
             self.add(item)
@@ -119,8 +115,6 @@ class Tracker(object):
     def add(self, item):
         assert not isinstance(item, (int, long, type(None)))
         delta = self._delta_type.from_element(item)
-        if self._subset_of is not None:
-            assert delta.head in self._subset_of.items
         
         if delta.head in self.items:
             raise ValueError('item already present')
@@ -151,8 +145,6 @@ class Tracker(object):
         assert isinstance(item_hash, (int, long, type(None)))
         if item_hash not in self.items:
             raise KeyError()
-        if self._subset_of is not None:
-            assert item_hash in self._subset_of.items
         
         item = self.items[item_hash]
         del item_hash
@@ -291,3 +283,20 @@ class Tracker(object):
             return None # not connected, so can't be determined
         height_up = child_height - height
         return height_up >= 0 and self.get_nth_parent_hash(possible_child_hash, height_up) == item_hash
+
+class SubsetTracker(Tracker):
+    def __init__(self, subset_of, **kwargs):
+        Tracker.__init__(self, **kwargs)
+        self.get_nth_parent_hash = subset_of.get_nth_parent_hash # overwrites Tracker.__init__'s
+        self._subset_of = subset_of
+    
+    def add(self, item):
+        delta = self._delta_type.from_element(item)
+        if self._subset_of is not None:
+            assert delta.head in self._subset_of.items
+        Tracker.add(self, item)
+    
+    def remove(self, item_hash):
+        if self._subset_of is not None:
+            assert item_hash in self._subset_of.items
+        Tracker.remove(self, item_hash)

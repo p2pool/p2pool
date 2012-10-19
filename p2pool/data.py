@@ -607,7 +607,7 @@ class OkayTracker(forest.Tracker):
             min_work=lambda share: bitcoin_data.target_to_average_attempts(share.max_target),
         )))
         self.net = net
-        self.verified = forest.Tracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
+        self.verified = forest.SubsetTracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
             work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
             my_count=lambda share: 1 if share.hash in my_share_hashes else 0,
             my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
