@@ -55,5 +55,5 @@ class SkipList(object):
             for x in updates:
                 updates[x] = updates[x][0], self.combine_deltas(updates[x][1], delta) if updates[x][1] is not None else delta
     
-    def finalize(self, sol):
+    def finalize(self, sol, args):
         return sol
