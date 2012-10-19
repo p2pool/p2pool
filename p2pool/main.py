@@ -101,13 +101,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if not args.testnet:
             factory = yield connect_p2p()
         
-        block_height_var = variable.Variable(None)
-        @defer.inlineCallbacks
-        def poll_height():
-            block_height_var.set((yield deferral.retry('Error while calling getblockcount:')(bitcoind.rpc_getblockcount)()))
-        yield poll_height()
-        task.LoopingCall(poll_height).start(60*60)
-        
         bitcoind_warning_var = variable.Variable(None)
         @defer.inlineCallbacks
         def poll_warnings():
@@ -118,7 +111,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block'],)
-        print '    Current block height: %i' % (block_height_var.value,)
+        print '    Current block height: %i' % (temp_work['height'] - 1,)
         print
         
         print 'Determining payout address...'
@@ -511,7 +504,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         get_current_txouts = lambda: p2pool_data.get_expected_payouts(tracker, best_share_var.value, bitcoind_work.value['bits'].target, bitcoind_work.value['subsidy'], net)
         
-        wb = work.WorkerBridge(my_pubkey_hash, net, args.donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, args.worker_fee, p2p_node, submit_block, set_best_share, broadcast_share, block_height_var)
+        wb = work.WorkerBridge(my_pubkey_hash, net, args.donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, args.worker_fee, p2p_node, submit_block, set_best_share, broadcast_share)
         web_root = web.get_web_root(tracker, bitcoind_work, get_current_txouts, datadir_path, net, wb.get_stale_counts, my_pubkey_hash, wb.local_rate_monitor, args.worker_fee, p2p_node, wb.my_share_hashes, wb.pseudoshare_received, wb.share_received, best_share_var, bitcoind_warning_var, traffic_happened, args.donation_percentage)
         worker_interface.WorkerInterface(wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
         

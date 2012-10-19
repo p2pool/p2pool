@@ -14,7 +14,7 @@ from util import jsonrpc, variable, deferral, math, pack
 import p2pool, p2pool.data as p2pool_data
 
 class WorkerBridge(worker_interface.WorkerBridge):
-    def __init__(self, my_pubkey_hash, net, donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, worker_fee, p2p_node, submit_block, set_best_share, broadcast_share, block_height_var):
+    def __init__(self, my_pubkey_hash, net, donation_percentage, bitcoind_work, best_block_header, merged_urls, best_share_var, tracker, my_share_hashes, my_doa_share_hashes, worker_fee, p2p_node, submit_block, set_best_share, broadcast_share):
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
@@ -32,7 +32,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.submit_block = submit_block
         self.set_best_share = set_best_share
         self.broadcast_share = broadcast_share
-        self.block_height_var = block_height_var
         
         self.pseudoshare_received = variable.Event()
         self.share_received = variable.Event()
@@ -93,7 +92,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     time=bb['timestamp'] + 600, # better way?
                     transactions=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
-                    subsidy=net.PARENT.SUBSIDY_FUNC(self.block_height_var.value),
+                    subsidy=net.PARENT.SUBSIDY_FUNC(self.bitcoind_work.value['height']),
                     last_update=self.bitcoind_work.value['last_update'],
                 )
             
