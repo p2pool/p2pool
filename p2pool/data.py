@@ -601,7 +601,7 @@ class WeightsSkipList(forest.TrackerSkipList):
         return math.add_dicts(*math.flatten_linked_list(weights_list)), total_weight, total_donation_weight
 
 class OkayTracker(forest.Tracker):
-    def __init__(self, net, my_share_hashes, my_doa_share_hashes):
+    def __init__(self, net):
         forest.Tracker.__init__(self, delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
             work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
             min_work=lambda share: bitcoin_data.target_to_average_attempts(share.max_target),
@@ -609,10 +609,6 @@ class OkayTracker(forest.Tracker):
         self.net = net
         self.verified = forest.SubsetTracker(delta_type=forest.get_attributedelta_type(dict(forest.AttributeDelta.attrs,
             work=lambda share: bitcoin_data.target_to_average_attempts(share.target),
-            my_count=lambda share: 1 if share.hash in my_share_hashes else 0,
-            my_doa_count=lambda share: 1 if share.hash in my_doa_share_hashes else 0,
-            my_orphan_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 'orphan' else 0,
-            my_dead_announce_count=lambda share: 1 if share.hash in my_share_hashes and share.share_data['stale_info'] == 'doa' else 0,
         )), subset_of=self)
         self.get_cumulative_weights = WeightsSkipList(self)
     

@@ -552,17 +552,17 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, traffic_happened=variable.Event(), known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({})):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({})):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
         self.addr_store = dict(addr_store)
         self.connect_addrs = connect_addrs
         self.preferred_storage = preferred_storage
-        self.traffic_happened = traffic_happened
         self.known_txs_var = known_txs_var
         self.mining_txs_var = mining_txs_var
         
+        self.traffic_happened = variable.Event()
         self.nonce = random.randrange(2**64)
         self.peers = {}
         self.bans = {} # address -> end_time
