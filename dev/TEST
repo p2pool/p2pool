@@ -1,0 +1,5 @@
+while true ; do
+	find -iname '*.pyc' | xargs rm
+	trial p2pool
+	git checkout HEAD^
+done
