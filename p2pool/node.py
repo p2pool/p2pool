@@ -241,6 +241,8 @@ class Node(object):
         @defer.inlineCallbacks
         def _(before, after):
             yield deferral.sleep(random.expovariate(1/1))
+            if self.factory.conn.value is None:
+                return
             for tx_hash in set(after) - set(before):
                 self.factory.conn.value.send_tx(tx=after[tx_hash])
         
