@@ -48,8 +48,8 @@
         <h2>Miners</h2>
         <div id="miners"></div>
         
-        <h2>Desired versions</h2>
-        <svg id="desired_versions"></svg>
+        <h2>Desired version rates</h2>
+        <svg id="desired_version_rates"></svg>
         
         <h2>Traffic rate</h2>
         <svg id="traffic_rate"></svg>
@@ -143,6 +143,8 @@
                         d3.max(data, function(d) { return d3.max(d.data, function(d) { return d.y0 + d.y; }) })
                     ]).range([h - margin_v, margin_v]);
                     
+                    var y_abs = d3.scale.linear().domain([0, 1]).range([h - margin_v, margin_v]);
+                    
                     g.selectAll().data(lines).enter().append("svg:path")
                         .attr("d", function(line){
                             return d3.svg.area()
@@ -154,15 +156,19 @@
                         })
                         .style("fill", function(line){return line.color})
                         .attr("stroke", function(line){return line.color})
-                        .attr("class", "plotline")
-                        .on("mouseover", function(line, i) {
-                            for(var j = 0; j < text_boxes.length; j++)
-                                text_boxes[j][1].attr("opacity", text_boxes[j][0] == i ? 1 : 0.3);
-                        });
+                        .attr("class", "plotline");
                     
-                    var text_boxes = [];
                     var total = 0;
                     var total_area = 0;
+                    for(var i = 0; i < lines.length; ++i) {
+                        var line = lines[i];
+                        var stats = get_area_mean(line.data);
+                        if(stats.mean != null) {
+                            total += stats.mean;
+                            total_area += stats.area;
+                        }
+                    }
+                    
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
@@ -175,40 +181,50 @@
                                     num += (d.y+1)*((d.y0 + d.y) + (d.y0))/2;
                                     denom += (d.y+1);
                                 }
-                            text_boxes.push([i, g.append("svg:text")
+                            g.append("svg:line")
+                                .style("stroke", line.color)
+                                .attr("x1", w - margin_h + 3)
+                                .attr("y1", y(num/denom))
+                                .attr("x2", w - margin_h + 10)
+                                .attr("y2", y_abs(i/lines.length));
+                            g.append("svg:text")
                                 .text(line.label + " (mean: " + d3.format(".3s")(stats.mean) + unit + ")")
                                 .attr("text-anchor", "start")
                                 .attr("dominant-baseline", "central")
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h + 10)
-                                .attr("y", y(num/denom))]);
+                                .attr("y", y_abs(i/lines.length));
                             if(total_unit != null)
-                                text_boxes.push([i, g.append("svg:text")
-                                    .text("Area: " + d3.format(".3s")(stats.area) + total_unit)
+                                g.append("svg:text")
+                                    .text("Area: " + d3.format(".3s")(stats.area) + total_unit + " (" + d3.format(".2p")(stats.area/total_area) + " total)")
                                     .attr("text-anchor", "start")
                                     .attr("dominant-baseline", "central")
                                     .attr("fill", line.color)
                                     .attr("x", w - margin_h + 10)
-                                    .attr("y", y(num/denom) + 12)]);
-                            total += stats.mean;
-                            total_area += stats.area;
+                                    .attr("y", y_abs(i/lines.length) + 12);
                         }
                     }
-                    text_boxes.push([i, g.append("svg:text")
-                        .text("- Total (mean: " + d3.format(".3s")(total) + unit + ")")
+                    g.append("svg:line")
+                        .style("stroke", "black")
+                        .attr("x1", w - margin_h + 3)
+                        .attr("y1", y(total))
+                        .attr("x2", w - margin_h + 10)
+                        .attr("y2", y_abs(1));
+                    g.append("svg:text")
+                        .text("Total (mean: " + d3.format(".3s")(total) + unit + ")")
                         .attr("text-anchor", "start")
                         .attr("dominant-baseline", "central")
                         .attr("fill", "black")
-                        .attr("x", w - margin_h)
-                        .attr("y", y(total))]);
+                        .attr("x", w - margin_h + 10)
+                        .attr("y", y_abs(1));
                     if(total_unit != null)
-                        text_boxes.push([i, g.append("svg:text")
+                        g.append("svg:text")
                             .text("Area: " + d3.format(".3s")(total_area) + total_unit)
                             .attr("text-anchor", "start")
                             .attr("dominant-baseline", "central")
                             .attr("fill", "black")
                             .attr("x", w - margin_h + 10)
-                            .attr("y", y(total) + 12)]);
+                            .attr("y", y_abs(1) + 12);
                 } else {
                     var y = d3.scale.linear().domain([
                         0,
@@ -224,39 +240,34 @@
                                 (line.data)
                         })
                         .style("stroke", function(line) { return line.color })
-                        .attr("class", "plotline")
-                        .on("mouseover", function(line, i) {
-                            for(var j = 0; j < text_boxes.length; j++)
-                                text_boxes[j][1].attr("opacity", text_boxes[j][0] == i ? 1 : 0.3);
-                        });
+                        .attr("class", "plotline");
                     
-                    var text_boxes = [];
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
                         if(stats.mean != null) {
-                            text_boxes.push([i, g.append("svg:text")
+                            g.append("svg:text")
                                 .text(line.label)
                                 .attr("text-anchor", "start")
                                 .attr("dominant-baseline", "central")
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h + 10)
-                                .attr("y", y(stats.mean) - 12)]);
-                            text_boxes.push([i, g.append("svg:text")
+                                .attr("y", y(stats.mean) - 12);
+                            g.append("svg:text")
                                 .text("-Mean: " + d3.format(".3s")(stats.mean) + unit)
                                 .attr("text-anchor", "start")
                                 .attr("dominant-baseline", "central")
                                 .attr("fill", line.color)
                                 .attr("x", w - margin_h)
-                                .attr("y", y(stats.mean))]);
+                                .attr("y", y(stats.mean));
                             if(total_unit != null)
-                                text_boxes.push([i, g.append("svg:text")
+                                g.append("svg:text")
                                     .text("Area: " + d3.format(".3s")(stats.area) + total_unit)
                                     .attr("text-anchor", "start")
                                     .attr("dominant-baseline", "central")
                                     .attr("fill", line.color)
                                     .attr("x", w - margin_h + 10)
-                                    .attr("y", y(stats.mean) + 12)]);
+                                    .attr("y", y(stats.mean) + 12);
                         }
                     }
                 }
@@ -358,7 +369,7 @@
                     {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
                 ]);
                 d3.json("/web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
-                    plot(d3.select('#pool'), 'H/s', null, data_to_lines(data), true);
+                    plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data), true);
                 });
                 plot_later(d3.select("#peers"), "", null, [
                     {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"},
@@ -389,8 +400,8 @@
                     });
                 });
                 
-                d3.json("/web/graph_data/desired_versions/last_" + lowerperiod, function(data) {
-                    plot(d3.select('#desired_versions'), '', null, data_to_lines(data, function(line){ return parseInt(line.label) }), true);
+                d3.json("/web/graph_data/desired_version_rates/last_" + lowerperiod, function(data) {
+                    plot(d3.select('#desired_version_rates'), 'H/s', 'H', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
                 
                 d3.json("/web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {

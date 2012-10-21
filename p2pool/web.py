@@ -349,31 +349,24 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
-    def build_pool_rates(ds_name, ds_desc, dv_name, dv_desc, obj):
+    def build_desired_rates(ds_name, ds_desc, dv_name, dv_desc, obj):
         if not obj:
             last_bin_end = 0
             bins = dv_desc.bin_count*[{}]
         else:
-            pool_rate = obj['pool_rate'][dv_name]
-            pool_stale_rate = obj['pool_stale_rate'][dv_name]
-            last_bin_end = max(pool_rate['last_bin_end'], pool_stale_rate['last_bin_end'])
-            bins = dv_desc.bin_count*[{}]
-            def get_value(obj, t):
-                n = int((obj['last_bin_end'] - t)/dv_desc.bin_width)
+            pool_rates = obj['pool_rates'][dv_name]
+            desired_versions = obj['desired_versions'][dv_name]
+            def get_total_pool_rate(t):
+                n = int((pool_rates['last_bin_end'] - t)/dv_desc.bin_width)
                 if n < 0 or n >= dv_desc.bin_count:
-                    return None, 0
-                total, count = obj['bins'][n].get('null', [0, 0])
+                    return None
+                total = sum(x[0] for x in pool_rates['bins'][n].values())
+                count = math.mean(x[1] for x in pool_rates['bins'][n].values())
                 if count == 0:
-                    return None, 0
-                return total/count, count
-            def get_bin(t):
-                total, total_count = get_value(pool_rate, t)
-                bad, bad_count = get_value(pool_stale_rate, t)
-                if total is None or bad is None:
-                    return {}
-                count = int((total_count+bad_count)/2+1/2)
-                return dict(good=[(total-bad)*count, count], bad=[bad*count, count], null=[0, count])
-            bins = [get_bin(last_bin_end - (i+1/2)*dv_desc.bin_width) for i in xrange(dv_desc.bin_count)]
+                    return None
+                return total/count
+            last_bin_end = desired_versions['last_bin_end']
+            bins = [dict((name, (total*get_total_pool_rate(last_bin_end - (i+1/2)*dv_desc.bin_width), count)) for name, (total, count) in desired_versions['bins'][i].iteritems()) for i in xrange(dv_desc.bin_count)]
         return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
@@ -381,7 +374,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         'local_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'pool_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
-            multivalue_undefined_means_0=True, default_func=build_pool_rates),
+            multivalue_undefined_means_0=True),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
         'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
         'incoming_peers': graph.DataStreamDescription(dataview_descriptions),
@@ -390,6 +383,8 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
+        'desired_version_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
+            multivalue_undefined_means_0=True, default_func=build_desired_rates),
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
@@ -418,7 +413,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         lookbehind = min(node.net.CHAIN_LENGTH, 60*60//node.net.SHARE_PERIOD, node.tracker.get_height(node.best_share_var.value))
         t = time.time()
         
-        hd.datastreams['pool_rates'].add_datum(t, p2pool_data.get_stale_counts(node.tracker, node.best_share_var.value, lookbehind, rates=True))
+        pool_rates = p2pool_data.get_stale_counts(node.tracker, node.best_share_var.value, lookbehind, rates=True)
+        pool_total = sum(pool_rates.itervalues())
+        hd.datastreams['pool_rates'].add_datum(t, pool_rates)
         
         current_txouts = node.get_current_txouts()
         hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_hash_to_script2(wb.my_pubkey_hash), 0)*1e-8)
@@ -432,6 +429,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         vs = p2pool_data.get_desired_version_counts(node.tracker, node.best_share_var.value, lookbehind)
         vs_total = sum(vs.itervalues())
         hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
+        hd.datastreams['desired_version_rates'].add_datum(t, dict((str(k), v/vs_total*pool_total) for k, v in vs.iteritems()))
     task.LoopingCall(add_point).start(5)
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
