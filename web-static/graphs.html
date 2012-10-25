@@ -56,6 +56,9 @@
         <h2>Traffic rate</h2>
         <svg id="traffic_rate"></svg>
         
+        <h2>Getwork Latency</h2>
+        <svg id="getwork_latency"></svg>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -409,6 +412,10 @@
                 d3.json("/web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {
                     plot(d3.select('#traffic_rate'), 'B/s', 'B', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
+                
+                plot_later(d3.select("#getwork_latency"), "s", null, [
+                    {"url": "/web/graph_data/getwork_latency/last_" + lowerperiod, "color": "#FF0000", "label": "Getwork Latency"}
+                ], false);
             }
             
             d3.json('/local_stats', function(local_stats) {

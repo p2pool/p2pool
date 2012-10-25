@@ -26,11 +26,15 @@ def getwork(bitcoind, use_getblocktemplate=False):
         else:
             return bitcoind.rpc_getmemorypool()
     try:
+        start = time.time()
         work = yield go()
+        end = time.time()
     except jsonrpc.Error_for_code(-32601): # Method not found
         use_getblocktemplate = not use_getblocktemplate
         try:
+            start = time.time()
             work = yield go()
+            end = time.time()
         except jsonrpc.Error_for_code(-32601): # Method not found
             print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
             raise deferral.RetrySilentlyException()
@@ -51,6 +55,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         height=work['height'],
         last_update=time.time(),
         use_getblocktemplate=use_getblocktemplate,
+        latency=end - start,
     ))
 
 @deferral.retry('Error submitting primary block: (will retry)', 10, 10)

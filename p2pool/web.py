@@ -386,6 +386,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         'desired_version_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True, default_func=build_desired_rates),
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
+        'getwork_latency': graph.DataStreamDescription(dataview_descriptions),
     }, hd_obj)
     task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
     @wb.pseudoshare_received.watch
@@ -431,6 +432,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
         hd.datastreams['desired_version_rates'].add_datum(t, dict((str(k), v/vs_total*pool_total) for k, v in vs.iteritems()))
     task.LoopingCall(add_point).start(5)
+    @node.bitcoind_work.changed.watch
+    def _(new_work):
+        hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
