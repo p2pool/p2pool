@@ -5,3 +5,8 @@
 /litecoin_scrypt/build/
 /_trial_temp/
 /_trial_temp.lock
+Makefile.local
+.cache/
+.pkg/
+.coverage
+build/
