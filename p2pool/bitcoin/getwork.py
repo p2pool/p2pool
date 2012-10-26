@@ -31,7 +31,7 @@ class BlockAttempt(object):
     def __repr__(self):
         return 'BlockAttempt(%s)' % (', '.join('%s=%r' % (k, v) for k, v in self.__dict__.iteritems()),)
     
-    def getwork(self, _check=False, **extra):
+    def getwork(self, **extra):
         if 'data' in extra or 'hash1' in extra or 'target' in extra or 'midstate' in extra:
             raise ValueError()
         
@@ -51,21 +51,16 @@ class BlockAttempt(object):
             'midstate': _swap4(sha256.process(sha256.initial_state, block_data[:64])).encode('hex'),
         }
         
-        if _check:
-            self_check = self.__class__.from_getwork(getwork, _check=False)
-            if self_check != self:
-                raise AssertionError('failed check - input invalid or implementation error')
-        
         getwork = dict(getwork)
         getwork.update(extra)
         
         return getwork
     
     @classmethod
-    def from_getwork(cls, getwork, _check=True):
+    def from_getwork(cls, getwork):
         attrs = decode_data(getwork['data'])
         
-        ba = cls(
+        return cls(
             version=attrs['version'],
             previous_block=attrs['previous_block'],
             merkle_root=attrs['merkle_root'],
@@ -73,16 +68,6 @@ class BlockAttempt(object):
             bits=attrs['bits'],
             share_target=pack.IntType(256).unpack(getwork['target'].decode('hex')),
         )
-        
-        if _check:
-            extra = dict(getwork)
-            del extra['data'], extra['hash1'], extra['target']
-            extra.pop('midstate', None)
-            getwork_check = ba.getwork(_check=False, **extra)
-            if getwork_check != getwork and dict((k, v) for k, v in getwork_check.iteritems() if k != 'midstate') != getwork:
-                raise AssertionError('failed check - input invalid or implementation error')
-        
-        return ba
     
     def update(self, **kwargs):
         d = self.__dict__.copy()
