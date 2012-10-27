@@ -1,5 +1,6 @@
 import random
 import sys
+import time
 
 from twisted.internet import defer, reactor, task
 from twisted.python import log
@@ -272,12 +273,65 @@ class Node(object):
                         new_known_txs[tx_hash] = self.known_txs_var.value[tx_hash]
             self.known_txs_var.set(new_known_txs)
         task.LoopingCall(forget_old_txs).start(10)
+        
+        task.LoopingCall(self.clean_tracker).start(5)
     
     def set_best_share(self):
-        best, desired = self.tracker.think(self.get_height_rel_highest, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)
+        best, desired, decorated_heads = self.tracker.think(self.get_height_rel_highest, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)
         
         self.best_share_var.set(best)
         self.desired_var.set(desired)
     
     def get_current_txouts(self):
         return p2pool_data.get_expected_payouts(self.tracker, self.best_share_var.value, self.bitcoind_work.value['bits'].target, self.bitcoind_work.value['subsidy'], self.net)
+    
+    def clean_tracker(self):
+        best, desired, decorated_heads = self.tracker.think(self.get_height_rel_highest, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)
+        
+        # eat away at heads
+        if decorated_heads:
+            for i in xrange(1000):
+                to_remove = set()
+                for share_hash, tail in self.tracker.heads.iteritems():
+                    if share_hash in [head_hash for score, head_hash in decorated_heads[-5:]]:
+                        #print 1
+                        continue
+                    if self.tracker.items[share_hash].time_seen > time.time() - 300:
+                        #print 2
+                        continue
+                    if share_hash not in self.tracker.verified.items and max(self.tracker.items[after_tail_hash].time_seen for after_tail_hash in self.tracker.reverse.get(tail)) > time.time() - 120: # XXX stupid
+                        #print 3
+                        continue
+                    to_remove.add(share_hash)
+                if not to_remove:
+                    break
+                for share_hash in to_remove:
+                    if share_hash in self.tracker.verified.items:
+                        self.tracker.verified.remove(share_hash)
+                    self.tracker.remove(share_hash)
+                #print "_________", to_remove
+        
+        # drop tails
+        for i in xrange(1000):
+            to_remove = set()
+            for tail, heads in self.tracker.tails.iteritems():
+                if min(self.tracker.get_height(head) for head in heads) < 2*self.tracker.net.CHAIN_LENGTH + 10:
+                    continue
+                for aftertail in self.tracker.reverse.get(tail, set()):
+                    if len(self.tracker.reverse[self.tracker.items[aftertail].previous_hash]) > 1: # XXX
+                        print "raw"
+                        continue
+                    to_remove.add(aftertail)
+            if not to_remove:
+                break
+            # if removed from this, it must be removed from verified
+            #start = time.time()
+            for aftertail in to_remove:
+                if self.tracker.items[aftertail].previous_hash not in self.tracker.tails:
+                    print "erk", aftertail, self.tracker.items[aftertail].previous_hash
+                    continue
+                if aftertail in self.tracker.verified.items:
+                    self.tracker.verified.remove(aftertail)
+                self.tracker.remove(aftertail)
+            #end = time.time()
+            #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))

@@ -704,54 +704,6 @@ class OkayTracker(forest.Tracker):
                 print '   ', format_hash(head_hash), format_hash(self.items[head_hash].previous_hash), score
         best_head_score, best = decorated_heads[-1] if decorated_heads else (None, None)
         
-        # eat away at heads
-        if decorated_heads:
-            for i in xrange(1000):
-                to_remove = set()
-                for share_hash, tail in self.heads.iteritems():
-                    if share_hash in [head_hash for score, head_hash in decorated_heads[-5:]]:
-                        #print 1
-                        continue
-                    if self.items[share_hash].time_seen > time.time() - 300:
-                        #print 2
-                        continue
-                    if share_hash not in self.verified.items and max(self.items[after_tail_hash].time_seen for after_tail_hash in self.reverse.get(tail)) > time.time() - 120: # XXX stupid
-                        #print 3
-                        continue
-                    to_remove.add(share_hash)
-                if not to_remove:
-                    break
-                for share_hash in to_remove:
-                    if share_hash in self.verified.items:
-                        self.verified.remove(share_hash)
-                    self.remove(share_hash)
-                #print "_________", to_remove
-        
-        # drop tails
-        for i in xrange(1000):
-            to_remove = set()
-            for tail, heads in self.tails.iteritems():
-                if min(self.get_height(head) for head in heads) < 2*self.net.CHAIN_LENGTH + 10:
-                    continue
-                for aftertail in self.reverse.get(tail, set()):
-                    if len(self.reverse[self.items[aftertail].previous_hash]) > 1: # XXX
-                        print "raw"
-                        continue
-                    to_remove.add(aftertail)
-            if not to_remove:
-                break
-            # if removed from this, it must be removed from verified
-            #start = time.time()
-            for aftertail in to_remove:
-                if self.items[aftertail].previous_hash not in self.tails:
-                    print "erk", aftertail, self.items[aftertail].previous_hash
-                    continue
-                if aftertail in self.verified.items:
-                    self.verified.remove(aftertail)
-                self.remove(aftertail)
-            #end = time.time()
-            #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
-        
         if best is not None:
             best_share = self.items[best]
             if (best_share.header['previous_block'], best_share.header['bits']) != (previous_block, bits) and best_share.header_hash != previous_block and best_share.peer is not None:
@@ -779,7 +731,7 @@ class OkayTracker(forest.Tracker):
             for peer, hash, ts, targ in desired:
                 print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
         
-        return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff]
+        return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff], decorated_heads
     
     def score(self, share_hash, block_rel_height_func):
         # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time
