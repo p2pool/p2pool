@@ -30,6 +30,8 @@
         
         <p>Periods: <span id="period_chooser"></span> Current: <span id="period_current"></span></p>
         
+        <div id="warnings"></div>
+        
         <h2>Local rate</h2>
         <svg id="local"></svg>
         
@@ -408,6 +410,12 @@
                     plot(d3.select('#traffic_rate'), 'B/s', 'B', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
             }
+            
+            d3.json('/local_stats', function(local_stats) {
+                d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
+                    .text(function(w){ return 'Warning: ' + w })
+                    .attr('style', 'color:red;border:1px solid red;padding:5px');
+            })
             
             periods = ["Hour", "Day", "Week", "Month", "Year"];
             d3.select("#period_chooser").selectAll().data(periods).enter().append("a")
