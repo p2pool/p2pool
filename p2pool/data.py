@@ -275,11 +275,11 @@ class Share(object):
         return []
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
-        if self.pow_hash <= self.header['bits'].target:
-            return -1, 'block solution'
-        
         if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer is not None:
             return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
+        
+        if self.pow_hash <= self.header['bits'].target:
+            return -1, 'block solution'
         
         return False, None
     
@@ -546,11 +546,11 @@ class NewShare(object):
         return [known_txs[tx_hash] for tx_hash in other_tx_hashes]
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
-        if self.pow_hash <= self.header['bits'].target:
-            return -1, 'block solution'
-        
         if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer is not None:
             return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
+        
+        if self.pow_hash <= self.header['bits'].target:
+            return -1, 'block solution'
         
         other_txs = self._get_other_txs(tracker, known_txs)
         if other_txs is None:
@@ -713,7 +713,7 @@ class OkayTracker(forest.Tracker):
         if best is not None:
             best_share = self.items[best]
             punish, punish_reason = best_share.should_punish_reason(previous_block, bits, self, known_txs)
-            if punish:
+            if punish > 0:
                 if p2pool.DEBUG:
                     print >>sys.stderr, 'Punishing share for %r! Jumping from %s to %s!' % (punish_reason, format_hash(best), format_hash(best_share.previous_hash))
                 best = best_share.previous_hash
