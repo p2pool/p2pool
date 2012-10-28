@@ -182,16 +182,16 @@ class Protocol(p2protocol.Protocol):
             added = set(after) - set(before)
             removed = set(before) - set(after)
             if added:
-                self.remote_remembered_txs_size += sum(len(bitcoin_data.tx_type.pack(after[x])) for x in added)
+                self.remote_remembered_txs_size += sum(bitcoin_data.tx_type.packed_size(after[x]) for x in added)
                 assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
                 fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
             if removed:
                 self.send_forget_tx(tx_hashes=list(removed))
-                self.remote_remembered_txs_size -= sum(len(bitcoin_data.tx_type.pack(before[x])) for x in removed)
+                self.remote_remembered_txs_size -= sum(bitcoin_data.tx_type.packed_size(before[x]) for x in removed)
         watch_id2 = self.node.mining_txs_var.transitioned.watch(update_remote_view_of_my_mining_txs)
         self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
         
-        self.remote_remembered_txs_size += sum(len(bitcoin_data.tx_type.pack(x)) for x in self.node.mining_txs_var.value.values())
+        self.remote_remembered_txs_size += sum(bitcoin_data.tx_type.packed_size(x) for x in self.node.mining_txs_var.value.values())
         assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
         fragment(self.send_remember_tx, tx_hashes=[], txs=self.node.mining_txs_var.value.values())
     
@@ -270,7 +270,7 @@ class Protocol(p2protocol.Protocol):
             
             hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
             
-            new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(len(bitcoin_data.tx_type.pack(known_txs[x])) for x in hashes_to_send)
+            new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
             if new_remote_remembered_txs_size > self.max_remembered_txs_size:
                 raise ValueError('shares have too many txs')
             self.remote_remembered_txs_size = new_remote_remembered_txs_size
@@ -282,7 +282,7 @@ class Protocol(p2protocol.Protocol):
         if self.other_version >= 8:
             res = self.send_forget_tx(tx_hashes=hashes_to_send)
             
-            self.remote_remembered_txs_size -= sum(len(bitcoin_data.tx_type.pack(known_txs[x])) for x in hashes_to_send)
+            self.remote_remembered_txs_size -= sum(bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
         
         return res
     
@@ -359,7 +359,7 @@ class Protocol(p2protocol.Protocol):
                     return
             
             self.remembered_txs[tx_hash] = tx
-            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+            self.remembered_txs_size += bitcoin_data.tx_type.packed_size(tx)
         new_known_txs = dict(self.node.known_txs_var.value)
         warned = False
         for tx in txs:
@@ -374,7 +374,7 @@ class Protocol(p2protocol.Protocol):
                 warned = True
             
             self.remembered_txs[tx_hash] = tx
-            self.remembered_txs_size += len(bitcoin_data.tx_type.pack(tx))
+            self.remembered_txs_size += bitcoin_data.tx_type.packed_size(tx)
             new_known_txs[tx_hash] = tx
         self.node.known_txs_var.set(new_known_txs)
         if self.remembered_txs_size >= self.max_remembered_txs_size:
@@ -384,7 +384,7 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_forget_tx(self, tx_hashes):
         for tx_hash in tx_hashes:
-            self.remembered_txs_size -= len(bitcoin_data.tx_type.pack(self.remembered_txs[tx_hash]))
+            self.remembered_txs_size -= bitcoin_data.tx_type.packed_size(self.remembered_txs[tx_hash])
             assert self.remembered_txs_size >= 0
             del self.remembered_txs[tx_hash]
     

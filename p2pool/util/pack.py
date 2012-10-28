@@ -75,6 +75,19 @@ class Type(object):
                 raise AssertionError((self._unpack(data), obj))
         
         return data
+    
+    def packed_size(self, obj):
+        if hasattr(obj, '_packed_size') and obj._packed_size is not None:
+            type_obj, packed_size = obj._packed_size
+            if type_obj is self:
+                return packed_size
+        
+        packed_size = len(self.pack(obj))
+        
+        if hasattr(obj, '_packed_size'):
+            obj._packed_size = self, packed_size
+        
+        return packed_size
 
 class VarIntType(Type):
     def read(self, file):
@@ -228,11 +241,13 @@ _record_types = {}
 
 def get_record(fields):
     fields = tuple(sorted(fields))
-    if 'keys' in fields:
+    if 'keys' in fields or '_packed_size' in fields:
         raise ValueError()
     if fields not in _record_types:
         class _Record(object):
-            __slots__ = fields
+            __slots__ = fields + ('_packed_size',)
+            def __init__(self):
+                self._packed_size = None
             def __repr__(self):
                 return repr(dict(self))
             def __getitem__(self, key):
@@ -240,10 +255,10 @@ def get_record(fields):
             def __setitem__(self, key, value):
                 setattr(self, key, value)
             #def __iter__(self):
-            #    for field in self.__slots__:
+            #    for field in fields:
             #        yield field, getattr(self, field)
             def keys(self):
-                return self.__slots__
+                return fields
             def get(self, key, default=None):
                 return getattr(self, key, default)
             def __eq__(self, other):
