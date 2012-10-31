@@ -153,7 +153,7 @@ class Protocol(p2protocol.Protocol):
         random.expovariate(1/100)][-1])
         
         self._stop_thread2 = deferral.run_repeatedly(lambda: [
-            self.send_addrme(port=self.node.port),
+            self.send_addrme(port=self.node.serverfactory.listen_port.getHost().port),
         random.expovariate(1/(100*len(self.node.peers) + 1))][-1])
         
         if best_share_hash is not None:
