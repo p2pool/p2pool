@@ -97,7 +97,8 @@ class Protocol(p2protocol.Protocol):
         if p2pool.DEBUG:
             print "Bad peer banned:", self.addr
         self.transport.loseConnection()
-        self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
+        if self.transport.getPeer().host != '127.0.0.1': # never ban localhost
+            self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
     
     def _timeout(self):
         self.timeout_delayed = None
