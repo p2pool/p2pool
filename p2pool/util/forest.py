@@ -97,33 +97,33 @@ class TrackerView(object):
         self._delta_refs = {} # ref -> delta
         self._reverse_delta_refs = {} # delta.tail -> ref
         
-        self._tracker.preremove_special.watch_weakref(self, lambda self, item: self._handle_preremove_special(item))
-        self._tracker.postremove_special.watch_weakref(self, lambda self, item: self._handle_postremove_special(item))
+        self._tracker.remove_special.watch_weakref(self, lambda self, item: self._handle_remove_special(item))
         self._tracker.removed.watch_weakref(self, lambda self, item: self._handle_removed(item))
     
-    def _handle_preremove_special(self, item):
+    def _handle_remove_special(self, item):
         delta = self._delta_type.from_element(item)
+        
+        if delta.tail not in self._reverse_delta_refs:
+            return
         
         # move delta refs referencing children down to this, so they can be moved up in one step
-        if delta.tail in self._reverse_delta_refs:
-            for x in list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set())):
-                self.get_last(x)
-            assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, None), set()))
-    
-    def _handle_postremove_special(self, item):
-        delta = self._delta_type.from_element(item)
+        for x in list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set())):
+            self.get_last(x)
+        
+        assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set()))
+        
+        if delta.tail not in self._reverse_delta_refs:
+            return
         
         # move ref pointing to this up
-        if delta.tail in self._reverse_delta_refs:
-            assert delta.head not in self._reverse_delta_refs, list(self._reverse_deltas.get(self._reverse_delta_refs.get(delta.head, object()), set()))
-            
-            ref = self._reverse_delta_refs[delta.tail]
-            cur_delta = self._delta_refs[ref]
-            assert cur_delta.tail == delta.tail
-            self._delta_refs[ref] = cur_delta - self._delta_type.from_element(item)
-            assert self._delta_refs[ref].tail == delta.head
-            del self._reverse_delta_refs[delta.tail]
-            self._reverse_delta_refs[delta.head] = ref
+        
+        ref = self._reverse_delta_refs[delta.tail]
+        cur_delta = self._delta_refs[ref]
+        assert cur_delta.tail == delta.tail
+        self._delta_refs[ref] = cur_delta - self._delta_type.from_element(item)
+        assert self._delta_refs[ref].tail == delta.head
+        del self._reverse_delta_refs[delta.tail]
+        self._reverse_delta_refs[delta.head] = ref
     
     def _handle_removed(self, item):
         delta = self._delta_type.from_element(item)
@@ -209,8 +209,7 @@ class Tracker(object):
         self.tails = {} # tail hash -> set of head hashes
         
         self.added = variable.Event()
-        self.preremove_special = variable.Event()
-        self.postremove_special = variable.Event()
+        self.remove_special = variable.Event()
         self.removed = variable.Event()
         
         self.get_nth_parent_hash = DistanceSkipList(self)
@@ -281,14 +280,12 @@ class Tracker(object):
                 self.tails[tail].add(delta.tail)
                 self.heads[delta.tail] = tail
         elif delta.tail in self.tails and len(self.reverse[delta.tail]) <= 1:
-            self.preremove_special.happened(item)
-            
             heads = self.tails.pop(delta.tail)
             for head in heads:
                 self.heads[head] = delta.head
             self.tails[delta.head] = set(heads)
             
-            self.postremove_special.happened(item)
+            self.remove_special.happened(item)
         else:
             raise NotImplementedError()
         
