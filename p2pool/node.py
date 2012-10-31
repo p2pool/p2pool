@@ -174,7 +174,7 @@ class Node(object):
         self.bitcoind_work = variable.Variable((yield helper.getwork(self.bitcoind)))
         @defer.inlineCallbacks
         def work_poller():
-            while True:
+            while stop_signal.times == 0:
                 flag = self.factory.new_block.get_deferred()
                 try:
                     self.bitcoind_work.set((yield helper.getwork(self.bitcoind, self.bitcoind_work.value['use_getblocktemplate'])))
@@ -204,6 +204,8 @@ class Node(object):
         self.handle_header = handle_header
         @defer.inlineCallbacks
         def poll_header():
+            if self.factory.conn.value is None:
+                return
             handle_header((yield self.factory.conn.value.get_block_header(self.bitcoind_work.value['previous_block'])))
         self.bitcoind_work.changed.watch(lambda _: poll_header())
         yield deferral.retry('Error while requesting best block header:')(poll_header)()
@@ -272,9 +274,13 @@ class Node(object):
                     if tx_hash in self.known_txs_var.value:
                         new_known_txs[tx_hash] = self.known_txs_var.value[tx_hash]
             self.known_txs_var.set(new_known_txs)
-        task.LoopingCall(forget_old_txs).start(10)
+        t = task.LoopingCall(forget_old_txs)
+        t.start(10)
+        stop_signal.watch(t.stop)
         
-        task.LoopingCall(self.clean_tracker).start(5)
+        t = task.LoopingCall(self.clean_tracker)
+        t.start(5)
+        stop_signal.watch(t.stop)
     
     def set_best_share(self):
         best, desired, decorated_heads = self.tracker.think(self.get_height_rel_highest, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)

@@ -160,7 +160,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         return pubkey_hash, desired_share_target, desired_pseudoshare_target
     
     def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
-        if len(self.node.p2p_node.peers) == 0 and self.node.net.PERSIST:
+        if (self.node.p2p_node is None or len(self.node.p2p_node.peers) == 0) and self.node.net.PERSIST:
             raise jsonrpc.Error_for_code(-12345)(u'p2pool is not connected to any peers')
         if self.node.best_share_var.value is None and self.node.net.PERSIST:
             raise jsonrpc.Error_for_code(-12345)(u'p2pool is downloading shares')
