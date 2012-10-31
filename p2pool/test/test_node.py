@@ -1,8 +1,10 @@
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.trial import unittest
+from twisted.web import resource, server
 
 from p2pool import networks, node, work
-from p2pool.util import deferral, variable
+from p2pool.bitcoin import worker_interface
+from p2pool.util import deferral, jsonrpc, variable
 
 class factory(object):
     new_headers = variable.Event()
@@ -48,12 +50,6 @@ class bitcoind(object):
             "height" : 205801
         }
 
-class FakeRequest(object):
-    def getUser(self):
-        return 'fakeuser'
-    def getClientIP(self):
-        return 'fakeclientip'
-
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_node(self):
@@ -62,13 +58,17 @@ class Test(unittest.TestCase):
         yield n.start()
         
         wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[], worker_fee=3)
+        web_root = resource.Resource()
+        worker_interface.WorkerInterface(wb).attach_to(web_root)
+        port = reactor.listenTCP(8080, server.Site(web_root))
+        
+        proxy = jsonrpc.Proxy('http://127.0.0.1:8080')
         
         yield deferral.sleep(3)
         
         for i in xrange(100):
-            ba, got_resp = wb.get_work(pubkey_hash=4242, desired_share_target=2**256-1, desired_pseudoshare_target=2**256-1)
-            got_resp(dict(version=ba.version, previous_block=ba.previous_block, merkle_root=ba.merkle_root, timestamp=ba.timestamp, bits=ba.bits, nonce=42), FakeRequest())
-            yield deferral.sleep(.01)
+            blah = yield proxy.rpc_getwork()
+            yield proxy.rpc_getwork(blah['data'])
         
         yield deferral.sleep(3)
         
@@ -76,5 +76,12 @@ class Test(unittest.TestCase):
         assert n.tracker.verified.get_height(n.best_share_var.value) == 100
         
         n.stop()
+        
+        yield port.stopListening()
+        del net, n, wb, web_root, port, proxy
+        import gc
+        gc.collect()
+        gc.collect()
+        gc.collect()
         
         yield deferral.sleep(20) # waiting for work_poller to exit
