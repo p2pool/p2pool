@@ -29,6 +29,9 @@ Running P2Pool:
 
     Run "python run_p2pool.py --help" for additional options.
 
+Donations towards further development:
+    1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+
 Notes for Litecoin:
     Requirements:
         In order to run P2Pool with the Litecoin network, you would need to build and install the
