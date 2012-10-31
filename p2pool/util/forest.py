@@ -98,6 +98,7 @@ class TrackerView(object):
         self._reverse_delta_refs = {} # delta.tail -> ref
         
         self._tracker.remove_special.watch_weakref(self, lambda self, item: self._handle_remove_special(item))
+        self._tracker.remove_special2.watch_weakref(self, lambda self, item: self._handle_remove_special2(item))
         self._tracker.removed.watch_weakref(self, lambda self, item: self._handle_removed(item))
     
     def _handle_remove_special(self, item):
@@ -124,6 +125,18 @@ class TrackerView(object):
         assert self._delta_refs[ref].tail == delta.head
         del self._reverse_delta_refs[delta.tail]
         self._reverse_delta_refs[delta.head] = ref
+    
+    def _handle_remove_special2(self, item):
+        delta = self._delta_type.from_element(item)
+        
+        if delta.tail not in self._reverse_delta_refs:
+            return
+        
+        ref = self._reverse_delta_refs.pop(delta.tail)
+        del self._delta_refs[ref]
+        
+        for x in self._reverse_deltas.pop(ref):
+            del self._deltas[x]
     
     def _handle_removed(self, item):
         delta = self._delta_type.from_element(item)
@@ -210,6 +223,7 @@ class Tracker(object):
         
         self.added = variable.Event()
         self.remove_special = variable.Event()
+        self.remove_special2 = variable.Event()
         self.removed = variable.Event()
         
         self.get_nth_parent_hash = DistanceSkipList(self)
@@ -286,6 +300,17 @@ class Tracker(object):
             self.tails[delta.head] = set(heads)
             
             self.remove_special.happened(item)
+        elif delta.tail in self.tails and len(self.reverse[delta.tail]) > 1:
+            heads = [x for x in self.tails[delta.tail] if self.is_child_of(delta.head, x)]
+            self.tails[delta.tail] -= set(heads)
+            if not self.tails[delta.tail]:
+                self.tails.pop(delta.tail)
+            for head in heads:
+                self.heads[head] = delta.head
+            assert delta.head not in self.tails
+            self.tails[delta.head] = set(heads)
+            
+            self.remove_special2.happened(item)
         else:
             raise NotImplementedError()
         
