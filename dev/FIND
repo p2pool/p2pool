@@ -1,0 +1,1 @@
+find p2pool/ -iname '*py' | xargs grep $@

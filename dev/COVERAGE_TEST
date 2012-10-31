@@ -1,0 +1,1 @@
+python -m coverage run `which trial` p2pool

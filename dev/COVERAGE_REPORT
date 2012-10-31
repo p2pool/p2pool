@@ -1,0 +1,1 @@
+python -m coverage report --include='p2pool/*' --omit='p2pool/test/*' -m
