@@ -60,9 +60,9 @@ class Test(unittest.TestCase):
         wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[], worker_fee=3)
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
-        port = reactor.listenTCP(8080, server.Site(web_root))
+        port = reactor.listenTCP(0, server.Site(web_root))
         
-        proxy = jsonrpc.Proxy('http://127.0.0.1:8080')
+        proxy = jsonrpc.Proxy('http://127.0.0.1:' + str(port.getHost().port))
         
         yield deferral.sleep(3)
         
