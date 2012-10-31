@@ -317,11 +317,7 @@ class Node(object):
             for tail, heads in self.tracker.tails.iteritems():
                 if min(self.tracker.get_height(head) for head in heads) < 2*self.tracker.net.CHAIN_LENGTH + 10:
                     continue
-                for aftertail in self.tracker.reverse.get(tail, set()):
-                    if len(self.tracker.reverse[self.tracker.items[aftertail].previous_hash]) > 1: # XXX
-                        print "raw"
-                        continue
-                    to_remove.add(aftertail)
+                to_remove.update(self.tracker.reverse.get(tail, set()))
             if not to_remove:
                 break
             # if removed from this, it must be removed from verified
