@@ -6,7 +6,7 @@ from twisted.internet import defer, reactor
 from twisted.trial import unittest
 from twisted.web import resource, server
 
-from p2pool import node, work
+from p2pool import data, node, work
 from p2pool.bitcoin import networks, worker_interface
 from p2pool.util import deferral, jsonrpc, math, variable
 
@@ -136,7 +136,12 @@ class Test(unittest.TestCase):
     
     @defer.inlineCallbacks
     def test_nodes(self):
+      try:
+        old_successor = data.Share.SUCCESSOR
+        data.Share.SUCCESSOR = data.NewShare
+        
         N = 3
+        SHARES = 600
         
         nodes = []
         for i in xrange(N):
@@ -144,17 +149,21 @@ class Test(unittest.TestCase):
         
         yield deferral.sleep(3)
         
-        for i in xrange(100):
+        for i in xrange(SHARES):
             proxy = jsonrpc.Proxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
             yield deferral.sleep(random.expovariate(1/.1))
+            print i
+            print type(nodes[0].n.tracker.items[nodes[0].n.best_share_var.value])
     
         yield deferral.sleep(3)
         
         for i, n in enumerate(nodes):
-            assert len(n.n.tracker.items) == 100, (i, len(n.n.tracker.items))
-            assert n.n.tracker.verified.get_height(n.n.best_share_var.value) == 100, (i, n.n.tracker.verified.get_height(n.n.best_share_var.value))
+            assert len(n.n.tracker.items) == SHARES, (i, len(n.n.tracker.items))
+            assert n.n.tracker.verified.get_height(n.n.best_share_var.value) == SHARES, (i, n.n.tracker.verified.get_height(n.n.best_share_var.value))
+            assert type(n.n.tracker.items[nodes[0].n.best_share_var.value]) is data.NewShare
+            assert type(n.n.tracker.items[n.n.tracker.get_nth_parent_hash(nodes[0].n.best_share_var.value, SHARES - 5)]) is data.Share
         
         for n in nodes:
             yield n.stop()
@@ -166,3 +175,5 @@ class Test(unittest.TestCase):
         gc.collect()
         
         yield deferral.sleep(20) # waiting for work_poller to exit
+      finally:
+        data.Share.SUCCESSOR = old_successor
