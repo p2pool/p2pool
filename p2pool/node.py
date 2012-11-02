@@ -337,3 +337,5 @@ class Node(object):
                 self.tracker.remove(aftertail)
             #end = time.time()
             #print "removed! %i %f" % (len(to_remove), (end - start)/len(to_remove))
+        
+        self.set_best_share()
