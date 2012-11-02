@@ -123,7 +123,7 @@ class Share(object):
             attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True, integer=True)
             pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
             pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
-            pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
+            pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
         bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target, (pre_target3//10, pre_target3)))
         
@@ -356,7 +356,7 @@ class NewShare(object):
             attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True, integer=True)
             pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
             pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
-            pre_target3 = math.clip(pre_target2, (0, net.MAX_TARGET))
+            pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
         bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target, (pre_target3//10, pre_target3)))
         

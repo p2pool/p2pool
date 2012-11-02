@@ -6,9 +6,9 @@ from twisted.internet import defer, reactor
 from twisted.trial import unittest
 from twisted.web import resource, server
 
-from p2pool import networks, node, work
-from p2pool.bitcoin import worker_interface
-from p2pool.util import deferral, jsonrpc, variable
+from p2pool import node, work
+from p2pool.bitcoin import networks, worker_interface
+from p2pool.util import deferral, jsonrpc, math, variable
 
 class factory(object):
     new_headers = variable.Event()
@@ -54,6 +54,25 @@ class bitcoind(object):
             "height" : 205801
         }
 
+mynet = math.Object(
+    PARENT=networks.nets['litecoin_testnet'],
+    SHARE_PERIOD=3, # seconds
+    CHAIN_LENGTH=20*60//3, # shares
+    REAL_CHAIN_LENGTH=20*60//3, # shares
+    TARGET_LOOKBEHIND=200, # shares
+    SPREAD=12, # blocks
+    IDENTIFIER='cca5e24ec6408b1e'.decode('hex'),
+    PREFIX='ad9614f6466a39cf'.decode('hex'),
+    P2P_PORT=19338,
+    MIN_TARGET=2**256 - 1,
+    MAX_TARGET=2**256 - 1,
+    PERSIST=False,
+    WORKER_PORT=19327,
+    BOOTSTRAP_ADDRS='72.14.191.28'.split(' '),
+    ANNOUNCE_CHANNEL='#p2pool-alt',
+    VERSION_CHECK=lambda v: True,
+)
+
 class MiniNode(object):
     @classmethod
     @defer.inlineCallbacks
@@ -83,8 +102,7 @@ class MiniNode(object):
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_node(self):
-        net = networks.nets['litecoin_testnet']
-        n = node.Node(factory, bitcoind, [], [], net)
+        n = node.Node(factory, bitcoind, [], [], mynet)
         yield n.start()
         
         wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[], worker_fee=3)
@@ -108,7 +126,7 @@ class Test(unittest.TestCase):
         n.stop()
         
         yield port.stopListening()
-        del net, n, wb, web_root, port, proxy
+        del n, wb, web_root, port, proxy
         import gc
         gc.collect()
         gc.collect()
@@ -118,12 +136,11 @@ class Test(unittest.TestCase):
     
     @defer.inlineCallbacks
     def test_nodes(self):
-        net = networks.nets['litecoin_testnet']
         N = 3
         
         nodes = []
         for i in xrange(N):
-            nodes.append((yield MiniNode.start(net, factory, bitcoind, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes])))
+            nodes.append((yield MiniNode.start(mynet, factory, bitcoind, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes])))
         
         yield deferral.sleep(3)
         
