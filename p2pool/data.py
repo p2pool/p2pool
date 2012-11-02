@@ -56,6 +56,9 @@ def load_share(share, net, peer):
 DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
 
 class Share(object):
+    VERSION = 7
+    SUCCESSOR = None
+    
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()), # XXX must be constrained to 32 bits
         ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
@@ -259,11 +262,24 @@ class Share(object):
             return self.as_share1b()
     
     def check(self, tracker):
+        from p2pool import p2p
         if self.share_data['previous_share_hash'] is not None:
             previous_share = tracker.items[self.share_data['previous_share_hash']]
-            if isinstance(previous_share, NewShare):
-                from p2pool import p2p
-                raise p2p.PeerMisbehavingError('''Share can't follow NewShare''')
+            if type(self) is type(previous_share):
+                pass
+            elif type(self) is type(previous_share).SUCCESSOR:
+                if tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
+                    from p2pool import p2p
+                    raise p2p.PeerMisbehavingError('switch without enough history')
+                
+                # switch only valid if 85% of hashes in [self.net.CHAIN_LENGTH*9//10, self.net.CHAIN_LENGTH] for new version
+                counts = get_desired_version_counts(tracker,
+                    tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
+                if counts.get(self.VERSION, 0) < sum(counts.itervalues())*85//100:
+                    raise p2p.PeerMisbehavingError('switch without enough hash power upgraded')
+            else:
+                raise p2p.PeerMisbehavingError('''%s can't follow %s''' % (type(self).__name__, type(previous_share).__name__))
+        
         share_info, gentx, other_transaction_hashes, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.common['ref_merkle_link'], [], self.net) # ok because desired_other_transaction_hashes is only used in get_share
         if share_info != self.share_info:
             raise ValueError('share_info invalid')
@@ -290,6 +306,7 @@ class Share(object):
 
 class NewShare(object):
     VERSION = 8
+    SUCCESSOR = None
     
     other_txs = None
     
@@ -506,19 +523,23 @@ class NewShare(object):
         return dict(type=self.VERSION, contents=self.share_type.pack(self.contents))
     
     def check(self, tracker):
+        from p2pool import p2p
         if self.share_data['previous_share_hash'] is not None:
             previous_share = tracker.items[self.share_data['previous_share_hash']]
-            if isinstance(previous_share, Share):
+            if type(self) is type(previous_share):
+                pass
+            elif type(self) is type(previous_share).SUCCESSOR:
                 if tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
                     from p2pool import p2p
-                    raise p2p.PeerMisbehavingError('NewShare without enough history')
-                else:
-                    # Share -> NewShare only valid if 85% of hashes in [self.net.CHAIN_LENGTH*9//10, self.net.CHAIN_LENGTH] for new version
-                    counts = get_desired_version_counts(tracker,
-                        tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
-                    if counts.get(self.VERSION, 0) < sum(counts.itervalues())*85//100:
-                        from p2pool import p2p
-                        raise p2p.PeerMisbehavingError('NewShare without enough hash power upgraded')
+                    raise p2p.PeerMisbehavingError('switch without enough history')
+                
+                # switch only valid if 85% of hashes in [self.net.CHAIN_LENGTH*9//10, self.net.CHAIN_LENGTH] for new version
+                counts = get_desired_version_counts(tracker,
+                    tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
+                if counts.get(self.VERSION, 0) < sum(counts.itervalues())*85//100:
+                    raise p2p.PeerMisbehavingError('switch without enough hash power upgraded')
+            else:
+                raise p2p.PeerMisbehavingError('''%s can't follow %s''' % (type(self).__name__, type(previous_share).__name__))
         
         other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
         

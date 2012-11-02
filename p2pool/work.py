@@ -183,20 +183,24 @@ class WorkerBridge(worker_interface.WorkerBridge):
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
         
-        share_type = p2pool_data.NewShare
-        if self.node.best_share_var.value is not None:
+        if self.node.best_share_var.value is None:
+            share_type = p2pool_data.Share
+        else:
             previous_share = self.node.tracker.items[self.node.best_share_var.value]
-            if isinstance(previous_share, p2pool_data.Share):
+            previous_share_type = type(previous_share)
+            
+            if previous_share_type.SUCCESSOR is None or self.node.tracker.get_height(previous_share.hash) < self.node.net.CHAIN_LENGTH:
+                share_type = previous_share_type
+            else:
+                successor_type = previous_share_type.SUCCESSOR
+                
+                counts = p2pool_data.get_desired_version_counts(self.node.tracker,
+                    self.node.tracker.get_nth_parent_hash(previous_share.hash, self.node.net.CHAIN_LENGTH*9//10), self.node.net.CHAIN_LENGTH//10)
                 # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
-                if self.node.tracker.get_height(previous_share.hash) < self.node.net.CHAIN_LENGTH:
-                    share_type = p2pool_data.Share
-                elif time.time() < 1351383661 and self.node.net.NAME == 'bitcoin':
-                    share_type = p2pool_data.Share
+                if counts.get(successor_type.VERSION, 0) > sum(counts.itervalues())*95//100:
+                    share_type = successor_type
                 else:
-                    counts = p2pool_data.get_desired_version_counts(self.node.tracker,
-                        self.node.tracker.get_nth_parent_hash(previous_share.hash, self.node.net.CHAIN_LENGTH*9//10), self.node.net.CHAIN_LENGTH//10)
-                    if counts.get(p2pool_data.NewShare.VERSION, 0) < sum(counts.itervalues())*95//100:
-                        share_type = p2pool_data.Share
+                    share_type = previous_share_type
         
         if True:
             share_info, gentx, other_transaction_hashes, get_share = share_type.generate_transaction(
@@ -216,7 +220,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=7,
+                    desired_version=share_type.SUCCESSOR.VERSION if share_type.SUCCESSOR is not None else share_type.VERSION,
                 ),
                 block_target=self.current_work.value['bits'].target,
                 desired_timestamp=int(time.time() + 0.5),
