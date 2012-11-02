@@ -23,6 +23,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.donation_percentage = donation_percentage
         self.worker_fee = worker_fee
         
+        self.running = True
         self.pseudoshare_received = variable.Event()
         self.share_received = variable.Event()
         self.local_rate_monitor = math.RateMonitor(10*60)
@@ -60,7 +61,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         @defer.inlineCallbacks
         def set_merged_work(merged_url, merged_userpass):
             merged_proxy = jsonrpc.Proxy(merged_url, dict(Authorization='Basic ' + base64.b64encode(merged_userpass)))
-            while True:
+            while self.running:
                 auxblock = yield deferral.retry('Error while calling merged getauxblock:', 30)(merged_proxy.rpc_getauxblock)()
                 self.merged_work.set(dict(self.merged_work.value, **{auxblock['chainid']: dict(
                     hash=int(auxblock['hash'], 16),
@@ -110,6 +111,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 self.new_work_event.happened()
         self.merged_work.changed.watch(lambda _: self.new_work_event.happened())
         self.node.best_share_var.changed.watch(lambda _: self.new_work_event.happened())
+    
+    def stop(self):
+        self.running = False
     
     def get_stale_counts(self):
         '''Returns (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain)'''

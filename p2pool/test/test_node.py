@@ -98,6 +98,20 @@ class bitcoind(object):
             "height" : 205801
         }
 
+@apply
+class mm_provider(object):
+    def __getattr__(self, name):
+        print '>>>>>>>', name
+    def rpc_getauxblock(self, request, result1=None, result2=None):
+        if result1 is not None:
+            print result1, result2
+            return True
+        return {
+            "target" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", # 2**256*2/3
+            "hash" : "2756ea0315d46dc3d8d974f34380873fc88863845ac01a658ef11bc3b368af52",
+            "chainid" : 1
+        }
+
 mynet = math.Object(
     PARENT=networks.nets['litecoin_testnet'],
     SHARE_PERIOD=3, # seconds
@@ -120,7 +134,7 @@ mynet = math.Object(
 class MiniNode(object):
     @classmethod
     @defer.inlineCallbacks
-    def start(cls, net, factory, bitcoind, peer_ports):
+    def start(cls, net, factory, bitcoind, peer_ports, merged_urls):
         self = cls()
         
         self.n = node.Node(factory, bitcoind, [], [], net)
@@ -129,7 +143,7 @@ class MiniNode(object):
         self.n.p2p_node = node.P2PNode(self.n, 0, 1000000, {}, [('127.0.0.1', peer_port) for peer_port in peer_ports])
         self.n.p2p_node.start()
         
-        wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=[], worker_fee=3)
+        wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=merged_urls, worker_fee=3)
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         self.web_port = reactor.listenTCP(0, server.Site(web_root))
@@ -146,10 +160,14 @@ class MiniNode(object):
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_node(self):
+        mm_root = resource.Resource()
+        mm_root.putChild('', jsonrpc.Server(mm_provider))
+        mm_port = reactor.listenTCP(0, server.Site(mm_root))
+        
         n = node.Node(factory, bitcoind, [], [], mynet)
         yield n.start()
         
-        wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[], worker_fee=3)
+        wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[('http://127.0.0.1:%i' % (mm_port.getHost().port,), '')], worker_fee=3)
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         port = reactor.listenTCP(0, server.Site(web_root))
@@ -167,6 +185,7 @@ class Test(unittest.TestCase):
         assert len(n.tracker.items) == 100
         assert n.tracker.verified.get_height(n.best_share_var.value) == 100
         
+        wb.stop()
         n.stop()
         
         yield port.stopListening()
@@ -177,6 +196,7 @@ class Test(unittest.TestCase):
         gc.collect()
         
         yield deferral.sleep(20) # waiting for work_poller to exit
+        yield mm_port.stopListening()
     #test_node.timeout = 15
     
     @defer.inlineCallbacks
@@ -190,7 +210,7 @@ class Test(unittest.TestCase):
         
         nodes = []
         for i in xrange(N):
-            nodes.append((yield MiniNode.start(mynet, factory, bitcoind, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes])))
+            nodes.append((yield MiniNode.start(mynet, factory, bitcoind, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes], [])))
         
         yield deferral.sleep(3)
         
