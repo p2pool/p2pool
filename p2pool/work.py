@@ -337,7 +337,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 self.node.set_best_share()
                 
                 try:
-                    if pow_hash <= header['bits'].target or p2pool.DEBUG:
+                    if (pow_hash <= header['bits'].target or p2pool.DEBUG) and self.node.p2p_node is not None:
                         self.node.p2p_node.broadcast_share(share.hash)
                 except:
                     log.err(None, 'Error forwarding block solution:')

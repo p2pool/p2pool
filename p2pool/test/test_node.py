@@ -7,17 +7,35 @@ from twisted.trial import unittest
 from twisted.web import resource, server
 
 from p2pool import data, node, work
-from p2pool.bitcoin import networks, worker_interface
+from p2pool.bitcoin import data as bitcoin_data, networks, worker_interface
 from p2pool.util import deferral, jsonrpc, math, variable
+
+@apply
+class bitcoinp2p(object):
+    def send_block(self, block):
+        pass
+    
+    def get_block_header(self, hash):
+        if hash == 0x16c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89:
+            return defer.succeed({
+                'nonce': 1853158954,
+                'timestamp': 1351658517,
+                'merkle_root': 2282849479936278423916707524932131168473430114569971665822757638339486597658L,
+                'version': 1,
+                'previous_block': 1048610514577342396345362905164852351970507722694242579238530L,
+                'bits': bitcoin_data.FloatingInteger(bits=0x1a0513c5, target=0x513c50000000000000000000000000000000000000000000000L),
+            })
+        print hex(hash)
+        return defer.fail('blah')
 
 class factory(object):
     new_headers = variable.Event()
     new_block = variable.Event()
     new_tx = variable.Event()
-    conn = variable.Variable(None)
+    conn = variable.Variable(bitcoinp2p)
     @classmethod
     def getProtocol(self):
-        return defer.Deferred()
+        return bitcoinp2p
 
 class bitcoind(object):
     @classmethod
@@ -29,7 +47,9 @@ class bitcoind(object):
         return dict(height=42)
     
     @classmethod
-    def rpc_getmemorypool(self):
+    def rpc_getmemorypool(self, result=None):
+        if result is not None:
+            return True
         return {
             "version" : 2,
             "previousblockhash" : "000000000000016c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89",
@@ -50,7 +70,7 @@ class bitcoind(object):
             "sigoplimit" : 20000,
             "sizelimit" : 1000000,
             "curtime" : 1351659940,
-            "bits" : "1a0513c5",
+            "bits" : "21008000",
             "height" : 205801
         }
 
@@ -133,6 +153,7 @@ class Test(unittest.TestCase):
         gc.collect()
         
         yield deferral.sleep(20) # waiting for work_poller to exit
+    #test_node.timeout = 15
     
     @defer.inlineCallbacks
     def test_nodes(self):
