@@ -1,1 +1,1 @@
-python -m coverage report --include='p2pool/*' --omit='p2pool/test/*' -m
+python -m coverage report --include='p2pool/*' --omit='p2pool/test/*' -m | sort -k 3 -n
