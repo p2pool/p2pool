@@ -325,13 +325,15 @@ class Protocol(p2protocol.Protocol):
         ('tx_hashes', pack.ListType(pack.IntType(256))),
     ])
     def handle_have_tx(self, tx_hashes):
-        assert self.remote_tx_hashes.isdisjoint(tx_hashes)
+        #assert self.remote_tx_hashes.isdisjoint(tx_hashes)
         self.remote_tx_hashes.update(tx_hashes)
+        while len(self.remote_tx_hashes) > 10000:
+            self.remote_tx_hashes.pop()
     message_losing_tx = pack.ComposedType([
         ('tx_hashes', pack.ListType(pack.IntType(256))),
     ])
     def handle_losing_tx(self, tx_hashes):
-        assert self.remote_tx_hashes.issuperset(tx_hashes)
+        #assert self.remote_tx_hashes.issuperset(tx_hashes)
         self.remote_tx_hashes.difference_update(tx_hashes)
     
     
