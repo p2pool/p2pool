@@ -23,7 +23,7 @@ nets = dict(
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://blockexplorer.com/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://blockexplorer.com/address/',
-        SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
+        SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
     ),
     bitcoin_testnet=math.Object(
         P2P_PREFIX='0b110907'.decode('hex'),
@@ -41,7 +41,7 @@ nets = dict(
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://blockexplorer.com/testnet/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://blockexplorer.com/testnet/address/',
-        SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
+        SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
     ),
     
     namecoin=math.Object(
