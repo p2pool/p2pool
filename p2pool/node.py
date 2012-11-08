@@ -11,18 +11,14 @@ from p2pool.util import deferral, variable
 
 
 class P2PNode(p2p.Node):
-    def __init__(self, node, p2pool_port, p2pool_conns, addrs, connect_addrs):
+    def __init__(self, node, **kwargs):
         self.node = node
         p2p.Node.__init__(self,
             best_share_hash_func=lambda: node.best_share_var.value,
-            port=p2pool_port,
             net=node.net,
-            addr_store=addrs,
-            connect_addrs=connect_addrs,
-            max_incoming_conns=p2pool_conns,
             known_txs_var=node.known_txs_var,
             mining_txs_var=node.mining_txs_var,
-        )
+        **kwargs)
     
     def handle_shares(self, shares, peer):
         if len(shares) > 5:

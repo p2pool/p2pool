@@ -140,7 +140,7 @@ class MiniNode(object):
         self.n = node.Node(factory, bitcoind, [], [], net)
         yield self.n.start()
         
-        self.n.p2p_node = node.P2PNode(self.n, 0, 1000000, {}, [('127.0.0.1', peer_port) for peer_port in peer_ports])
+        self.n.p2p_node = node.P2PNode(self.n, port=0, max_incoming_conns=1000000, addr_store={}, connect_addrs=[('127.0.0.1', peer_port) for peer_port in peer_ports])
         self.n.p2p_node.start()
         
         wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=merged_urls, worker_fee=3)

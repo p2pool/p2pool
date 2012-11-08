@@ -173,7 +173,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             except:
                 log.err()
         
-        node.p2p_node = p2pool_node.P2PNode(node, args.p2pool_port, args.p2pool_conns, addrs, connect_addrs)
+        node.p2p_node = p2pool_node.P2PNode(node,
+            port=args.p2pool_port,
+            max_incoming_conns=args.p2pool_conns,
+            addr_store=addrs,
+            connect_addrs=connect_addrs,
+            desired_outgoing_conns=args.p2pool_outgoing_conns,
+        )
         node.p2p_node.start()
         
         def save_addrs():
@@ -392,6 +398,9 @@ def run():
     p2pool_group.add_argument('--max-conns', metavar='CONNS',
         help='maximum incoming connections (default: 40)',
         type=int, action='store', default=40, dest='p2pool_conns')
+    p2pool_group.add_argument('--outgoing-conns', metavar='CONNS',
+        help='outgoing connections (default: 10)',
+        type=int, action='store', default=10, dest='p2pool_outgoing_conns')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
@@ -477,6 +486,9 @@ def run():
     
     if args.p2pool_port is None:
         args.p2pool_port = net.P2P_PORT
+    
+    if args.p2pool_outgoing_conns > 10:
+        parser.error('''--outgoing-conns can't be more than 10''')
     
     if args.worker_endpoint is None:
         worker_endpoint = '', net.WORKER_PORT
