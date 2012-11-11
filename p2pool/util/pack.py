@@ -291,6 +291,44 @@ class ComposedType(Type):
             file = type_.write(file, item[key])
         return file
 
+class VersionedType(Type):
+    def __init__(self, fields, version_key=None):
+        if version_key is None: version_key = 'version'
+        self.fields = tuple(fields)
+        self.field_names = set(f[0] for f in fields)
+        self.version_key = fields[0][0]
+
+    def _include_field(self, check, item):
+        if check is False or check is None:
+            return False
+        if check is not True:
+            if callable(check) and not check(item):
+                return False
+            elif item[self.version_key] not in check:
+                return False
+        return True
+
+    def read(self, file):
+        item = get_record(f[0] for f in self.fields)
+        for field in self.fields:
+            key, type_ = field[0], field[1]
+            check = field[2] if len(field)>=3 else True
+            default = field[3] if len(field)>=4 else None
+            if self._include_field(check, item):
+                item[key], file = type_.read(file)
+            else:
+                item[key] = default
+        return item, file
+
+    def write(self, file, item):
+        #assert set(item.keys()) == self.field_names, (set(item.keys()) - self.field_names, self.field_names - set(item.keys()))
+        for field in self.fields:
+            key, type_ = field[0], field[1]
+            check = field[2] if len(field)>=3 else True
+            if self._include_field(check, item):
+                file = type_.write(file, item[key])
+        return file
+
 class PossiblyNoneType(Type):
     def __init__(self, none_value, inner):
         self.none_value = none_value

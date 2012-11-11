@@ -81,6 +81,25 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
     ),
     
+    freicoin_beta2=math.Object(
+        P2P_PREFIX='c7d32389'.decode('hex'),
+        P2P_PORT=8639,
+        ADDRESS_VERSION=0,
+        RPC_PORT=8638,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'freicoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: ((262500-height) * 6996713230545) // 262500 if height < 262500 else 953674316406,
+        POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
+        SYMBOL='FRC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Freicoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Freicoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.freicoin'), 'freicoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://freicoin.com/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://freicoin.com/address/',
+        SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
+    ),
+    
     litecoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
         P2P_PORT=9333,

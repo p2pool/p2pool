@@ -203,8 +203,14 @@ class NewNewShare(object):
             transaction_hash_refs=transaction_hash_refs,
         )
         
+        tx_version = 1
+        ref_height = 0
+        if 'FRC' in net.PARENT.SYMBOL:
+            tx_version = 2
+            ref_height = parse_bip0034(share_data['coinbase'])[0]
+        
         gentx = dict(
-            version=1,
+            version=tx_version,
             tx_ins=[dict(
                 previous_output=None,
                 sequence=None,
@@ -215,6 +221,7 @@ class NewNewShare(object):
                 script='\x24' + cls.get_ref_hash(net, share_info, ref_merkle_link) + pack.IntType(32).pack(last_txout_nonce),
             )],
             lock_time=0,
+            refheight=ref_height if tx_version in set([2]) else 0,
         )
         
         def get_share(header, transactions):
@@ -224,7 +231,7 @@ class NewNewShare(object):
                 share_info=share_info,
                 ref_merkle_link=dict(branch=[], index=0),
                 last_txout_nonce=last_txout_nonce,
-                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-4], cls.gentx_before_refhash),
+                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-4-(tx_version in set([2]) and 4 or 0)], cls.gentx_before_refhash),
                 merkle_link=bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0),
             ))
         
@@ -257,6 +264,8 @@ class NewNewShare(object):
         
         assert not self.hash_link['extra_data'], repr(self.hash_link['extra_data'])
         
+        ref_height = parse_bip0034(self.share_info['share_data']['coinbase'])[0]
+        
         self.share_data = self.share_info['share_data']
         self.max_target = self.share_info['max_bits'].target
         self.target = self.share_info['bits'].target
@@ -270,9 +279,13 @@ class NewNewShare(object):
         for i, x in enumerate(self.share_info['new_transaction_hashes']):
             assert dict(share_count=0, tx_count=i) in self.share_info['transaction_hash_refs']
         
+        suffix = pack.IntType(32).pack(self.contents['last_txout_nonce']) + pack.IntType(32).pack(0)
+        if 'FRC' in net.PARENT.SYMBOL:
+            suffix = suffix + pack.IntType(32).pack(ref_height)
+        
         self.gentx_hash = check_hash_link(
             self.hash_link,
-            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + pack.IntType(32).pack(self.contents['last_txout_nonce']) + pack.IntType(32).pack(0),
+            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + suffix,
             self.gentx_before_refhash,
         )
         merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.merkle_link)
@@ -472,8 +485,14 @@ class Share(object):
             )) if previous_share is not None else desired_timestamp,
         )
         
+        tx_version = 1
+        ref_height = 0
+        if 'FRC' in net.PARENT.SYMBOL:
+            tx_version = 2
+            ref_height = parse_bip0034(share_data['coinbase'])[0]
+        
         gentx = dict(
-            version=1,
+            version=tx_version,
             tx_ins=[dict(
                 previous_output=None,
                 sequence=None,
@@ -484,12 +503,13 @@ class Share(object):
                 script='\x20' + cls.get_ref_hash(net, share_info, ref_merkle_link),
             )],
             lock_time=0,
+            refheight=ref_height if tx_version in set([2]) else 0,
         )
         
         def get_share(header, transactions):
             assert transactions[0] == gentx and [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions[1:]] == desired_other_transaction_hashes
             min_header = dict(header);del min_header['merkle_root']
-            hash_link = prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4], cls.gentx_before_refhash)
+            hash_link = prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-(tx_version in set([2]) and 4 or 0)], cls.gentx_before_refhash)
             merkle_link = bitcoin_data.calculate_merkle_link([None] + desired_other_transaction_hashes, 0)
             pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
             return cls(net, None, dict(
@@ -529,6 +549,8 @@ class Share(object):
         
         assert not self.hash_link['extra_data'], repr(self.hash_link['extra_data'])
         
+        ref_height = parse_bip0034(self.share_info['share_data']['coinbase'])[0]
+        
         self.share_data = self.share_info['share_data']
         self.max_target = self.share_info['max_bits'].target
         self.target = self.share_info['bits'].target
@@ -537,9 +559,13 @@ class Share(object):
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
         self.desired_version = self.share_data['desired_version']
         
+        suffix = pack.IntType(32).pack(0)
+        if 'FRC' in net.PARENT.SYMBOL:
+            suffix = suffix + pack.IntType(32).pack(ref_height)
+        
         self.gentx_hash = check_hash_link(
             self.hash_link,
-            self.get_ref_hash(net, self.share_info, common['ref_merkle_link']) + pack.IntType(32).pack(0),
+            self.get_ref_hash(net, self.share_info, common['ref_merkle_link']) + suffix,
             self.gentx_before_refhash,
         )
         merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, merkle_link)
@@ -742,8 +768,14 @@ class NewShare(object):
             transaction_hash_refs=transaction_hash_refs,
         )
         
+        tx_version = 1
+        ref_height = 0
+        if 'FRC' in net.PARENT.SYMBOL:
+            tx_version = 2
+            ref_height = parse_bip0034(share_data['coinbase'])[0]
+        
         gentx = dict(
-            version=1,
+            version=tx_version,
             tx_ins=[dict(
                 previous_output=None,
                 sequence=None,
@@ -754,6 +786,7 @@ class NewShare(object):
                 script='\x20' + cls.get_ref_hash(net, share_info, ref_merkle_link),
             )],
             lock_time=0,
+            refheight=ref_height if tx_version in set([2]) else 0,
         )
         
         def get_share(header, transactions):
@@ -762,7 +795,7 @@ class NewShare(object):
                 min_header=min_header,
                 share_info=share_info,
                 ref_merkle_link=dict(branch=[], index=0),
-                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4], cls.gentx_before_refhash),
+                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-(tx_version in set([2]) and 4 or 0)], cls.gentx_before_refhash),
                 merkle_link=bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0),
             ))
         
@@ -795,6 +828,8 @@ class NewShare(object):
         
         assert not self.hash_link['extra_data'], repr(self.hash_link['extra_data'])
         
+        ref_height = parse_bip0034(self.share_info['share_data']['coinbase'])[0]
+        
         self.share_data = self.share_info['share_data']
         self.max_target = self.share_info['max_bits'].target
         self.target = self.share_info['bits'].target
@@ -808,9 +843,13 @@ class NewShare(object):
         for i, x in enumerate(self.share_info['new_transaction_hashes']):
             assert dict(share_count=0, tx_count=i) in self.share_info['transaction_hash_refs']
         
+        suffix = pack.IntType(32).pack(0)
+        if 'FRC' in net.PARENT.SYMBOL:
+            suffix = suffix + pack.IntType(32).pack(ref_height)
+        
         self.gentx_hash = check_hash_link(
             self.hash_link,
-            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + pack.IntType(32).pack(0),
+            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + suffix,
             self.gentx_before_refhash,
         )
         merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.merkle_link)

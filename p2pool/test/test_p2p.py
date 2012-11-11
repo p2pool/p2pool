@@ -57,6 +57,7 @@ class Test(unittest.TestCase):
                             script='x'*900000,
                         )],
                         lock_time=i,
+                        refheight=0,
                     )
                     new_mining_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(huge_tx))] = huge_tx
                 self.mining_txs_var.set(new_mining_txs)
