@@ -12,6 +12,28 @@ import p2pool
 from p2pool.bitcoin import data as bitcoin_data, script, sha256
 from p2pool.util import math, forest, pack
 
+def deserialize_bignum(str_, len_):
+    result = 0L
+    for idx in xrange(len_//8):
+        limb, str_ = pack.IntType(64).unpack(str_[:8]), str_[8:]
+        result += limb << (idx * 64)
+    if len_ & 4:
+        limb, str_ = pack.IntType(32).unpack(str_[:4]), str_[4:]
+        result += limb << ((len_ & ~7) * 8)
+    if len_ & 2:
+        limb, str_ = pack.IntType(16).unpack(str_[:2]), str_[2:]
+        result += limb << ((len_ & ~3) * 8)
+    if len_ & 1:
+        limb, str_ = pack.IntType(8).unpack(str_[:1]), str_[1:]
+        result += limb << ((len_ & ~1) * 8)
+    return result
+def parse_bip0034(coinbase):
+    _, opdata = script.parse(coinbase).next()
+    bignum = deserialize_bignum(opdata, len(opdata))
+    if ord(opdata[-1]) & 0x80:
+        bignum = -bignum
+    return (bignum,)
+
 # hashlink
 
 hash_link_type = pack.ComposedType([
