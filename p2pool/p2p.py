@@ -267,7 +267,9 @@ class Protocol(p2protocol.Protocol):
             tx_hashes = set()
             for share in shares:
                 if share.hash in include_txs_with:
-                    tx_hashes.update(share.get_other_tx_hashes(tracker))
+                    x = share.get_other_tx_hashes(tracker)
+                    if x is not None:
+                        tx_hashes.update(x)
             
             hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
             

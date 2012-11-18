@@ -311,10 +311,14 @@ class NewNewShare(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
+        if tracker.get_height(self.hash) <= max(x['share_count'] for x in self.share_info['transaction_hash_refs']):
+            return None
         return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
     def _get_other_txs(self, tracker, known_txs):
         other_tx_hashes = self.get_other_tx_hashes(tracker)
+        if other_tx_hashes is None:
+            return None # not all parents present
         
         if not all(tx_hash in known_txs for tx_hash in other_tx_hashes):
             return None # not all txs present
@@ -849,10 +853,14 @@ class NewShare(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
+        if tracker.get_height(self.hash) <= max(x['share_count'] for x in self.share_info['transaction_hash_refs']):
+            return None
         return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
     def _get_other_txs(self, tracker, known_txs):
         other_tx_hashes = self.get_other_tx_hashes(tracker)
+        if other_tx_hashes is None:
+            return None # not all parents present
         
         if not all(tx_hash in known_txs for tx_hash in other_tx_hashes):
             return None # not all txs present
