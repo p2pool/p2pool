@@ -167,6 +167,11 @@ class NewNewShare(object):
         if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
             raise ValueError()
         
+        block_height = parse_bip0034(share_data['coinbase'])[0]
+        for addr, amount in net.PARENT.TITHE_FUNC(block_height):
+            address = bitcoin_data.human_address_type.unpack(bitcoin_data.base58_decode(addr))
+            amounts[bitcoin_data.pubkey_hash_to_script2(address.pubkey_hash)] = amount
+        
         dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
         
         new_transaction_hashes = []
@@ -207,7 +212,7 @@ class NewNewShare(object):
         ref_height = 0
         if 'FRC' in net.PARENT.SYMBOL:
             tx_version = 2
-            ref_height = parse_bip0034(share_data['coinbase'])[0]
+            ref_height = block_height
         
         gentx = dict(
             version=tx_version,
@@ -472,6 +477,11 @@ class Share(object):
         if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
             raise ValueError()
         
+        block_height = parse_bip0034(share_data['coinbase'])[0]
+        for addr, amount in net.PARENT.TITHE_FUNC(block_height):
+            address = bitcoin_data.human_address_type.unpack(bitcoin_data.base58_decode(addr))
+            amounts[bitcoin_data.pubkey_hash_to_script2(address.pubkey_hash)] = amount
+        
         dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
         
         share_info = dict(
@@ -489,7 +499,7 @@ class Share(object):
         ref_height = 0
         if 'FRC' in net.PARENT.SYMBOL:
             tx_version = 2
-            ref_height = parse_bip0034(share_data['coinbase'])[0]
+            ref_height = block_height
         
         gentx = dict(
             version=tx_version,
@@ -732,6 +742,11 @@ class NewShare(object):
         if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
             raise ValueError()
         
+        block_height = parse_bip0034(share_data['coinbase'])[0]
+        for addr, amount in net.PARENT.TITHE_FUNC(block_height):
+            address = bitcoin_data.human_address_type.unpack(bitcoin_data.base58_decode(addr))
+            amounts[bitcoin_data.pubkey_hash_to_script2(address.pubkey_hash)] = amount
+        
         dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
         
         new_transaction_hashes = []
@@ -772,7 +787,7 @@ class NewShare(object):
         ref_height = 0
         if 'FRC' in net.PARENT.SYMBOL:
             tx_version = 2
-            ref_height = parse_bip0034(share_data['coinbase'])[0]
+            ref_height = block_height
         
         gentx = dict(
             version=tx_version,
