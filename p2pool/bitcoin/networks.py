@@ -90,7 +90,7 @@ nets = dict(
             'freicoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: ((262500-height) * 6996713230545) // 262500 if height < 262500 else 953674316406,
+        SUBSIDY_FUNC=lambda height: (((262500-height) * 6996713230545) // 262500) + 953674316406 if height < 262500 else 953674316406,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='FRC',
