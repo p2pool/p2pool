@@ -1129,9 +1129,8 @@ def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
     
     if bitcoind_warning is not None:
-        if 'This is a pre-release test build' in bitcoind_warning:
-            pass
-        res.append('(from bitcoind) %s' % (bitcoind_warning,))
+        if 'This is a pre-release test build' not in bitcoind_warning:
+            res.append('(from bitcoind) %s' % (bitcoind_warning,))
     
     if time.time() > bitcoind_work_value['last_update'] + 60:
         res.append('''LOST CONTACT WITH BITCOIND for %s! Check that it isn't frozen or dead!''' % (math.format_dt(time.time() - bitcoind_work_value['last_update']),))
