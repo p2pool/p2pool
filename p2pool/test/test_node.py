@@ -15,6 +15,9 @@ class bitcoinp2p(object):
     def send_block(self, block):
         pass
     
+    def send_tx(self, tx):
+        pass
+    
     def get_block_header(self, hash):
         if hash == 0x16c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89:
             return defer.succeed({
@@ -53,7 +56,7 @@ class bitcoind(object):
         return {
             "version" : 2,
             "previousblockhash" : "000000000000016c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89",
-            "transactions" : [
+            "transactions" : ([
                 {
                     "data" : "01000000014c6ade5af7e7803fdf2ecae88d939ec044fdb3de84bc70168723969666b30e38010000008b483045022100e1fce6361811e24d57b494c3d71a9e653e54b9489dd5a1889affdef8a1e912b002204079a4720f25b55a0f092bcd70a5824e38a85072bb8e58477df8eb6a66b967ae01410426952de5ee7e5fea3c2065ffceada913d7d643f5631f0d714d667a0b81b599aada24f6e0b46d4bd4051b8111be95cf460fbd1977eadb3f2adc68b4018f8b5ba6ffffffff020065cd1d000000001976a9144799fc9c1b2cfb2c0187551be50f6ea41ed37ed888ac80969800000000001976a914ac2092a73378e8b80a127748a10274c962579f5188ac00000000",
                     "hash" : "9665fece00aceffd175a28912707889c9b2039be004c77e1497b59d8f5132966",
@@ -78,7 +81,7 @@ class bitcoind(object):
                     "fee" : 0,
                     "sigops" : 2
                 }
-            ],
+            ] if random.randrange(2) else []),
             "coinbaseaux" : {
                 "flags" : "062f503253482f"
             },

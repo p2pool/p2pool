@@ -311,7 +311,8 @@ class NewNewShare(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
-        if tracker.get_height(self.hash) <= max(x['share_count'] for x in self.share_info['transaction_hash_refs']):
+        parents = tracker.get_height(self.hash) - 1
+        if not all(x['share_count'] <= parents for x in self.share_info['transaction_hash_refs']):
             return None
         return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
@@ -853,7 +854,8 @@ class NewShare(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
-        if tracker.get_height(self.hash) <= max(x['share_count'] for x in self.share_info['transaction_hash_refs']):
+        parents = tracker.get_height(self.hash) - 1
+        if not all(x['share_count'] <= parents for x in self.share_info['transaction_hash_refs']):
             return None
         return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
