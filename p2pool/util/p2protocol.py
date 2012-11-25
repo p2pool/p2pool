@@ -76,7 +76,8 @@ class Protocol(protocol.Protocol):
                 print 'no handler for', repr(command)
             return
         
-        handler(**payload2)
+        if getattr(self, 'connected', True) and not getattr(self, 'disconnecting', False):
+            handler(**payload2)
     
     def badPeerHappened(self):
         self.transport.loseConnection()
