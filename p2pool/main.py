@@ -399,8 +399,8 @@ def run():
         help='maximum incoming connections (default: 40)',
         type=int, action='store', default=40, dest='p2pool_conns')
     p2pool_group.add_argument('--outgoing-conns', metavar='CONNS',
-        help='outgoing connections (default: 10)',
-        type=int, action='store', default=10, dest='p2pool_outgoing_conns')
+        help='outgoing connections (default: 6)',
+        type=int, action='store', default=6, dest='p2pool_outgoing_conns')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
