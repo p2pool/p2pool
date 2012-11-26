@@ -257,7 +257,7 @@ class Protocol(p2protocol.Protocol):
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
-        self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] == 9], self)
+        self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] >= 9], self)
     
     def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
         if not shares:
@@ -310,7 +310,7 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = [p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] not in [6, 7]]
+            res = [p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] >= 9]
         else:
             res = failure.Failure("sharereply result: " + result)
         self.get_shares.got_response(id, res)
