@@ -114,6 +114,9 @@ class P2PNode(p2p.Node):
                             self.node.tracker.get_nth_parent_hash(head, min(max(0, self.node.tracker.get_height_and_last(head)[0] - 1), 10)) for head in self.node.tracker.heads
                         ))[:100],
                     )
+                except defer.TimeoutError:
+                    print 'Share request timed out!'
+                    continue
                 except:
                     log.err(None, 'in download_shares:')
                     continue
