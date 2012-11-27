@@ -56,7 +56,7 @@ class P2PNode(p2p.Node):
         except:
             log.err(None, 'in handle_share_hashes:')
         else:
-            self.handle_shares(shares, peer)
+            self.handle_shares([x for x in shares if isinstance(x, p2pool_data.NewNewShare)], peer)
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         parents = min(parents, 1000//len(hashes))
