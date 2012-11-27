@@ -282,6 +282,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         return dict(
             parent='%064x' % share.previous_hash,
             children=['%064x' % x for x in sorted(node.tracker.reverse.get(share.hash, set()), key=lambda sh: -len(node.tracker.reverse.get(sh, set())))], # sorted from most children to least children
+            type_name=type(share).__name__,
             local=dict(
                 verified=share.hash in node.tracker.verified.items,
                 time_first_seen=start_time if share.time_seen == 0 else share.time_seen,

@@ -42,6 +42,7 @@
                     var children = b.append('p');
                         children.append('span').text('Children: ');
                         children.data(share.children).append('a').attr('href', function(c){return '#' + c}).text(function(c){return c.substr(-8)});
+                    b.append('p').text('Type: ' + share.type_name);
                     b.append('h2').text('Local data');
                     b.append('p').text('Verified: ' + share.local.verified);
                     b.append('p').text('Time first seen: ' + new Date(1000*share.local.time_first_seen) + ' (' + share.local.time_first_seen + ')');
