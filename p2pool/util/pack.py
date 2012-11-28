@@ -161,10 +161,9 @@ class ListType(Type):
     
     def read(self, file):
         length, file = self._inner_size.read(file)
-        res = []
+        res = [None]*length
         for i in xrange(length):
-            item, file = self.type.read(file)
-            res.append(item)
+            res[i], file = self.type.read(file)
         return res, file
     
     def write(self, file, item):
