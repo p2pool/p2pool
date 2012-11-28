@@ -236,10 +236,12 @@ class Share(object):
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
         self.desired_version = self.share_data['desired_version']
         
+        n = set()
         for x in self.share_info['transaction_hash_refs']:
             assert x['share_count'] < 110
-        for i, x in enumerate(self.share_info['new_transaction_hashes']):
-            assert dict(share_count=0, tx_count=i) in self.share_info['transaction_hash_refs']
+            if x['share_count'] == 0:
+                n.add(x['tx_count'])
+        assert n == set(range(len(self.share_info['new_transaction_hashes'])))
         
         self.gentx_hash = check_hash_link(
             self.hash_link,
