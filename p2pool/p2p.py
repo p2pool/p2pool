@@ -120,6 +120,8 @@ class Protocol(p2protocol.Protocol):
             raise PeerMisbehavingError('more than one version message')
         if version < 8:
             raise PeerMisbehavingError('peer too old')
+        if "8." in sub_version:
+            raise PeerMisbehavingError('dropping old 8.x peer')
         
         self.other_version = version
         self.other_sub_version = sub_version[:512]
