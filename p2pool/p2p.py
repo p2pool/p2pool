@@ -45,7 +45,7 @@ class Protocol(p2protocol.Protocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=8,
+            version=901,
             services=0,
             addr_to=dict(
                 services=0,
