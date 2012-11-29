@@ -37,3 +37,31 @@ def memoize_with_backing(backing, has_inverses=set()):
 
 def memoize(f):
     return memoize_with_backing({})(f)
+
+
+class cdict(dict):
+    def __init__(self, func):
+        dict.__init__(self)
+        self._func = func
+    
+    def __missing__(self, key):
+        value = self._func(key)
+        self[key] = value
+        return value
+
+def fast_memoize_single_arg(func):
+    return cdict(func).__getitem__
+
+class cdict2(dict):
+    def __init__(self, func):
+        dict.__init__(self)
+        self._func = func
+    
+    def __missing__(self, key):
+        value = self._func(*key)
+        self[key] = value
+        return value
+
+def fast_memoize_multiple_args(func):
+    f = cdict2(func).__getitem__
+    return lambda *args: f(args)
