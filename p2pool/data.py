@@ -145,11 +145,15 @@ class Share(object):
         transaction_hash_refs = []
         other_transaction_hashes = []
         
+        past_shares = list(tracker.get_chain(share_data['previous_share_hash'], min(height, 100)))
+        tx_hash_to_this = {}
+        for i, share in enumerate(past_shares):
+            for j, tx_hash in enumerate(share.new_transaction_hashes):
+                if tx_hash not in tx_hash_to_this:
+                    tx_hash_to_this[tx_hash] = dict(share_count=1+i, tx_count=j)
         for tx_hash in desired_other_transaction_hashes:
-            for i, share in enumerate(tracker.get_chain(share_data['previous_share_hash'], min(height, 100))):
-                if tx_hash in share.new_transaction_hashes:
-                    this = dict(share_count=i+1, tx_count=share.new_transaction_hashes.index(tx_hash))
-                    break
+            if tx_hash in tx_hash_to_this:
+                this = tx_hash_to_this[tx_hash]
             else:
                 if known_txs is not None:
                     this_size = bitcoin_data.tx_type.packed_size(known_txs[tx_hash])
