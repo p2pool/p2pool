@@ -59,6 +59,14 @@ def get_attributedelta_type(attrs): # attrs: {name: func}
         def from_element(cls, item):
             return cls(item.hash, item.previous_hash, **dict((k, v(item)) for k, v in attrs.iteritems()))
         
+        @staticmethod
+        def get_head(item):
+            return item.hash
+        
+        @staticmethod
+        def get_tail(item):
+            return item.previous_hash
+        
         def __init__(self, head, tail, **kwargs):
             self.head, self.tail = head, tail
             for k, v in kwargs.iteritems():
@@ -121,7 +129,7 @@ class TrackerView(object):
         ref = self._reverse_delta_refs[delta.tail]
         cur_delta = self._delta_refs[ref]
         assert cur_delta.tail == delta.tail
-        self._delta_refs[ref] = cur_delta - self._delta_type.from_element(item)
+        self._delta_refs[ref] = cur_delta - delta
         assert self._delta_refs[ref].tail == delta.head
         del self._reverse_delta_refs[delta.tail]
         self._reverse_delta_refs[delta.head] = ref
@@ -324,8 +332,9 @@ class Tracker(object):
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
         for i in xrange(length):
-            yield self.items[start_hash]
-            start_hash = self._delta_type.from_element(self.items[start_hash]).tail
+            item = self.items[start_hash]
+            yield item
+            start_hash = self._delta_type.get_tail(item)
     
     def is_child_of(self, item_hash, possible_child_hash):
         height, last = self.get_height_and_last(item_hash)
@@ -342,9 +351,8 @@ class SubsetTracker(Tracker):
         self._subset_of = subset_of
     
     def add(self, item):
-        delta = self._delta_type.from_element(item)
         if self._subset_of is not None:
-            assert delta.head in self._subset_of.items
+            assert self._delta_type.get_head(item) in self._subset_of.items
         Tracker.add(self, item)
     
     def remove(self, item_hash):

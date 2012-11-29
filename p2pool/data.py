@@ -306,10 +306,12 @@ class Share(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
+        parents_needed = max(x['share_count'] for x in self.share_info['transaction_hash_refs']) if self.share_info['transaction_hash_refs'] else 0
         parents = tracker.get_height(self.hash) - 1
-        if not all(x['share_count'] <= parents for x in self.share_info['transaction_hash_refs']):
+        if parents < parents_needed:
             return None
-        return [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+        last_shares = list(tracker.get_chain(self.hash, parents_needed + 1))
+        return [last_shares[x['share_count']].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
     
     def _get_other_txs(self, tracker, known_txs):
         other_tx_hashes = self.get_other_tx_hashes(tracker)
