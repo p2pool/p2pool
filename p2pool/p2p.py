@@ -356,10 +356,10 @@ class Protocol(p2protocol.Protocol):
                 for cache in self.known_txs_cache.itervalues():
                     if tx_hash in cache:
                         tx = cache[tx_hash]
-                        print 'Transaction rescued from peer latency cache!'
+                        print 'Transaction %064x rescued from peer latency cache!' % (tx_hash,)
                         break
                 else:
-                    print >>sys.stderr, 'Peer referenced unknown transaction, disconnecting'
+                    print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
                     self.transport.loseConnection()
                     return
             
@@ -375,7 +375,7 @@ class Protocol(p2protocol.Protocol):
                 return
             
             if tx_hash in self.node.known_txs_var.value and not warned:
-                print 'Peer sent entire transaction that was already received'
+                print 'Peer sent entire transaction %064x that was already received' % (tx_hash,)
                 warned = True
             
             self.remembered_txs[tx_hash] = tx
