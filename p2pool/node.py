@@ -67,7 +67,8 @@ class P2PNode(p2p.Node):
                 if share.hash in stops:
                     break
                 shares.append(share)
-        print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
+        if len(shares) > 0:
+            print 'Sending %i shares to %s:%i' % (len(shares), peer.addr[0], peer.addr[1])
         return shares
     
     def handle_bestblock(self, header, peer):
