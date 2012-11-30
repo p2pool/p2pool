@@ -266,8 +266,7 @@ class Node(object):
             print
         
         def forget_old_txs():
-            print "KNOWN:", sum(bitcoin_data.tx_type.packed_size(tx) for tx in self.known_txs_var.value.itervalues())
-            print "MINING:", sum(bitcoin_data.tx_type.packed_size(tx) for tx in self.mining_txs_var.value.itervalues())
+            print "KNOWN: %i ; MINING: %i " % (sum(bitcoin_data.tx_type.packed_size(tx) for tx in self.known_txs_var.value.itervalues()), sum(bitcoin_data.tx_type.packed_size(tx) for tx in self.mining_txs_var.value.itervalues()))
             new_known_txs = {}
             if self.p2p_node is not None:
                 for peer in self.p2p_node.peers.itervalues():
