@@ -336,7 +336,7 @@ class Share(object):
         
         other_txs = self._get_other_txs(tracker, known_txs)
         if other_txs is None:
-            if self.time_seen is not None: # ignore if loaded from ShareStore
+            if self.time_seen == 0: # ignore if loaded from ShareStore
                 return True, 'not all txs present'
         else:
             all_txs_size = sum(bitcoin_data.tx_type.packed_size(tx) for tx in other_txs)
