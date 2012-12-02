@@ -110,7 +110,7 @@ class P2PNode(p2p.Node):
                 try:
                     shares = yield peer.get_shares(
                         hashes=[share_hash],
-                        parents=500,
+                        parents=300-1,
                         stops=list(set(self.node.tracker.heads) | set(
                             self.node.tracker.get_nth_parent_hash(head, min(max(0, self.node.tracker.get_height_and_last(head)[0] - 1), 10)) for head in self.node.tracker.heads
                         ))[:100],
