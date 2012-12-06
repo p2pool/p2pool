@@ -157,18 +157,21 @@ class EnumType(Type):
 class ListType(Type):
     _inner_size = VarIntType()
     
-    def __init__(self, type):
+    def __init__(self, type, mul=1):
         self.type = type
+        self.mul = mul
     
     def read(self, file):
         length, file = self._inner_size.read(file)
+        length *= self.mul
         res = [None]*length
         for i in xrange(length):
             res[i], file = self.type.read(file)
         return res, file
     
     def write(self, file, item):
-        file = self._inner_size.write(file, len(item))
+        assert len(item) % self.mul == 0
+        file = self._inner_size.write(file, len(item)//self.mul)
         for subitem in item:
             file = self.type.write(file, subitem)
         return file

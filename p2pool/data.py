@@ -76,10 +76,7 @@ class Share(object):
             ('desired_version', pack.VarIntType()),
         ])),
         ('new_transaction_hashes', pack.ListType(pack.IntType(256))),
-        ('transaction_hash_refs', pack.ListType(pack.ComposedType([ # compressed by referencing previous shares' hashes
-            ('share_count', pack.VarIntType()),
-            ('tx_count', pack.VarIntType()),
-        ]))),
+        ('transaction_hash_refs', pack.ListType(pack.VarIntType(), 2)), # pairs of share_count, tx_count
         ('far_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
         ('max_bits', bitcoin_data.FloatingIntegerType()),
         ('bits', bitcoin_data.FloatingIntegerType()),
@@ -150,7 +147,7 @@ class Share(object):
         for i, share in enumerate(past_shares):
             for j, tx_hash in enumerate(share.new_transaction_hashes):
                 if tx_hash not in tx_hash_to_this:
-                    tx_hash_to_this[tx_hash] = dict(share_count=1+i, tx_count=j)
+                    tx_hash_to_this[tx_hash] = [1+i, j] # share_count, tx_count
         for tx_hash in desired_other_transaction_hashes:
             if tx_hash in tx_hash_to_this:
                 this = tx_hash_to_this[tx_hash]
@@ -161,8 +158,8 @@ class Share(object):
                         break
                     new_transaction_size += this_size
                 new_transaction_hashes.append(tx_hash)
-                this = dict(share_count=0, tx_count=len(new_transaction_hashes)-1)
-            transaction_hash_refs.append(this)
+                this = [0, len(new_transaction_hashes)-1]
+            transaction_hash_refs.extend(this)
             other_transaction_hashes.append(tx_hash)
         
         share_info = dict(
@@ -241,10 +238,10 @@ class Share(object):
         self.desired_version = self.share_data['desired_version']
         
         n = set()
-        for x in self.share_info['transaction_hash_refs']:
-            assert x['share_count'] < 110
-            if x['share_count'] == 0:
-                n.add(x['tx_count'])
+        for share_count, tx_count in self.iter_transaction_hash_refs():
+            assert share_count < 110
+            if share_count == 0:
+                n.add(tx_count)
         assert n == set(range(len(self.share_info['new_transaction_hashes'])))
         
         self.gentx_hash = check_hash_link(
@@ -276,6 +273,9 @@ class Share(object):
     def as_share(self):
         return dict(type=self.VERSION, contents=self.share_type.pack(self.contents))
     
+    def iter_transaction_hash_refs(self):
+        return zip(self.share_info['transaction_hash_refs'][::2], self.share_info['transaction_hash_refs'][1::2])
+    
     def check(self, tracker):
         from p2pool import p2p
         if self.share_data['previous_share_hash'] is not None:
@@ -295,7 +295,7 @@ class Share(object):
             else:
                 raise p2p.PeerMisbehavingError('''%s can't follow %s''' % (type(self).__name__, type(previous_share).__name__))
         
-        other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, x['share_count'])].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+        other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, share_count)].share_info['new_transaction_hashes'][tx_count] for share_count, tx_count in self.iter_transaction_hash_refs()]
         
         share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], other_tx_hashes, self.net, last_txout_nonce=self.contents['last_txout_nonce'])
         assert other_tx_hashes2 == other_tx_hashes
@@ -310,12 +310,12 @@ class Share(object):
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
-        parents_needed = max(x['share_count'] for x in self.share_info['transaction_hash_refs']) if self.share_info['transaction_hash_refs'] else 0
+        parents_needed = max(share_count for share_count, tx_count in self.iter_transaction_hash_refs()) if self.share_info['transaction_hash_refs'] else 0
         parents = tracker.get_height(self.hash) - 1
         if parents < parents_needed:
             return None
         last_shares = list(tracker.get_chain(self.hash, parents_needed + 1))
-        return [last_shares[x['share_count']].share_info['new_transaction_hashes'][x['tx_count']] for x in self.share_info['transaction_hash_refs']]
+        return [last_shares[share_count].share_info['new_transaction_hashes'][tx_count] for share_count, tx_count in self.iter_transaction_hash_refs()]
     
     def _get_other_txs(self, tracker, known_txs):
         other_tx_hashes = self.get_other_tx_hashes(tracker)
