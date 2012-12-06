@@ -85,8 +85,8 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
     ),
     
-    freicoin_beta3=math.Object(
-        P2P_PREFIX='e474dbca'.decode('hex'),
+    freicoin_beta5=math.Object(
+        P2P_PREFIX='e4422f61'.decode('hex'),
         P2P_PORT=8639,
         ADDRESS_VERSION=0,
         RPC_PORT=8638,
@@ -94,7 +94,7 @@ nets = dict(
             'freicoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: (((161280-height) * 15916928405) // 161280) + 9536743164 if height < 161280 else 9536743164,
+        SUBSIDY_FUNC=lambda height: int(mpq((161280-height) * 15916928405, 161280) + mpq(9999999999999999, 1048576)) if height < 161280 else 9536743164,
         TITHE_FUNC=lambda height: () if height >= 161280 else [({
             0: '1DCyWRmTXB9goqA4Zb88nU1Q8snA7d7n4x',
             1: '1LoFvV5YJsSMkpyPLizqyWH8KAkevV2XwJ',
@@ -416,27 +416,7 @@ nets = dict(
             317: '1M3wUX9YYrcVSSw6Tncdoic3Fj13okQ63u',
             318: '1PVKsqeVqM4B2ccq915GHeK3aDeruStr24',
             319: '1PKNQqSuPknZ1PaqKkRqa9qYujWKL9KQ7E',
-        }[(height*320)//161280], 49603174603)],
-        POW_FUNC=data.hash256,
-        BLOCK_PERIOD=600, # s
-        SYMBOL='FRC',
-        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Freicoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Freicoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.freicoin'), 'freicoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://freicoin.com/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://freicoin.com/address/',
-        SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
-    ),
-    
-    freicoin_beta2=math.Object(
-        P2P_PREFIX='c7d32389'.decode('hex'),
-        P2P_PORT=8639,
-        ADDRESS_VERSION=0,
-        RPC_PORT=8638,
-        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'freicoinaddress' in (yield bitcoind.rpc_help()) and
-            not (yield bitcoind.rpc_getinfo())['testnet']
-        )),
-        SUBSIDY_FUNC=lambda height: (((262500-height) * 6996713230545) // 262500) + 953674316406 if height < 262500 else 953674316406,
-        TITHE_FUNC=lambda height: (),
+        }[(height*320)//161280], 49603174604)],
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='FRC',

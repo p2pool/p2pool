@@ -45,34 +45,15 @@ nets = dict(
         VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
     ),
     
-    freicoin_beta3=math.Object(
-        PARENT=networks.nets['freicoin_beta3'],
+    freicoin_beta5=math.Object(
+        PARENT=networks.nets['freicoin_beta5'],
         SHARE_PERIOD=10, # seconds
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
-        IDENTIFIER='543813f28d793aa6'.decode('hex'),
-        PREFIX='760132e8d539d6d0'.decode('hex'),
-        P2P_PORT=9639,
-        MIN_TARGET=0,
-        MAX_TARGET=2**256//2**32 - 1,
-        PERSIST=True,
-        WORKER_PORT=9638,
-        BOOTSTRAP_ADDRS='pool.freico.in'.split(' '),
-        ANNOUNCE_CHANNEL='#p2pool-frc',
-        VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
-    ),
-    
-    freicoin_beta2=math.Object(
-        PARENT=networks.nets['freicoin_beta2'],
-        SHARE_PERIOD=10, # seconds
-        CHAIN_LENGTH=24*60*60//10, # shares
-        REAL_CHAIN_LENGTH=24*60*60//10, # shares
-        TARGET_LOOKBEHIND=200, # shares
-        SPREAD=3, # blocks
-        IDENTIFIER='c40827fbff4fe867'.decode('hex'),
-        PREFIX='4296879f5c0d1fa7'.decode('hex'),
+        IDENTIFIER='e77d49aed4b74a02'.decode('hex'),
+        PREFIX='be2d1105166e3691'.decode('hex'),
         P2P_PORT=9639,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**32 - 1,
