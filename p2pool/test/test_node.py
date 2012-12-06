@@ -239,3 +239,4 @@ class Test(unittest.TestCase):
         gc.collect()
         
         yield deferral.sleep(20) # waiting for work_poller to exit
+    test_nodes.timeout = 300
