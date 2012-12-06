@@ -59,7 +59,7 @@ nets = dict(
         MAX_TARGET=2**256//2**32 - 1,
         PERSIST=True,
         WORKER_PORT=9638,
-        BOOTSTRAP_ADDRS='pool.freico.in'.split(' '),
+        BOOTSTRAP_ADDRS='pool.freico.in abacus.freico.in'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-frc',
         VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
     ),
