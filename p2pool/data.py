@@ -525,7 +525,7 @@ class OkayTracker(forest.Tracker):
         block_height = max(block_rel_height_func(share.header['previous_block']) for share in
             self.verified.get_chain(end_point, self.net.CHAIN_LENGTH//16))
         
-        return self.net.CHAIN_LENGTH, self.verified.get_delta(share_hash, end_point).work//((0 - block_height + 1)*self.net.PARENT.BLOCK_PERIOD)
+        return self.net.CHAIN_LENGTH, self.verified.get_delta(share_hash, end_point).work/((0 - block_height + 1)*self.net.PARENT.BLOCK_PERIOD)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False, integer=False):
     assert dist >= 2
