@@ -46,4 +46,4 @@ def _get_version():
 
 __version__ = _get_version()
 
-DEBUG = False
+DEBUG = True
