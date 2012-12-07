@@ -11,52 +11,61 @@ from p2pool import data, node, work
 from p2pool.bitcoin import data as bitcoin_data, networks, worker_interface
 from p2pool.util import deferral, jsonrpc, math, variable
 
-@apply
-class bitcoinp2p(object):
+class bitcoind(object): # can be used as p2p factory, p2p protocol, or rpc jsonrpc proxy
+    def __init__(self):
+        self.blocks = [0x000000000000016c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89]
+        self.headers = {0x16c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89: {
+            'nonce': 1853158954,
+            'timestamp': 1351658517,
+            'merkle_root': 2282849479936278423916707524932131168473430114569971665822757638339486597658L,
+            'version': 1,
+            'previous_block': 1048610514577342396345362905164852351970507722694242579238530L,
+            'bits': bitcoin_data.FloatingInteger(bits=0x1a0513c5, target=0x513c50000000000000000000000000000000000000000000000L),
+        }}
+        
+        self.conn = variable.Variable(self)
+        self.new_headers = variable.Event()
+        self.new_block = variable.Event()
+        self.new_tx = variable.Event()
+    
+    # p2p factory
+    
+    def getProtocol(self):
+        return self
+    
+    # p2p protocol
+    
     def send_block(self, block):
         pass
     
     def send_tx(self, tx):
         pass
     
-    def get_block_header(self, hash):
-        if hash == 0x16c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89:
-            return defer.succeed({
-                'nonce': 1853158954,
-                'timestamp': 1351658517,
-                'merkle_root': 2282849479936278423916707524932131168473430114569971665822757638339486597658L,
-                'version': 1,
-                'previous_block': 1048610514577342396345362905164852351970507722694242579238530L,
-                'bits': bitcoin_data.FloatingInteger(bits=0x1a0513c5, target=0x513c50000000000000000000000000000000000000000000000L),
-            })
-        print hex(hash)
-        return defer.fail('blah')
-
-class factory(object):
-    new_headers = variable.Event()
-    new_block = variable.Event()
-    new_tx = variable.Event()
-    conn = variable.Variable(bitcoinp2p)
-    @classmethod
-    def getProtocol(self):
-        return bitcoinp2p
-
-class bitcoind(object):
-    @classmethod
+    def get_block_header(self, block_hash):
+        return self.headers[block_hash]
+    
+    # rpc jsonrpc proxy
+    
     def rpc_help(self):
         return '\ngetblock '
     
-    @classmethod
     def rpc_getblock(self, block_hash_hex):
-        return dict(height=42)
+        block_hash = int(block_hash_hex, 16)
+        return dict(height=self.blocks.index(block_hash))
     
-    @classmethod
     def rpc_getmemorypool(self, result=None):
         if result is not None:
+            block = bitcoin_data.block_type.unpack(result.decode('hex'))
+            if block['header']['previous_block'] != self.blocks[-1]:
+                return False
+            header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header']))
+            self.blocks.append(header_hash)
+            self.headers[header_hash] = block['header']
             return True
+        
         return {
             "version" : 2,
-            "previousblockhash" : "000000000000016c169477c25421250ec5d32cf9c6d38538b5de970a2355fd89",
+            "previousblockhash" : '%064x' % (self.blocks[-1],),
             "transactions" : ([
                 {
                     "data" : "01000000014c6ade5af7e7803fdf2ecae88d939ec044fdb3de84bc70168723969666b30e38010000008b483045022100e1fce6361811e24d57b494c3d71a9e653e54b9489dd5a1889affdef8a1e912b002204079a4720f25b55a0f092bcd70a5824e38a85072bb8e58477df8eb6a66b967ae01410426952de5ee7e5fea3c2065ffceada913d7d643f5631f0d714d667a0b81b599aada24f6e0b46d4bd4051b8111be95cf460fbd1977eadb3f2adc68b4018f8b5ba6ffffffff020065cd1d000000001976a9144799fc9c1b2cfb2c0187551be50f6ea41ed37ed888ac80969800000000001976a914ac2092a73378e8b80a127748a10274c962579f5188ac00000000",
@@ -99,7 +108,7 @@ class bitcoind(object):
             "sizelimit" : 1000000,
             "curtime" : 1351659940,
             "bits" : "21008000",
-            "height" : 205801
+            "height" : len(self.blocks),
         }
 
 @apply
@@ -165,11 +174,13 @@ class MiniNode(object):
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_node(self):
+        bitd = bitcoind()
+        
         mm_root = resource.Resource()
         mm_root.putChild('', jsonrpc.Server(mm_provider))
         mm_port = reactor.listenTCP(0, server.Site(mm_root))
         
-        n = node.Node(factory, bitcoind, [], [], mynet)
+        n = node.Node(bitd, bitd, [], [], mynet)
         yield n.start()
         
         wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[('http://127.0.0.1:%i' % (mm_port.getHost().port,), '')], worker_fee=3)
@@ -210,9 +221,11 @@ class Test(unittest.TestCase):
         N = 3
         SHARES = 600
         
+        bitd = bitcoind()
+        
         nodes = []
         for i in xrange(N):
-            nodes.append((yield MiniNode.start(mynet, factory, bitcoind, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes], [])))
+            nodes.append((yield MiniNode.start(mynet, bitd, bitd, [mn.n.p2p_node.serverfactory.listen_port.getHost().port for mn in nodes], [])))
         
         yield deferral.sleep(3)
         
