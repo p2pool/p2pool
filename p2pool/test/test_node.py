@@ -1,10 +1,11 @@
 from __future__ import division
 
 import random
+import tempfile
 
 from twisted.internet import defer, reactor
 from twisted.trial import unittest
-from twisted.web import resource, server
+from twisted.web import client, resource, server
 
 from p2pool import data, node, work
 from p2pool.bitcoin import data as bitcoin_data, networks, worker_interface
@@ -147,6 +148,7 @@ class MiniNode(object):
         self.n.p2p_node.start()
         
         wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=merged_urls, worker_fee=3)
+        self.wb = wb
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         self.web_port = reactor.listenTCP(0, server.Site(web_root))
@@ -183,6 +185,7 @@ class Test(unittest.TestCase):
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
         
+        
         yield deferral.sleep(3)
         
         assert len(n.tracker.items) == 100
@@ -217,10 +220,30 @@ class Test(unittest.TestCase):
             proxy = jsonrpc.Proxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
-            yield deferral.sleep(random.expovariate(1/.1))
+            yield deferral.sleep(.02)
             print i
             print type(nodes[0].n.tracker.items[nodes[0].n.best_share_var.value])
-    
+        
+        # crawl web pages
+        from p2pool import web
+        stop_event = variable.Event()
+        web2_root = web.get_web_root(nodes[0].wb, tempfile.mkdtemp(), variable.Variable(None), stop_event)
+        web2_port = reactor.listenTCP(0, server.Site(web2_root))
+        for name in web2_root.listNames() + ['web/' + x for x in web2_root.getChildWithDefault('web', None).listNames()]:
+            print
+            print name
+            try:
+                res = yield client.getPage('http://127.0.0.1:%i/%s' % (web2_port.getHost().port, name))
+            except:
+                import traceback
+                traceback.print_exc()
+            else:
+                print repr(res)[:100]
+            print
+        yield web2_port.stopListening()
+        stop_event.happened()
+        del web2_root
+        
         yield deferral.sleep(3)
         
         for i, n in enumerate(nodes):

@@ -13,7 +13,7 @@ from twisted.web import resource, static
 import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
-from util import deferred_resource, graph, math, pack
+from util import deferred_resource, graph, math, pack, variable
 
 def _atomic_read(filename):
     try:
@@ -44,7 +44,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(wb, datadir_path, bitcoind_warning_var):
+def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Event()):
     node = wb.node
     start_time = time.time()
     
@@ -195,7 +195,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
             res = yield self.func(*self.args)
             defer.returnValue(json.dumps(res) if self.mime_type == 'application/json' else res)
     
-    web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, 720)/(1-p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, 720))))
+    def decent_height():
+        return min(node.tracker.get_height(node.best_share_var.value), 720)
+    web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, decent_height())/(1-p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, decent_height()))))
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target)))
     web_root.putChild('users', WebInterface(get_users))
     web_root.putChild('user_stales', WebInterface(lambda: dict((bitcoin_data.pubkey_hash_to_address(ph, node.net.PARENT), prop) for ph, prop in
@@ -226,7 +228,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         share='%064x' % s.hash,
     ) for s in node.tracker.get_chain(node.best_share_var.value, min(node.tracker.get_height(node.best_share_var.value), 24*60*60//node.net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
-    web_root.putChild('stale_rates', WebInterface(lambda: p2pool_data.get_stale_counts(node.tracker, node.best_share_var.value, 720, rates=True)))
+    web_root.putChild('stale_rates', WebInterface(lambda: p2pool_data.get_stale_counts(node.tracker, node.best_share_var.value, decent_height(), rates=True)))
     
     new_root = resource.Resource()
     web_root.putChild('web', new_root)
@@ -271,7 +273,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         
         with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
             f.write(json.dumps(stat_log))
-    task.LoopingCall(update_stat_log).start(5*60)
+    x = task.LoopingCall(update_stat_log)
+    x.start(5*60)
+    stop_event.watch(x.stop)
     new_root.putChild('log', WebInterface(lambda: stat_log))
     
     def get_share(share_hash_str):
@@ -389,7 +393,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'getwork_latency': graph.DataStreamDescription(dataview_descriptions),
     }, hd_obj)
-    task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj()))).start(100)
+    x = task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj())))
+    x.start(100)
+    stop_event.watch(x.stop)
     @wb.pseudoshare_received.watch
     def _(work, dead, user):
         t = time.time()
@@ -432,7 +438,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var):
         vs_total = sum(vs.itervalues())
         hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
         hd.datastreams['desired_version_rates'].add_datum(t, dict((str(k), v/vs_total*pool_total) for k, v in vs.iteritems()))
-    task.LoopingCall(add_point).start(5)
+    x = task.LoopingCall(add_point)
+    x.start(5)
+    stop_event.watch(x.stop)
     @node.bitcoind_work.changed.watch
     def _(new_work):
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
