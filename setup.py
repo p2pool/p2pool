@@ -8,7 +8,7 @@ from distutils.core import setup
 import py2exe
 
 version = __import__('p2pool').__version__
-im64 = '64' in platform.architecture()
+im64 = '64' in platform.architecture()[0]
 
 if os.path.exists('INITBAK'):
     os.remove('INITBAK')
