@@ -224,7 +224,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
     web_root.putChild('recent_blocks', WebInterface(lambda: [dict(
         ts=s.timestamp,
         hash='%064x' % s.header_hash,
-        number=pack.IntType(24).unpack(s.share_data['coinbase'][1:4]),
+        number=pack.IntType(24).unpack(s.share_data['coinbase'][1:4]) if len(s.share_data['coinbase']) >= 4 else None,
         share='%064x' % s.hash,
     ) for s in node.tracker.get_chain(node.best_share_var.value, min(node.tracker.get_height(node.best_share_var.value), 24*60*60//node.net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
