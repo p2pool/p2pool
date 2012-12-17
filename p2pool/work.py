@@ -93,6 +93,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     height=t['height'] + 1,
                     time=bb['timestamp'] + 600, # better way?
                     transactions=[],
+                    transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
                     subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.node.bitcoind_work.value['height']),
                     last_update=self.node.bitcoind_work.value['last_update'],
@@ -230,9 +231,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_timestamp=int(time.time() + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
-                desired_other_transaction_hashes=tx_hashes,
+                desired_other_transaction_hashes_and_fees=zip(tx_hashes, self.current_work.value['transaction_fees']),
                 net=self.node.net,
                 known_txs=tx_map,
+                base_subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['height']),
             )
         
         transactions = [gentx] + [tx_map[tx_hash] for tx_hash in other_transaction_hashes]

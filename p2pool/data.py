@@ -106,7 +106,7 @@ class Share(object):
     gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x24' + pack.IntType(256).pack(0) + pack.IntType(32).pack(0))[:2]
     
     @classmethod
-    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes, net, known_txs=None, last_txout_nonce=0):
+    def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
@@ -148,7 +148,7 @@ class Share(object):
             for j, tx_hash in enumerate(share.new_transaction_hashes):
                 if tx_hash not in tx_hash_to_this:
                     tx_hash_to_this[tx_hash] = [1+i, j] # share_count, tx_count
-        for tx_hash in desired_other_transaction_hashes:
+        for tx_hash, fee in desired_other_transaction_hashes_and_fees:
             if tx_hash in tx_hash_to_this:
                 this = tx_hash_to_this[tx_hash]
             else:
@@ -161,6 +161,15 @@ class Share(object):
                 this = [0, len(new_transaction_hashes)-1]
             transaction_hash_refs.extend(this)
             other_transaction_hashes.append(tx_hash)
+        
+        included_transactions = set(other_transaction_hashes)
+        removed_fees = [fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash not in included_transactions]
+        definite_fees = sum(0 if fee is None else fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash in included_transactions)
+        if None not in removed_fees:
+            share_data = dict(share_data, subsidy=share_data['subsidy'] - sum(removed_fees))
+        else:
+            assert base_subsidy is not None
+            share_data = dict(share_data, subsidy=base_subsidy + definite_fees)
         
         share_info = dict(
             share_data=share_data,
@@ -297,7 +306,7 @@ class Share(object):
         
         other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, share_count)].share_info['new_transaction_hashes'][tx_count] for share_count, tx_count in self.iter_transaction_hash_refs()]
         
-        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], other_tx_hashes, self.net, last_txout_nonce=self.contents['last_txout_nonce'])
+        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], [(h, None) for h in other_tx_hashes], self.net, last_txout_nonce=self.contents['last_txout_nonce'])
         assert other_tx_hashes2 == other_tx_hashes
         if share_info != self.share_info:
             raise ValueError('share_info invalid')
