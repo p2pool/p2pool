@@ -45,15 +45,15 @@ nets = dict(
         VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
     ),
     
-    freicoin_beta5=math.Object(
-        PARENT=networks.nets['freicoin_beta5'],
+    freicoin_rc1=math.Object(
+        PARENT=networks.nets['freicoin_rc1'],
         SHARE_PERIOD=10, # seconds
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
-        IDENTIFIER='e77d49aed4b74a02'.decode('hex'),
-        PREFIX='be2d1105166e3691'.decode('hex'),
+        IDENTIFIER='ad60705de1c22612'.decode('hex'),
+        PREFIX='895b8214abe1b8ac'.decode('hex'),
         P2P_PORT=9639,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**32 - 1,

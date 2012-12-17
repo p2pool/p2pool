@@ -85,8 +85,8 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
     ),
     
-    freicoin_beta5=math.Object(
-        P2P_PREFIX='e4422f61'.decode('hex'),
+    freicoin_rc1=math.Object(
+        P2P_PREFIX='5c9ffaaf'.decode('hex'),
         P2P_PORT=8639,
         ADDRESS_VERSION=0,
         RPC_PORT=8638,
