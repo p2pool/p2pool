@@ -336,8 +336,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     self.my_doa_share_hashes.add(share.hash)
                 
                 self.node.tracker.add(share)
-                if not p2pool.DEBUG:
-                    self.node.tracker.verified.add(share)
                 self.node.set_best_share()
                 
                 try:
