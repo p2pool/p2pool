@@ -20,6 +20,7 @@ class P2PNode(p2p.Node):
             mining_txs_var=node.mining_txs_var,
         **kwargs)
     
+    @defer.inlineCallbacks
     def handle_shares(self, shares, peer):
         if len(shares) > 5:
             print 'Processing %i shares from %s...' % (len(shares), '%s:%i' % peer.addr if peer is not None else None)
@@ -34,7 +35,7 @@ class P2PNode(p2p.Node):
             
             #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
             
-            self.node.tracker.add(share)
+            yield self.node.tracker.add(share)
         
         if new_count:
             self.node.set_best_share()
