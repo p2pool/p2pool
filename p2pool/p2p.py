@@ -120,7 +120,8 @@ class Protocol(p2protocol.Protocol):
             raise PeerMisbehavingError('more than one version message')
         if version < 8:
             raise PeerMisbehavingError('peer too old')
-        
+        if 'terra' in self.node.net.NAME and version < 900:
+            raise PeerMisbehavingError('TRC peer too old')
         self.other_version = version
         self.other_sub_version = sub_version[:512]
         self.other_services = services
