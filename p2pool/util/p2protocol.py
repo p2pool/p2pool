@@ -54,6 +54,7 @@ class Protocol(protocol.Protocol):
             
             if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
                 print 'invalid hash for', self.transport.getPeer().host, repr(command), length, checksum.encode('hex'), hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4].encode('hex'), payload.encode('hex')
+                self.transport.loseConnection()
                 continue
             
             type_ = getattr(self, 'message_' + command, None)
