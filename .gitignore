@@ -1,12 +1,13 @@
 *.pyc
 *.pyo
 *~
+
 /data/
 /litecoin_scrypt/build/
-/_trial_temp/
-/_trial_temp.lock
+/_trial_temp*
 Makefile.local
 .cache/
 .pkg/
 .coverage
 build/
+ltc_scrypt.so
