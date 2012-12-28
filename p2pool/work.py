@@ -131,9 +131,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
     
-    def get_user_details(self, request):
-        user = request.getUser() if request.getUser() is not None else ''
-        
+    def get_user_details(self, user):
         desired_pseudoshare_target = None
         if '+' in user:
             user, desired_pseudoshare_difficulty_str = user.rsplit('+', 1)
@@ -160,8 +158,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
     
-    def preprocess_request(self, request):
-        user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(request)
+    def preprocess_request(self, user):
+        user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
         return pubkey_hash, desired_share_target, desired_pseudoshare_target
     
     def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
@@ -277,7 +275,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         received_header_hashes = set()
         
-        def got_response(header, request):
+        def got_response(header, user):
             header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
             pow_hash = self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
             try:
@@ -290,7 +288,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             except:
                 log.err(None, 'Error while processing potential block:')
             
-            user, _, _, _ = self.get_user_details(request)
+            user, _, _, _ = self.get_user_details(user)
             assert header['previous_block'] == ba.previous_block
             assert header['merkle_root'] == ba.merkle_root
             assert header['bits'] == ba.bits
@@ -328,7 +326,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 share = get_share(header)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
-                    request.getUser(),
+                    user,
                     p2pool_data.format_hash(share.hash),
                     p2pool_data.format_hash(share.previous_hash),
                     time.time() - getwork_time,
@@ -350,11 +348,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 self.share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time)
             
             if pow_hash > target:
-                print 'Worker %s submitted share with hash > target:' % (request.getUser(),)
+                print 'Worker %s submitted share with hash > target:' % (user,)
                 print '    Hash:   %56x' % (pow_hash,)
                 print '    Target: %56x' % (target,)
             elif header_hash in received_header_hashes:
-                print >>sys.stderr, 'Worker %s @ %s submitted share more than once!' % (request.getUser(), request.getClientIP())
+                print >>sys.stderr, 'Worker %s submitted share more than once!' % (user,)
             else:
                 received_header_hashes.add(header_hash)
                 

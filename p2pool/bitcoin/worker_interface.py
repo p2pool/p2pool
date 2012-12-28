@@ -65,7 +65,7 @@ class WorkerInterface(object):
             if header['merkle_root'] not in self.merkle_root_to_handler:
                 print >>sys.stderr, '''Couldn't link returned work's merkle root with its handler. This should only happen if this process was recently restarted!'''
                 defer.returnValue(False)
-            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request))
+            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request.getUser() if request.getUser() is not None else ''))
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
@@ -82,7 +82,7 @@ class WorkerInterface(object):
                 yield self.worker_bridge.new_work_event.get_deferred()
             self.worker_views[request_id] = self.worker_bridge.new_work_event.times
         
-        key = self.worker_bridge.preprocess_request(request)
+        key = self.worker_bridge.preprocess_request(request.getUser() if request.getUser() is not None else '')
         
         if self.work_cache_times != self.worker_bridge.new_work_event.times:
             self.work_cache = {}
