@@ -4,7 +4,7 @@ import json
 import weakref
 
 from twisted.internet import defer
-from twisted.python import log
+from twisted.python import failure, log
 from twisted.web import client, error
 
 from p2pool.util import deferred_resource, memoize
@@ -61,7 +61,7 @@ def _handle(data, provider, preargs=(), response_handler=None):
                 
                 if 'result' in req or 'error' in req:
                     response_handler(req['id'], req['result'] if 'error' not in req or req['error'] is None else
-                        failure.Failure(Error_for_code(resp['error']['code'])(resp['error']['message'], resp['error'].get('data', None))))
+                        failure.Failure(Error_for_code(req['error']['code'])(req['error']['message'], req['error'].get('data', None))))
                     defer.returnValue(None)
                 
                 id_ = req.get('id', None)
