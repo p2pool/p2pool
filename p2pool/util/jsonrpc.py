@@ -4,10 +4,11 @@ import json
 import weakref
 
 from twisted.internet import defer
+from twisted.protocols import basic
 from twisted.python import failure, log
 from twisted.web import client, error
 
-from p2pool.util import deferred_resource, memoize
+from p2pool.util import deferral, deferred_resource, memoize
 
 class Error(Exception):
     def __init__(self, code, message, data=None):
@@ -145,3 +146,19 @@ class HTTPServer(deferred_resource.DeferredResource):
         request.setHeader('Content-Type', 'application/json')
         request.setHeader('Content-Length', len(data))
         request.write(data)
+
+class LineBasedPeer(basic.LineOnlyReceiver):
+    delimiter = '\n'
+    
+    def __init__(self):
+        #basic.LineOnlyReceiver.__init__(self)
+        self._matcher = deferral.GenericDeferrer(max_id=2**30, func=lambda id, method, params: self.sendLine(json.dumps({
+            'jsonrpc': '2.0',
+            'method': method,
+            'params': params,
+            'id': id,
+        })))
+        self.other = Proxy(self._matcher)
+    
+    def lineReceived(self, line):
+        _handle(line, self, response_handler=self._matcher.got_response).addCallback(lambda line2: self.sendLine(line2) if line2 is not None else None)

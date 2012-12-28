@@ -8,8 +8,8 @@ import sys
 from twisted.internet import defer
 
 import p2pool
-from p2pool.bitcoin import getwork
-from p2pool.util import expiring_dict, jsonrpc, variable
+from p2pool.bitcoin import data as bitcoin_data, getwork
+from p2pool.util import expiring_dict, jsonrpc, pack, variable
 
 class _Provider(object):
     def __init__(self, parent, long_poll):
@@ -59,13 +59,15 @@ class WorkerInterface(object):
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('X-Roll-NTime', 'expire=10')
         request.setHeader('X-Is-P2Pool', 'true')
+        if request.getHeader('Host') is not None:
+            request.setHeader('X-Stratum', 'stratum+tcp://' + request.getHeader('Host'))
         
         if data is not None:
             header = getwork.decode_data(data)
             if header['merkle_root'] not in self.merkle_root_to_handler:
                 print >>sys.stderr, '''Couldn't link returned work's merkle root with its handler. This should only happen if this process was recently restarted!'''
                 defer.returnValue(False)
-            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request.getUser() if request.getUser() is not None else ''))
+            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request.getUser() if request.getUser() is not None else '', 0))
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
@@ -91,7 +93,15 @@ class WorkerInterface(object):
         if key in self.work_cache:
             res, orig_timestamp, handler = self.work_cache.pop(key)
         else:
-            res, handler = self.worker_bridge.get_work(*key)
+            x, handler = self.worker_bridge.get_work(*key)
+            res = getwork.BlockAttempt(
+                version=x['version'],
+                previous_block=x['previous_block'],
+                merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(x['coinb1'] + pack.IntType(32).pack(0) + x['coinb2']), x['merkle_link']),
+                timestamp=x['timestamp'],
+                bits=x['bits'],
+                share_target=x['share_target'],
+            )
             assert res.merkle_root not in self.merkle_root_to_handler
             orig_timestamp = res.timestamp
         

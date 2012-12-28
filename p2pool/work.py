@@ -264,10 +264,12 @@ class WorkerBridge(worker_interface.WorkerBridge):
             len(self.current_work.value['transactions']),
         )
         
-        ba = bitcoin_getwork.BlockAttempt(
+        ba = dict(
             version=min(self.current_work.value['version'], 2),
             previous_block=self.current_work.value['previous_block'],
-            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(packed_gentx), merkle_link),
+            merkle_link=merkle_link,
+            coinb1=packed_gentx[:-4-4],
+            coinb2=packed_gentx[-4:],
             timestamp=self.current_work.value['time'],
             bits=self.current_work.value['bits'],
             share_target=target,
@@ -275,12 +277,15 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         received_header_hashes = set()
         
-        def got_response(header, user):
+        def got_response(header, user, last_txout_nonce):
+            new_packed_gentx = packed_gentx[:-4-4] + pack.IntType(32).pack(last_txout_nonce) + packed_gentx[-4:] if last_txout_nonce != 0 else packed_gentx
+            new_gentx = bitcoin_data.tx_type.unpack(new_packed_gentx) if last_txout_nonce != 0 else gentx
+            
             header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
             pow_hash = self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
             try:
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                    helper.submit_block(dict(header=header, txs=[gentx] + other_transactions), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
+                    helper.submit_block(dict(header=header, txs=[new_gentx] + other_transactions), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
                     if pow_hash <= header['bits'].target:
                         print
                         print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (self.node.net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
@@ -289,9 +294,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 log.err(None, 'Error while processing potential block:')
             
             user, _, _, _ = self.get_user_details(user)
-            assert header['previous_block'] == ba.previous_block
-            assert header['merkle_root'] == ba.merkle_root
-            assert header['bits'] == ba.bits
+            assert header['previous_block'] == ba['previous_block']
+            assert header['merkle_root'] == bitcoin_data.check_merkle_link(bitcoin_data.hash256(new_packed_gentx), merkle_link)
+            assert header['bits'] == ba['bits']
             
             on_time = self.new_work_event.times == lp_count
             
@@ -302,7 +307,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                             pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
-                                    tx=gentx,
+                                    tx=new_gentx,
                                     block_hash=header_hash,
                                     merkle_link=merkle_link,
                                 ),
@@ -323,7 +328,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     log.err(None, 'Error while processing merged mining POW:')
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
-                share = get_share(header)
+                share = get_share(header, last_txout_nonce)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                     user,
