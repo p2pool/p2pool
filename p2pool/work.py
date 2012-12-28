@@ -324,7 +324,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     log.err(None, 'Error while processing merged mining POW:')
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
-                share = get_share(header, transactions)
+                share = get_share(header)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                     request.getUser(),

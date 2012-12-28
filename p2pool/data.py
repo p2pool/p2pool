@@ -198,7 +198,7 @@ class Share(object):
             lock_time=0,
         )
         
-        def get_share(header, transactions):
+        def get_share(header):
             min_header=dict(header);del min_header['merkle_root']
             return cls(net, None, dict(
                 min_header=min_header,
