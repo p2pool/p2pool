@@ -421,8 +421,8 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='FRC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Freicoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Freicoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.freicoin'), 'freicoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://freicoin.com/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://freicoin.com/address/',
+        BLOCK_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:4750/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:4750/address/',
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
     ),
     
