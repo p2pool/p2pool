@@ -237,7 +237,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 base_subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['height']),
             )
         
-        transactions = [gentx] + [tx_map[tx_hash] for tx_hash in other_transaction_hashes]
+        packed_gentx = bitcoin_data.tx_type.pack(gentx)
+        other_transactions = [tx_map[tx_hash] for tx_hash in other_transaction_hashes]
         
         mm_later = [(dict(aux_work, target=aux_work['target'] if aux_work['target'] != 'p2pool' else share_info['bits'].target), index, hashes) for aux_work, index, hashes in mm_later]
         
@@ -256,7 +257,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         getwork_time = time.time()
         lp_count = self.new_work_event.times
-        merkle_link = bitcoin_data.calculate_merkle_link([bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in transactions], 0)
+        merkle_link = bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0)
         
         print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
             bitcoin_data.target_to_difficulty(target),
@@ -268,7 +269,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         ba = bitcoin_getwork.BlockAttempt(
             version=min(self.current_work.value['version'], 2),
             previous_block=self.current_work.value['previous_block'],
-            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(bitcoin_data.tx_type.pack(transactions[0])), merkle_link),
+            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(packed_gentx), merkle_link),
             timestamp=self.current_work.value['time'],
             bits=self.current_work.value['bits'],
             share_target=target,
@@ -281,7 +282,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             pow_hash = self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
             try:
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                    helper.submit_block(dict(header=header, txs=transactions), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
+                    helper.submit_block(dict(header=header, txs=[gentx] + other_transactions), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
                     if pow_hash <= header['bits'].target:
                         print
                         print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (self.node.net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)
@@ -303,7 +304,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                             pack.IntType(256, 'big').pack(aux_work['hash']).encode('hex'),
                             bitcoin_data.aux_pow_type.pack(dict(
                                 merkle_tx=dict(
-                                    tx=transactions[0],
+                                    tx=gentx,
                                     block_hash=header_hash,
                                     merkle_link=merkle_link,
                                 ),
