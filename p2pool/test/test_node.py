@@ -177,7 +177,7 @@ class Test(unittest.TestCase):
         bitd = bitcoind()
         
         mm_root = resource.Resource()
-        mm_root.putChild('', jsonrpc.Server(mm_provider))
+        mm_root.putChild('', jsonrpc.HTTPServer(mm_provider))
         mm_port = reactor.listenTCP(0, server.Site(mm_root))
         
         n = node.Node(bitd, bitd, [], [], mynet)
@@ -188,7 +188,7 @@ class Test(unittest.TestCase):
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         port = reactor.listenTCP(0, server.Site(web_root))
         
-        proxy = jsonrpc.Proxy('http://127.0.0.1:' + str(port.getHost().port))
+        proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(port.getHost().port))
         
         yield deferral.sleep(3)
         
@@ -230,7 +230,7 @@ class Test(unittest.TestCase):
         yield deferral.sleep(3)
         
         for i in xrange(SHARES):
-            proxy = jsonrpc.Proxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
+            proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
             yield deferral.sleep(.02)

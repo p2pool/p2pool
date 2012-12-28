@@ -19,9 +19,9 @@ class _Provider(object):
     def rpc_getwork(self, request, data=None):
         return self.parent._getwork(request, data, long_poll=self.long_poll)
 
-class _GETableServer(jsonrpc.Server):
+class _GETableServer(jsonrpc.HTTPServer):
     def __init__(self, provider, render_get_func):
-        jsonrpc.Server.__init__(self, provider)
+        jsonrpc.HTTPServer.__init__(self, provider)
         self.render_GET = render_get_func
 
 class WorkerBridge(object):
