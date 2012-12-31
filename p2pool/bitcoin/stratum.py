@@ -18,6 +18,8 @@ class StratumRPCMiningProvider(object):
         self.watch_id = self.wb.new_work_event.watch(self._send_work)
     
     def rpc_subscribe(self):
+        reactor.callLater(0, self._send_work)
+        
         return [
             ["mining.notify", "ae6812eb4cd7735a302a8a9dd95cf71f"], # subscription details
             "", # extranonce1
@@ -30,10 +32,7 @@ class StratumRPCMiningProvider(object):
         reactor.callLater(0, self._send_work)
     
     def _send_work(self):
-        if self.username is None: # authorize hasn't been received yet
-            return
-        
-        x, got_response = self.wb.get_work(*self.wb.preprocess_request(self.username))
+        x, got_response = self.wb.get_work(*self.wb.preprocess_request('' if self.username is None else self.username))
         jobid = str(random.randrange(2**128))
         self.other.svc_mining.rpc_set_difficulty(bitcoin_data.target_to_difficulty(x['share_target'])).addErrback(lambda err: None)
         self.other.svc_mining.rpc_notify(
