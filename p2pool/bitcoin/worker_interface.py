@@ -98,3 +98,37 @@ class WorkerInterface(object):
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
         
         defer.returnValue(res.getwork(identifier=str(self.worker_bridge.new_work_event.times), submitold=True))
+
+class CachingWorkerBridge(object):
+    def __init__(self, inner):
+        self._inner = inner
+        
+        self.COINBASE_NONCE_LENGTH = (inner.COINBASE_NONCE_LENGTH+1)//2
+        self.new_work_event = inner.new_work_event
+        self.preprocess_request = inner.preprocess_request
+        
+        self._my_bits = (self._inner.COINBASE_NONCE_LENGTH - self.COINBASE_NONCE_LENGTH)*8
+        
+        self._cache = {}
+        self._times = None
+    
+    def get_work(self, *args):
+        if self._times != self.new_work_event.times:
+            self._cache = {}
+            self._times = self.new_work_event.times
+        
+        if args not in self._cache:
+            x, handler = self._inner.get_work(*args)
+            self._cache[args] = x, handler, 0
+        
+        x, handler, nonce = self._cache.pop(args)
+        
+        res = (
+            dict(x, coinb1=x['coinb1'] + pack.IntType(self._my_bits).pack(nonce)),
+            lambda header, user, coinbase_nonce: handler(header, user, pack.IntType(self._my_bits).pack(nonce) + coinbase_nonce),
+        )
+        
+        if nonce + 1 != 2**self._my_bits:
+            self._cache[args] = x, handler, nonce + 1
+        
+        return res
