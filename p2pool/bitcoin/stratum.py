@@ -32,7 +32,7 @@ class StratumRPCMiningProvider(object):
         if self.username is None: # authorize hasn't been received yet
             return
         
-        x, got_response = self.wb.get_work(*self.wb.get_user_details(self.username)[1:])
+        x, got_response = self.wb.get_work(*self.wb.preprocess_request(self.username))
         jobid = str(random.randrange(2**128))
         self.other.svc_mining.rpc_set_difficulty(bitcoin_data.target_to_difficulty(x['share_target'])).addErrback(lambda err: None)
         self.other.svc_mining.rpc_notify(
