@@ -40,9 +40,6 @@ class WorkerInterface(object):
         
         self.worker_views = {}
         
-        self.work_cache = {}
-        self.work_cache_times = self.worker_bridge.new_work_event.times
-        
         self.merkle_root_to_handler = expiring_dict.ExpiringDict(300)
     
     def attach_to(self, res, get_handler=None):
@@ -57,7 +54,7 @@ class WorkerInterface(object):
     @defer.inlineCallbacks
     def _getwork(self, request, data, long_poll):
         request.setHeader('X-Long-Polling', '/long-polling')
-        request.setHeader('X-Roll-NTime', 'expire=10')
+        request.setHeader('X-Roll-NTime', 'expire=100')
         request.setHeader('X-Is-P2Pool', 'true')
         if request.getHeader('Host') is not None:
             request.setHeader('X-Stratum', 'stratum+tcp://' + request.getHeader('Host'))
@@ -84,31 +81,18 @@ class WorkerInterface(object):
                 yield self.worker_bridge.new_work_event.get_deferred()
             self.worker_views[request_id] = self.worker_bridge.new_work_event.times
         
-        key = self.worker_bridge.preprocess_request(request.getUser() if request.getUser() is not None else '')
-        
-        if self.work_cache_times != self.worker_bridge.new_work_event.times:
-            self.work_cache = {}
-            self.work_cache_times = self.worker_bridge.new_work_event.times
-        
-        if key in self.work_cache:
-            res, orig_timestamp, handler = self.work_cache.pop(key)
-        else:
-            x, handler = self.worker_bridge.get_work(*key)
-            res = getwork.BlockAttempt(
-                version=x['version'],
-                previous_block=x['previous_block'],
-                merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(x['coinb1'] + pack.IntType(32).pack(0) + x['coinb2']), x['merkle_link']),
-                timestamp=x['timestamp'],
-                bits=x['bits'],
-                share_target=x['share_target'],
-            )
-            assert res.merkle_root not in self.merkle_root_to_handler
-            orig_timestamp = res.timestamp
+        x, handler = self.worker_bridge.get_work(*self.worker_bridge.preprocess_request(request.getUser() if request.getUser() is not None else ''))
+        res = getwork.BlockAttempt(
+            version=x['version'],
+            previous_block=x['previous_block'],
+            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(x['coinb1'] + pack.IntType(32).pack(0) + x['coinb2']), x['merkle_link']),
+            timestamp=x['timestamp'],
+            bits=x['bits'],
+            share_target=x['share_target'],
+        )
+        assert res.merkle_root not in self.merkle_root_to_handler
         
         self.merkle_root_to_handler[res.merkle_root] = handler
-        
-        if res.timestamp + 120 < orig_timestamp + 1800:
-            self.work_cache[key] = res.update(timestamp=res.timestamp + 120), orig_timestamp, handler
         
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
