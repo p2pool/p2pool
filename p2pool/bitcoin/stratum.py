@@ -1,4 +1,5 @@
 import random
+import sys
 
 from twisted.internet import protocol, reactor
 
@@ -49,6 +50,9 @@ class StratumRPCMiningProvider(object):
         self.handler_map[jobid] = x, got_response
     
     def rpc_submit(self, worker_name, job_id, extranonce2, ntime, nonce):
+        if job_id not in self.handler_map:
+            print >>sys.stderr, '''Couldn't link returned work's job id with its handler. This should only happen if this process was recently restarted!'''
+            return False
         x, got_response = self.handler_map[job_id]
         coinb_nonce = pack.IntType(32).unpack(extranonce2.decode('hex'))
         new_packed_gentx = x['coinb1'] + pack.IntType(32).pack(coinb_nonce) + x['coinb2']
