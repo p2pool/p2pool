@@ -64,7 +64,7 @@ class WorkerInterface(object):
             if header['merkle_root'] not in self.merkle_root_to_handler:
                 print >>sys.stderr, '''Couldn't link returned work's merkle root with its handler. This should only happen if this process was recently restarted!'''
                 defer.returnValue(False)
-            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request.getUser() if request.getUser() is not None else '', 0))
+            defer.returnValue(self.merkle_root_to_handler[header['merkle_root']](header, request.getUser() if request.getUser() is not None else '', '\0'*self.worker_bridge.COINBASE_NONCE_LENGTH))
         
         if p2pool.DEBUG:
             id = random.randrange(1000, 10000)
@@ -85,7 +85,7 @@ class WorkerInterface(object):
         res = getwork.BlockAttempt(
             version=x['version'],
             previous_block=x['previous_block'],
-            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(x['coinb1'] + pack.IntType(32).pack(0) + x['coinb2']), x['merkle_link']),
+            merkle_root=bitcoin_data.check_merkle_link(bitcoin_data.hash256(x['coinb1'] + '\0'*self.worker_bridge.COINBASE_NONCE_LENGTH + x['coinb2']), x['merkle_link']),
             timestamp=x['timestamp'],
             bits=x['bits'],
             share_target=x['share_target'],

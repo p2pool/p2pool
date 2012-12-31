@@ -21,7 +21,7 @@ class StratumRPCMiningProvider(object):
         return [
             ["mining.notify", "ae6812eb4cd7735a302a8a9dd95cf71f"], # subscription details
             "", # extranonce1
-            4, # extranonce2_size
+            self.wb.COINBASE_NONCE_LENGTH, # extranonce2_size
         ]
     
     def rpc_authorize(self, username, password):
@@ -54,8 +54,9 @@ class StratumRPCMiningProvider(object):
             print >>sys.stderr, '''Couldn't link returned work's job id with its handler. This should only happen if this process was recently restarted!'''
             return False
         x, got_response = self.handler_map[job_id]
-        coinb_nonce = pack.IntType(32).unpack(extranonce2.decode('hex'))
-        new_packed_gentx = x['coinb1'] + pack.IntType(32).pack(coinb_nonce) + x['coinb2']
+        coinb_nonce = extranonce2.decode('hex')
+        assert len(coinb_nonce) == self.wb.COINBASE_NONCE_LENGTH
+        new_packed_gentx = x['coinb1'] + coinb_nonce + x['coinb2']
         header = dict(
             version=x['version'],
             previous_block=x['previous_block'],
