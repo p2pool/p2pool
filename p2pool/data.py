@@ -199,8 +199,8 @@ class Share(object):
         )
         
         def get_share(header, last_txout_nonce=last_txout_nonce):
-            min_header=dict(header);del min_header['merkle_root']
-            return cls(net, None, dict(
+            min_header = dict(header); del min_header['merkle_root']
+            share = cls(net, None, dict(
                 min_header=min_header,
                 share_info=share_info,
                 ref_merkle_link=dict(branch=[], index=0),
@@ -208,6 +208,8 @@ class Share(object):
                 hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-4], cls.gentx_before_refhash),
                 merkle_link=bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0),
             ))
+            assert share.header == header # checks merkle_root
+            return share
         
         return share_info, gentx, other_transaction_hashes, get_share
     
