@@ -58,9 +58,12 @@ class bitcoind(object): # can be used as p2p factory, p2p protocol, or rpc jsonr
             block = bitcoin_data.block_type.unpack(result.decode('hex'))
             if block['header']['previous_block'] != self.blocks[-1]:
                 return False
+            if bitcoin_data.hash256(result.decode('hex')) > block['header']['bits'].target:
+                return False
             header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header']))
             self.blocks.append(header_hash)
             self.headers[header_hash] = block['header']
+            reactor.callLater(0, self.new_block.happened)
             return True
         
         return {
@@ -233,7 +236,7 @@ class Test(unittest.TestCase):
             proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
-            yield deferral.sleep(.02)
+            yield deferral.sleep(.05)
             print i
             print type(nodes[0].n.tracker.items[nodes[0].n.best_share_var.value])
         
@@ -243,6 +246,7 @@ class Test(unittest.TestCase):
         web2_root = web.get_web_root(nodes[0].wb, tempfile.mkdtemp(), variable.Variable(None), stop_event)
         web2_port = reactor.listenTCP(0, server.Site(web2_root))
         for name in web2_root.listNames() + ['web/' + x for x in web2_root.getChildWithDefault('web', None).listNames()]:
+            if name in ['web/graph_data', 'web/share', 'web/share_data']: continue
             print
             print name
             try:
