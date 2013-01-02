@@ -121,22 +121,6 @@ class Share(object):
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
         bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target, (pre_target3//10, pre_target3)))
         
-        weights, total_weight, donation_weight = tracker.get_cumulative_weights(share_data['previous_share_hash'],
-            min(height, net.REAL_CHAIN_LENGTH),
-            65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
-        )
-        assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
-        
-        amounts = dict((script, share_data['subsidy']*(199*weight)//(200*total_weight)) for script, weight in weights.iteritems()) # 99.5% goes according to weights prior to this share
-        this_script = bitcoin_data.pubkey_hash_to_script2(share_data['pubkey_hash'])
-        amounts[this_script] = amounts.get(this_script, 0) + share_data['subsidy']//200 # 0.5% goes to block finder
-        amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + share_data['subsidy'] - sum(amounts.itervalues()) # all that's left over is the donation weight and some extra satoshis due to rounding
-        
-        if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
-            raise ValueError()
-        
-        dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
-        
         new_transaction_hashes = []
         new_transaction_size = 0
         transaction_hash_refs = []
@@ -170,6 +154,22 @@ class Share(object):
         else:
             assert base_subsidy is not None
             share_data = dict(share_data, subsidy=base_subsidy + definite_fees)
+        
+        weights, total_weight, donation_weight = tracker.get_cumulative_weights(share_data['previous_share_hash'],
+            min(height, net.REAL_CHAIN_LENGTH),
+            65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
+        )
+        assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
+        
+        amounts = dict((script, share_data['subsidy']*(199*weight)//(200*total_weight)) for script, weight in weights.iteritems()) # 99.5% goes according to weights prior to this share
+        this_script = bitcoin_data.pubkey_hash_to_script2(share_data['pubkey_hash'])
+        amounts[this_script] = amounts.get(this_script, 0) + share_data['subsidy']//200 # 0.5% goes to block finder
+        amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + share_data['subsidy'] - sum(amounts.itervalues()) # all that's left over is the donation weight and some extra satoshis due to rounding
+        
+        if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
+            raise ValueError()
+        
+        dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
         
         share_info = dict(
             share_data=share_data,
