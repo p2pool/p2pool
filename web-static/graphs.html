@@ -59,6 +59,9 @@
         <h2>Bitcoind GetBlockTemplate Latency</h2>
         <svg id="getwork_latency"></svg>
         
+        <h2>Memory Usage</h2>
+        <svg id="memory_usage"></svg>
+        
         <script type="text/javascript">
             function compose() {
                 var funcs = arguments;
@@ -415,6 +418,10 @@
                 
                 plot_later(d3.select("#getwork_latency"), "s", null, [
                     {"url": "/web/graph_data/getwork_latency/last_" + lowerperiod, "color": "#FF0000", "label": "Getwork Latency"}
+                ], false);
+                
+                plot_later(d3.select("#memory_usage"), "s", null, [
+                    {"url": "/web/graph_data/memory_usage/last_" + lowerperiod, "color": "#FF0000", "label": "Memory Usage"}
                 ], false);
             }
             

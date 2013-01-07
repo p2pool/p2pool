@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+import traceback
 
 from twisted.internet import defer, task
 from twisted.python import log
@@ -13,7 +14,7 @@ from twisted.web import resource, static
 import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
-from util import deferred_resource, graph, math, pack, variable
+from util import deferred_resource, graph, math, memory, pack, variable
 
 def _atomic_read(filename):
     try:
@@ -392,6 +393,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
             multivalue_undefined_means_0=True, default_func=build_desired_rates),
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'getwork_latency': graph.DataStreamDescription(dataview_descriptions),
+        'memory_usage': graph.DataStreamDescription(dataview_descriptions),
     }, hd_obj)
     x = task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj())))
     x.start(100)
@@ -438,6 +440,11 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         vs_total = sum(vs.itervalues())
         hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
         hd.datastreams['desired_version_rates'].add_datum(t, dict((str(k), v/vs_total*pool_total) for k, v in vs.iteritems()))
+        try:
+            hd.datastreams['memory_usage'].add_datum(t, memory.resident())
+        except:
+            if p2pool.DEBUG:
+                traceback.print_exc()
     x = task.LoopingCall(add_point)
     x.start(5)
     stop_event.watch(x.stop)
