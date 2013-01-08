@@ -634,7 +634,8 @@ class Node(object):
             old_services, old_first_seen, old_last_seen = self.addr_store[host, port]
             self.addr_store[host, port] = services, old_first_seen, max(old_last_seen, timestamp)
         else:
-            self.addr_store[host, port] = services, timestamp, timestamp
+            if len(self.addr_store) < 10000:
+                self.addr_store[host, port] = services, timestamp, timestamp
     
     def handle_shares(self, shares, peer):
         print 'handle_shares', (shares, peer)
