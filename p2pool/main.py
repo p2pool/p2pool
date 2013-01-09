@@ -1,6 +1,7 @@
 from __future__ import division
 
 import base64
+import gc
 import json
 import os
 import random
@@ -338,6 +339,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             print >>sys.stderr, '#'*40
                             print >>sys.stderr, '>>> Warning: ' + warning
                             print >>sys.stderr, '#'*40
+                        
+                        if gc.garbage:
+                            print '%i pieces of uncollectable cyclic garbage! Types: %r' % (len(gc.garbage), map(type, gc.garbage))
                     
                     if this_str != last_str or time.time() > last_time + 15:
                         print this_str
