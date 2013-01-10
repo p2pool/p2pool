@@ -5,7 +5,6 @@ _scale = {'kB': 1024, 'mB': 1024*1024,
     'KB': 1024, 'MB': 1024*1024}
 
 def resident():
-    gc.collect()
     with open('/proc/%d/status' % os.getpid()) as f:
         v = f.read()
     i = v.index('VmRSS:')
