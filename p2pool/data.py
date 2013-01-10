@@ -39,12 +39,12 @@ share_type = pack.ComposedType([
     ('contents', pack.VarStrType()),
 ])
 
-def load_share(share, net, peer):
+def load_share(share, net, peer_addr):
     if share['type'] in [0, 1, 2, 3, 4, 5, 6, 7, 8]:
         from p2pool import p2p
         raise p2p.PeerMisbehavingError('sent an obsolete share')
     elif share['type'] == Share.VERSION:
-        return Share(net, peer, Share.share_type.unpack(share['contents']))
+        return Share(net, peer_addr, Share.share_type.unpack(share['contents']))
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
@@ -220,11 +220,11 @@ class Share(object):
             share_info=share_info,
         ))), ref_merkle_link))
     
-    __slots__ = 'net peer contents min_header share_info hash_link merkle_link hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen'.split(' ')
+    __slots__ = 'net peer_addr contents min_header share_info hash_link merkle_link hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen'.split(' ')
     
-    def __init__(self, net, peer, contents):
+    def __init__(self, net, peer_addr, contents):
         self.net = net
-        self.peer = peer
+        self.peer_addr = peer_addr
         self.contents = contents
         
         self.min_header = contents['min_header']
@@ -279,7 +279,7 @@ class Share(object):
         self.time_seen = time.time()
     
     def __repr__(self):
-        return 'Share' + repr((self.net, self.peer, self.contents))
+        return 'Share' + repr((self.net, self.peer_addr, self.contents))
     
     def as_share(self):
         return dict(type=self.VERSION, contents=self.share_type.pack(self.contents))
@@ -339,7 +339,7 @@ class Share(object):
         return [known_txs[tx_hash] for tx_hash in other_tx_hashes]
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
-        if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer is not None:
+        if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer_addr is not None:
             return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
         
         if self.pow_hash <= self.header['bits'].target:
@@ -451,7 +451,7 @@ class OkayTracker(forest.Tracker):
             else:
                 if last is not None:
                     desired.add((
-                        self.items[random.choice(list(self.reverse[last]))].peer,
+                        self.items[random.choice(list(self.reverse[last]))].peer_addr,
                         last,
                         max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
                         min(x.target for x in self.get_chain(head, min(head_height, 5))),
@@ -477,7 +477,7 @@ class OkayTracker(forest.Tracker):
                     break
             if head_height < self.net.CHAIN_LENGTH and last_last_hash is not None:
                 desired.add((
-                    self.items[random.choice(list(self.verified.reverse[last_hash]))].peer,
+                    self.items[random.choice(list(self.verified.reverse[last_hash]))].peer_addr,
                     last_last_hash,
                     max(x.timestamp for x in self.get_chain(head, min(head_height, 5))),
                     min(x.target for x in self.get_chain(head, min(head_height, 5))),
@@ -494,7 +494,7 @@ class OkayTracker(forest.Tracker):
         # decide best verified head
         decorated_heads = sorted(((
             self.verified.get_work(self.verified.get_nth_parent_hash(h, min(5, self.verified.get_height(h)))),
-            #self.items[h].peer is None,
+            #self.items[h].peer_addr is None,
             -self.items[h].should_punish_reason(previous_block, bits, self, known_txs)[0],
             -self.items[h].time_seen,
         ), h) for h in self.verified.tails.get(best_tail, []))
@@ -519,10 +519,10 @@ class OkayTracker(forest.Tracker):
         
         if p2pool.DEBUG:
             print 'Desire %i shares. Cutoff: %s old diff>%.2f' % (len(desired), math.format_dt(time.time() - timestamp_cutoff), bitcoin_data.target_to_difficulty(target_cutoff))
-            for peer, hash, ts, targ in desired:
-                print '   ', '%s:%i' % peer.addr if peer is not None else None, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
+            for peer_addr, hash, ts, targ in desired:
+                print '   ', '%s:%i' % peer_addr, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
         
-        return best, [(peer, hash) for peer, hash, ts, targ in desired if ts >= timestamp_cutoff], decorated_heads
+        return best, [(peer_addr, hash) for peer_addr, hash, ts, targ in desired if ts >= timestamp_cutoff], decorated_heads
     
     def score(self, share_hash, block_rel_height_func):
         # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time

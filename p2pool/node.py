@@ -32,7 +32,7 @@ class P2PNode(p2p.Node):
             
             new_count += 1
             
-            #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer.addr if share.peer is not None else None)
+            #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer_addr)
             
             self.node.tracker.add(share)
         
@@ -86,7 +86,7 @@ class P2PNode(p2p.Node):
             shares.append(share)
         
         for peer in list(self.peers.itervalues()):
-            yield peer.sendShares([share for share in shares if share.peer is not peer], self.node.tracker, self.node.known_txs_var.value, include_txs_with=[share_hash])
+            yield peer.sendShares([share for share in shares if share.peer_addr != peer.addr], self.node.tracker, self.node.known_txs_var.value, include_txs_with=[share_hash])
     
     def start(self):
         p2p.Node.start(self)
@@ -99,7 +99,7 @@ class P2PNode(p2p.Node):
         def download_shares():
             while True:
                 desired = yield self.node.desired_var.get_when_satisfies(lambda val: len(val) != 0)
-                peer2, share_hash = random.choice(desired)
+                peer_addr, share_hash = random.choice(desired)
                 
                 if len(self.peers) == 0:
                     yield deferral.sleep(1)

@@ -291,7 +291,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
             local=dict(
                 verified=share.hash in node.tracker.verified.items,
                 time_first_seen=start_time if share.time_seen == 0 else share.time_seen,
-                peer_first_received_from=share.peer.addr if share.peer is not None else None,
+                peer_first_received_from=share.peer_addr,
             ),
             share_data=dict(
                 timestamp=share.timestamp,
