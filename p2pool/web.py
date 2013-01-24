@@ -339,6 +339,15 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         address_explorer_url_prefix=node.net.PARENT.ADDRESS_EXPLORER_URL_PREFIX,
     )))
     new_root.putChild('version', WebInterface(lambda: p2pool.__version__))
+    def get_memory():
+        res = {}
+        import gc
+        for obj in gc.get_objects():
+            name = str(type(obj))
+            res[name] = res.get(name, 0) + 1
+        return ''.join('%s %s\n' % (name, count)
+            for name, count in sorted(res.iteritems(), key=lambda (name, count): count))
+    new_root.putChild('memory', WebInterface(get_memory, 'text/plain'))
     
     hd_path = os.path.join(datadir_path, 'graph_db')
     hd_data = _atomic_read(hd_path)
