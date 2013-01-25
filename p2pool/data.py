@@ -40,7 +40,7 @@ share_type = pack.ComposedType([
 ])
 
 def load_share(share, net, peer_addr):
-    assert isinstance(peer_addr, tuple)
+    assert peer_addr is None or isinstance(peer_addr, tuple)
     if share['type'] in [0, 1, 2, 3, 4, 5, 6, 7, 8]:
         from p2pool import p2p
         raise p2p.PeerMisbehavingError('sent an obsolete share')
