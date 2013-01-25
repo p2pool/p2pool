@@ -310,7 +310,7 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = [p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] >= 9]
+            res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= 9]
         else:
             res = failure.Failure("sharereply result: " + result)
         self.get_shares.got_response(id, res)
