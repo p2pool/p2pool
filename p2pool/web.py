@@ -342,8 +342,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
     def get_memory():
         res = {}
         import gc
+        import types
         for obj in gc.get_objects():
-            name = str(type(obj))
+            name = str(obj.__class__) if isinstance(obj, types.InstanceType) else str(type(obj))
             res[name] = res.get(name, 0) + 1
         return ''.join('%s %s\n' % (name, count)
             for name, count in sorted(res.iteritems(), key=lambda (name, count): count))
