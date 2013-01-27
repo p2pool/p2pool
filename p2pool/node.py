@@ -76,7 +76,6 @@ class P2PNode(p2p.Node):
             raise p2p.PeerMisbehavingError('received block header fails PoW test')
         self.node.handle_header(header)
     
-    @defer.inlineCallbacks
     def broadcast_share(self, share_hash):
         shares = []
         for share in self.node.tracker.get_chain(share_hash, min(5, self.node.tracker.get_height(share_hash))):
@@ -85,8 +84,8 @@ class P2PNode(p2p.Node):
             self.shared_share_hashes.add(share.hash)
             shares.append(share)
         
-        for peer in list(self.peers.itervalues()):
-            yield peer.sendShares([share for share in shares if share.peer_addr != peer.addr], self.node.tracker, self.node.known_txs_var.value, include_txs_with=[share_hash])
+        for peer in self.peers.itervalues():
+            peer.sendShares([share for share in shares if share.peer_addr != peer.addr], self.node.tracker, self.node.known_txs_var.value, include_txs_with=[share_hash])
     
     def start(self):
         p2p.Node.start(self)

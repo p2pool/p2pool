@@ -19,10 +19,10 @@ class PeerMisbehavingError(Exception):
 
 def fragment(f, **kwargs):
     try:
-        return f(**kwargs)
+        f(**kwargs)
     except p2protocol.TooLong:
         fragment(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-        return fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+        fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
     max_remembered_txs_size = 2500000
@@ -36,8 +36,6 @@ class Protocol(p2protocol.Protocol):
         self.connected2 = False
     
     def connectionMade(self):
-        p2protocol.Protocol.connectionMade(self)
-        
         self.factory.proto_made_connection(self)
         
         self.connection_lost_event = variable.Event()
@@ -260,9 +258,6 @@ class Protocol(p2protocol.Protocol):
         self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= 9], self)
     
     def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
-        if not shares:
-            return defer.succeed(None)
-        
         if self.other_version >= 8:
             tx_hashes = set()
             for share in shares:
@@ -280,14 +275,12 @@ class Protocol(p2protocol.Protocol):
             
             fragment(self.send_remember_tx, tx_hashes=[x for x in hashes_to_send if x in self.remote_tx_hashes], txs=[known_txs[x] for x in hashes_to_send if x not in self.remote_tx_hashes])
         
-        res = fragment(self.send_shares, shares=[share.as_share() for share in shares])
+        fragment(self.send_shares, shares=[share.as_share() for share in shares])
         
         if self.other_version >= 8:
-            res = self.send_forget_tx(tx_hashes=hashes_to_send)
+            self.send_forget_tx(tx_hashes=hashes_to_send)
             
             self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
-        
-        return res
     
     
     message_sharereq = pack.ComposedType([
