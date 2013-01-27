@@ -343,11 +343,13 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         res = {}
         import gc
         import types
+        import random
         for obj in gc.get_objects():
             name = str(obj.__class__) if isinstance(obj, types.InstanceType) else str(type(obj))
-            res[name] = res.get(name, 0) + 1
-        return ''.join('%s %s\n' % (name, count)
-            for name, count in sorted(res.iteritems(), key=lambda (name, count): count))
+            prev_count, prev_obj = res.get(name, (0, None))
+            res[name] = prev_count + 1, obj if random.random() < 1/(prev_count + 1) else prev_obj
+        return ''.join('%s %s %r\n' % (name, count, obj)
+            for name, (count, obj) in sorted(res.iteritems(), key=lambda (name, (count, obj)): count))
     new_root.putChild('memory', WebInterface(get_memory, 'text/plain'))
     
     hd_path = os.path.join(datadir_path, 'graph_db')
