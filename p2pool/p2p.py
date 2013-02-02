@@ -80,7 +80,12 @@ class Protocol(p2protocol.Protocol):
     def _connect_timeout(self):
         self.timeout_delayed = None
         print 'Handshake timed out, disconnecting from %s:%i' % self.addr
-        self.transport.loseConnection()
+        if self.transport.abortConnection is not None:
+            # Available since Twisted 11.1
+            self.transport.abortConnection()
+        else:
+            # This doesn't always close timed out connections!
+            self.transport.loseConnection()
     
     def packetReceived(self, command, payload2):
         try:
@@ -101,7 +106,12 @@ class Protocol(p2protocol.Protocol):
     def _timeout(self):
         self.timeout_delayed = None
         print 'Connection timed out, disconnecting from %s:%i' % self.addr
-        self.transport.loseConnection()
+        if self.transport.abortConnection is not None:
+            # Available since Twisted 11.1
+            self.transport.abortConnection()
+        else:
+            # This doesn't always close timed out connections!
+            self.transport.loseConnection()
     
     message_version = pack.ComposedType([
         ('version', pack.IntType(32)),
