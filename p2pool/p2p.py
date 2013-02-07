@@ -80,7 +80,7 @@ class Protocol(p2protocol.Protocol):
     def _connect_timeout(self):
         self.timeout_delayed = None
         print 'Handshake timed out, disconnecting from %s:%i' % self.addr
-        if self.transport.abortConnection is not None:
+        if hasattr(self.transport, 'abortConnection'):
             # Available since Twisted 11.1
             self.transport.abortConnection()
         else:
@@ -106,7 +106,7 @@ class Protocol(p2protocol.Protocol):
     def _timeout(self):
         self.timeout_delayed = None
         print 'Connection timed out, disconnecting from %s:%i' % self.addr
-        if self.transport.abortConnection is not None:
+        if hasattr(self.transport, 'abortConnection'):
             # Available since Twisted 11.1
             self.transport.abortConnection()
         else:
