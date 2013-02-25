@@ -14,7 +14,7 @@ import urlparse
 if '--iocp' in sys.argv:
     from twisted.internet import iocpreactor
     iocpreactor.install()
-from twisted.internet import defer, reactor, protocol, task
+from twisted.internet import defer, reactor, protocol, task, tcp
 from twisted.web import server
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -355,6 +355,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         log.err(None, 'Fatal error:')
 
 def run():
+    if not hasattr(tcp.Client, 'abortConnection'):
+        print "Twisted doesn't have abortConnection! Upgrade to a newer version of Twisted to avoid memory leaks!"
+        print 'Pausing for 3 seconds...'
+        time.sleep(3)
+    
     realnets = dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
     
     parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
