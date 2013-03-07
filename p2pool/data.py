@@ -177,7 +177,7 @@ class Share(object):
         )
 
         # calculate "raw" subsidy
-        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(weights))
+        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(weights) + 1)
 
         # calculate "raw" amounts
         raw_amounts = dict((script, raw_subsidy*weight//total_weight) for script, weight in weights.iteritems()) 
