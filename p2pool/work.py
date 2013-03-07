@@ -16,12 +16,12 @@ import p2pool, p2pool.data as p2pool_data
 class WorkerBridge(worker_interface.WorkerBridge):
     COINBASE_NONCE_LENGTH = 4
     
-    def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee):
+    def __init__(self, node, my_pubkey, donation_percentage, merged_urls, worker_fee):
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
         self.node = node
-        self.my_pubkey_hash = my_pubkey_hash
+        self.my_pubkey = my_pubkey
         self.donation_percentage = donation_percentage
         self.worker_fee = worker_fee
         
@@ -80,16 +80,20 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         # COMBINE WORK
         
+
         self.current_work = variable.Variable(None)
         def compute_work():
             t = self.node.bitcoind_work.value
             bb = self.node.best_block_header.value
+
+            subsidy = self.node.net.PARENT.SUBSIDY_FUNC(bb['bits'].target)
+
             if bb is not None and bb['previous_block'] == t['previous_block'] and self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(bb)) <= t['bits'].target:
                 print 'Skipping from block %x to block %x!' % (bb['previous_block'],
-                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(bb)))
+                    self.node.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(bb)))
                 t = dict(
                     version=bb['version'],
-                    previous_block=bitcoin_data.hash256(bitcoin_data.block_header_type.pack(bb)),
+                    previous_block=self.node.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(bb)),
                     bits=bb['bits'], # not always true
                     coinbaseflags='',
                     height=t['height'] + 1,
@@ -97,7 +101,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
-                    subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.node.bitcoind_work.value['height']),
+                    subsidy=subsidy,
                     last_update=self.node.bitcoind_work.value['last_update'],
                 )
             
@@ -150,21 +154,15 @@ class WorkerBridge(worker_interface.WorkerBridge):
             except:
                 pass
         
-        if random.uniform(0, 100) < self.worker_fee:
-            pubkey_hash = self.my_pubkey_hash
-        else:
-            try:
-                pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, self.node.net.PARENT)
-            except: # XXX blah
-                pubkey_hash = self.my_pubkey_hash
+        pubkey = self.my_pubkey
         
-        return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
+        return user, pubkey, desired_share_target, desired_pseudoshare_target
     
     def preprocess_request(self, user):
-        user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
-        return pubkey_hash, desired_share_target, desired_pseudoshare_target
+        user, pubkey, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
+        return pubkey, desired_share_target, desired_pseudoshare_target
     
-    def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
+    def get_work(self, pubkey, desired_share_target, desired_pseudoshare_target):
         if (self.node.p2p_node is None or len(self.node.p2p_node.peers) == 0) and self.node.net.PERSIST:
             raise jsonrpc.Error_for_code(-12345)(u'p2pool is not connected to any peers')
         if self.node.best_share_var.value is None and self.node.net.PERSIST:
@@ -208,6 +206,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     share_type = previous_share_type
         
         if True:
+            subsidy = self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['bits'].target)
+
             share_info, gentx, other_transaction_hashes, get_share = share_type.generate_transaction(
                 tracker=self.node.tracker,
                 share_data=dict(
@@ -217,7 +217,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         ] + ([mm_data] if mm_data else []) + [
                     ]) + self.current_work.value['coinbaseflags'])[:100],
                     nonce=random.randrange(2**32),
-                    pubkey_hash=pubkey_hash,
+                    pubkey=pubkey,
                     subsidy=self.current_work.value['subsidy'],
                     donation=math.perfect_round(65535*self.donation_percentage/100),
                     stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
@@ -234,7 +234,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_other_transaction_hashes_and_fees=zip(tx_hashes, self.current_work.value['transaction_fees']),
                 net=self.node.net,
                 known_txs=tx_map,
-                base_subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['height']),
+                base_subsidy=subsidy
             )
         
         packed_gentx = bitcoin_data.tx_type.pack(gentx)
@@ -262,7 +262,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
             bitcoin_data.target_to_difficulty(target),
             bitcoin_data.target_to_difficulty(share_info['bits'].target),
-            self.current_work.value['subsidy']*1e-8, self.node.net.PARENT.SYMBOL,
+            self.current_work.value['subsidy']*1e-6, self.node.net.PARENT.SYMBOL,
             len(self.current_work.value['transactions']),
         )
         
@@ -272,7 +272,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             merkle_link=merkle_link,
             coinb1=packed_gentx[:-4-4],
             coinb2=packed_gentx[-4:],
-            timestamp=self.current_work.value['time'],
+            timestamp=gentx['timestamp'],
             bits=self.current_work.value['bits'],
             share_target=target,
         )
@@ -284,11 +284,26 @@ class WorkerBridge(worker_interface.WorkerBridge):
             new_packed_gentx = packed_gentx[:-4-4] + coinbase_nonce + packed_gentx[-4:] if coinbase_nonce != '\0'*self.COINBASE_NONCE_LENGTH else packed_gentx
             new_gentx = bitcoin_data.tx_type.unpack(new_packed_gentx) if coinbase_nonce != '\0'*self.COINBASE_NONCE_LENGTH else gentx
             
-            header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
+            header_hash = self.node.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(header))
             pow_hash = self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header))
             try:
+                if header['timestamp'] > new_gentx['timestamp'] + 3600:
+                    print 
+                    print header['timestamp'], '>', new_gentx['timestamp'] + 3600
+                    print 'Coinbase timestamp is too early!'
+                    print 
+
+                    return
+
+                if header['timestamp'] < new_gentx['timestamp']:
+                    print 
+                    print header['timestamp'], '<', new_gentx['timestamp']
+                    print 'Block header timestamp is before coinbase timestamp!'
+                    print 
+                    return
+
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
-                    helper.submit_block(dict(header=header, txs=[new_gentx] + other_transactions), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
+                    helper.submit_block(dict(header=header, txs=[new_gentx] + other_transactions, signature=''), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
                     if pow_hash <= header['bits'].target:
                         print
                         print 'GOT BLOCK FROM MINER! Passing to bitcoind! %s%064x' % (self.node.net.PARENT.BLOCK_EXPLORER_URL_PREFIX, header_hash)

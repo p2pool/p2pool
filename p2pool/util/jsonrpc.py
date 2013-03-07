@@ -129,7 +129,7 @@ def _http_do(url, headers, timeout, method, params):
     
     if resp['id'] != id_:
         raise ValueError('invalid id')
-    if 'error' in resp and resp['error'] is not None:
+    if 'error' in resp and resp['error'] is not None and resp['error']['code'] != -100:
         raise Error_for_code(resp['error']['code'])(resp['error']['message'], resp['error'].get('data', None))
     defer.returnValue(resp['result'])
 HTTPProxy = lambda url, headers={}, timeout=5: Proxy(lambda method, params: _http_do(url, headers, timeout, method, params))

@@ -5,12 +5,15 @@ import os
 import random
 import sys
 import time
+import math
 
 from twisted.python import log
 
 import p2pool
 from p2pool.bitcoin import data as bitcoin_data, script, sha256
 from p2pool.util import math, forest, pack
+
+minout = pow(10, 6) / 100;
 
 # hashlink
 
@@ -56,7 +59,7 @@ class Share(object):
     SUCCESSOR = None
     
     other_txs = None
-    
+
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()),
         ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
@@ -70,7 +73,7 @@ class Share(object):
             ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
             ('coinbase', pack.VarStrType()),
             ('nonce', pack.IntType(32)),
-            ('pubkey_hash', pack.IntType(160)),
+            ('pubkey', pack.FixedStrType(33)),
             ('subsidy', pack.IntType(64)),
             ('donation', pack.IntType(16)),
             ('stale_info', pack.EnumType(pack.IntType(8), dict((k, {0: None, 253: 'orphan', 254: 'doa'}.get(k, 'unk%i' % (k,))) for k in xrange(256)))),
@@ -103,13 +106,30 @@ class Share(object):
         ('identifier', pack.FixedStrType(64//8)),
         ('share_info', share_info_type),
     ])
-    
-    gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x24' + pack.IntType(256).pack(0) + pack.IntType(32).pack(0))[:2]
-    
+
+
+    gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(minout) + pack.VarStrType().pack('\x24' + pack.IntType(256).pack(0) + pack.IntType(32).pack(0))[:2]
+
     @classmethod
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
-        
+
+        def get_coinbase_fee(outpointsnum):
+            # calculate neccessary coinbase fee
+            coinbase_size = 59 + outpointsnum * 44 + 50
+
+            # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
+            if coinbase_size > 1000:
+                return floor(coinbase_size / 1000.0) * minout
+
+            return 0
+
+        if base_subsidy is None:
+            base_subsidy = net.PARENT.SUBSIDY_FUNC(block_target)
+
+        # current user payout script
+        this_script = bitcoin_data.pubkey_to_script2(share_data['pubkey'])
+
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
         assert height >= net.REAL_CHAIN_LENGTH or last is None
         if height < net.TARGET_LOOKBEHIND:
@@ -121,12 +141,12 @@ class Share(object):
             pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
         bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target, (pre_target3//10, pre_target3)))
-        
+
         new_transaction_hashes = []
         new_transaction_size = 0
         transaction_hash_refs = []
         other_transaction_hashes = []
-        
+
         past_shares = list(tracker.get_chain(share_data['previous_share_hash'], min(height, 100)))
         tx_hash_to_this = {}
         for i, share in enumerate(past_shares):
@@ -146,32 +166,60 @@ class Share(object):
                 this = [0, len(new_transaction_hashes)-1]
             transaction_hash_refs.extend(this)
             other_transaction_hashes.append(tx_hash)
-        
+
         included_transactions = set(other_transaction_hashes)
-        removed_fees = [fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash not in included_transactions]
-        definite_fees = sum(0 if fee is None else fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash in included_transactions)
-        if None not in removed_fees:
-            share_data = dict(share_data, subsidy=share_data['subsidy'] - sum(removed_fees))
-        else:
-            assert base_subsidy is not None
-            share_data = dict(share_data, subsidy=base_subsidy + definite_fees)
-        
+
+        share_data = dict(share_data, subsidy=base_subsidy)
+
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(share_data['previous_share_hash'],
             min(height, net.REAL_CHAIN_LENGTH),
             65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
         )
+
+        # calculate "raw" subsidy
+        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(weights))
+
+        # calculate "raw" amounts
+        raw_amounts = dict((script, raw_subsidy*weight//total_weight) for script, weight in weights.iteritems()) 
+
+        total_remowed_weight = 0
+
+        # iterate list and collect all weights, which produces less than 0.01 payout
+        # it's neccessary due to NVC/PPC protocol-level limitations for coinbase outpoint size
+        for x in raw_amounts.keys():
+            if raw_amounts[x] < minout and x not in [this_script, DONATION_SCRIPT]:
+                total_remowed_weight = total_remowed_weight + weights[x]
+                del weights[x]
+
+        total_weight = total_weight - total_remowed_weight
         assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
-        
-        amounts = dict((script, share_data['subsidy']*(199*weight)//(200*total_weight)) for script, weight in weights.iteritems()) # 99.5% goes according to weights prior to this share
-        this_script = bitcoin_data.pubkey_hash_to_script2(share_data['pubkey_hash'])
-        amounts[this_script] = amounts.get(this_script, 0) + share_data['subsidy']//200 # 0.5% goes to block finder
-        amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + share_data['subsidy'] - sum(amounts.itervalues()) # all that's left over is the donation weight and some extra satoshis due to rounding
-        
-        if sum(amounts.itervalues()) != share_data['subsidy'] or any(x < 0 for x in amounts.itervalues()):
+
+
+        # base subsidy value calculated as:
+        # [subsidy - (0.01 for donation + 0.01 for current user + 0.01 for p2pool outpoint) - netfee]
+        my_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(weights) + 1)
+
+        # subsidy goes according to weights prior to this share
+        amounts = dict((script, my_subsidy*weight//total_weight) for script, weight in weights.iteritems()) 
+
+        # all that's left over is the donation weight and some extra satoshis due to rounding
+        amounts[DONATION_SCRIPT] = amounts.get(DONATION_SCRIPT, 0) + my_subsidy - sum(amounts.itervalues()) 
+
+        if sum(amounts.itervalues()) != my_subsidy or any(x < 0 for x in amounts.itervalues()):
             raise ValueError()
-        
+
+        # add 0.01 coin to donation, to satisfy the protocol
+        amounts[DONATION_SCRIPT] = amounts[DONATION_SCRIPT] + minout
+
+        # add 0.01 to current user output, to satisfy the protocol
+        amounts[this_script] = amounts.get(this_script, 0) + minout
+
+#        print amounts
+
         dests = sorted(amounts.iterkeys(), key=lambda script: (script == DONATION_SCRIPT, amounts[script], script))[-4000:] # block length limit, unlikely to ever be hit
-        
+
+#        print dests
+
         share_info = dict(
             share_data=share_data,
             far_share_hash=None if last is None and height < 99 else tracker.get_nth_parent_hash(share_data['previous_share_hash'], 99),
@@ -184,21 +232,27 @@ class Share(object):
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
         )
-        
+
         gentx = dict(
             version=1,
+            # coinbase timestamp must be older than share/block timestamp
+            # maybe there are more elegant solution, but this hack works quite well for now
+            timestamp=share_info['timestamp'],
             tx_ins=[dict(
                 previous_output=None,
                 sequence=None,
                 script=share_data['coinbase'],
             )],
             tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script] or script == DONATION_SCRIPT] + [dict(
-                value=0,
+                # add 0.01 coin to service output, to satisfy the protocol
+                value=minout,
                 script='\x24' + cls.get_ref_hash(net, share_info, ref_merkle_link) + pack.IntType(32).pack(last_txout_nonce),
             )],
             lock_time=0,
         )
-        
+
+        #print gentx
+
         def get_share(header, last_txout_nonce=last_txout_nonce):
             min_header = dict(header); del min_header['merkle_root']
             share = cls(net, None, dict(
@@ -246,7 +300,7 @@ class Share(object):
         self.target = self.share_info['bits'].target
         self.timestamp = self.share_info['timestamp']
         self.previous_hash = self.share_data['previous_share_hash']
-        self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
+        self.new_script = bitcoin_data.pubkey_to_script2(self.share_data['pubkey'])
         self.desired_version = self.share_data['desired_version']
         
         n = set()
@@ -264,7 +318,7 @@ class Share(object):
         merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.merkle_link)
         self.header = dict(self.min_header, merkle_root=merkle_root)
         self.pow_hash = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(self.header))
-        self.hash = self.header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.header))
+        self.hash = self.header_hash = net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(self.header))
         
         if self.target > net.MAX_TARGET:
             from p2pool import p2p
@@ -273,7 +327,7 @@ class Share(object):
         if self.pow_hash > self.target:
             from p2pool import p2p
             raise p2p.PeerMisbehavingError('share PoW invalid')
-        
+
         self.new_transaction_hashes = self.share_info['new_transaction_hashes']
         
         # XXX eww
@@ -308,10 +362,24 @@ class Share(object):
                 raise p2p.PeerMisbehavingError('''%s can't follow %s''' % (type(self).__name__, type(previous_share).__name__))
         
         other_tx_hashes = [tracker.items[tracker.get_nth_parent_hash(self.hash, share_count)].share_info['new_transaction_hashes'][tx_count] for share_count, tx_count in self.iter_transaction_hash_refs()]
-        
-        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], [(h, None) for h in other_tx_hashes], self.net, last_txout_nonce=self.contents['last_txout_nonce'])
+#        print self
+
+        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(
+            tracker, 
+            self.share_info['share_data'], 
+            self.header['bits'].target, 
+            self.share_info['timestamp'], 
+            self.share_info['bits'].target, 
+            self.contents['ref_merkle_link'], 
+            [(h, None) for h in other_tx_hashes], 
+            self.net, 
+            last_txout_nonce=self.contents['last_txout_nonce'],
+            base_subsidy=None
+        )
+
         assert other_tx_hashes2 == other_tx_hashes
         if share_info != self.share_info:
+            print share_info, self.share_info
             raise ValueError('share_info invalid')
         if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:
             raise ValueError('''gentx doesn't match hash_link''')
@@ -365,7 +433,7 @@ class Share(object):
         other_txs = self._get_other_txs(tracker, known_txs)
         if other_txs is None:
             return None # not all txs present
-        return dict(header=self.header, txs=[self.check(tracker)] + other_txs)
+        return dict(header=self.header, txs=[self.check(tracker)] + other_txs, signature='')
 
 
 class WeightsSkipList(forest.TrackerSkipList):
@@ -570,18 +638,33 @@ def get_stale_counts(tracker, share_hash, lookbehind, rates=False):
 def get_user_stale_props(tracker, share_hash, lookbehind):
     res = {}
     for share in tracker.get_chain(share_hash, lookbehind - 1):
-        stale, total = res.get(share.share_data['pubkey_hash'], (0, 0))
+        stale, total = res.get(share.share_data['pubkey'], (0, 0))
         total += 1
         if share.share_data['stale_info'] is not None:
             stale += 1
             total += 1
-        res[share.share_data['pubkey_hash']] = stale, total
-    return dict((pubkey_hash, stale/total) for pubkey_hash, (stale, total) in res.iteritems())
+        res[share.share_data['pubkey']] = stale, total
+    return dict((pubkey, stale/total) for pubkey, (stale, total) in res.iteritems())
+
+def calculate_payout(weight, total_weight, subsidy):
+    global minout
+
+    payout = (subsidy - 3*minout) * weight//total_weight
+
+    if payout < minout:
+        payout = 0
+
+    return payout
 
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
+
     weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
-    res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
+
+    #res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
+
+    res = dict((script, calculate_payout(weight, total_weight, subsidy)) for script, weight in weights.iteritems())
     res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
+
     return res
 
 def get_desired_version_counts(tracker, best_share_hash, dist):

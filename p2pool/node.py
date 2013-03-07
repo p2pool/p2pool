@@ -195,10 +195,10 @@ class Node(object):
             if (self.best_block_header.value is None
                 or (
                     new_header['previous_block'] == bitcoind_best_block and
-                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.best_block_header.value)) == bitcoind_best_block
+                    self.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(self.best_block_header.value)) == bitcoind_best_block
                 ) # new is child of current and previous is current
                 or (
-                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(new_header)) == bitcoind_best_block and
+                    self.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(new_header)) == bitcoind_best_block and
                     self.best_block_header.value['previous_block'] != bitcoind_best_block
                 )): # new is current and previous is not a child of current
                 self.best_block_header.set(new_header)
@@ -252,9 +252,11 @@ class Node(object):
         
         @self.tracker.verified.added.watch
         def _(share):
+            if share.timestamp < share.min_header['timestamp']:
+                return
             if not (share.pow_hash <= share.header['bits'].target):
                 return
-            
+
             block = share.as_block(self.tracker, self.known_txs_var.value)
             if block is None:
                 print >>sys.stderr, 'GOT INCOMPLETE BLOCK FROM PEER! %s bitcoin: %s%064x' % (p2pool_data.format_hash(share.hash), self.net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)

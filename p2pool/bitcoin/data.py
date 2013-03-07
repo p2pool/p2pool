@@ -92,6 +92,7 @@ address_type = pack.ComposedType([
 
 tx_type = pack.ComposedType([
     ('version', pack.IntType(32)),
+    ('timestamp', pack.IntType(32)),
     ('tx_ins', pack.ListType(pack.ComposedType([
         ('previous_output', pack.PossiblyNoneType(dict(hash=0, index=2**32 - 1), pack.ComposedType([
             ('hash', pack.IntType(256)),
@@ -130,6 +131,7 @@ block_header_type = pack.ComposedType([
 block_type = pack.ComposedType([
     ('header', block_header_type),
     ('txs', pack.ListType(tx_type)),
+    ('signature', pack.VarStrType()),
 ])
 
 # merged mining
