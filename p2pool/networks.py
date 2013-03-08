@@ -10,9 +10,9 @@ from p2pool.util import math
 nets = dict(
     novacoin=math.Object(
         PARENT=networks.nets['novacoin'],
-        SHARE_PERIOD=10, # seconds
-        CHAIN_LENGTH=24*60*60//10, # shares
-        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        SHARE_PERIOD=30, # seconds
+        CHAIN_LENGTH=24*60*60//30, # shares
+        REAL_CHAIN_LENGTH=24*60*60//30, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
         IDENTIFIER='e037d5b8c6923510'.decode('hex'),
