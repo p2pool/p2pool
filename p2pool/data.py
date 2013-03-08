@@ -189,7 +189,7 @@ class Share(object):
         for x in raw_amounts.keys():
             if raw_amounts[x] < minout and x not in [this_script, DONATION_SCRIPT]:
                 total_remowed_weight = total_remowed_weight + weights[x]
-                del weights[x]
+                weights.pop(x)
 
         total_weight = total_weight - total_remowed_weight
         assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
