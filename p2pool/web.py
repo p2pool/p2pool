@@ -86,7 +86,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         total = int(float(total)*1e8)
         trunc = int(float(trunc)*1e8)
         return json.dumps(dict(
-            (bitcoin_data.script2_to_address(script, node.net.PARENT), value/1e8)
+            (bitcoin_data.script2_to_address(script, node.net.PARENT), value/1e6)
             for script, value in get_current_scaled_txouts(total, trunc).iteritems()
             if bitcoin_data.script2_to_address(script, node.net.PARENT) is not None
         ))
@@ -204,7 +204,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
     web_root.putChild('user_stales', WebInterface(lambda: dict((bitcoin_data.pubkey_to_address(ph, node.net.PARENT), prop) for ph, prop in
         p2pool_data.get_user_stale_props(node.tracker, node.best_share_var.value, node.tracker.get_height(node.best_share_var.value)).iteritems())))
     web_root.putChild('fee', WebInterface(lambda: wb.worker_fee))
-    web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_address(script, node.net.PARENT), value/1e8) for script, value in node.get_current_txouts().iteritems())))
+    web_root.putChild('current_payouts', WebInterface(lambda: dict((bitcoin_data.script2_to_address(script, node.net.PARENT), value/1e6) for script, value in node.get_current_txouts().iteritems())))
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
