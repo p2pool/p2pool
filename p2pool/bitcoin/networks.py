@@ -44,7 +44,7 @@ nets = dict(
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'NovaCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/NovaCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.novacoin'), 'novacoin.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://novacoin.ru/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://novacoin.ru/address/',
-        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        SANE_TARGET_RANGE=(2**256//2**20//1000 - 1, 2**256//2**20 - 1),
     ),
     novacoin_testnet=math.Object(
         P2P_PREFIX='cdf2c0ef'.decode('hex'),
