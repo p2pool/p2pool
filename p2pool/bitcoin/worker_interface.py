@@ -56,8 +56,8 @@ class WorkerInterface(object):
         request.setHeader('X-Long-Polling', '/long-polling')
         request.setHeader('X-Roll-NTime', 'expire=100')
         request.setHeader('X-Is-P2Pool', 'true')
-        if request.getHeader('Host') is not None:
-            request.setHeader('X-Stratum', 'stratum+tcp://' + request.getHeader('Host'))
+#        if request.getHeader('Host') is not None:
+#            request.setHeader('X-Stratum', 'stratum+tcp://' + request.getHeader('Host'))
         
         if data is not None:
             header = getwork.decode_data(data)
