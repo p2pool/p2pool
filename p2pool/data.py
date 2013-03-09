@@ -120,7 +120,7 @@ class Share(object):
 
             # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
             if coinbase_size > 1000:
-                return floor(coinbase_size / 1000.0) * minout
+                return math.floor(coinbase_size / 1000.0) * minout
 
             return 0
 
