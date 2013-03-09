@@ -5,7 +5,7 @@ import os
 import random
 import sys
 import time
-import math
+from math import ceil, floor
 
 from twisted.python import log
 
@@ -120,7 +120,7 @@ class Share(object):
 
             # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
             if coinbase_size > 1000:
-                return math.floor(coinbase_size / 1000.0) * minout
+                return ceil(coinbase_size / 1000.0) * minout
 
             return 0
 
