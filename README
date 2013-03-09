@@ -1,6 +1,6 @@
 Requirements:
     Generic:
-        Novacoin >= 0.3.1
+        Novacoin >= 0.3.2
         ltc_scrypt
         Python
         Twisted
