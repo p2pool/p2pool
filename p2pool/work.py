@@ -97,7 +97,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     bits=self.node.pow_bits, # not always true
                     coinbaseflags='',
                     height=t['height'] + 1,
-                    time=bb['timestamp'] + 600, # better way?
+                    time=t['time'] + 5, # better way?
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
