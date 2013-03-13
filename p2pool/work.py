@@ -86,7 +86,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             t = self.node.bitcoind_work.value
             bb = self.node.best_block_header.value
 
-            subsidy = self.node.net.PARENT.SUBSIDY_FUNC(bb['bits'].target)
+#            subsidy = self.node.net.PARENT.SUBSIDY_FUNC(self.node.pow_bits.target)
 
             if bb is not None and bb['previous_block'] == t['previous_block'] and self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(bb)) <= t['bits'].target:
                 print 'Skipping from block %x to block %x!' % (bb['previous_block'],
@@ -94,14 +94,14 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 t = dict(
                     version=bb['version'],
                     previous_block=self.node.net.PARENT.BLOCKHASH_FUNC(bitcoin_data.block_header_type.pack(bb)),
-                    bits=bb['bits'], # not always true
+                    bits=self.node.pow_bits, # not always true
                     coinbaseflags='',
                     height=t['height'] + 1,
                     time=bb['timestamp'] + 600, # better way?
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
-                    subsidy=subsidy,
+                    subsidy=self.node.pow_subsidy,
                     last_update=self.node.bitcoind_work.value['last_update'],
                 )
             

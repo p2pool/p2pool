@@ -181,17 +181,31 @@ class Node(object):
                     self.bitcoind_work.set((yield helper.getwork(self.bitcoind, self.bitcoind_work.value['use_getblocktemplate'])))
                 except:
                     log.err()
-                yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
+                yield defer.DeferredList([flag, deferral.sleep(5)], fireOnOneCallback=True)
         work_poller()
         
         # PEER WORK
         
         self.best_block_header = variable.Variable(None)
+
+        self.pow_bits = variable.Variable(None)
+        self.pow_subsidy = 0
+        self.last_block_time = 0
+
         def handle_header(new_header):
+            self.pow_bits = self.bitcoind_work.value['bits']
+            self.pow_subsidy = self.bitcoind_work.value['subsidy']
+            self.last_block_time = self.bitcoind_work.value['time']
+
             # check that header matches current target
+            #
+            # TODO: PoS (stake-modifier & modifier-checksum) checkings implementation
+            #
             if not (self.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(new_header)) <= self.bitcoind_work.value['bits'].target):
                 return
+
             bitcoind_best_block = self.bitcoind_work.value['previous_block']
+
             if (self.best_block_header.value is None
                 or (
                     new_header['previous_block'] == bitcoind_best_block and
