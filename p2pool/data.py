@@ -5,7 +5,7 @@ import os
 import random
 import sys
 import time
-from math import ceil, floor
+from math import floor, ceil
 
 from twisted.python import log
 
@@ -114,13 +114,36 @@ class Share(object):
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
 
-        def get_coinbase_fee(outpointsnum):
+        def get_coinbase_fee(coinbase_flags, outpointsnum):
             # calculate neccessary coinbase fee
-            coinbase_size = 59 + outpointsnum * 44 + 50
+
+            # coinbase usually seems like this:
+            #
+            # 01000000 - nVersion
+            # 1a184351 - nTimestamp
+
+            # 01 - Inputs num
+            # 0000000000000000000000000000000000000000000000000000000000000000 - Input hash
+            # ffffffff - Input index (-1)
+            # 0a02732a062f503253482f - Scriptsig
+            # ffffffff - nSequence
+
+            # 15 - Outpoints num
+            # (User outpoints, 44 bytes per each)
+            # (Donation outpoint, 76 bytes)
+
+            # P2Pool service outpoint (contains merkle link), 46 bytes
+            #
+            # 1027000000000000
+            # 25
+            # 2417cc2063b11fd5255c7e5605780de78163ffc698ed22856bff1a5d880c3c44e400000000
+
+
+            coinbase_size = 50 + (1 + len(coinbase_flags)) + outpointsnum * 44 + 76 + 46
 
             # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
             if coinbase_size > 1000:
-                return ceil(coinbase_size / 1000.0) * minout
+                return int(ceil(coinbase_size / 1000.0) * minout)
 
             return 0
 
@@ -177,7 +200,7 @@ class Share(object):
         )
 
         # calculate "raw" subsidy
-        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(raw_weights) + 1)
+        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data['coinbase'], len(raw_weights) + 1)
 
         # calculate "raw" amounts
         raw_amounts = dict((script, raw_subsidy*weight//total_weight) for script, weight in raw_weights.iteritems()) 
@@ -199,7 +222,7 @@ class Share(object):
 
         # base subsidy value calculated as:
         # [subsidy - (0.01 for donation + 0.01 for current user + 0.01 for p2pool outpoint) - netfee]
-        my_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(len(weights) + 1)
+        my_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data['coinbase'], len(weights) + 1)
 
         # subsidy goes according to weights prior to this share
         amounts = dict((script, my_subsidy*weight//total_weight) for script, weight in weights.iteritems()) 
