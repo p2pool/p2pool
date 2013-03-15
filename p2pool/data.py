@@ -114,7 +114,7 @@ class Share(object):
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
 
-        def get_coinbase_fee(coinbase_flags, outpointsnum):
+        def get_coinbase_fee(share_data, outpointsnum):
             # calculate neccessary coinbase fee
 
             # coinbase usually seems like this:
@@ -138,8 +138,11 @@ class Share(object):
             # 25
             # 2417cc2063b11fd5255c7e5605780de78163ffc698ed22856bff1a5d880c3c44e400000000
 
-
-            coinbase_size = 50 + (1 + len(coinbase_flags)) + outpointsnum * 44 + 76 + 46
+            # Giving users some time to upgrade
+            if share_data['desired_version'] > 11:
+                coinbase_size = 50 + (1 + len(share_data['coinbase'])) + outpointsnum * 44 + 76 + 46
+            else:
+                coinbase_size = 59 + outpointsnum * 44 + 50
 
             # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
             if coinbase_size > 1000:
@@ -200,7 +203,7 @@ class Share(object):
         )
 
         # calculate "raw" subsidy
-        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data['coinbase'], len(raw_weights) + 1)
+        raw_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data, len(raw_weights) + 1)
 
         # calculate "raw" amounts
         raw_amounts = dict((script, raw_subsidy*weight//total_weight) for script, weight in raw_weights.iteritems()) 
@@ -222,7 +225,7 @@ class Share(object):
 
         # base subsidy value calculated as:
         # [subsidy - (0.01 for donation + 0.01 for current user + 0.01 for p2pool outpoint) - netfee]
-        my_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data['coinbase'], len(weights) + 1)
+        my_subsidy = share_data['subsidy'] - 3 * minout - get_coinbase_fee(share_data, len(weights) + 1)
 
         # subsidy goes according to weights prior to this share
         amounts = dict((script, my_subsidy*weight//total_weight) for script, weight in weights.iteritems()) 
