@@ -139,10 +139,7 @@ class Share(object):
             # 2417cc2063b11fd5255c7e5605780de78163ffc698ed22856bff1a5d880c3c44e400000000
 
             # Giving users some time to upgrade
-            if share_data['desired_version'] > 11:
-                coinbase_size = 50 + (1 + len(share_data['coinbase'])) + outpointsnum * 44 + 76 + 46
-            else:
-                coinbase_size = 59 + outpointsnum * 44 + 50
+            coinbase_size = 50 + (1 + len(share_data['coinbase'])) + outpointsnum * 44 + 76 + 46
 
             # if coinbase size is greater than 1000 bytes, it should pay fee (0.01 per 1000 bytes)
             if coinbase_size > 1000:
@@ -711,7 +708,7 @@ def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value
     desired_version_counts = get_desired_version_counts(tracker, best_share,
         min(net.CHAIN_LENGTH, 60*60//net.SHARE_PERIOD, tracker.get_height(best_share)))
     majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-    if majority_desired_version > 12 and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+    if majority_desired_version > 13 and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
         res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
             'An upgrade is likely necessary. Check https://github.com/CryptoManiac/p2pool for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))

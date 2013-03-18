@@ -97,7 +97,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     bits=self.node.pow_bits, # not always true
                     coinbaseflags='',
                     height=t['height'] + 1,
-                    time=t['time'] + 5, # better way?
+                    time=t['time'] + 300, # better way?
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
@@ -185,6 +185,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
+        txn_timestamp = self.current_work.value['txn_timestamp']
         
         if self.node.best_share_var.value is None:
             share_type = p2pool_data.Share
@@ -207,6 +208,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         if True:
             subsidy = self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['bits'].target)
+            desired_timestamp = int(time.time() + 0.5)
 
             share_info, gentx, other_transaction_hashes, get_share = share_type.generate_transaction(
                 tracker=self.node.tracker,
@@ -225,10 +227,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=12,
+                    desired_version=13,
                 ),
                 block_target=self.current_work.value['bits'].target,
-                desired_timestamp=int(time.time() + 0.5),
+                desired_timestamp=desired_timestamp if txn_timestamp < desired_timestamp else txn_timestamp + 1,
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
                 desired_other_transaction_hashes_and_fees=zip(tx_hashes, self.current_work.value['transaction_fees']),

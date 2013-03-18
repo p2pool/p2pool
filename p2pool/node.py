@@ -190,12 +190,10 @@ class Node(object):
 
         self.pow_bits = variable.Variable(None)
         self.pow_subsidy = 0
-        self.last_block_time = 0
 
         def handle_header(new_header):
             self.pow_bits = self.bitcoind_work.value['bits']
             self.pow_subsidy = self.bitcoind_work.value['subsidy']
-            self.last_block_time = self.bitcoind_work.value['time']
 
             # check that header matches current target
             #
@@ -251,6 +249,12 @@ class Node(object):
         # add p2p transactions from bitcoind to known_txs
         @self.factory.new_tx.watch
         def _(tx):
+            if tx.timestamp > time.time() + 3600:
+                return
+            
+            if tx.timestamp > self.bitcoind_work.value['txn_timestamp']:
+                self.bitcoind_work.value['txn_timestamp'] = tx.timestamp
+            
             new_known_txs = dict(self.known_txs_var.value)
             new_known_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
             self.known_txs_var.set(new_known_txs)
