@@ -188,9 +188,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
         txn_timestamp = self.current_work.value['txn_timestamp']
         
-        print
-        print txn_timestamp
-        print
+        #print
+        #print txn_timestamp
+        #print
         
         if self.node.best_share_var.value is None:
             share_type = p2pool_data.Share
