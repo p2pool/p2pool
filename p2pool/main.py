@@ -145,12 +145,12 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print 'Joining p2pool network using port %i...' % (args.p2pool_port,)
         
         @defer.inlineCallbacks
-        def parse(x):
-            if ':' in x:
-                ip, port = x.split(':')
-                defer.returnValue(((yield reactor.resolve(ip)), int(port)))
-            else:
-                defer.returnValue(((yield reactor.resolve(x)), net.P2P_PORT))
+        def parse(host):
+            port = net.P2P_PORT
+            if ':' in host:
+                host, port_str = host.split(':')
+                port = int(port_str)
+            defer.returnValue(((yield reactor.resolve(host)), port))
         
         addrs = {}
         if os.path.exists(os.path.join(datadir_path, 'addrs')):
