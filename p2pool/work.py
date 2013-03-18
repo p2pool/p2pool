@@ -100,6 +100,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     time=t['time'] + 30, # better way?
                     transactions=[],
                     transaction_fees=[],
+                    txn_timestamp=0,
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
                     subsidy=self.node.pow_subsidy,
                     last_update=self.node.bitcoind_work.value['last_update'],
@@ -186,6 +187,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
         txn_timestamp = self.current_work.value['txn_timestamp']
+        
+        print
+        print txn_timestamp
+        print
         
         if self.node.best_share_var.value is None:
             share_type = p2pool_data.Share
