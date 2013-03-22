@@ -102,6 +102,7 @@ class WorkerInterface(object):
 class CachingWorkerBridge(object):
     def __init__(self, inner):
         self._inner = inner
+        self.net = self._inner.net
         
         self.COINBASE_NONCE_LENGTH = (inner.COINBASE_NONCE_LENGTH+1)//2
         self.new_work_event = inner.new_work_event
