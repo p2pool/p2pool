@@ -17,7 +17,7 @@ class StratumRPCMiningProvider(object):
         
         self.watch_id = self.wb.new_work_event.watch(self._send_work)
     
-    def rpc_subscribe(self):
+    def rpc_subscribe(self, miner_version=None, session_id=None):
         reactor.callLater(0, self._send_work)
         
         return [
