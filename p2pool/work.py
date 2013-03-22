@@ -25,6 +25,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.donation_percentage = donation_percentage
         self.worker_fee = worker_fee
         
+        self.net = self.node.net.PARENT
         self.running = True
         self.pseudoshare_received = variable.Event()
         self.share_received = variable.Event()
