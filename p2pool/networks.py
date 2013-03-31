@@ -42,7 +42,7 @@ nets = dict(
         WORKER_PORT=18336,
         BOOTSTRAP_ADDRS=' '.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v: True,
+        VERSION_CHECK=lambda v: 60004 >= v,
     ),
 )
 for net_name, net in nets.iteritems():
