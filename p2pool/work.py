@@ -232,7 +232,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=13,
+                    desired_version=14,
                 ),
                 block_target=self.current_work.value['bits'].target,
                 desired_timestamp=desired_timestamp if txn_timestamp < desired_timestamp else txn_timestamp + 1,
@@ -274,7 +274,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         )
         
         ba = dict(
-            version=min(self.current_work.value['version'], 2),
+            version=min(self.current_work.value['version'], 3),
             previous_block=self.current_work.value['previous_block'],
             merkle_link=merkle_link,
             coinb1=packed_gentx[:-4-4],
