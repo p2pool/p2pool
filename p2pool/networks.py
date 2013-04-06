@@ -24,7 +24,7 @@ nets = dict(
         WORKER_PORT=8336,
         BOOTSTRAP_ADDRS='188.120.239.144 81.200.245.198 81.200.241.51 81.200.241.54 217.77.220.40'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v: 60004 >= v,
+        VERSION_CHECK=lambda v: v >= 60004,
     ),
     novacoin_testnet=math.Object(
         PARENT=networks.nets['novacoin_testnet'],
@@ -42,7 +42,7 @@ nets = dict(
         WORKER_PORT=18336,
         BOOTSTRAP_ADDRS=' '.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v: 60004 >= v,
+        VERSION_CHECK=lambda v: v >= 60004,
     ),
 )
 for net_name, net in nets.iteritems():
