@@ -1,4 +1,5 @@
 Requirements:
+=============
     Generic:
         Bitcoin >=0.6.4
         Python
@@ -16,6 +17,7 @@ Requirements:
             Unzip the files into C:\Python27\Lib\site-packages
 
 Running P2Pool:
+=============
     To use P2Pool, you must be running your own local bitcoind. For standard
     configurations, using P2Pool should be as simple as:
 
@@ -30,9 +32,11 @@ Running P2Pool:
     Run "python run_p2pool.py --help" for additional options.
 
 Donations towards further development:
+=============
     1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
 
 Notes for Litecoin:
+=============
     Requirements:
         In order to run P2Pool with the Litecoin network, you would need to build and install the
         ltc_scrypt module that includes the scrypt proof of work code that Litecoin uses for hashes.
