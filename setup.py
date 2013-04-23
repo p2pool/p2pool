@@ -26,7 +26,7 @@ try:
         author_email='forrest@forre.st',
         url='http://p2pool.forre.st/',
         data_files=[
-            ('', ['README']),
+            ('', ['README.md']),
             ('web-static', [
                 'web-static/d3.v2.min.js',
                 'web-static/graphs.html',
