@@ -1,29 +1,27 @@
-Global:
-=========================
 Requirements:
 -------------------------
 Generic:
-	Bitcoin >=0.6.4
-	Python
-	Twisted
-	python-argparse (for Python <=2.6)
+* Bitcoin >=0.6.4
+* Python
+* Twisted
+* python-argparse (for Python <=2.6)
 
 Linux:
-	sudo apt-get install python-zope.interface python-twisted python-twisted-web
-	sudo apt-get install python-argparse # if on Python 2.6 or older
+* sudo apt-get install python-zope.interface python-twisted python-twisted-web
+* sudo apt-get install python-argparse # if on Python 2.6 or older
 
 Windows:
-	Install Python 2.7: http://www.python.org/getit/
-	Install Twisted: http://twistedmatrix.com/trac/wiki/Downloads
-	Install Zope.Interface: http://pypi.python.org/pypi/zope.interface/3.8.0
-		Unzip the files into C:\Python27\Lib\site-packages
+* Install Python 2.7: http://www.python.org/getit/
+* Install Twisted: http://twistedmatrix.com/trac/wiki/Downloads
+* Install Zope.Interface: http://pypi.python.org/pypi/zope.interface/3.8.0
+* Unzip the files into C:\Python27\Lib\site-packages
 
 Running P2Pool:
 -------------------------
 To use P2Pool, you must be running your own local bitcoind. For standard
 configurations, using P2Pool should be as simple as:
 
-	python run_p2pool.py
+    python run_p2pool.py
 
 Then run your miner program, connecting to 127.0.0.1 on port 9332 with any
 username and password.
@@ -31,16 +29,22 @@ username and password.
 If you are behind a NAT, you should enable TCP port forwarding on your
 router. Forward port 9333 to the host running P2Pool.
 
-Run "python run_p2pool.py --help" for additional options.
+Run for additional options.
 
+    python run_p2pool.py --help
+    
 Donations towards further development:
 -------------------------
-1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+    1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
 
 Official wiki :
 -------------------------
 https://en.bitcoin.it/wiki/P2Pool	
-	
+
+Alternate web front end :
+-------------------------
+* https://github.com/hardcpp/P2PoolExtendedFrontEnd
+
 Notes for Litecoin:
 =========================
 Requirements:
@@ -49,27 +53,31 @@ In order to run P2Pool with the Litecoin network, you would need to build and in
 ltc_scrypt module that includes the scrypt proof of work code that Litecoin uses for hashes.
 
 Linux:
-	cd litecoin_scrypt
-	sudo python setup.py install
+
+    cd litecoin_scrypt
+    sudo python setup.py install
 
 Windows:
-	Install MinGW: http://www.mingw.org/wiki/Getting_Started
-	Install Python 2.7: http://www.python.org/getit/
+* Install MinGW: http://www.mingw.org/wiki/Getting_Started
+* Install Python 2.7: http://www.python.org/getit/
 
-	cd litecoin_scrypt
-	C:\Python27\python.exe setup.py build --compile=mingw32 install
+In bash type this:
 
-	If you run into an error with unrecognized command line option '-mno-cygwin', see this:
-		http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o
+    cd litecoin_scrypt
+    C:\Python27\python.exe setup.py build --compile=mingw32 install
+
+If you run into an error with unrecognized command line option '-mno-cygwin', see this:
+http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o
 
 Running P2Pool:
 -------------------------
-	Run P2Pool with the "--net litecoin" option.
-	Run your miner program, connecting to 127.0.0.1 on port 9327.
-	Forward port 9338 to the host running P2Pool.
-	
-	Litecoin's use of ports 9332 and 9332 conflicts with P2Pool running on
-	the Bitcoin network. To avoid problems, add these lines to litecoin.conf
-	and restart litecoind:
-		rpcport=10332
-		port=10333
+Run P2Pool with the "--net litecoin" option.
+Run your miner program, connecting to 127.0.0.1 on port 9327.
+Forward port 9338 to the host running P2Pool.
+
+Litecoin's use of ports 9332 and 9332 conflicts with P2Pool running on
+the Bitcoin network. To avoid problems, add these lines to litecoin.conf
+and restart litecoind:
+
+    rpcport=10332
+    port=10333
