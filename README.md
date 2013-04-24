@@ -14,6 +14,7 @@ Windows:
 * Install Python 2.7: http://www.python.org/getit/
 * Install Twisted: http://twistedmatrix.com/trac/wiki/Downloads
 * Install Zope.Interface: http://pypi.python.org/pypi/zope.interface/3.8.0
+* Install python win32 api: http://sourceforge.net/projects/pywin32/files/pywin32/Build%20218/
 * Unzip the files into C:\Python27\Lib\site-packages
 
 Running P2Pool:
