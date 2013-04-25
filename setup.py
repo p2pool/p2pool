@@ -5,6 +5,7 @@ import zipfile
 import platform
 
 from distutils.core import setup
+from distutils.sysconfig import get_python_lib
 import py2exe
 
 version = __import__('p2pool').__version__
@@ -15,6 +16,8 @@ if os.path.exists('INITBAK'):
 os.rename(os.path.join('p2pool', '__init__.py'), 'INITBAK')
 try:
     open(os.path.join('p2pool', '__init__.py'), 'wb').write('__version__ = %r%s%sDEBUG = False%s' % (version, os.linesep, os.linesep, os.linesep))
+    mfcdir = get_python_lib() + '\pythonwin\\'
+    mfcfiles = [os.path.join(mfcdir, i) for i in ["mfc90.dll", "mfc90u.dll", "mfcm90.dll", "mfcm90u.dll", "Microsoft.VC90.MFC.manifest"]]
     bundle = 1
     if im64:
         bundle = bundle + 2
@@ -27,14 +30,16 @@ try:
         url='http://p2pool.forre.st/',
         data_files=[
             ('', ['README.md']),
+            ("Microsoft.VC90.MFC", mfcfiles),
             ('web-static', [
                 'web-static/d3.v2.min.js',
+                'web-static/favicon.ico',
                 'web-static/graphs.html',
                 'web-static/index.html',
                 'web-static/share.html',
             ]),
         ],
-        
+
         console=['run_p2pool.py'],
         options=dict(py2exe=dict(
             bundle_files=bundle,
@@ -50,7 +55,7 @@ finally:
 win = '32'
 if im64:
     win = '64'
-    
+
 dir_name = 'p2pool_win' + win + '_' + version
 
 if os.path.exists(dir_name):
