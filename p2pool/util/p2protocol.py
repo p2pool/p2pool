@@ -55,7 +55,7 @@ class Protocol(protocol.Protocol):
             except:
                 print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
                 log.err(None, 'Error handling message: (see RECV line)')
-                self.transport.loseConnection()
+                self.disconnect()
     
     def packetReceived(self, command, payload2):
         handler = getattr(self, 'handle_' + command, None)
@@ -67,8 +67,16 @@ class Protocol(protocol.Protocol):
         if getattr(self, 'connected', True) and not getattr(self, 'disconnecting', False):
             handler(**payload2)
     
+    def disconnect(self):
+        if hasattr(self.transport, 'abortConnection'):
+            # Available since Twisted 11.1
+            self.transport.abortConnection()
+        else:
+            # This doesn't always close timed out connections! warned about in main
+            self.transport.loseConnection()
+    
     def badPeerHappened(self):
-        self.transport.loseConnection()
+        self.disconnect()
     
     def sendPacket(self, command, payload2):
         if len(command) >= 12:

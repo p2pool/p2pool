@@ -67,7 +67,7 @@ class Protocol(p2protocol.Protocol):
             max_id=2**256,
             func=lambda id, hashes, parents, stops: self.send_sharereq(id=id, hashes=hashes, parents=parents, stops=stops),
             timeout=15,
-            on_timeout=self.transport.loseConnection,
+            on_timeout=self.disconnect,
         )
         
         self.remote_tx_hashes = set() # view of peer's known_txs # not actually initially empty, but sending txs instead of tx hashes won't hurt
@@ -80,12 +80,7 @@ class Protocol(p2protocol.Protocol):
     def _connect_timeout(self):
         self.timeout_delayed = None
         print 'Handshake timed out, disconnecting from %s:%i' % self.addr
-        if hasattr(self.transport, 'abortConnection'):
-            # Available since Twisted 11.1
-            self.transport.abortConnection()
-        else:
-            # This doesn't always close timed out connections!
-            self.transport.loseConnection()
+        self.disconnect()
     
     def packetReceived(self, command, payload2):
         try:
@@ -99,19 +94,14 @@ class Protocol(p2protocol.Protocol):
     def badPeerHappened(self):
         if p2pool.DEBUG:
             print "Bad peer banned:", self.addr
-        self.transport.loseConnection()
+        self.disconnect()
         if self.transport.getPeer().host != '127.0.0.1': # never ban localhost
             self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
     
     def _timeout(self):
         self.timeout_delayed = None
         print 'Connection timed out, disconnecting from %s:%i' % self.addr
-        if hasattr(self.transport, 'abortConnection'):
-            # Available since Twisted 11.1
-            self.transport.abortConnection()
-        else:
-            # This doesn't always close timed out connections!
-            self.transport.loseConnection()
+        self.disconnect()
     
     message_version = pack.ComposedType([
         ('version', pack.IntType(32)),
@@ -138,7 +128,7 @@ class Protocol(p2protocol.Protocol):
         if nonce in self.node.peers:
             if p2pool.DEBUG:
                 print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
-            self.transport.loseConnection()
+            self.disconnect()
             return
         
         self.nonce = nonce
@@ -350,7 +340,7 @@ class Protocol(p2protocol.Protocol):
         for tx_hash in tx_hashes:
             if tx_hash in self.remembered_txs:
                 print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
-                self.transport.loseConnection()
+                self.disconnect()
                 return
             
             if tx_hash in self.node.known_txs_var.value:
@@ -363,7 +353,7 @@ class Protocol(p2protocol.Protocol):
                         break
                 else:
                     print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
-                    self.transport.loseConnection()
+                    self.disconnect()
                     return
             
             self.remembered_txs[tx_hash] = tx
@@ -374,7 +364,7 @@ class Protocol(p2protocol.Protocol):
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
             if tx_hash in self.remembered_txs:
                 print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
-                self.transport.loseConnection()
+                self.disconnect()
                 return
             
             if tx_hash in self.node.known_txs_var.value and not warned:
