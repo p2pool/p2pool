@@ -163,7 +163,8 @@ nets = dict(
         DUMB_SCRYPT_DIFF=1,
     ),
     feathercoin=math.Object(
-        P2P_PREFIX='46656174'.decode('hex'),
+#        P2P_PREFIX='46656174'.decode('hex'),
+        P2P_PREFIX='fbc0b6db'.decode('hex'),
         P2P_PORT=9336,
         ADDRESS_VERSION=14,
         RPC_PORT=9337,
