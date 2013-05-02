@@ -1,7 +1,7 @@
 Requirements:
 -------------------------
 Generic:
-* Bitcoin >=0.6.4
+* Feathercoin >=0.6.4
 * Python
 * Twisted
 * python-argparse (for Python <=2.6)
@@ -47,12 +47,12 @@ Alternate web front end :
 -------------------------
 * https://github.com/hardcpp/P2PoolExtendedFrontEnd
 
-Notes for Litecoin:
+Notes for Feathercoin:
 =========================
 Requirements:
 -------------------------
-In order to run P2Pool with the Litecoin network, you would need to build and install the
-ltc_scrypt module that includes the scrypt proof of work code that Litecoin uses for hashes.
+In order to run P2Pool with the Feathercoin network, you would need to build and install the
+ltc_scrypt module that includes the scrypt proof of work code that Feathercoin uses for hashes.
 
 Linux:
 
@@ -83,13 +83,6 @@ http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produ
 
 Running P2Pool:
 -------------------------
-Run P2Pool with the "--net litecoin" option.
-Run your miner program, connecting to 127.0.0.1 on port 9327.
-Forward port 9338 to the host running P2Pool.
-
-Litecoin's use of ports 9332 and 9332 conflicts with P2Pool running on
-the Bitcoin network. To avoid problems, add these lines to litecoin.conf
-and restart litecoind:
-
-    rpcport=10332
-    port=10333
+Run P2Pool with the "--net feathercoin" option.
+Run your miner program, connecting to 127.0.0.1 on port 19327.
+Forward port 19339 to the host running P2Pool.

@@ -132,7 +132,7 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=19327,
-        BOOTSTRAP_ADDRS='i.hashfaster.com'.split(' '),
+        BOOTSTRAP_ADDRS='i.hashfaster.com ftc.p2pool.skralg.com'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
