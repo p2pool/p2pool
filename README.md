@@ -86,3 +86,8 @@ Running P2Pool:
 Run P2Pool with the "--net feathercoin" option.
 Run your miner program, connecting to 127.0.0.1 on port 19327.
 Forward port 19339 to the host running P2Pool.
+
+Donating to skralg:
+-------------------------
+You can mine on http://ftc.p2pool.skralg.com:19327/ which takes a 1% fee.
+Or you can send your hard-earned Feathercoins to 6hn2ENAgSdBteXj6aXyHuxY28Y6wcz9phV
