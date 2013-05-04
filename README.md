@@ -81,13 +81,24 @@ In bash type this:
 If you run into an error with unrecognized command line option '-mno-cygwin', see this:
 http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o
 
-Running P2Pool:
+Running P2Pool for Feathercoin:
 -------------------------
 Run P2Pool with the "--net feathercoin" option.
 Run your miner program, connecting to 127.0.0.1 on port 19327.
 Forward port 19339 to the host running P2Pool.
 
+Running P2Pool for CHNcoin:
+-------------------------
+Run P2Pool with the "--net chncoin" option.
+Run your miner program, connecting to 127.0.0.1 on port 8109.
+Forward port 8107 to the host running P2Pool.
+
 Donating to skralg:
 -------------------------
-You can mine on http://ftc.p2pool.skralg.com:19327/ which takes a 1% fee.
-Or you can send your hard-earned Feathercoins to 6hn2ENAgSdBteXj6aXyHuxY28Y6wcz9phV
+Feathercoin:
+  You can mine on http://ftc.p2pool.skralg.com:19327/ which takes a 1% fee.
+  Or you can send your hard-earned Feathercoins to 6hn2ENAgSdBteXj6aXyHuxY28Y6wcz9phV
+
+CHNcoin:
+  You can mine on http://chn.p2pool.skralg.com:8109/ which takes a 1% fee.
+  Or you can send your hard-earned CHNcoins to CUavsytS7urugUy14gWGyuSK1CF4rJd8Po

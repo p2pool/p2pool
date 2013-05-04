@@ -136,6 +136,27 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    chncoin=math.Object(
+	# Note: These values (except identifier and prefix) are inherited
+	#       from chrda's fork and original litecoin settings, and are
+	#       subject to change
+        PARENT=networks.nets['chncoin'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//10, # shares
+        REAL_CHAIN_LENGTH=12*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares
+        SPREAD=3, # blocks
+	IDENTIFIER='43484E636F696D21'.decode('hex'),
+	PREFIX='B4C305FD74B0DEBE'.decode('hex'),
+        P2P_PORT=8107,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8109,
+        BOOTSTRAP_ADDRS='chn.p2pool.skralg.com'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
