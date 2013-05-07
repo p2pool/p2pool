@@ -137,8 +137,6 @@ nets = dict(
         VERSION_CHECK=lambda v: True,
     ),
     chncoin=math.Object(
-	# Note: These values (except identifier and prefix) are inherited
-	#       from chrda's fork. Bootstraping to chrda's server 
         PARENT=networks.nets['chncoin'],
         SHARE_PERIOD=15, # seconds
         CHAIN_LENGTH=12*60*60//10, # shares
@@ -171,6 +169,24 @@ nets = dict(
         PERSIST=False,
         WORKER_PORT=9771,
         BOOTSTRAP_ADDRS=''.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+    bbqcoin=math.Object(
+        PARENT=networks.nets['bbqcoin'],
+        SHARE_PERIOD=10, # seconds
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares
+        SPREAD=30, # blocks
+        IDENTIFIER='626974636f696e21'.decode('hex'),
+        PREFIX='6772696c6c697421'.decode('hex'),
+        P2P_PORT=12339,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8900,
+        BOOTSTRAP_ADDRS='bbq.crabdance.com'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
