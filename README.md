@@ -1,3 +1,18 @@
+Contact:
+-------------------------
+You can reach me on
+https://bitcointalk.org/index.php?action=profile;u=109808
+
+Donate for my work if you like it and use it
+
+CHNcoin to CetTdSEEERtWSrDb2kCqGZpb7TjtaBacpo
+
+Feathercoin to 6vmP85BVbP51eSp1zCQn3xns1D8JWWSAbV
+
+Bitcoina to 1NyfKgd29XAHkZhjFZbTWhz1YKQX2Dwtrg
+
+it took a bit of work
+
 Requirements:
 -------------------------
 Generic:
@@ -106,11 +121,6 @@ Forward port 19339 to the host running P2Pool.
 Note: Fork is based on newest p2pool base
 I will try to update with new altcoins if needed
 
-Contact:
--------------------------
-You can reach me on
-https://bitcointalk.org/index.php?action=profile;u=109808
 
-Donate for work, send few CHNcoin to CetTdSEEERtWSrDb2kCqGZpb7TjtaBacpo
 
-  Or you can send your hard-earned CHNcoins to CUavsytS7urugUy14gWGyuSK1CF4rJd8Po
+
