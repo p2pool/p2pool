@@ -138,7 +138,7 @@ nets = dict(
     ),
     chncoin=math.Object(
 	# Note: These values (except identifier and prefix) are inherited
-	#       from chrda's fork 
+	#       from chrda's fork. Bootstraping to chrda's server 
         PARENT=networks.nets['chncoin'],
         SHARE_PERIOD=15, # seconds
         CHAIN_LENGTH=12*60*60//10, # shares
@@ -156,6 +156,25 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+        junkcoin=math.Object(
+        PARENT=networks.nets['junkcoin'],
+        SHARE_PERIOD=60, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=70, # shares coinbase maturity
+        SPREAD=120, # blocks
+        IDENTIFIER='e031F5b8c6924210'.decode('hex'),
+        PREFIX='e290192ba6d4729a'.decode('hex'),
+        P2P_PORT=9772,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9771,
+        BOOTSTRAP_ADDRS=''.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+  
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
