@@ -112,6 +112,13 @@ Run P2Pool with the "--net chncoin" option.
 Run your miner program, connecting to 127.0.0.1 on port 8109.
 Forward port 8107 to the host running P2Pool.
 
+Running P2Pool for BBQcoin:
+-------------------------
+Run P2Pool with the "--net bbqcoin" option.
+Run your miner program, connecting to 127.0.0.1 on port 8109.
+Forward port 8107 to the host running P2Pool.
+
+
 Running P2Pool for Junkcoin:
 -------------------------
 Run P2Pool with the "--net junkcoin" option. 
