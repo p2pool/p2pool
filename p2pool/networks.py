@@ -152,7 +152,7 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=8800,
-        BOOTSTRAP_ADDRS='chncoin.no-ip.biz'.split(' '),
+        BOOTSTRAP_ADDRS='chncoin.no-ip.biz pool01-cnc.coinloot.com pool04-cnc.coinloot.com'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
