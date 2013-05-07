@@ -11,7 +11,9 @@ Feathercoin to 6vmP85BVbP51eSp1zCQn3xns1D8JWWSAbV
 
 Bitcoin to 1NyfKgd29XAHkZhjFZbTWhz1YKQX2Dwtrg
 
-it took a bit of work
+Litecoin to LbRt6djFknA8ZLYGAdp5eb48rVR1xxCuQT
+
+It took a bit of work and lot's of time
 
 Requirements:
 -------------------------
