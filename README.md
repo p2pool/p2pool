@@ -31,6 +31,10 @@ username and password.
 If you are behind a NAT, you should enable TCP port forwarding on your
 router. Forward port 9333 to the host running P2Pool.
 
+Aslo open p2p port based on your coin.
+So other nodes can connect to you
+Look networks.py for ports under P2P_PORT for the coin you rune
+
 Run for additional options.
 
     python run_p2pool.py --help
@@ -93,12 +97,20 @@ Run P2Pool with the "--net chncoin" option.
 Run your miner program, connecting to 127.0.0.1 on port 8109.
 Forward port 8107 to the host running P2Pool.
 
-Donating to skralg:
+Running P2Pool for Junkcoin:
 -------------------------
-Feathercoin:
-  You can mine on http://ftc.p2pool.skralg.com:19327/ which takes a 1% fee.
-  Or you can send your hard-earned Feathercoins to 6hn2ENAgSdBteXj6aXyHuxY28Y6wcz9phV
+Run P2Pool with the "--net junkcoin" option. 
+Run your miner program, connecting to 127.0.0.1 on port 19327. 
+Forward port 19339 to the host running P2Pool.
 
-CHNcoin:
-  You can mine on http://chn.p2pool.skralg.com:8109/ which takes a 1% fee.
+Note: Fork is based on newest p2pool base
+I will try to update with new altcoins if needed
+
+Contact:
+-------------------------
+You can reach me on
+https://bitcointalk.org/index.php?action=profile;u=109808
+
+Donate for work, send few CHNcoin to CetTdSEEERtWSrDb2kCqGZpb7TjtaBacpo
+
   Or you can send your hard-earned CHNcoins to CUavsytS7urugUy14gWGyuSK1CF4rJd8Po
