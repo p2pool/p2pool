@@ -147,7 +147,7 @@ nets = dict(
         SPREAD=30, # blocks
         IDENTIFIER='e137d5b8c6923410'.decode('hex'),
         PREFIX='7218c1a53ef629b0'.decode('hex'),
-        P2P_PORT=13388,
+        P2P_PORT=13389,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
@@ -156,7 +156,7 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-        junkcoin=math.Object(
+    junkcoin=math.Object(
         PARENT=networks.nets['junkcoin'],
         SHARE_PERIOD=60, # seconds target spacing
         CHAIN_LENGTH=24*60*60//10, # shares
