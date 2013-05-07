@@ -9,7 +9,7 @@ CHNcoin to CetTdSEEERtWSrDb2kCqGZpb7TjtaBacpo
 
 Feathercoin to 6vmP85BVbP51eSp1zCQn3xns1D8JWWSAbV
 
-Bitcoina to 1NyfKgd29XAHkZhjFZbTWhz1YKQX2Dwtrg
+Bitcoin to 1NyfKgd29XAHkZhjFZbTWhz1YKQX2Dwtrg
 
 it took a bit of work
 
