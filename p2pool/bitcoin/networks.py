@@ -238,6 +238,44 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
     ),
+    mincoin=math.Object(
+        P2P_PREFIX='fbc0b6db'.decode('hex'),
+        P2P_PORT=9772,
+        ADDRESS_VERSION=50,
+        RPC_PORT=9771,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'mincoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 2*100000000 >> (height + 1)//105000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # s targetspacing
+        SYMBOL='MNC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Mincoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Mincoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.mincoin'), 'mincoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://d.evco.in/abe/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://d.evco.in/abe/address/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**12,
+    ),
+    royalcoin=math.Object(
+        P2P_PREFIX='fbc0b6db'.decode('hex'),
+        P2P_PORT=18312,
+        ADDRESS_VERSION=60,
+        RPC_PORT=18311,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'royalcoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 100*100000000 >> (height + 1)//1080000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # s targetspacing
+        SYMBOL='RYC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Royalcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Royalcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.royalcoin'), 'royalcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://d.evco.in/abe/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://d.evco.in/abe/address/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**12,
+    ),
     
 )
 for net_name, net in nets.iteritems():
