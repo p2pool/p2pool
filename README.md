@@ -3,6 +3,9 @@ Contact:
 You can reach me on
 https://bitcointalk.org/index.php?action=profile;u=109808
 
+Information thread:
+https://bitcointalk.org/index.php?topic=198175
+
 Donate for my work if you like it and use it
 
 CHNcoin to CetTdSEEERtWSrDb2kCqGZpb7TjtaBacpo
