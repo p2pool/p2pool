@@ -190,6 +190,42 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    mincoin=math.Object(
+        PARENT=networks.nets['mincoin'],
+        SHARE_PERIOD=30, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=70, # shares coinbase maturity
+        SPREAD=15, # blocks
+        IDENTIFIER='6031F5b8c6924210'.decode('hex'),
+        PREFIX='6290192ba6d4729a'.decode('hex'),
+        P2P_PORT=8732,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9771,
+        BOOTSTRAP_ADDRS='chncoin.no-ip.biz'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+    royalcoin=math.Object(
+        PARENT=networks.nets['royalcoin'],
+        SHARE_PERIOD=60, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=70, # shares coinbase maturity
+        SPREAD=120, # blocks
+        IDENTIFIER='f143F5b8c6924210'.decode('hex'),
+        PREFIX='c387192ba6d4729a'.decode('hex'),
+        P2P_PORT=9779,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9771,
+        BOOTSTRAP_ADDRS='chncoin.no-ip.biz'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ), 
   
 )
 for net_name, net in nets.iteritems():
