@@ -70,7 +70,7 @@ def submit_block_p2p(block, factory, net):
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
     if bitcoind_work.value['use_getblocktemplate']:
-        if 'feather' in net.NAME or 'chn' in net.NAME:
+        if 'feather' in net.NAME or 'chn' in net.NAME or 'franko' in net.NAME:
             result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
             success = result is None
         else:
