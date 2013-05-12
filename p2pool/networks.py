@@ -226,6 +226,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ), 
+    franko=math.Object(
+        PARENT=networks.nets['franko'],
+        SHARE_PERIOD=15, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares coinbase maturity
+        SPREAD=30, # blocks
+        IDENTIFIER='be43F5b8c6924210'.decode('hex'),
+        PREFIX='b587192ba6d4729a'.decode('hex'),
+        P2P_PORT=9777,
+        MIN_TARGET=0,
+		MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9777,
+        BOOTSTRAP_ADDRS='chncoin.no-ip.biz'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ), 
   
 )
 for net_name, net in nets.iteritems():
