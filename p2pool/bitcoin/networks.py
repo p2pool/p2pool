@@ -31,7 +31,7 @@ nets = dict(
         P2P_PREFIX='e4e8e9e5'.decode('hex'),
         P2P_PORT=8777,
         ADDRESS_VERSION=25,
-        RPC_PORT=8337,
+        RPC_PORT=9344,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             'bitbaraddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
