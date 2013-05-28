@@ -74,7 +74,7 @@ class Share(object):
             ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
             ('coinbase', pack.VarStrType()),
             ('nonce', pack.IntType(32)),
-            ('pubkey', pack.IntType(160)),
+            ('pubkey', pack.FixedStrType(33)),
             ('subsidy', pack.IntType(64)),
             ('donation', pack.IntType(16)),
             ('stale_info', pack.EnumType(pack.IntType(8), dict((k, {0: None, 253: 'orphan', 254: 'doa'}.get(k, 'unk%i' % (k,))) for k in xrange(256)))),
