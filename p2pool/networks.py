@@ -8,34 +8,34 @@ from p2pool.util import math
 # changes can be done by changing one, then the other
 
 nets = dict(
-    novacoin=math.Object(
-        PARENT=networks.nets['novacoin'],
+    bitbar=math.Object(
+        PARENT=networks.nets['bitbar'],
         SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=24*60*60//30, # shares
         REAL_CHAIN_LENGTH=24*60*60//30, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
-        IDENTIFIER='e037d5b8c6923510'.decode('hex'),
-        PREFIX='7208c1a53ef649b0'.decode('hex'),
-        P2P_PORT=9777,
+        IDENTIFIER='f982abe394923510'.decode('hex'),
+        PREFIX='8208c1a53ef649b0'.decode('hex'),
+        P2P_PORT=18727,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
-        PERSIST=True,
+        PERSIST=False,
         WORKER_PORT=8336,
-        BOOTSTRAP_ADDRS='188.120.239.144 81.200.245.198 85.234.62.99 81.200.241.54 217.77.220.40'.split(' '),
+        BOOTSTRAP_ADDRS=''.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: v >= 60004,
     ),
-    novacoin_testnet=math.Object(
-        PARENT=networks.nets['novacoin_testnet'],
+    bitbar_testnet=math.Object(
+        PARENT=networks.nets['bitbar_testnet'],
         SHARE_PERIOD=3, # seconds
         CHAIN_LENGTH=20*60//3, # shares
         REAL_CHAIN_LENGTH=20*60//3, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=12, # blocks
-        IDENTIFIER='e037d5b8c7923510'.decode('hex'),
-        PREFIX='7208c1a54ef649b0'.decode('hex'),
-        P2P_PORT=19777,
+        IDENTIFIER='f982abe394923510'.decode('hex'),
+        PREFIX='8208c1a54ef649b0'.decode('hex'),
+        P2P_PORT=19767,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,

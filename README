@@ -35,7 +35,7 @@ Additional info about scrypt module:
                 http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o
 
 Running P2Pool:
-    To use P2Pool, you must be running your own local novacoind. For standard
+    To use P2Pool, you must be running your own local bitbard. For standard
     configurations, using P2Pool should be as simple as:
 
         python run_p2pool.py

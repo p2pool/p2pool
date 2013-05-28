@@ -361,8 +361,8 @@ def run():
     parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
-        help='use specified network (default: novacoin)',
-        action='store', choices=sorted(realnets), default='novacoin', dest='net_name')
+        help='use specified network (default: bitbar)',
+        action='store', choices=sorted(realnets), default='bitbar', dest='net_name')
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')

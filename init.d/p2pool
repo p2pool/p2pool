@@ -21,7 +21,7 @@ DAEMON=/opt/p2pool/run_p2pool.py
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 CHUID=p2pool:p2pool
-DAEMON_ARGS="--net novacoin --give-author 0"
+DAEMON_ARGS="--net bitbar --give-author 0"
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
