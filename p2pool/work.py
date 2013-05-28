@@ -155,7 +155,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             except:
                 pass
 
-            pubkey = self.my_pubkey
+        pubkey = self.my_pubkey
 
         return user, pubkey, desired_share_target, desired_pseudoshare_target
     

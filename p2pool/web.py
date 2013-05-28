@@ -262,7 +262,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
             shares=shares,
             stale_shares=stale_orphan_shares + stale_doa_shares,
             stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
-            current_payout=node.get_current_txouts().get(bitcoin_data.pubkey_to_script2(bitcoin_data.hash160(wb.my_pubkey)), 0)*1e-6,
+            current_payout=node.get_current_txouts().get(bitcoin_data.pubkey_to_script2(wb.my_pubkey), 0)*1e-6,
             peers=dict(
                 incoming=sum(1 for peer in node.p2p_node.peers.itervalues() if peer.incoming),
                 outgoing=sum(1 for peer in node.p2p_node.peers.itervalues() if not peer.incoming),
