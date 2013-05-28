@@ -428,7 +428,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         hd.datastreams['pool_rates'].add_datum(t, pool_rates)
         
         current_txouts = node.get_current_txouts()
-        hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_to_script2(bitcoin_data.hash160(wb.my_pubkey)), 0)*1e-6)
+        hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_to_script2(wb.my_pubkey), 0)*1e-6)
         miner_hash_rates, miner_dead_hash_rates = get_local_rates()
         current_txouts_by_address = dict((bitcoin_data.script2_to_address(script, node.net.PARENT), amount) for script, amount in current_txouts.iteritems())
         hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-6) for user in miner_hash_rates if user in current_txouts_by_address))
