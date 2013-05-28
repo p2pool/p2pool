@@ -52,6 +52,7 @@ def load_share(share, net, peer_addr):
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
+# DONATION_SCRIPT = '2102113fff8e7479083978588444f39fdff6b2dda33582408527656c9a8153fd50cfac'.decode('hex')
 DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
 
 class Share(object):
@@ -73,7 +74,7 @@ class Share(object):
             ('previous_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
             ('coinbase', pack.VarStrType()),
             ('nonce', pack.IntType(32)),
-            ('pubkey_hash', pack.IntType(160)),
+            ('pubkey', pack.IntType(160)),
             ('subsidy', pack.IntType(64)),
             ('donation', pack.IntType(16)),
             ('stale_info', pack.EnumType(pack.IntType(8), dict((k, {0: None, 253: 'orphan', 254: 'doa'}.get(k, 'unk%i' % (k,))) for k in xrange(256)))),
@@ -151,7 +152,7 @@ class Share(object):
             base_subsidy = net.PARENT.SUBSIDY_FUNC(block_target)
 
         # current user payout script
-        this_script = bitcoin_data.pubkey_hash_to_script2(share_data['pubkey_hash'])
+        this_script = bitcoin_data.pubkey_to_script2(share_data['pubkey'])
 
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
         assert height >= net.REAL_CHAIN_LENGTH or last is None
@@ -325,7 +326,7 @@ class Share(object):
         self.target = self.share_info['bits'].target
         self.timestamp = self.share_info['timestamp']
         self.previous_hash = self.share_data['previous_share_hash']
-        self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
+        self.new_script = bitcoin_data.pubkey_to_script2(self.share_data['pubkey'])
         self.desired_version = self.share_data['desired_version']
         
         n = set()
@@ -667,13 +668,13 @@ def get_stale_counts(tracker, share_hash, lookbehind, rates=False):
 def get_user_stale_props(tracker, share_hash, lookbehind):
     res = {}
     for share in tracker.get_chain(share_hash, lookbehind - 1):
-        stale, total = res.get(share.share_data['pubkey_hash'], (0, 0))
+        stale, total = res.get(share.share_data['pubkey'], (0, 0))
         total += 1
         if share.share_data['stale_info'] is not None:
             stale += 1
             total += 1
-        res[share.share_data['pubkey_hash']] = stale, total
-    return dict((pubkey_hash, stale/total) for pubkey_hash, (stale, total) in res.iteritems())
+        res[share.share_data['pubkey']] = stale, total
+    return dict((pubkey, stale/total) for pubkey, (stale, total) in res.iteritems())
 
 def calculate_payout(weight, total_weight, subsidy):
     global minout

@@ -11,7 +11,6 @@ from twisted.python import log
 import bitcoin.getwork as bitcoin_getwork, bitcoin.data as bitcoin_data
 from bitcoin import helper, script, worker_interface
 from util import forest, jsonrpc, variable, deferral, math, pack
-from p2pool.bitcoin import data as p2pool_bitcoin_data
 import p2pool, p2pool.data as p2pool_data
 
 class WorkerBridge(worker_interface.WorkerBridge):
@@ -156,21 +155,15 @@ class WorkerBridge(worker_interface.WorkerBridge):
             except:
                 pass
 
-        if random.uniform(0, 100) < self.worker_fee:
-            pubkey_hash = p2pool_bitcoin_data.hash160(self.my_pubkey)
-        else:
-            try:
-                pubkey_hash = bitcoin_data.address_to_pubkey_hash(user, self.node.net.PARENT)
-            except: # XXX blah
-                pubkey_hash = p2pool_bitcoin_data.hash160(self.my_pubkey)
-       
-        return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
+            pubkey = self.my_pubkey
+
+        return user, pubkey, desired_share_target, desired_pseudoshare_target
     
     def preprocess_request(self, user):
-        user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
-        return pubkey_hash, desired_share_target, desired_pseudoshare_target
+        user, pubkey, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
+        return pubkey, desired_share_target, desired_pseudoshare_target
     
-    def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
+    def get_work(self, pubkey, desired_share_target, desired_pseudoshare_target):
         if (self.node.p2p_node is None or len(self.node.p2p_node.peers) == 0) and self.node.net.PERSIST:
             raise jsonrpc.Error_for_code(-12345)(u'p2pool is not connected to any peers')
         if self.node.best_share_var.value is None and self.node.net.PERSIST:
@@ -231,7 +224,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         ] + ([mm_data] if mm_data else []) + [
                     ]) + self.current_work.value['coinbaseflags'])[:100],
                     nonce=random.randrange(2**32),
-                    pubkey_hash=pubkey_hash,
+                    pubkey=pubkey,
                     subsidy=self.current_work.value['subsidy'],
                     donation=math.perfect_round(65535*self.donation_percentage/100),
                     stale_info=(lambda (orphans, doas), total, (orphans_recorded_in_chain, doas_recorded_in_chain):
@@ -315,6 +308,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     print 'Block header timestamp is before coinbase timestamp!'
                     print 
                     return
+
 
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
                     helper.submit_block(dict(header=header, txs=[new_gentx] + other_transactions, signature=''), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)
