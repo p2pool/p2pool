@@ -42,8 +42,8 @@ nets = dict(
         BLOCK_PERIOD=600, # s
         SYMBOL='BTB',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'BitBar') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/BitBar/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitbar'), 'bitbar.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://bitbar.biz/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://bitbar.biz/address/',
+        BLOCK_EXPLORER_URL_PREFIX='http://btb.cryptocoinexplorer.com/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://btb.cryptocoinexplorer.com/address/',
         SANE_TARGET_RANGE=(2**256//2**20//1000 - 1, 2**256//2**20 - 1),
     ),
     bitbar_testnet=math.Object(
