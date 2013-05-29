@@ -8,21 +8,21 @@ from p2pool.util import math, pack
 from operator import *
 
 def get_subsidy(nCap, nMaxSubsidy, bnTarget):
-    bnLowerBound = 0.0001
+    bnLowerBound = 0.01
     bnUpperBound = bnSubsidyLimit = nMaxSubsidy
     bnTargetLimit = 0x00000fffff000000000000000000000000000000000000000000000000000000
 
-    while bnLowerBound + 0.0001 <= bnUpperBound:
+    while bnLowerBound + 0.01 <= bnUpperBound:
         bnMidValue = (bnLowerBound + bnUpperBound) / 2
         if pow(bnMidValue, nCap) * bnTargetLimit > pow(bnSubsidyLimit, nCap) * bnTarget:
             bnUpperBound = bnMidValue
         else:
             bnLowerBound = bnMidValue
 
-    nSubsidy = round(bnMidValue, 2)
+    nSubsidy = round(bnUpperBound, 6)
 
-    if nSubsidy > bnMidValue:
-        nSubsidy = nSubsidy - 0.0001
+    if nSubsidy > bnUpperBound:
+        nSubsidy = nSubsidy - 0.000001
 
     return int(nSubsidy * 1000000)
 
@@ -55,7 +55,7 @@ nets = dict(
             'bitbaraddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda target: get_subsidy(6, 100, target),
+        SUBSIDY_FUNC=lambda target: get_subsidy(6, 1, target),
         BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=600, # s
