@@ -48,9 +48,9 @@ nets = dict(
     ),
     bitbar_testnet=math.Object(
         P2P_PREFIX='cdf2c0ef'.decode('hex'),
-        P2P_PORT=17777,
-        ADDRESS_VERSION=111,
-        RPC_PORT=8344,
+        P2P_PORT=18777,
+        ADDRESS_VERSION=115,
+        RPC_PORT=19344,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             'bitbaraddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
@@ -59,7 +59,7 @@ nets = dict(
         BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=600, # s
-        SYMBOL='tNVC',
+        SYMBOL='tBTB',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'NovaCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/NovaCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitbar'), 'bitbar.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-bitbar-testnet-explorer/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-bitbar-testnet-explorer/address/',
