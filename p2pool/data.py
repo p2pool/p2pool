@@ -110,6 +110,11 @@ class Share(object):
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
+        timestamp = math.clip(desired_timestamp, (
+            (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
+            (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
+        )) if previous_share is not None else desired_timestamp
+        
         height, last = tracker.get_height_and_last(share_data['previous_share_hash'])
         assert height >= net.REAL_CHAIN_LENGTH or last is None
         if height < net.TARGET_LOOKBEHIND:
@@ -120,7 +125,8 @@ class Share(object):
             pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
             pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
-        bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target, (pre_target3//10, pre_target3)))
+        bits = bitcoin_data.FloatingInteger.from_target_upper_bound(math.clip(desired_target,
+            (pre_target3//getattr(net, 'MAX_DIFFICULTY_INCREASE_FUNC', lambda t: 10)(timestamp), pre_target3)))
         
         new_transaction_hashes = []
         new_transaction_size = 0
@@ -158,7 +164,7 @@ class Share(object):
         
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(share_data['previous_share_hash'],
             min(height, net.REAL_CHAIN_LENGTH),
-            65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
+            65535*getattr(net, 'SPREAD_FUNC', lambda t: net.SPREAD)(timestamp)*bitcoin_data.target_to_average_attempts(block_target),
         )
         assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
         
@@ -177,10 +183,7 @@ class Share(object):
             far_share_hash=None if last is None and height < 99 else tracker.get_nth_parent_hash(share_data['previous_share_hash'], 99),
             max_bits=max_bits,
             bits=bits,
-            timestamp=math.clip(desired_timestamp, (
-                (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
-                (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
-            )) if previous_share is not None else desired_timestamp,
+            timestamp=timestamp,
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
         )
@@ -579,7 +582,8 @@ def get_user_stale_props(tracker, share_hash, lookbehind):
     return dict((pubkey_hash, stale/total) for pubkey_hash, (stale, total) in res.iteritems())
 
 def get_expected_payouts(tracker, best_share_hash, block_target, subsidy, net):
-    weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target))
+    best_share = tracker.items[best_share_hash]
+    weights, total_weight, donation_weight = tracker.get_cumulative_weights(best_share_hash, min(tracker.get_height(best_share_hash), net.REAL_CHAIN_LENGTH), 65535*getattr(net, 'SPREAD_FUNC', lambda t: net.SPREAD)(best_share.timestamp)*bitcoin_data.target_to_average_attempts(block_target))
     res = dict((script, subsidy*weight//total_weight) for script, weight in weights.iteritems())
     res[DONATION_SCRIPT] = res.get(DONATION_SCRIPT, 0) + subsidy - sum(res.itervalues())
     return res
@@ -596,7 +600,7 @@ def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value
     desired_version_counts = get_desired_version_counts(tracker, best_share,
         min(net.CHAIN_LENGTH, 60*60//net.SHARE_PERIOD, tracker.get_height(best_share)))
     majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-    if majority_desired_version > 11 and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+    if majority_desired_version > 12 and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
         res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))

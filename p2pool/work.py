@@ -226,7 +226,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=11,
+                    desired_version=12 if self.net.NAME == 'litecoin' else 11,
                 ),
                 block_target=self.current_work.value['bits'].target,
                 desired_timestamp=int(time.time() + 0.5),

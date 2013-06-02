@@ -51,7 +51,7 @@ nets = dict(
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
-        SPREAD=12, # blocks
+        SPREAD_FUNC=lambda t: 12 if t < 1371366272 else 1, # blocks
         IDENTIFIER='e037d5b8c6923410'.decode('hex'),
         PREFIX='7208c1a53ef629b0'.decode('hex'),
         P2P_PORT=9338,
@@ -62,6 +62,7 @@ nets = dict(
         BOOTSTRAP_ADDRS='forre.st vps.forre.st 199.255.95.94 75.12.89.18 181.28.244.151 83.142.189.132 66.90.82.155:11332 201.57.241.77 80.222.255.91 142.68.214.29 24.52.247.82 72.230.179.177 94.127.200.29 200.204.161.215 91.121.9.7 91.235.254.37 198.154.98.195 178.79.136.10'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
+        MAX_DIFFICULTY_INCREASE_FUNC=lambda t: 10 if t < 1371366272 else 30,
     ),
     litecoin_testnet=math.Object(
         PARENT=networks.nets['litecoin_testnet'],
