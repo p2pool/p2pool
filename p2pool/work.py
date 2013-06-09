@@ -44,7 +44,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             my_orphan_announce_count=lambda share: 1 if share.hash in self.my_share_hashes and share.share_data['stale_info'] == 'orphan' else 0,
             my_dead_announce_count=lambda share: 1 if share.hash in self.my_share_hashes and share.share_data['stale_info'] == 'doa' else 0,
         )))
-       
+        
         @self.node.tracker.verified.removed.watch
         def _(share):
             if share.hash in self.my_share_hashes and self.node.tracker.is_child_of(share.hash, self.node.best_share_var.value):
@@ -138,7 +138,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         my_doa_shares_not_in_chain = my_doa_shares - my_doa_shares_in_chain
         
         return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
-
+    
     def get_user_details(self, user):
         desired_pseudoshare_target = None
         if '+' in user:
@@ -155,32 +155,32 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
             except:
                 pass
-	
+        
+#        pubkey = self.my_pubkey
 	pubkey = user
-
-	@defer.inlineCallbacks
-	def validate_pubkey(self, pubkey1):
-            res = yield self.node.bitcoind.rpc_validatepubkey(pubkey1)
-	    defer.returnValue(res)
 	
-	res1 = validate_pubkey(self, pubkey)
-
-	self.res2[pubkey] = 0
-
-	def mycallback(x):
-	    self.res2[pubkey] = x
-
-	res1.addCallback(mycallback)
-
-	while self.res2[pubkey] == 0:
-	    reactor.iterate(0.055)
-	    time.sleep(0.001)
-
-	if not self.res2[pubkey]['isvalid']:
-	    pubkey = self.my_pubkey
-	else:
-	    pubkey=pubkey.decode('hex')
-	    
+        @defer.inlineCallbacks
+        def validate_pubkey(self, pubkey1):
+            res = yield self.node.bitcoind.rpc_validatepubkey(pubkey1)
+            defer.returnValue(res)
+	
+        res1 = validate_pubkey(self, pubkey)
+        self.res2[pubkey] = 0
+	
+        def mycallback(x):
+            self.res2[pubkey] = x
+	
+        res1.addCallback(mycallback)
+	
+        while self.res2[pubkey] == 0:
+            reactor.iterate(0.05)
+            time.sleep(0.001)
+	
+        if not self.res2[pubkey]['isvalid']:
+            pubkey = self.my_pubkey
+        else:
+            pubkey=pubkey.decode('hex')
+        
         return user, pubkey, desired_share_target, desired_pseudoshare_target
     
     def preprocess_request(self, user):
@@ -332,7 +332,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     print 'Block header timestamp is before coinbase timestamp!'
                     print 
                     return
-
 
                 if pow_hash <= header['bits'].target or p2pool.DEBUG:
                     helper.submit_block(dict(header=header, txs=[new_gentx] + other_transactions, signature=''), False, self.node.factory, self.node.bitcoind, self.node.bitcoind_work, self.node.net)

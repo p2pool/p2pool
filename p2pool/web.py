@@ -433,7 +433,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         current_txouts_by_address = dict((bitcoin_data.script2_to_address(script, node.net.PARENT), amount) for script, amount in current_txouts.iteritems())
         current_txouts_by_pubkey = dict((bitcoin_data.script2_to_pubkey(script).encode('hex'), amount) for script, amount in current_txouts.iteritems())
         hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_pubkey[user]*1e-6) for user in miner_hash_rates if user in current_txouts_by_pubkey))
-        
+
         hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in node.p2p_node.peers.itervalues() if peer.incoming))
         hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in node.p2p_node.peers.itervalues() if not peer.incoming))
         

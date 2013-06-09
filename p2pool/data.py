@@ -13,7 +13,7 @@ import p2pool
 from p2pool.bitcoin import data as bitcoin_data, script, sha256
 from p2pool.util import math, forest, pack
 
-minout = pow(10, 6) / 10000;
+minout = pow(10, 6) / 100;
 
 # hashlink
 
@@ -52,7 +52,6 @@ def load_share(share, net, peer_addr):
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
-# DONATION_SCRIPT = '2102113fff8e7479083978588444f39fdff6b2dda33582408527656c9a8153fd50cfac'.decode('hex')
 DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
 
 class Share(object):

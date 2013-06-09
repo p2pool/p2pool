@@ -19,50 +19,50 @@ def get_subsidy(nCap, nMaxSubsidy, bnTarget):
         else:
             bnLowerBound = bnMidValue
 
-    nSubsidy = round(bnUpperBound, 6)
+    nSubsidy = round(bnMidValue, 2)
 
-    if nSubsidy > bnUpperBound:
-        nSubsidy = nSubsidy - 0.000001
+    if nSubsidy > bnMidValue:
+        nSubsidy = nSubsidy - 0.01
 
     return int(nSubsidy * 1000000)
 
 nets = dict(
-    bitbar=math.Object(
+    novacoin=math.Object(
         P2P_PREFIX='e4e8e9e5'.decode('hex'),
-        P2P_PORT=8777,
-        ADDRESS_VERSION=25,
-        RPC_PORT=9344,
+        P2P_PORT=7777,
+        ADDRESS_VERSION=8,
+        RPC_PORT=8344,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'bitbaraddress' in (yield bitcoind.rpc_help()) and
+            'novacoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda target: get_subsidy(6, 1, target),
+        SUBSIDY_FUNC=lambda target: get_subsidy(6, 100, target),
         BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=600, # s
-        SYMBOL='BTB',
-        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'BitBar') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/BitBar/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitbar'), 'bitbar.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://btb.cryptocoinexplorer.com/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://btb.cryptocoinexplorer.com/address/',
+        SYMBOL='NVC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'NovaCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/NovaCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.novacoin'), 'novacoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://novacoin.ru/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://novacoin.ru/address/',
         SANE_TARGET_RANGE=(2**256//2**20//1000 - 1, 2**256//2**20 - 1),
     ),
-    bitbar_testnet=math.Object(
+    novacoin_testnet=math.Object(
         P2P_PREFIX='cdf2c0ef'.decode('hex'),
-        P2P_PORT=18777,
-        ADDRESS_VERSION=115,
-        RPC_PORT=19344,
+        P2P_PORT=17777,
+        ADDRESS_VERSION=111,
+        RPC_PORT=8344,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'bitbaraddress' in (yield bitcoind.rpc_help()) and
+            'novacoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda target: get_subsidy(6, 1, target),
+        SUBSIDY_FUNC=lambda target: get_subsidy(6, 100, target),
         BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=600, # s
-        SYMBOL='tBTB',
-        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'NovaCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/NovaCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitbar'), 'bitbar.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-bitbar-testnet-explorer/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-bitbar-testnet-explorer/address/',
+        SYMBOL='tNVC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'NovaCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/NovaCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.novacoin'), 'novacoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-novacoin-testnet-explorer/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-novacoin-testnet-explorer/address/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
     ),
 )

@@ -260,7 +260,6 @@ def pubkey_to_script2(pubkey):
     return (chr(len(pubkey)) + pubkey) + '\xac'
 
 def pubkey_hash_to_script2(pubkey_hash):
-#    print '\x76\xa9' + ('\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x88\xac'
     return '\x76\xa9' + ('\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x88\xac'
 
 def script2_to_pubkey(script2):
