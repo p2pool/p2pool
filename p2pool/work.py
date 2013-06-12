@@ -155,39 +155,36 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
             except:
                 pass
-        
-#        pubkey = self.my_pubkey
-        if random.uniform(0, 100) < self.worker_fee:
-	    pubkey = self.my_pubkey
-	elif self.node.get_current_txouts().get(bitcoin_data.pubkey_to_script2(self.my_pubkey), 0) < 10000:
-	    pubkey = self.my_pubkey
-	else:
-	    pubkey = user
 
-	    if not self.res2.has_key(pubkey):
-      
+        if random.uniform(0, 100) < self.worker_fee:
+            pubkey = self.my_pubkey
+        elif self.node.get_current_txouts().get(bitcoin_data.pubkey_to_script2(self.my_pubkey), 0) < 10000:
+            pubkey = self.my_pubkey
+        else:
+
+            if user not in self.res2 or 'isvalid' not in self.res2[user]:
+
                 @defer.inlineCallbacks
                 def validate_pubkey(self, pubkey1):
                     res = yield self.node.bitcoind.rpc_validatepubkey(pubkey1)
                     defer.returnValue(res)
-	
-                res1 = validate_pubkey(self, pubkey)
-                self.res2[pubkey] = 0
-	
+
+                res1 = validate_pubkey(self, user)
+
                 def mycallback(x):
-                    self.res2[pubkey] = x
-	
+                    self.res2[user] = x
+
                 res1.addCallback(mycallback)
-	
-                while self.res2[pubkey] == 0:
+
+                while user not in self.res2 or 'isvalid' not in self.res2[user]:
                     reactor.iterate(0.05)
                     time.sleep(0.001)
-	
-            if not self.res2[pubkey]['isvalid']:
-                pubkey = self.my_pubkey
+
+            if self.res2[user]['isvalid']:
+                pubkey = user.decode('hex')
             else:
-                pubkey=pubkey.decode('hex')
-        
+                pubkey = self.my_pubkey
+       
         return user, pubkey, desired_share_target, desired_pseudoshare_target
     
     def preprocess_request(self, user):
