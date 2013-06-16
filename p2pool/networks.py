@@ -157,6 +157,62 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    digitalcoin=math.Object(
+        PARENT=networks.nets['digitalcoin'],
+        SHARE_PERIOD=30, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares coinbase maturity
+        SPREAD=90, # blocks
+        IDENTIFIER='7696CFD6441FB537'.decode('hex'),
+        PREFIX='4C2530B5ED0E1EB5'.decode('hex'),
+        P2P_PORT=23396,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8810,
+        BOOTSTRAP_ADDRS=''.split(' '),
+        ANNOUNCE_CHANNEL='#digitalcoin',
+        VERSION_CHECK=lambda v: True,
+    ),
+#版本2代
+#     worldcoin=math.Object(
+#        PARENT=networks.nets['worldcoin'],
+#        SHARE_PERIOD=15, # seconds target spacing
+#        CHAIN_LENGTH=24*60*60//10, # shares
+#        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+#        TARGET_LOOKBEHIND=200, # shares coinbase maturity
+#        SPREAD=120, # blocks
+#        IDENTIFIER='e021a7b8c602421f'.decode('hex'),
+#        PREFIX='e280193ae6b8617b'.decode('hex'),
+#        P2P_PORT=48907,
+#        MIN_TARGET=0,
+#        MAX_TARGET=2**256//2**20 - 1,
+#        PERSIST=False,
+#        WORKER_PORT=8820,
+#        BOOTSTRAP_ADDRS=''.split(' '),
+#        ANNOUNCE_CHANNEL='#p2pool-worldcoin',
+#        VERSION_CHECK=lambda v: True,
+#    ),
+    #版本1代
+    worldcoin=math.Object(
+        PARENT=networks.nets['worldcoin'],
+        SHARE_PERIOD=15, # seconds target spacing
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares coinbase maturity
+        SPREAD=30, # blocks
+        IDENTIFIER='e021a7b8c602421f'.decode('hex'),
+        PREFIX='e280193ae6b8617b'.decode('hex'),
+        P2P_PORT=48907,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=19331,
+        BOOTSTRAP_ADDRS=''.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
