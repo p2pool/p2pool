@@ -172,7 +172,7 @@ nets = dict(
         PERSIST=False,
         WORKER_PORT=8810,
         BOOTSTRAP_ADDRS=''.split(' '),
-        ANNOUNCE_CHANNEL='#digitalcoin',
+        ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
 #版本2代
