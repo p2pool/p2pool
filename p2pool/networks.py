@@ -81,7 +81,6 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-
     terracoin=math.Object(
         PARENT=networks.nets['terracoin'],
         SHARE_PERIOD=30, # seconds
@@ -175,33 +174,13 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-#版本2代
-#     worldcoin=math.Object(
-#        PARENT=networks.nets['worldcoin'],
-#        SHARE_PERIOD=15, # seconds target spacing
-#        CHAIN_LENGTH=24*60*60//10, # shares
-#        REAL_CHAIN_LENGTH=24*60*60//10, # shares
-#        TARGET_LOOKBEHIND=200, # shares coinbase maturity
-#        SPREAD=120, # blocks
-#        IDENTIFIER='e021a7b8c602421f'.decode('hex'),
-#        PREFIX='e280193ae6b8617b'.decode('hex'),
-#        P2P_PORT=48907,
-#        MIN_TARGET=0,
-#        MAX_TARGET=2**256//2**20 - 1,
-#        PERSIST=False,
-#        WORKER_PORT=8820,
-#        BOOTSTRAP_ADDRS=''.split(' '),
-#        ANNOUNCE_CHANNEL='#p2pool-worldcoin',
-#        VERSION_CHECK=lambda v: True,
-#    ),
-    #版本1代
     worldcoin=math.Object(
         PARENT=networks.nets['worldcoin'],
         SHARE_PERIOD=15, # seconds target spacing
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares coinbase maturity
-        SPREAD=30, # blocks
+        SPREAD=120, # blocks
         IDENTIFIER='e021a7b8c602421f'.decode('hex'),
         PREFIX='e280193ae6b8617b'.decode('hex'),
         P2P_PORT=48907,
