@@ -250,7 +250,7 @@ class Test(unittest.TestCase):
         for i, n in enumerate(nodes):
             assert len(n.n.tracker.items) == SHARES, (i, len(n.n.tracker.items))
             assert n.n.tracker.verified.get_height(n.n.best_share_var.value) == SHARES, (i, n.n.tracker.verified.get_height(n.n.best_share_var.value))
-            assert type(n.n.tracker.items[nodes[0].n.best_share_var.value]) is data.Share
+            assert type(n.n.tracker.items[nodes[0].n.best_share_var.value]) is (data.Share.SUCCESSOR if data.Share.SUCCESSOR is not None else data.Share)
             assert type(n.n.tracker.items[n.n.tracker.get_nth_parent_hash(nodes[0].n.best_share_var.value, SHARES - 5)]) is data.Share
         
         for n in nodes:
