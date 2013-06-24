@@ -72,7 +72,7 @@ class bitcoind(object): # can be used as p2p factory, p2p protocol, or rpc jsonr
         for i in xrange(100):
             fee = i
             txs.append(dict(
-                data=bitcoin_data.tx_type.pack(dict(version=1, tx_ins=[], tx_outs=[dict(value=fee*1000 + i, script='hello!'*100)], lock_time=0)).encode('hex'),
+                data=bitcoin_data.tx_type.pack(dict(version=1, tx_ins=[], tx_outs=[dict(value=fee, script='hello!'*100)], lock_time=0)).encode('hex'),
                 fee=fee,
             ))
         return {
