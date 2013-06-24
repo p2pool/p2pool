@@ -226,7 +226,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         'doa' if doas > doas_recorded_in_chain else
                         None
                     )(*self.get_stale_counts()),
-                    desired_version=11,
+                    desired_version=(share_type.SUCCESSOR if share_type.SUCCESSOR is not None else share_type).VOTING_VERSION,
                 ),
                 block_target=self.current_work.value['bits'].target,
                 desired_timestamp=int(time.time() + 0.5),
