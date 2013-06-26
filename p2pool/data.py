@@ -92,7 +92,7 @@ class NewShare(object):
             ('branch', pack.ListType(pack.IntType(256))),
             ('index', pack.IntType(0)),
         ])),
-        ('last_txout_nonce', pack.IntType(32)),
+        ('last_txout_nonce', pack.IntType(64)),
         ('hash_link', hash_link_type),
         ('merkle_link', pack.ComposedType([
             ('branch', pack.ListType(pack.IntType(256))),
@@ -105,7 +105,7 @@ class NewShare(object):
         ('share_info', share_info_type),
     ])
     
-    gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x24' + pack.IntType(256).pack(0) + pack.IntType(32).pack(0))[:2]
+    gentx_before_refhash = pack.VarStrType().pack(DONATION_SCRIPT) + pack.IntType(64).pack(0) + pack.VarStrType().pack('\x28' + pack.IntType(256).pack(0) + pack.IntType(64).pack(0))[:2]
     
     @classmethod
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None):
@@ -195,7 +195,7 @@ class NewShare(object):
             )],
             tx_outs=[dict(value=amounts[script], script=script) for script in dests if amounts[script] or script == DONATION_SCRIPT] + [dict(
                 value=0,
-                script='\x24' + cls.get_ref_hash(net, share_info, ref_merkle_link) + pack.IntType(32).pack(last_txout_nonce),
+                script='\x28' + cls.get_ref_hash(net, share_info, ref_merkle_link) + pack.IntType(64).pack(last_txout_nonce),
             )],
             lock_time=0,
         )
@@ -206,8 +206,8 @@ class NewShare(object):
                 min_header=min_header,
                 share_info=share_info,
                 ref_merkle_link=dict(branch=[], index=0),
-                last_txout_nonce=last_txout_nonce,
-                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-4-4], cls.gentx_before_refhash),
+                last_txout_nonce=last_txout_nonce*2**32,
+                hash_link=prefix_to_hash_link(bitcoin_data.tx_type.pack(gentx)[:-32-8-4], cls.gentx_before_refhash),
                 merkle_link=bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0),
             ))
             assert share.header == header # checks merkle_root
@@ -259,7 +259,7 @@ class NewShare(object):
         
         self.gentx_hash = check_hash_link(
             self.hash_link,
-            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + pack.IntType(32).pack(self.contents['last_txout_nonce']) + pack.IntType(32).pack(0),
+            self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + pack.IntType(64).pack(self.contents['last_txout_nonce']) + pack.IntType(32).pack(0),
             self.gentx_before_refhash,
         )
         merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.merkle_link)
