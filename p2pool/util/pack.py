@@ -38,12 +38,12 @@ class Type(object):
     def __ne__(self, other):
         return not (self == other)
     
-    def _unpack(self, data):
+    def _unpack(self, data, ignore_trailing=False):
         obj, (data2, pos) = self.read((data, 0))
         
         assert data2 is data
         
-        if pos != len(data):
+        if pos != len(data) and not ignore_trailing:
             raise LateEnd()
         
         return obj
@@ -59,8 +59,8 @@ class Type(object):
         return ''.join(res)
     
     
-    def unpack(self, data):
-        obj = self._unpack(data)
+    def unpack(self, data, ignore_trailing=False):
+        obj = self._unpack(data, ignore_trailing)
         
         if p2pool.DEBUG:
             if self._pack(obj) != data:
