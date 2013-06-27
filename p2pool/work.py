@@ -136,7 +136,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
     
     def get_user_details(self, username):
-        contents = re.split('[+/]', username)
+        contents = re.split('([+/])', username)
         assert len(contents) % 2 == 1
         
         user, contents2 = contents[0], contents[1:]
@@ -151,7 +151,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     pass
             elif symbol == '/':
                 try:
-                    desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
+                    desired_share_target = bitcoin_data.difficulty_to_target(float(parameter))
                 except:
                     pass
         
