@@ -126,10 +126,12 @@ class mm_provider(object):
 mynet = math.Object(
     PARENT=networks.nets['litecoin_testnet'],
     SHARE_PERIOD=3, # seconds
+    NEW_SHARE_PERIOD=5, # seconds
     CHAIN_LENGTH=20*60//3, # shares
     REAL_CHAIN_LENGTH=20*60//3, # shares
     TARGET_LOOKBEHIND=200, # shares
     SPREAD=12, # blocks
+    NEW_SPREAD=3, # blocks
     IDENTIFIER='cca5e24ec6408b1e'.decode('hex'),
     PREFIX='ad9614f6466a39cf'.decode('hex'),
     P2P_PORT=19338,

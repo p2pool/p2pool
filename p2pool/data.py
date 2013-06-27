@@ -117,7 +117,7 @@ class NewShare(object):
             pre_target3 = net.MAX_TARGET
         else:
             attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True, integer=True)
-            pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
+            pre_target = 2**256//(net.NEW_SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
             pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
             pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
@@ -159,7 +159,7 @@ class NewShare(object):
         
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(previous_share.share_data['previous_share_hash'] if previous_share is not None else None,
             min(height, net.REAL_CHAIN_LENGTH-1),
-            65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
+            65535*net.NEW_SPREAD*bitcoin_data.target_to_average_attempts(block_target),
         )
         assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
         
@@ -179,8 +179,8 @@ class NewShare(object):
             max_bits=max_bits,
             bits=bits,
             timestamp=math.clip(desired_timestamp, (
-                (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
-                (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
+                (previous_share.timestamp + net.NEW_SHARE_PERIOD) - (net.NEW_SHARE_PERIOD - 1), # = previous_share.timestamp + 1
+                (previous_share.timestamp + net.NEW_SHARE_PERIOD) + (net.NEW_SHARE_PERIOD - 1),
             )) if previous_share is not None else desired_timestamp,
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
