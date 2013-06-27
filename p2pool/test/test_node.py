@@ -4,6 +4,7 @@ import random
 import tempfile
 
 from twisted.internet import defer, reactor
+from twisted.python import failure
 from twisted.trial import unittest
 from twisted.web import client, resource, server
 
@@ -53,8 +54,15 @@ class bitcoind(object): # can be used as p2p factory, p2p protocol, or rpc jsonr
         block_hash = int(block_hash_hex, 16)
         return dict(height=self.blocks.index(block_hash))
     
-    def rpc_getmemorypool(self, result=None):
-        if result is not None:
+    def __getattr__(self, name):
+        if name.startswith('rpc_'):
+            return lambda *args, **kwargs: failure.Failure(jsonrpc.Error_for_code(-32601)('Method not found'))
+    
+    def rpc_getblocktemplate(self, param):
+        if param['mode'] == 'template':
+            pass
+        elif param['mode'] == 'submit':
+            result = param['data']
             block = bitcoin_data.block_type.unpack(result.decode('hex'))
             if sum(tx_out['value'] for tx_out in block['txs'][0]['tx_outs']) != sum(tx['tx_outs'][0]['value'] for tx in block['txs'][1:]) + 5000000000:
                 print 'invalid fee'
@@ -67,6 +75,8 @@ class bitcoind(object): # can be used as p2p factory, p2p protocol, or rpc jsonr
             self.headers[header_hash] = block['header']
             reactor.callLater(0, self.new_block.happened)
             return True
+        else:
+            raise jsonrpc.Error_for_code(-1)('invalid request')
         
         txs = []
         for i in xrange(100):

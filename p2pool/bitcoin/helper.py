@@ -70,12 +70,11 @@ def submit_block_p2p(block, factory, net):
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
     if bitcoind_work.value['use_getblocktemplate']:
-        if 'lite' in net.NAME:
-            result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
-            success = result is None
-        else:
+        try:
             result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
-            success = result is None
+        except jsonrpc.Error_for_code(-32601): # Method not found, for older litecoin versions
+            result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
+        success = result is None
     else:
         result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
         success = result
