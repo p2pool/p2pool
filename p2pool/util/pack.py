@@ -63,7 +63,9 @@ class Type(object):
         obj = self._unpack(data, ignore_trailing)
         
         if p2pool.DEBUG:
-            if self._pack(obj) != data:
+            packed = self._pack(obj)
+            good = data.startswith(packed) if ignore_trailing else data == packed
+            if not good:
                 raise AssertionError()
         
         return obj
