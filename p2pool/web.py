@@ -318,7 +318,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
                     coinbase=share.share_data['coinbase'].ljust(2, '\x00').encode('hex'),
                     value=share.share_data['subsidy']*1e-8,
                 ),
-                txn_count_range=[len(share.other_txs), len(share.other_txs)] if share.other_txs is not None else 1 if len(share.merkle_link['branch']) == 0 else [2**len(share.merkle_link['branch'])//2+1, 2**len(share.merkle_link['branch'])],
+                txn_count=len(list(share.iter_transaction_hash_refs())),
             ),
         )
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))

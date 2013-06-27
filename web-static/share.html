@@ -60,7 +60,7 @@
                     var block = b.append('p')
                         block.append('span').text('Hash: ')
                         block.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.hash).text(share.block.hash);
-                    b.append('p').text('Transaction count: ' + share.block.txn_count_range);
+                    b.append('p').text('Transaction count: ' + share.block.txn_count);
                     b.append('h2').text('Header');
                     b.append('p').text('Version: ' + share.block.header.version);
                     var prevblock = b.append('p')

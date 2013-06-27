@@ -56,8 +56,6 @@ class Share(object):
     VOTING_VERSION = 11
     SUCCESSOR = None
     
-    other_txs = None
-    
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()),
         ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
