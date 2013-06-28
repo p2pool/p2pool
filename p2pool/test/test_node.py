@@ -1,5 +1,6 @@
 from __future__ import division
 
+import base64
 import random
 import tempfile
 
@@ -185,7 +186,8 @@ class Test(unittest.TestCase):
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         port = reactor.listenTCP(0, server.Site(web_root))
         
-        proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(port.getHost().port))
+        proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(port.getHost().port),
+            headers=dict(Authorization='Basic ' + base64.b64encode('user/0:password')))
         
         yield deferral.sleep(3)
         
@@ -227,7 +229,8 @@ class Test(unittest.TestCase):
         yield deferral.sleep(3)
         
         for i in xrange(SHARES):
-            proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port))
+            proxy = jsonrpc.HTTPProxy('http://127.0.0.1:' + str(random.choice(nodes).web_port.getHost().port),
+                headers=dict(Authorization='Basic ' + base64.b64encode('user/0:password')))
             blah = yield proxy.rpc_getwork()
             yield proxy.rpc_getwork(blah['data'])
             yield deferral.sleep(.05)

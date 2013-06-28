@@ -142,18 +142,20 @@ class WorkerBridge(worker_interface.WorkerBridge):
         user, contents2 = contents[0], contents[1:]
         
         desired_pseudoshare_target = None
-        desired_share_target = 2**256 - 1
+        desired_share_target = None
         for symbol, parameter in zip(contents2[::2], contents2[1::2]):
             if symbol == '+':
                 try:
                     desired_pseudoshare_target = bitcoin_data.difficulty_to_target(float(parameter))
                 except:
-                    pass
+                    if p2pool.DEBUG:
+                        log.err()
             elif symbol == '/':
                 try:
                     desired_share_target = bitcoin_data.difficulty_to_target(float(parameter))
                 except:
-                    pass
+                    if p2pool.DEBUG:
+                        log.err()
         
         if random.uniform(0, 100) < self.worker_fee:
             pubkey_hash = self.my_pubkey_hash
@@ -168,6 +170,13 @@ class WorkerBridge(worker_interface.WorkerBridge):
     def preprocess_request(self, user):
         user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
         return pubkey_hash, desired_share_target, desired_pseudoshare_target
+    
+    def _estimate_local_hash_rate(self):
+        if len(self.recent_shares_ts_work) == 50:
+            hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
+            if hash_rate:
+                return hash_rate
+        return None
     
     def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
         if (self.node.p2p_node is None or len(self.node.p2p_node.peers) == 0) and self.node.net.PERSIST:
@@ -212,6 +221,13 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 else:
                     share_type = previous_share_type
         
+        if desired_share_target is None:
+            desired_share_target = 2**256-1
+            local_hash_rate = self._estimate_local_hash_rate()
+            if local_hash_rate is not None:
+                desired_share_target = min(desired_share_target,
+                    bitcoin_data.average_attempts_to_target(local_hash_rate * self.node.net.SHARE_PERIOD / 0.05)) # limit to 5% of pool shares by modulating share difficulty
+        
         if True:
             share_info, gentx, other_transaction_hashes, get_share = share_type.generate_transaction(
                 tracker=self.node.tracker,
@@ -249,10 +265,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         if desired_pseudoshare_target is None:
             target = 2**256-1
-            if len(self.recent_shares_ts_work) == 50:
-                hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-                if hash_rate:
-                    target = min(target, int(2**256/hash_rate))
+            local_hash_rate = self._estimate_local_hash_rate()
+            if local_hash_rate is not None:
+                target = min(target,
+                    bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
         else:
             target = desired_pseudoshare_target
         target = max(target, share_info['bits'].target)
