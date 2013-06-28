@@ -83,6 +83,8 @@ class NewShare(object):
         ('max_bits', bitcoin_data.FloatingIntegerType()),
         ('bits', bitcoin_data.FloatingIntegerType()),
         ('timestamp', pack.IntType(32)),
+        ('absheight', pack.IntType(32)),
+        ('abswork', pack.IntType(128)),
     ])
     
     share_type = pack.ComposedType([
@@ -184,6 +186,8 @@ class NewShare(object):
             )) if previous_share is not None else desired_timestamp,
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
+            absheight=((previous_share.absheight if previous_share is not None else 0) + 1) % 2**32,
+            abswork=((previous_share.abswork if previous_share is not None else 0) + bitcoin_data.target_to_average_attempts(bits.target)) % 2**128,
         )
         
         gentx = dict(
@@ -222,7 +226,7 @@ class NewShare(object):
             share_info=share_info,
         ))), ref_merkle_link))
     
-    __slots__ = 'net peer_addr contents min_header share_info hash_link merkle_link hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen'.split(' ')
+    __slots__ = 'net peer_addr contents min_header share_info hash_link merkle_link hash share_data max_target target timestamp previous_hash new_script desired_version gentx_hash header pow_hash header_hash new_transaction_hashes time_seen absheight abswork'.split(' ')
     
     def __init__(self, net, peer_addr, contents):
         self.net = net
@@ -249,6 +253,8 @@ class NewShare(object):
         self.previous_hash = self.share_data['previous_share_hash']
         self.new_script = bitcoin_data.pubkey_hash_to_script2(self.share_data['pubkey_hash'])
         self.desired_version = self.share_data['desired_version']
+        self.absheight = self.share_info['absheight']
+        self.abswork = self.share_info['abswork']
         
         n = set()
         for share_count, tx_count in self.iter_transaction_hash_refs():
@@ -372,6 +378,8 @@ class Share(object):
     VERSION = 9
     VOTING_VERSION = 11
     SUCCESSOR = NewShare
+    
+    absheight = abswork = 0
     
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()),
