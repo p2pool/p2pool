@@ -136,7 +136,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
     
     def get_user_details(self, username):
-        contents = re.split('[+/]', username)
+        contents = re.split('([+/])', username)
         assert len(contents) % 2 == 1
         
         user, contents2 = contents[0], contents[1:]
