@@ -151,7 +151,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     pass
             elif symbol == '/':
                 try:
-                    desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
+                    desired_share_target = bitcoin_data.difficulty_to_target(float(parameter))
                 except:
                     pass
         
