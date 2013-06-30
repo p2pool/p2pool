@@ -97,7 +97,14 @@ class WorkerInterface(object):
         if p2pool.DEBUG:
             print 'POLL %i END identifier=%i' % (id, self.worker_bridge.new_work_event.times)
         
-        defer.returnValue(res.getwork(identifier=str(self.worker_bridge.new_work_event.times), submitold=True))
+        extra_params = {}
+        if request.getHeader('User-Agent') == 'Jephis PIC Miner':
+            # ASICMINER BE Blades apparently have a buffer overflow bug and
+            # can't handle much extra in the getwork response
+            extra_params = {}
+        else:
+            extra_params = dict(identifier=str(self.worker_bridge.new_work_event.times), submitold=True)
+        defer.returnValue(res.getwork(**extra_params))
 
 class CachingWorkerBridge(object):
     def __init__(self, inner):
