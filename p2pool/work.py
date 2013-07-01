@@ -215,7 +215,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 
                 counts = p2pool_data.get_desired_version_counts(self.node.tracker,
                     self.node.tracker.get_nth_parent_hash(previous_share.hash, self.node.net.CHAIN_LENGTH*9//10), self.node.net.CHAIN_LENGTH//10)
-                # Share -> NewShare only valid if 85% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
+                upgraded = counts.get(successor_type.VERSION, 0)/sum(counts.itervalues())
+                if upgraded > .65:
+                    print 'Switchover imminent. Upgraded: %.3f%% Threshold: %.3f%%' % (upgraded*100, 95)
+                print 
+                # Share -> NewShare only valid if 95% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
                 if counts.get(successor_type.VERSION, 0) > sum(counts.itervalues())*95//100:
                     share_type = successor_type
                 else:
