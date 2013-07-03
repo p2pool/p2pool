@@ -25,6 +25,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://blockexplorer.com/address/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=0.001e8,
     ),
     bitcoin_testnet=math.Object(
         P2P_PREFIX='0b110907'.decode('hex'),
@@ -44,6 +45,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://blockexplorer.com/testnet/address/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=1e8,
     ),
     
     namecoin=math.Object(
@@ -64,6 +66,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://explorer.dot-bit.org/a/',
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=0.2e8,
     ),
     namecoin_testnet=math.Object(
         P2P_PREFIX='fabfb5fe'.decode('hex'),
@@ -83,6 +86,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://testnet.explorer.dot-bit.org/a/',
         SANE_TARGET_RANGE=(2**256//2**32 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=1e8,
     ),
     
     litecoin=math.Object(
@@ -103,6 +107,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://explorer.litecoin.net/address/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
     ),
     litecoin_testnet=math.Object(
         P2P_PREFIX='fcc1b7dc'.decode('hex'),
@@ -122,6 +127,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-litecoin-testnet-explorer/address/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
     ),
 
     terracoin=math.Object(
@@ -142,6 +148,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:3750/address/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=1e8,
     ),
     terracoin_testnet=math.Object(
         P2P_PREFIX='41babe56'.decode('hex'),
@@ -161,6 +168,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:3750/testnet/address/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=1e8,
     ),
 
 )
