@@ -198,7 +198,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
-    web_root.putChild('peer_addresses', WebInterface(lambda: ['%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port) for peer in node.p2p_node.peers.itervalues()]))
+    web_root.putChild('peer_addresses', WebInterface(lambda: ' '.join('%s%s' % (peer.transport.getPeer().host, ':'+str(peer.transport.getPeer().port) if peer.transport.getPeer().port != node.net.P2P_PORT else '') for peer in node.p2p_node.peers.itervalues())))
     web_root.putChild('peer_txpool_sizes', WebInterface(lambda: dict(('%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port), peer.remembered_txs_size) for peer in node.p2p_node.peers.itervalues())))
     web_root.putChild('pings', WebInterface(defer.inlineCallbacks(lambda: defer.returnValue(
         dict([(a, (yield b)) for a, b in
