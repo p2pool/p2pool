@@ -262,6 +262,16 @@ def pubkey_to_script2(pubkey):
 def pubkey_hash_to_script2(pubkey_hash):
     return '\x76\xa9' + ('\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x88\xac'
 
+def script2_to_pubkey(script2):
+    try:
+        pubkey = script2[1:-1]
+        script2_test = pubkey_to_script2(pubkey)
+    except:
+        pass
+    else:
+        if script2_test == script2:
+            return pubkey
+
 def script2_to_address(script2, net):
     try:
         pubkey = script2[1:-1]
