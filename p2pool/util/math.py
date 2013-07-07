@@ -230,3 +230,8 @@ class RateMonitor(object):
             self.first_timestamp = t
         else:
             self.datums.append((t, datum))
+
+def merge_dicts(*dicts):
+    res = {}
+    for d in dicts: res.update(d)
+    return res
