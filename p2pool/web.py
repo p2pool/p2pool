@@ -292,6 +292,8 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
                 stale_info=share.share_data['stale_info'],
                 nonce=share.share_data['nonce'],
                 desired_version=share.share_data['desired_version'],
+                absheight=share.absheight,
+                abswork=share.abswork,
             ),
             block=dict(
                 hash='%064x' % share.header_hash,

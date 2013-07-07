@@ -25,7 +25,11 @@ class P2PNode(p2p.Node):
             print 'Processing %i shares from %s...' % (len(shares), '%s:%i' % peer.addr if peer is not None else None)
         
         new_count = 0
-        for share in shares:
+        all_new_txs = {}
+        for share, new_txs in shares:
+            if new_txs is not None:
+                all_new_txs.update((bitcoin_data.hash256(bitcoin_data.tx_type.pack(new_tx)), new_tx) for new_tx in new_txs)
+            
             if share.hash in self.node.tracker.items:
                 #print 'Got duplicate share, ignoring. Hash: %s' % (p2pool_data.format_hash(share.hash),)
                 continue
@@ -35,6 +39,10 @@ class P2PNode(p2p.Node):
             #print 'Received share %s from %r' % (p2pool_data.format_hash(share.hash), share.peer_addr)
             
             self.node.tracker.add(share)
+        
+        new_known_txs = dict(self.node.known_txs_var.value)
+        new_known_txs.update(all_new_txs)
+        self.node.known_txs_var.set(new_known_txs)
         
         if new_count:
             self.node.set_best_share()
@@ -56,7 +64,7 @@ class P2PNode(p2p.Node):
         except:
             log.err(None, 'in handle_share_hashes:')
         else:
-            self.handle_shares(shares, peer)
+            self.handle_shares([(share, []) for share in shares], peer)
     
     def handle_get_shares(self, hashes, parents, stops, peer):
         parents = min(parents, 1000//len(hashes))
@@ -124,7 +132,7 @@ class P2PNode(p2p.Node):
                 if not shares:
                     yield deferral.sleep(1) # sleep so we don't keep rerequesting the same share nobody has
                     continue
-                self.handle_shares(shares, peer)
+                self.handle_shares([(share, []) for share in shares], peer)
         
         
         @self.node.best_block_header.changed.watch
