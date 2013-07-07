@@ -220,10 +220,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
         
-        if self.node.best_share_var.value is None:
+        previous_share = self.node.tracker.items[self.node.best_share_var.value] if self.node.best_share_var.value is not None else None
+        if previous_share is None:
             share_type = p2pool_data.Share
         else:
-            previous_share = self.node.tracker.items[self.node.best_share_var.value]
             previous_share_type = type(previous_share)
             
             if previous_share_type.SUCCESSOR is None or self.node.tracker.get_height(previous_share.hash) < self.node.net.CHAIN_LENGTH:
@@ -253,7 +253,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             local_addr_rates = self.get_local_addr_rates()
             lookbehind = 3600//self.node.net.SHARE_PERIOD
             block_subsidy = self.node.bitcoind_work.value['subsidy']
-            if self.node.tracker.get_height(previous_share.hash) > lookbehind:
+            if previous_share is not None and self.node.tracker.get_height(previous_share.hash) > lookbehind:
                 expected_payout_per_block = local_addr_rates.get(pubkey_hash, 0)/p2pool_data.get_pool_attempts_per_second(self.node.tracker, self.node.best_share_var.value, lookbehind) \
                     * block_subsidy*(1-self.donation_percentage/100) # XXX doesn't use global stale rate to compute pool hash
                 if expected_payout_per_block < self.node.net.PARENT.DUST_THRESHOLD:
