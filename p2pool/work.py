@@ -18,6 +18,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
     COINBASE_NONCE_LENGTH = 4
     
     def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee):
+        if node.net.NAME == 'bitcoin': self.COINBASE_NONCE_LENGTH = 8
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
@@ -324,7 +325,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             version=min(self.current_work.value['version'], 2),
             previous_block=self.current_work.value['previous_block'],
             merkle_link=merkle_link,
-            coinb1=packed_gentx[:-4-4],
+            coinb1=packed_gentx[:-self.COINBASE_NONCE_LENGTH-4],
             coinb2=packed_gentx[-4:],
             timestamp=self.current_work.value['time'],
             bits=self.current_work.value['bits'],
@@ -334,8 +335,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         received_header_hashes = set()
         
         def got_response(header, user, coinbase_nonce):
-            assert len(coinbase_nonce) == self.COINBASE_NONCE_LENGTH == 4
-            new_packed_gentx = packed_gentx[:-4-4] + coinbase_nonce + packed_gentx[-4:] if coinbase_nonce != '\0'*self.COINBASE_NONCE_LENGTH else packed_gentx
+            assert len(coinbase_nonce) == self.COINBASE_NONCE_LENGTH
+            new_packed_gentx = packed_gentx[:-self.COINBASE_NONCE_LENGTH-4] + coinbase_nonce + packed_gentx[-4:] if coinbase_nonce != '\0'*self.COINBASE_NONCE_LENGTH else packed_gentx
             new_gentx = bitcoin_data.tx_type.unpack(new_packed_gentx) if coinbase_nonce != '\0'*self.COINBASE_NONCE_LENGTH else gentx
             
             header_hash = bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header))
@@ -385,7 +386,10 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     log.err(None, 'Error while processing merged mining POW:')
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
-                share = get_share(header, pack.IntType(32).unpack(coinbase_nonce))
+                last_txout_nonce = pack.IntType(8*self.COINBASE_NONCE_LENGTH).unpack(coinbase_nonce)
+                if self.node.net.NAME == 'bitcoin':
+                    last_txout_nonce = (last_txout_nonce%2**32*2**32)|(last_txout_nonce>>32) # XXX
+                share = get_share(header, last_txout_nonce)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
                     user,
