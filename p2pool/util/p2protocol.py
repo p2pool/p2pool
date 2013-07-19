@@ -41,7 +41,9 @@ class Protocol(protocol.Protocol):
             payload = yield length
             
             if hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4] != checksum:
-                print 'invalid hash for', self.transport.getPeer().host, repr(command), length, checksum.encode('hex'), hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4].encode('hex'), payload.encode('hex')
+                print 'invalid hash for', self.transport.getPeer().host, repr(command), length, checksum.encode('hex')
+                if p2pool.DEBUG:
+                    print hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4].encode('hex'), payload.encode('hex')
                 self.badPeerHappened()
                 continue
             
