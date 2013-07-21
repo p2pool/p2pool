@@ -285,7 +285,7 @@ class Protocol(p2protocol.Protocol):
             if share.VERSION >= 13:
                 # send full transaction for every new_transaction_hash that peer does not know
                 for tx_hash in share.share_info['new_transaction_hashes']:
-                    assert tx_hash in known_txs, 'tried to broadcast transaction without knowing all its new transactions'
+                    assert tx_hash in known_txs, 'tried to broadcast share without knowing all its new transactions'
                     if tx_hash not in self.remote_tx_hashes:
                         tx_hashes.add(tx_hash)
                 continue
