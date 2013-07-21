@@ -10,7 +10,7 @@ from p2pool.util import math
 nets = dict(
     bitcoin=math.Object(
         PARENT=networks.nets['bitcoin'],
-        SHARE_PERIOD=10, # seconds
+        SHARE_PERIOD=30, # seconds
         NEW_SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
