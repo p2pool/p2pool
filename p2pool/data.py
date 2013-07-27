@@ -347,8 +347,8 @@ class NewShare(object):
         return [known_txs[tx_hash] for tx_hash in other_tx_hashes]
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
-        if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer_addr is not None:
-            return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
+#        if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer_addr is not None:
+#            return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
         
         if self.pow_hash <= self.header['bits'].target:
             return -1, 'block solution'
