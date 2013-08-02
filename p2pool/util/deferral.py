@@ -8,8 +8,8 @@ from twisted.internet import defer, reactor
 from twisted.python import failure, log
 
 def sleep(t):
-    d = defer.Deferred()
-    reactor.callLater(t, d.callback, None)
+    d = defer.Deferred(canceller=lambda d_: dc.cancel())
+    dc = reactor.callLater(t, d.callback, None)
     return d
 
 def run_repeatedly(f, *args, **kwargs):
