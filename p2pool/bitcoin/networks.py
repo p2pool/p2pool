@@ -25,6 +25,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:5750/address/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
     ),
     digitalcoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -44,6 +45,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://dgc.p2pool.nl/address/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
     ),
     worldcoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -63,6 +65,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://wdc.cryptocoinexplorer.com/address/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
     ),
 
  doubloons=math.Object(
@@ -83,6 +86,7 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://54.244.192.52/doubloon/address/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
     ),
 
     bitcoin=math.Object(
