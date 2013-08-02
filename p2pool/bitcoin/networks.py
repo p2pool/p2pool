@@ -82,8 +82,8 @@ nets = dict(
         BLOCK_PERIOD=30, # s targetspacing
         SYMBOL='DBL',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'doubloons') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Doubloons/') if platform.system() == 'Darwin' else os.path.expanduser('~/.doubloons'), 'doubloons.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://54.244.192.52/doubloon/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://54.244.192.52/doubloon/address/',
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/address/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
