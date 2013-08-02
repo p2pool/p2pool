@@ -124,6 +124,7 @@ class mm_provider(object):
         }
 
 mynet = math.Object(
+    NAME='mynet',
     PARENT=networks.nets['litecoin_testnet'],
     SHARE_PERIOD=3, # seconds
     NEW_SHARE_PERIOD=5, # seconds
