@@ -8,6 +8,27 @@ from p2pool.util import math
 # changes can be done by changing one, then the other
 
 nets = dict(
+    doubloons=math.Object(
+        PARENT=networks.nets['doubloons'],
+        SHARE_PERIOD=15, # seconds target spacing
+	NEW_SHARE_PERIOD=30, # seconds
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares coinbase maturity
+        SPREAD=30, # blocks
+	NEW_SPREAD=3, # blocks
+        IDENTIFIER='be43F6b9c6924210'.decode('hex'),
+        PREFIX='b587199ba6d7729a'.decode('hex'),
+        P2P_PORT=16345,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8345,
+        BOOTSTRAP_ADDRS='rav3n.dtdns.net'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+
     bitcoin=math.Object(
         PARENT=networks.nets['bitcoin'],
         SHARE_PERIOD=30, # seconds
