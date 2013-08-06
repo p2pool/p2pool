@@ -56,13 +56,11 @@
                     b.append('p').text('Last stale: ' + share.share_data.stale_info);
                     b.append('p').text('Nonce: ' + share.share_data.nonce);
                     b.append('p').text('Desired version: ' + share.share_data.desired_version);
-                    b.append('p').text('Absolute height: ' + share.share_data.absheight);
-                    b.append('p').text('Absolute work: ' + share.share_data.abswork);
                     b.append('h2').text('Block');
                     var block = b.append('p')
                         block.append('span').text('Hash: ')
                         block.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.hash).text(share.block.hash);
-                    b.append('p').text('Transaction count: ' + share.block.txn_count);
+                    b.append('p').text('Transaction count: ' + share.block.txn_count_range);
                     b.append('h2').text('Header');
                     b.append('p').text('Version: ' + share.block.header.version);
                     var prevblock = b.append('p')
