@@ -4,6 +4,7 @@ import base64
 import random
 import sys
 import time
+import re
 
 from twisted.internet import defer, reactor
 from twisted.python import log
@@ -140,21 +141,25 @@ class WorkerBridge(worker_interface.WorkerBridge):
         return (my_shares_not_in_chain - my_doa_shares_not_in_chain, my_doa_shares_not_in_chain), my_shares, (orphans_recorded_in_chain, doas_recorded_in_chain)
     
     def get_user_details(self, user):
+        contents = re.split('([+/])', user)
+        assert len(contents) % 2 == 1
+
+        user, contents2 = contents[0], contents[1:]
+
         desired_pseudoshare_target = None
-        if '+' in user:
-            user, desired_pseudoshare_difficulty_str = user.rsplit('+', 1)
-            try:
-                desired_pseudoshare_target = bitcoin_data.difficulty_to_target(float(desired_pseudoshare_difficulty_str))
-            except:
-                pass
-        
         desired_share_target = 2**256 - 1
-        if '/' in user:
-            user, min_diff_str = user.rsplit('/', 1)
-            try:
-                desired_share_target = bitcoin_data.difficulty_to_target(float(min_diff_str))
-            except:
-                pass
+
+        for symbol, parameter in zip(contents2[::2], contents2[1::2]):
+            if symbol == '+':
+                try:
+                    desired_pseudoshare_target = bitcoin_data.difficulty_to_target(float(parameter))
+                except:
+                    pass
+            elif symbol == '/':
+                try:
+                    desired_share_target = bitcoin_data.difficulty_to_target(float(parameter))
+                except:
+                    pass
 
         if random.uniform(0, 100) < self.worker_fee:
             pubkey = self.my_pubkey
