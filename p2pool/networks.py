@@ -8,6 +8,26 @@ from p2pool.util import math
 # changes can be done by changing one, then the other
 
 nets = dict(
+    stablecoin=math.Object(
+        PARENT=networks.nets['stablecoin'],
+        SHARE_PERIOD=45,
+	NEW_SHARE_PERIOD=20, # seconds
+        CHAIN_LENGTH=24*60*60//10,
+        REAL_CHAIN_LENGTH=24*60*60//10,
+        TARGET_LOOKBEHIND=200,
+        SPREAD=90,
+        NEW_SPREAD=5, # blocks
+        IDENTIFIER='e021a7b8c60242af'.decode('hex'),
+        PREFIX='b6c0601991aa19a2'.decode('hex'),
+        P2P_PORT=17779,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=17777,
+        BOOTSTRAP_ADDRS='',
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
     feathercoin=math.Object(
         PARENT=networks.nets['feathercoin'],
         SHARE_PERIOD=30, # seconds
