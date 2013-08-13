@@ -14,7 +14,7 @@ import urlparse
 if '--iocp' in sys.argv:
     from twisted.internet import iocpreactor
     iocpreactor.install()
-from twisted.internet import defer, reactor, protocol, task, tcp
+from twisted.internet import defer, reactor, protocol, tcp
 from twisted.web import server
 from twisted.python import log
 from nattraverso import portmapper, ipdiscover
@@ -58,7 +58,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             errors = (yield deferral.retry('Error while calling getmininginfo:')(bitcoind.rpc_getmininginfo)())['errors']
             bitcoind_warning_var.set(errors if errors != '' else None)
         yield poll_warnings()
-        task.LoopingCall(poll_warnings).start(20*60)
+        deferral.RobustLoopingCall(poll_warnings).start(20*60)
         
         print '    ...success!'
         print '    Current block hash: %x' % (temp_work['previous_block'],)
@@ -136,7 +136,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 ss.add_share(share)
                 if share.hash in node.tracker.verified.items:
                     ss.add_verified_hash(share.hash)
-        task.LoopingCall(save_shares).start(60)
+        deferral.RobustLoopingCall(save_shares).start(60)
         
         print '    ...success!'
         print
@@ -186,7 +186,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         def save_addrs():
             with open(os.path.join(datadir_path, 'addrs'), 'wb') as f:
                 f.write(json.dumps(node.p2p_node.addr_store.items()))
-        task.LoopingCall(save_addrs).start(60)
+        deferral.RobustLoopingCall(save_addrs).start(60)
         
         print '    ...success!'
         print
@@ -247,7 +247,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 sys.stderr.write, 'Watchdog timer went off at:\n' + ''.join(traceback.format_stack())
             ))
             signal.siginterrupt(signal.SIGALRM, False)
-            task.LoopingCall(signal.alarm, 30).start(1)
+            deferral.RobustLoopingCall(signal.alarm, 30).start(1)
         
         if args.irc_announce:
             from twisted.words.protocols import irc
@@ -543,7 +543,7 @@ def run():
             logfile.reopen()
             print '...and reopened %r after catching SIGUSR1.' % (args.logfile,)
         signal.signal(signal.SIGUSR1, sigusr1)
-    task.LoopingCall(logfile.reopen).start(5)
+    deferral.RobustLoopingCall(logfile.reopen).start(5)
     
     class ErrorReporter(object):
         def __init__(self):

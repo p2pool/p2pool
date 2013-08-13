@@ -2,7 +2,7 @@ import random
 import sys
 import time
 
-from twisted.internet import defer, reactor, task
+from twisted.internet import defer, reactor
 from twisted.python import log
 
 from p2pool import data as p2pool_data, p2p
@@ -283,11 +283,11 @@ class Node(object):
                     if tx_hash in self.known_txs_var.value:
                         new_known_txs[tx_hash] = self.known_txs_var.value[tx_hash]
             self.known_txs_var.set(new_known_txs)
-        t = task.LoopingCall(forget_old_txs)
+        t = deferral.RobustLoopingCall(forget_old_txs)
         t.start(10)
         stop_signal.watch(t.stop)
         
-        t = task.LoopingCall(self.clean_tracker)
+        t = deferral.RobustLoopingCall(self.clean_tracker)
         t.start(5)
         stop_signal.watch(t.stop)
     
