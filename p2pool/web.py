@@ -7,14 +7,14 @@ import sys
 import time
 import traceback
 
-from twisted.internet import defer, task
+from twisted.internet import defer
 from twisted.python import log
 from twisted.web import resource, static
 
 import p2pool
 from bitcoin import data as bitcoin_data
 from . import data as p2pool_data
-from util import deferred_resource, graph, math, memory, pack, variable
+from util import deferral, deferred_resource, graph, math, memory, pack, variable
 
 def _atomic_read(filename):
     try:
@@ -264,7 +264,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         
         with open(os.path.join(datadir_path, 'stats'), 'wb') as f:
             f.write(json.dumps(stat_log))
-    x = task.LoopingCall(update_stat_log)
+    x = deferral.RobustLoopingCall(update_stat_log)
     x.start(5*60)
     stop_event.watch(x.stop)
     new_root.putChild('log', WebInterface(lambda: stat_log))
@@ -387,7 +387,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         'getwork_latency': graph.DataStreamDescription(dataview_descriptions),
         'memory_usage': graph.DataStreamDescription(dataview_descriptions),
     }, hd_obj)
-    x = task.LoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj())))
+    x = deferral.RobustLoopingCall(lambda: _atomic_write(hd_path, json.dumps(hd.to_obj())))
     x.start(100)
     stop_event.watch(x.stop)
     @wb.pseudoshare_received.watch
@@ -437,7 +437,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         except:
             if p2pool.DEBUG:
                 traceback.print_exc()
-    x = task.LoopingCall(add_point)
+    x = deferral.RobustLoopingCall(add_point)
     x.start(5)
     stop_event.watch(x.stop)
     @node.bitcoind_work.changed.watch
