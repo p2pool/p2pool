@@ -44,6 +44,27 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: v >= 60004,
     ),
+    bottlecaps=math.Object(
+        PARENT=networks.nets['bottlecaps'],
+        SHARE_PERIOD=30, #seconds between sahres
+        NEW_SHARE_PERIOD=30, #seconds
+        CHAIN_LENGTH=12*60*60//30, # 12 hours of shares
+        REAL_CHAIN_LENGTH=12*60*60//30, # shares
+        TARGET_LOOKBEHIND=10, # shares to compute share diff
+        SPREAD=5, # pay up to 5 blocks per share
+        NEW_SPREAD=5, # blocks
+        IDENTIFIER='a55556b9c6924210'.decode('hex'),
+        PREFIX='a6666699a6d7729a'.decode('hex'),
+        P2P_PORT=7645,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8645,
+        BOOTSTRAP_ADDRS='rav3n.dtdns.net'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name

@@ -65,6 +65,28 @@ nets = dict(
         ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-novacoin-testnet-explorer/address/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
     ),
+     bottlecaps=math.Object(
+        P2P_PREFIX='e4e8e9e5'.decode('hex'),
+        P2P_PORT=7685,
+        ADDRESS_VERSION=34,
+        RPC_PORT=8385,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'BottleCapsaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        SUBSIDY_FUNC=lambda: 10*100000000, ## CAP has 10 per block forever
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # s targetspacing
+        SYMBOL='CAP',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'bottlecaps') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bottlecaps/') if platform.system() == 'Darwin' else os.path.expanduser('~/.BottleCaps'), 'BottleCaps.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://bottlecaps.kicks-ass.net/block_crawler.php?block_hash=',
+        ADDRESS_EXPLORER_URL_PREFIX='http://bottlecaps.kicks-ass.net/block_crawler.php?address=',
+        SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
+    ),
+
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
