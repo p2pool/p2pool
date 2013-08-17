@@ -256,7 +256,7 @@ class Protocol(p2protocol.Protocol):
     def handle_shares(self, shares):
         result = []
         for wrappedshare in shares:
-            if wrappedshare['type'] < 9: continue
+            if wrappedshare['type'] < p2pool_data.Share.VERSION: continue
             share = p2pool_data.load_share(wrappedshare, self.node.net, self.addr)
             if wrappedshare['type'] >= 13:
                 txs = []
@@ -333,7 +333,7 @@ class Protocol(p2protocol.Protocol):
     class ShareReplyError(Exception): pass
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= 9]
+            res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= p2pool_data.Share.VERSION]
         else:
             res = failure.Failure(self.ShareReplyError(result))
         self.get_shares.got_response(id, res)
