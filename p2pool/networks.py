@@ -62,7 +62,7 @@ nets = dict(
         WORKER_PORT=8645,
         BOOTSTRAP_ADDRS='rav3n.dtdns.net'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v: True,
+        VERSION_CHECK=lambda v: v >= 70000,
     ),
 
 )
