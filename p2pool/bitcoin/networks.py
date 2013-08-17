@@ -75,7 +75,7 @@ nets = dict(
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         BLOCKHASH_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
-        SUBSIDY_FUNC=lambda: 10*100000000, ## CAP has 10 per block forever
+        SUBSIDY_FUNC= lambda height:  10000000000, ## CAP has 10 per block forever
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s targetspacing
         SYMBOL='CAP',
