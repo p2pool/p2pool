@@ -312,8 +312,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
                     hash='%064x' % share.gentx_hash,
                     coinbase=share.share_data['coinbase'].ljust(2, '\x00').encode('hex'),
                     value=share.share_data['subsidy']*1e-8,
+                    last_txout_nonce='%016x' % share.contents['last_txout_nonce'],
                 ),
-                txn_count=len(list(share.iter_transaction_hash_refs())),
+                other_transaction_hashes=['%064x' % x for x in share.get_other_tx_hashes(node.tracker)],
             ),
         )
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
@@ -332,6 +333,7 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
         symbol=node.net.PARENT.SYMBOL,
         block_explorer_url_prefix=node.net.PARENT.BLOCK_EXPLORER_URL_PREFIX,
         address_explorer_url_prefix=node.net.PARENT.ADDRESS_EXPLORER_URL_PREFIX,
+        tx_explorer_url_prefix=node.net.PARENT.TX_EXPLORER_URL_PREFIX,
     )))
     new_root.putChild('version', WebInterface(lambda: p2pool.__version__))
     
