@@ -330,11 +330,12 @@ class Protocol(p2protocol.Protocol):
         ('result', pack.EnumType(pack.VarIntType(), {0: 'good', 1: 'too long', 2: 'unk2', 3: 'unk3', 4: 'unk4', 5: 'unk5', 6: 'unk6'})),
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
+    class ShareReplyError(Exception): pass
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
             res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= 9]
         else:
-            res = failure.Failure("sharereply result: " + result)
+            res = failure.Failure(self.ShareReplyError(result))
         self.get_shares.got_response(id, res)
     
     
