@@ -25,6 +25,8 @@ def fragment(f, **kwargs):
         fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
+    VERSION = 1300
+    
     max_remembered_txs_size = 2500000
     
     def __init__(self, node, incoming):
@@ -43,7 +45,7 @@ class Protocol(p2protocol.Protocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=1300,
+            version=self.VERSION,
             services=0,
             addr_to=dict(
                 services=0,
