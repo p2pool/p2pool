@@ -13,7 +13,7 @@ from twisted.web import resource, static
 
 import p2pool
 from bitcoin import data as bitcoin_data
-from . import data as p2pool_data
+from . import data as p2pool_data, p2p
 from util import deferral, deferred_resource, graph, math, memory, pack, variable
 
 def _atomic_read(filename):
@@ -169,6 +169,9 @@ def get_web_root(wb, datadir_path, bitcoind_warning_var, stop_event=variable.Eve
             block_value=node.bitcoind_work.value['subsidy']*1e-8,
             warnings=p2pool_data.get_warnings(node.tracker, node.best_share_var.value, node.net, bitcoind_warning_var.value, node.bitcoind_work.value),
             donation_proportion=wb.donation_percentage/100,
+            version=p2pool.__version__,
+            protocol_version=p2p.Protocol.VERSION,
+            fee=wb.worker_fee,
         )
     
     class WebInterface(deferred_resource.DeferredResource):

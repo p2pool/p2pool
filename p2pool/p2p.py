@@ -25,6 +25,8 @@ def fragment(f, **kwargs):
         fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
+    VERSION = 1300
+    
     max_remembered_txs_size = 2500000
     
     def __init__(self, node, incoming):
@@ -43,7 +45,7 @@ class Protocol(p2protocol.Protocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=1300,
+            version=self.VERSION,
             services=0,
             addr_to=dict(
                 services=0,
@@ -116,7 +118,7 @@ class Protocol(p2protocol.Protocol):
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
-        if version < (1300 if self.node.net.NAME == 'bitcoin' else 8):
+        if version < 1300:
             raise PeerMisbehavingError('peer too old')
         
         self.other_version = version
@@ -328,11 +330,12 @@ class Protocol(p2protocol.Protocol):
         ('result', pack.EnumType(pack.VarIntType(), {0: 'good', 1: 'too long', 2: 'unk2', 3: 'unk3', 4: 'unk4', 5: 'unk5', 6: 'unk6'})),
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
+    class ShareReplyError(Exception): pass
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
             res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= 9]
         else:
-            res = failure.Failure("sharereply result: " + result)
+            res = failure.Failure(self.ShareReplyError(result))
         self.get_shares.got_response(id, res)
     
     
