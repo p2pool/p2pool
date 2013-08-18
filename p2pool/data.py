@@ -348,7 +348,7 @@ class NewShare(object):
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
         if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer_addr is not None:
-            return True, 'Block-stale detected! %x < %x' % (self.header['previous_block'], previous_block)
+            return True, 'Block-stale detected! height(%x) < height(%x) or %08x != %08x' % (self.header['previous_block'], previous_block, self.header['bits'].bits, bits.bits)
         
         if self.pow_hash <= self.header['bits'].target:
             return -1, 'block solution'
