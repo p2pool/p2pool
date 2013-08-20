@@ -98,20 +98,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
         print
         
-        ss = p2pool_data.ShareStore(os.path.join(datadir_path, 'shares.'), net)
+        print "Loading shares..."
         shares = {}
         known_verified = set()
-        print "Loading shares..."
-        for i, (mode, contents) in enumerate(ss.get_shares()):
-            if mode == 'share':
-                contents.time_seen = 0
-                shares[contents.hash] = contents
-                if len(shares) % 1000 == 0 and shares:
-                    print "    %i" % (len(shares),)
-            elif mode == 'verified_hash':
-                known_verified.add(contents)
-            else:
-                raise AssertionError()
+        def share_cb(share):
+            share.time_seen = 0 # XXX
+            shares[share.hash] = share
+            if len(shares) % 1000 == 0 and shares:
+                print "    %i" % (len(shares),)
+        ss = p2pool_data.ShareStore(os.path.join(datadir_path, 'shares.'), net, share_cb, known_verified.add)
         print "    ...done loading %i shares (%i verified)!" % (len(shares), len(known_verified))
         print
         
@@ -127,7 +122,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         for share_hash in known_verified:
             if share_hash not in node.tracker.verified.items:
                 ss.forget_verified_share(share_hash)
-        del shares, known_verified
         node.tracker.removed.watch(lambda share: ss.forget_share(share.hash))
         node.tracker.verified.removed.watch(lambda share: ss.forget_verified_share(share.hash))
         

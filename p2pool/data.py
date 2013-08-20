@@ -940,17 +940,11 @@ def format_hash(x):
     return '%08x' % (x % 2**32)
 
 class ShareStore(object):
-    def __init__(self, prefix, net):
-        self.filename = prefix
+    def __init__(self, prefix, net, share_cb, verified_hash_cb):
         self.dirname = os.path.dirname(os.path.abspath(prefix))
         self.filename = os.path.basename(os.path.abspath(prefix))
         self.net = net
-        self.known = None # will be filename -> set of share hashes, set of verified hashes
-        self.known_desired = None
-    
-    def get_shares(self):
-        if self.known is not None:
-            raise AssertionError()
+        
         known = {}
         filenames, next = self.get_filenames_and_next()
         for filename in filenames:
@@ -966,20 +960,21 @@ class ShareStore(object):
                             pass
                         elif type_id == 2:
                             verified_hash = int(data_hex, 16)
-                            yield 'verified_hash', verified_hash
+                            verified_hash_cb(verified_hash)
                             verified_hashes.add(verified_hash)
                         elif type_id == 5:
                             raw_share = share_type.unpack(data_hex.decode('hex'))
                             if raw_share['type'] in [0, 1, 2, 3, 4, 5, 6, 7, 8]:
                                 continue
                             share = load_share(raw_share, self.net, None)
-                            yield 'share', share
+                            share_cb(share)
                             share_hashes.add(share.hash)
                         else:
                             raise NotImplementedError("share type %i" % (type_id,))
                     except Exception:
                         log.err(None, "HARMLESS error while reading saved shares, continuing where left off:")
-        self.known = known
+        
+        self.known = known # filename -> (set of share hashes, set of verified hashes)
         self.known_desired = dict((k, (set(a), set(b))) for k, (a, b) in known.iteritems())
     
     def _add_line(self, line):
