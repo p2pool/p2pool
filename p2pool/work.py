@@ -440,9 +440,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                          found_block=(pow_hash < header['bits'].target),
                          found_share=(pow_hash < share_info['bits'].target),
                          miner_username=user)
-                except:
-                    print 'COULD NOT EXECUTE SHARE LOGGING FUNCTION...'
-                    raise
+                except Exception as e:
+                    print 'WARNING: COULD NOT EXECUTE SHARE LOGGING FUNCTION: %s' % e
             
             return on_time
         
