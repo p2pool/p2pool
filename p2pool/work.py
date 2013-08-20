@@ -433,7 +433,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             if self.share_logging_function:
                 try:
                     parts = self.share_logging_function.split('.')
-                    mod = __import__('.'.join(parts[:-1]))
+                    mod = __import__('.'.join(parts[:-1]), fromlist=True)
                     func = getattr(mod, parts[-1])
                     func(submitted_hash='%064x' % header_hash,
                          submitted_diff=((0x00ffff * 2**(8*(0x1d - 3))) / pow_hash),
@@ -442,6 +442,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                          miner_username=user)
                 except:
                     print 'COULD NOT EXECUTE SHARE LOGGING FUNCTION...'
+                    raise
             
             return on_time
         
