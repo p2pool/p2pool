@@ -293,6 +293,26 @@ nets = dict(
         DUMB_SCRYPT_DIFF=1,
         DUST_THRESHOLD=1e8,
     ),
+    ppcoin=math.Object(
+        P2P_PREFIX='e6e8e9e5'.decode('hex'), #chainparams.cpp pchMessageStart
+        P2P_PORT=9901,
+        ADDRESS_VERSION=55, #PUBKEY_ADDRESS
+        RPC_PORT=9902,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'ppcoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 310*10000000000, #do zrobienia!!!
+        POW_FUNC=data.hash256,
+        BLOCK_PERIOD=600, # s
+        SYMBOL='PPC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'PPCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/PPCoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.ppcoin'), 'ppcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://ppc.cryptocoinexplorer.com/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://ppc.cryptocoinexplorer.com/address/',
+        SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
+        DUMB_SCRYPT_DIFF=1,
+        DUST_THRESHOLD=1e8,
+    ),
 
 )
 for net_name, net in nets.iteritems():
