@@ -212,7 +212,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee)
+        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args.share_logging_function)
         web_root = web.get_web_root(wb, datadir_path, bitcoind_warning_var)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
         worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
@@ -398,6 +398,9 @@ def run():
     parser.add_argument('--no-bugreport',
         help='disable submitting caught exceptions to the author',
         action='store_true', default=False, dest='no_bugreport')
+    parser.add_argument('--share-logging-function',
+        help='call this function to log shares',
+        type=str, action='store', default=None, dest='share_logging_function')
     
     p2pool_group = parser.add_argument_group('p2pool interface')
     p2pool_group.add_argument('--p2pool-port', metavar='PORT',

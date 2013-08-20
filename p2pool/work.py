@@ -17,7 +17,7 @@ import p2pool, p2pool.data as p2pool_data
 class WorkerBridge(worker_interface.WorkerBridge):
     COINBASE_NONCE_LENGTH = 4
     
-    def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee):
+    def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee, share_logging_function):
         if node.net.NAME == 'bitcoin': self.COINBASE_NONCE_LENGTH = 8
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
@@ -26,6 +26,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.my_pubkey_hash = my_pubkey_hash
         self.donation_percentage = donation_percentage
         self.worker_fee = worker_fee
+        self.share_logging_function = share_logging_function
         
         self.net = self.node.net.PARENT
         self.running = True
@@ -428,6 +429,19 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     self.recent_shares_ts_work.pop(0)
                 self.local_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), dead=not on_time, user=user, share_target=share_info['bits'].target))
                 self.local_addr_rate_monitor.add_datum(dict(work=bitcoin_data.target_to_average_attempts(target), pubkey_hash=pubkey_hash))
+
+            if self.share_logging_function:
+                try:
+                    parts = self.share_logging_function.split('.')
+                    mod = __import__('.'.join(parts[:-1]))
+                    func = getattr(mod, parts[-1])
+                    func(submitted_hash='%064x' % header_hash,
+                         submitted_diff=((0x00ffff * 2**(8*(0x1d - 3))) / pow_hash),
+                         found_block=(pow_hash < header['bits'].target),
+                         found_share=(pow_hash < share_info['bits'].target),
+                         miner_username=user)
+                except:
+                    print 'COULD NOT EXECUTE SHARE LOGGING FUNCTION...'
             
             return on_time
         
