@@ -46,6 +46,7 @@
     </head>
     
     <body>
+<<<<<<< HEAD
 		<div class="navbar navbar-inverse navbar-fixed-top">
 		  <div class="navbar-inner">
 			<div class="container">
@@ -89,6 +90,11 @@
 			});
 		</script>
         <p style="display: none">Periods: <span id="period_chooser"></span> Current: <span id="period_current"></span></p>
+=======
+        <h1><a href=".">P2Pool</a> &gt; Graphs</h1>
+        
+        <p>Periods: <span id="period_chooser"></span> Current: <span id="period_current"></span></p>
+>>>>>>> e35b7deedc2d6423287c100950f4c1627dea4e81
         
         <div id="warnings"></div>
 		<center>
@@ -447,27 +453,27 @@
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
                 plot_later(d3.select("#local"), "H/s", "H", [
-                    {"url": "/web/graph_data/local_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
-                    {"url": "/web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
+                    {"url": "../web/graph_data/local_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
+                    {"url": "../web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
                 ]);
                 plot_later(d3.select("#local_shares"), "H/s", "H", [
-                    {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
-                    //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
+                    {"url": "../web/graph_data/local_share_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
+                    //{"url": getData("../web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
                 ]);
                 plot_later(d3.select("#payout"), currency_info.symbol, null, [
-                    {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
+                    {"url": "../web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
                 ]);
-                d3.json("/web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
+                d3.json("../web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
                     plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data), true);
                 });
                 plot_later(d3.select("#peers"), "", null, [
-                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"},
-                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"}
+                    {"url": "../web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"},
+                    {"url": "../web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"}
                 ], true);
                 
-                d3.json("/web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
-                    d3.json("/web/graph_data/miner_dead_hash_rates/last_" + lowerperiod, function(dead_data) {
-                        d3.json("/web/graph_data/current_payouts/last_" + lowerperiod, function(current_payouts) {
+                d3.json("../web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
+                    d3.json("../web/graph_data/miner_dead_hash_rates/last_" + lowerperiod, function(dead_data) {
+                        d3.json("../web/graph_data/current_payouts/last_" + lowerperiod, function(current_payouts) {
                             var users = {}; for(var i = 0; i < data.length; ++i) for(var u in data[i][1]) users[u] = null; for(var i = 0; i < dead_data.length; ++i) for(var u in dead_data[i][1]) users[u] = null;
                             var userlist = []; for(var u in users) userlist.push(u);
                             userlist.sort();
@@ -489,24 +495,24 @@
                     });
                 });
                 
-                d3.json("/web/graph_data/desired_version_rates/last_" + lowerperiod, function(data) {
+                d3.json("../web/graph_data/desired_version_rates/last_" + lowerperiod, function(data) {
                     plot(d3.select('#desired_version_rates'), 'H/s', 'H', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
                 
-                d3.json("/web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {
+                d3.json("../web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {
                     plot(d3.select('#traffic_rate'), 'B/s', 'B', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
                 
                 plot_later(d3.select("#getwork_latency"), "s", null, [
-                    {"url": "/web/graph_data/getwork_latency/last_" + lowerperiod, "color": "#FF0000", "label": "Getwork Latency"}
+                    {"url": "../web/graph_data/getwork_latency/last_" + lowerperiod, "color": "#FF0000", "label": "Getwork Latency"}
                 ], false);
                 
                 plot_later(d3.select("#memory_usage"), "B", null, [
-                    {"url": "/web/graph_data/memory_usage/last_" + lowerperiod, "color": "#FF0000", "label": "Memory Usage"}
+                    {"url": "../web/graph_data/memory_usage/last_" + lowerperiod, "color": "#FF0000", "label": "Memory Usage"}
                 ], false);
             }
             
-            d3.json('/local_stats', function(local_stats) {
+            d3.json('../local_stats', function(local_stats) {
                 d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
                     .text(function(w){ return 'Warning: ' + w })
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
@@ -521,7 +527,7 @@
             if(period.length < 3) {
                 window.location.search = "Day";
             } else {
-                d3.json('/web/currency_info', function(currency_info) {
+                d3.json('../web/currency_info', function(currency_info) {
                     change_period(period, currency_info);
                 });
             }
