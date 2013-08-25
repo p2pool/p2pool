@@ -37,7 +37,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
             factory = bitcoin_p2p.ClientFactory(net.PARENT)
             reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
+            def long():
+                print '''    ...taking a while. Common reasons for this include all of bitcoind's connection slots being used...'''
+            long_dc = reactor.callLater(5, long)
             yield factory.getProtocol() # waits until handshake is successful
+            if not long_dc.called: long_dc.cancel()
             print '    ...success!'
             print
             defer.returnValue(factory)
