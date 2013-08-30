@@ -439,7 +439,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                          submitted_diff=((0x00ffff * 2**(8*(0x1d - 3))) / pow_hash),
                          found_block=(pow_hash < header['bits'].target),
                          found_share=(pow_hash < share_info['bits'].target),
-                         miner_username=user)
+                         miner_username=user,
+                         miner_rate=self.get_local_addr_rates().get(pubkey_hash, 0))
                 except Exception as e:
                     print 'WARNING: COULD NOT EXECUTE SHARE LOGGING FUNCTION: %s' % e
             
