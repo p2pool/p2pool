@@ -437,8 +437,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     func = getattr(mod, parts[-1])
                     func(submitted_hash='%064x' % header_hash,
                          submitted_diff=((0x00ffff * 2**(8*(0x1d - 3))) / pow_hash),
-                         found_block=(pow_hash < header['bits'].target),
-                         found_share=(pow_hash < share_info['bits'].target),
+                         found_block=(pow_hash <= header['bits'].target),
+                         found_share=(pow_hash <= share_info['bits'].target),
                          miner_username=user,
                          miner_rate=self.get_local_addr_rates().get(pubkey_hash, 0))
                 except Exception as e:
