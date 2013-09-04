@@ -178,6 +178,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             addr_store=addrs,
             connect_addrs=connect_addrs,
             desired_outgoing_conns=args.p2pool_outgoing_conns,
+            advertise_ip=args.advertise_ip,
         )
         node.p2p_node.start()
         
@@ -413,6 +414,9 @@ def run():
     p2pool_group.add_argument('--outgoing-conns', metavar='CONNS',
         help='outgoing connections (default: 6)',
         type=int, action='store', default=6, dest='p2pool_outgoing_conns')
+    parser.add_argument('--disable-advertise',
+        help='''don't advertise local IP address as being available for incoming connections. useful for running a dark node, along with multiple -n ADDR's and --outgoing-conns 0''',
+        action='store_false', default=True, dest='advertise_ip')
     
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
