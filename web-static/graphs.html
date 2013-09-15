@@ -75,6 +75,13 @@
             function itemgetter(i) { return function(x) { return x[i]; } }
             function as_date(x) { return new Date(1000*x); }
             function not_null(x) { return x != null; }
+            var cloneOf = (function() {
+              function F(){}
+              return function(o) {
+                F.prototype = o;
+                return new F();
+              }
+            }());
             
             function get_area_mean(data) {
                 var top = 0;
@@ -87,8 +94,40 @@
                 return {"area": top, "mean": bottom==0?null:top/bottom};
             }
             
-            function plot(g, unit, total_unit, lines, stack) {
+            function plot(g, unit, total_unit, lines, stack, proportion_view, isnt_first) {
                 // lines is a list of objects which have attributes data, color, and label
+                
+                var orig_unit = unit;
+                var orig_total_unit = total_unit;
+                var orig_lines = lines;
+                if(proportion_view) {
+                    var totals = {};
+                    for(var i = 0; i < lines.length; ++i) {
+                        var line = lines[i];
+                        for(var j = 0; j < line.data.length; ++j) {
+                            var time_str = JSON.stringify(line.data[j][0]);
+                            if(!totals.hasOwnProperty(time_str)) totals[time_str] = 0;
+                            totals[time_str] += line.data[j][1];
+                        }
+                    }
+                    
+                    var new_lines = [];
+                    for(var i = 0; i < lines.length; ++i) {
+                        var line = lines[i];
+                        var new_line = cloneOf(line);
+                        
+                        new_line.data = [];
+                        for(var j = 0; j < line.data.length; ++j) {
+                            var time_str = JSON.stringify(line.data[j][0]);
+                            new_line.data.push([line.data[j][0], totals[time_str] ? line.data[j][1]*100/totals[time_str] : null, line.data[j][2]]);
+                        }
+                        
+                        new_lines.push(new_line)
+                    }
+                    var lines = new_lines;
+                    var unit = '%';
+                    var total_unit = null;
+                }
                 
                 var table_div = document.createElement("div");
                 g.node().parentNode.insertBefore(table_div, g.node().nextSibling);
@@ -100,6 +139,17 @@
                     .text('Show/hide table')
                     .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
                     .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
+                if(stack) {
+                    d3.select(showhide).append('span').text(' ');
+                    d3.select(showhide).append("a")
+                        .text('Switch to/from proportion view')
+                        .on('click', function() {
+                            table_div.parentNode.removeChild(table_div);
+                            showhide.parentNode.removeChild(showhide);
+                            plot(g, orig_unit, orig_total_unit, orig_lines, stack, !proportion_view);
+                        })
+                        .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
+                }
                 
                 for(var i = 0; i < lines.length; ++i) {
                     var line = lines[i];
@@ -119,7 +169,8 @@
                 }
                 d3.select(table_div).append('div').attr('style', 'clear:both');
                 
-                d3.select(table_div).append('p').append("a")
+                var p_after = d3.select(table_div).append('p');
+                p_after.append("a")
                     .text('Show/hide table')
                     .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
                     .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
