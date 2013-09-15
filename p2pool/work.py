@@ -408,7 +408,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 except:
                     log.err(None, 'Error forwarding block solution:')
                 
-                self.share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time)
+                self.share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time, share.hash)
             
             if pow_hash > target:
                 print 'Worker %s submitted share with hash > target:' % (user,)

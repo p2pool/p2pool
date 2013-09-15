@@ -422,7 +422,8 @@
                 ]);
                 plot_later(d3.select("#local_shares"), "H/s", "H", [
                     {"url": "../web/graph_data/local_share_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
-                    //{"url": getData("../web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
+                    {"url": "../web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"},
+                    {"url": "../web/graph_data/local_orphan_share_hash_rate/last_" + lowerperiod, "color": "#00FF00", "label": "Orphan"}
                 ]);
                 plot_later(d3.select("#payout"), currency_info.symbol, null, [
                     {"url": "../web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
