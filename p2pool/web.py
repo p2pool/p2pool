@@ -352,25 +352,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
-    def build_desired_rates(ds_name, ds_desc, dv_name, dv_desc, obj):
-        if not obj:
-            last_bin_end = 0
-            bins = dv_desc.bin_count*[{}]
-        else:
-            pool_rates = obj['pool_rates'][dv_name]
-            desired_versions = obj['desired_versions'][dv_name]
-            def get_total_pool_rate(t):
-                n = int((pool_rates['last_bin_end'] - t)/dv_desc.bin_width)
-                if n < 0 or n >= dv_desc.bin_count:
-                    return None
-                total = sum(x[0] for x in pool_rates['bins'][n].values())
-                count = math.mean(x[1] for x in pool_rates['bins'][n].values())
-                if count == 0:
-                    return None
-                return total/count
-            last_bin_end = desired_versions['last_bin_end']
-            bins = [dict((name, (total*get_total_pool_rate(last_bin_end - (i+1/2)*dv_desc.bin_width), count)) for name, (total, count) in desired_versions['bins'][i].iteritems()) for i in xrange(dv_desc.bin_count)]
-        return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
@@ -388,7 +369,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
         'desired_version_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
-            multivalue_undefined_means_0=True, default_func=build_desired_rates),
+            multivalue_undefined_means_0=True),
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'getwork_latency': graph.DataStreamDescription(dataview_descriptions),
         'memory_usage': graph.DataStreamDescription(dataview_descriptions),
