@@ -352,6 +352,18 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
+    def build_peers(ds_name, ds_desc, dv_name, dv_desc, obj):
+        if not obj:
+            last_bin_end = 0
+            bins = dv_desc.bin_count*[{}]
+        else:
+            incoming_peers = obj['incoming_peers'][dv_name]
+            outgoing_peers = obj['outgoing_peers'][dv_name]
+            assert incoming_peers['last_bin_end'] == outgoing_peers['last_bin_end']
+            last_bin_end = incoming_peers['last_bin_end']
+            assert len(incoming_peers['bins']) == len(outgoing_peers['bins']) == dv_desc.bin_count
+            bins = [dict(incoming=inc.get('null', (0, 0)), outgoing=out.get('null', (0, 0))) for inc, out in zip(incoming_peers['bins'], outgoing_peers['bins'])]
+        return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
@@ -362,8 +374,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             multivalue_undefined_means_0=True),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
         'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
-        'incoming_peers': graph.DataStreamDescription(dataview_descriptions),
-        'outgoing_peers': graph.DataStreamDescription(dataview_descriptions),
+        'peers': graph.DataStreamDescription(dataview_descriptions, multivalues=True, default_func=build_peers),
         'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
@@ -422,8 +433,10 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         current_txouts_by_address = dict((bitcoin_data.script2_to_address(script, node.net.PARENT), amount) for script, amount in current_txouts.iteritems())
         hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-8) for user in miner_hash_rates if user in current_txouts_by_address))
         
-        hd.datastreams['incoming_peers'].add_datum(t, sum(1 for peer in node.p2p_node.peers.itervalues() if peer.incoming))
-        hd.datastreams['outgoing_peers'].add_datum(t, sum(1 for peer in node.p2p_node.peers.itervalues() if not peer.incoming))
+        hd.datastreams['peers'].add_datum(t, dict(
+            incoming=sum(1 for peer in node.p2p_node.peers.itervalues() if peer.incoming),
+            outgoing=sum(1 for peer in node.p2p_node.peers.itervalues() if not peer.incoming),
+        ))
         
         vs = p2pool_data.get_desired_version_counts(node.tracker, node.best_share_var.value, lookbehind)
         vs_total = sum(vs.itervalues())
