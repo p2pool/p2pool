@@ -117,7 +117,7 @@ class Share(object):
             pre_target3 = net.MAX_TARGET
         else:
             attempts_per_second = get_pool_attempts_per_second(tracker, share_data['previous_share_hash'], net.TARGET_LOOKBEHIND, min_work=True, integer=True)
-            pre_target = 2**256//(net.NEW_SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
+            pre_target = 2**256//(net.SHARE_PERIOD*attempts_per_second) - 1 if attempts_per_second else 2**256-1
             pre_target2 = math.clip(pre_target, (previous_share.max_target*9//10, previous_share.max_target*11//10))
             pre_target3 = math.clip(pre_target2, (net.MIN_TARGET, net.MAX_TARGET))
         max_bits = bitcoin_data.FloatingInteger.from_target_upper_bound(pre_target3)
@@ -158,8 +158,8 @@ class Share(object):
             share_data = dict(share_data, subsidy=base_subsidy + definite_fees)
         
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(previous_share.share_data['previous_share_hash'] if previous_share is not None else None,
-            min(height, net.REAL_CHAIN_LENGTH-1),
-            65535*net.NEW_SPREAD*bitcoin_data.target_to_average_attempts(block_target),
+            max(0, min(height, net.REAL_CHAIN_LENGTH) - 1),
+            65535*net.SPREAD*bitcoin_data.target_to_average_attempts(block_target),
         )
         assert total_weight == sum(weights.itervalues()) + donation_weight, (total_weight, sum(weights.itervalues()) + donation_weight)
         
@@ -179,8 +179,8 @@ class Share(object):
             max_bits=max_bits,
             bits=bits,
             timestamp=math.clip(desired_timestamp, (
-                (previous_share.timestamp + net.NEW_SHARE_PERIOD) - (net.NEW_SHARE_PERIOD - 1), # = previous_share.timestamp + 1
-                (previous_share.timestamp + net.NEW_SHARE_PERIOD) + (net.NEW_SHARE_PERIOD - 1),
+                (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
+                (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
             )) if previous_share is not None else desired_timestamp,
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
@@ -594,7 +594,7 @@ def get_desired_version_counts(tracker, best_share_hash, dist):
         res[share.desired_version] = res.get(share.desired_version, 0) + bitcoin_data.target_to_average_attempts(share.target)
     return res
 
-def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value):
+def get_warnings(tracker, best_share, net, bitcoind_getinfo, bitcoind_work_value):
     res = []
     
     desired_version_counts = get_desired_version_counts(tracker, best_share,
@@ -605,9 +605,13 @@ def get_warnings(tracker, best_share, net, bitcoind_warning, bitcoind_work_value
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
     
-    if bitcoind_warning is not None:
-        if 'This is a pre-release test build' not in bitcoind_warning:
-            res.append('(from bitcoind) %s' % (bitcoind_warning,))
+    if bitcoind_getinfo['errors'] != '':
+        if 'This is a pre-release test build' not in bitcoind_getinfo['errors']:
+            res.append('(from bitcoind) %s' % (bitcoind_getinfo['errors'],))
+    
+    version_warning = getattr(net, 'VERSION_WARNING', lambda v: None)(bitcoind_getinfo['version'])
+    if version_warning is not None:
+        res.append(version_warning)
     
     if time.time() > bitcoind_work_value['last_update'] + 60:
         res.append('''LOST CONTACT WITH BITCOIND for %s! Check that it isn't frozen or dead!''' % (math.format_dt(time.time() - bitcoind_work_value['last_update']),))
