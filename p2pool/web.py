@@ -355,9 +355,10 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_dead_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_orphan_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'local_share_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False,
+            multivalues=True, multivalue_undefined_means_0=True,
+            default_func=graph.make_multivalue_migrator(dict(good='local_share_hash_rate', dead='local_dead_share_hash_rate', orphan='local_orphan_share_hash_rate'),
+                post_func=lambda bins: [dict((k, (v[0] - (sum(bin.get(rem_k, (0, 0))[0] for rem_k in ['dead', 'orphan']) if k == 'good' else 0), v[1])) for k, v in bin.iteritems()) for bin in bins])),
         'pool_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
@@ -387,18 +388,19 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     @wb.share_received.watch
     def _(work, dead, share_hash):
         t = time.time()
-        hd.datastreams['local_share_hash_rate'].add_datum(t, work)
-        if dead:
-            hd.datastreams['local_dead_share_hash_rate'].add_datum(t, work)
+        if not dead:
+            hd.datastreams['local_share_hash_rates'].add_datum(t, dict(good=work))
+        else:
+            hd.datastreams['local_share_hash_rates'].add_datum(t, dict(dead=work))
         def later():
             res = node.tracker.is_child_of(share_hash, node.best_share_var.value)
-            if res is None: return # share isn't connected to sharechain?
+            if res is None: res = False # share isn't connected to sharechain? assume orphaned
             if res and dead: # share was DOA, but is now in sharechain
-                # remove from DOA graph
-                hd.datastreams['local_dead_share_hash_rate'].add_datum(t, -work)
+                # move from dead to good
+                hd.datastreams['local_share_hash_rates'].add_datum(t, dict(dead=-work, good=work))
             elif not res and not dead: # share wasn't DOA, and isn't in sharechain
-                # add to orphan graph
-                hd.datastreams['local_orphan_share_hash_rate'].add_datum(t, work)
+                # move from good to orphan
+                hd.datastreams['local_share_hash_rates'].add_datum(t, dict(good=-work, orphan=work))
         reactor.callLater(200, later)
     @node.p2p_node.traffic_happened.watch
     def _(name, bytes):
