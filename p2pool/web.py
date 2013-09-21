@@ -352,18 +352,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
-    def build_peers(ds_name, ds_desc, dv_name, dv_desc, obj):
-        if not obj:
-            last_bin_end = 0
-            bins = dv_desc.bin_count*[{}]
-        else:
-            incoming_peers = obj['incoming_peers'][dv_name]
-            outgoing_peers = obj['outgoing_peers'][dv_name]
-            assert incoming_peers['last_bin_end'] == outgoing_peers['last_bin_end']
-            last_bin_end = incoming_peers['last_bin_end']
-            assert len(incoming_peers['bins']) == len(outgoing_peers['bins']) == dv_desc.bin_count
-            bins = [dict(incoming=inc.get('null', (0, 0)), outgoing=out.get('null', (0, 0))) for inc, out in zip(incoming_peers['bins'], outgoing_peers['bins'])]
-        return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
@@ -374,7 +362,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             multivalue_undefined_means_0=True),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
         'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
-        'peers': graph.DataStreamDescription(dataview_descriptions, multivalues=True, default_func=build_peers),
+        'peers': graph.DataStreamDescription(dataview_descriptions, multivalues=True, default_func=graph.make_multivalue_migrator(dict(incoming='incoming_peers', outgoing='outgoing_peers'))),
         'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'desired_version_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
