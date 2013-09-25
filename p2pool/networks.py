@@ -11,12 +11,10 @@ nets = dict(
     bitcoin=math.Object(
         PARENT=networks.nets['bitcoin'],
         SHARE_PERIOD=30, # seconds
-        NEW_SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
-        NEW_SPREAD=3, # blocks
         IDENTIFIER='fc70035c7a81bc6f'.decode('hex'),
         PREFIX='2472ef181efcd37b'.decode('hex'),
         P2P_PORT=9333,
@@ -27,16 +25,15 @@ nets = dict(
         BOOTSTRAP_ADDRS='forre.st vps.forre.st portals94.ns01.us 54.227.25.14 119.1.96.99 204.10.105.113 76.104.150.248 89.71.151.9 76.114.13.54 72.201.24.106 79.160.2.128 207.244.175.195 168.7.116.243 94.23.215.27 218.54.45.177 5.9.157.150 78.155.217.76 91.154.90.163 173.52.43.124 78.225.49.209 220.135.57.230 169.237.101.193:8335 98.236.74.28 204.19.23.19 98.122.165.84:8338 71.90.88.222 67.168.132.228 193.6.148.18 80.218.174.253 50.43.56.102 68.13.4.106 24.246.31.2 176.31.208.222 1.202.128.218 86.155.135.31 204.237.15.51 5.12.158.126:38007 202.60.68.242 94.19.53.147 65.130.126.82 184.56.21.182 213.112.114.73 218.242.51.246 86.173.200.160 204.15.85.157 37.59.15.50 62.217.124.203 80.87.240.47 198.61.137.12 108.161.134.32 198.154.60.183:10333 71.39.52.34:9335 46.23.72.52:9343 83.143.42.177 192.95.61.149 144.76.17.34 46.65.68.119 188.227.176.66:9336 75.142.155.245:9336 213.67.135.99 76.115.224.177 50.148.193.245 64.53.185.79 80.65.30.137 109.126.14.42 76.84.63.146'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool',
         VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
+        VERSION_WARNING=lambda v: 'Upgrade Bitcoin to >=0.8.5!' if v < 80500 else None,
     ),
     bitcoin_testnet=math.Object(
         PARENT=networks.nets['bitcoin_testnet'],
-        SHARE_PERIOD=10, # seconds
-        NEW_SHARE_PERIOD=30, # seconds
+        SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=60*60//10, # shares
         REAL_CHAIN_LENGTH=60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=3, # blocks
-        NEW_SPREAD=3, # blocks
         IDENTIFIER='5fc2be2d4f0d6bfb'.decode('hex'),
         PREFIX='3f6057a15036f441'.decode('hex'),
         P2P_PORT=19333,
@@ -51,13 +48,11 @@ nets = dict(
     
     litecoin=math.Object(
         PARENT=networks.nets['litecoin'],
-        SHARE_PERIOD=10, # seconds
-        NEW_SHARE_PERIOD=15, # seconds
+        SHARE_PERIOD=15, # seconds
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares
-        SPREAD=12, # blocks
-        NEW_SPREAD=3, # blocks
+        SPREAD=3, # blocks
         IDENTIFIER='e037d5b8c6923410'.decode('hex'),
         PREFIX='7208c1a53ef629b0'.decode('hex'),
         P2P_PORT=9338,
@@ -71,13 +66,11 @@ nets = dict(
     ),
     litecoin_testnet=math.Object(
         PARENT=networks.nets['litecoin_testnet'],
-        SHARE_PERIOD=3, # seconds
-        NEW_SHARE_PERIOD=4, # seconds
+        SHARE_PERIOD=4, # seconds
         CHAIN_LENGTH=20*60//3, # shares
         REAL_CHAIN_LENGTH=20*60//3, # shares
         TARGET_LOOKBEHIND=200, # shares
-        SPREAD=12, # blocks
-        NEW_SPREAD=3, # blocks
+        SPREAD=3, # blocks
         IDENTIFIER='cca5e24ec6408b1e'.decode('hex'),
         PREFIX='ad9614f6466a39cf'.decode('hex'),
         P2P_PORT=19338,
@@ -93,12 +86,10 @@ nets = dict(
     terracoin=math.Object(
         PARENT=networks.nets['terracoin'],
         SHARE_PERIOD=30, # seconds
-        NEW_SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=24*60*60//30, # shares
         REAL_CHAIN_LENGTH=24*60*60//30, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=15, # blocks
-        NEW_SPREAD=15, # blocks
         IDENTIFIER='a41b2356a1b7d35e'.decode('hex'),
         PREFIX='5623b62178d2b8a3'.decode('hex'),
         P2P_PORT=9323,
@@ -109,16 +100,15 @@ nets = dict(
         BOOTSTRAP_ADDRS='seed1.p2pool.terracoin.org seed2.p2pool.terracoin.org forre.st vps.forre.st 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 94.23.34.145 168.7.116.243 94.174.40.189:9344 89.79.79.195 portals94.ns01.us'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
+        VERSION_WARNING=lambda v: 'Upgrade Terracoin to >= 0.8.0.1!' if v < 80001 else None,
     ),
     terracoin_testnet=math.Object(
         PARENT=networks.nets['terracoin_testnet'],
         SHARE_PERIOD=30, # seconds
-        NEW_SHARE_PERIOD=30, # seconds
         CHAIN_LENGTH=60*60//30, # shares
         REAL_CHAIN_LENGTH=60*60//30, # shares
         TARGET_LOOKBEHIND=200, # shares
         SPREAD=15, # blocks
-        NEW_SPREAD=15, # blocks
         IDENTIFIER='b41b2356a5b7d35d'.decode('hex'),
         PREFIX='1623b92172d2b8a2'.decode('hex'),
         P2P_PORT=19323,
@@ -129,6 +119,7 @@ nets = dict(
         BOOTSTRAP_ADDRS='seed1.p2pool.terracoin.org seed2.p2pool.terracoin.org forre.st vps.forre.st'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
+        VERSION_WARNING=lambda v: 'Upgrade Terracoin to >= 0.8.0.1!' if v < 80001 else None,
     ),
 
 )

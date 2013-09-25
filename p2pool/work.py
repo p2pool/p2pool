@@ -15,10 +15,9 @@ from util import forest, jsonrpc, variable, deferral, math, pack
 import p2pool, p2pool.data as p2pool_data
 
 class WorkerBridge(worker_interface.WorkerBridge):
-    COINBASE_NONCE_LENGTH = 4
+    COINBASE_NONCE_LENGTH = 8
     
     def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee, share_logging_function):
-        if node.net.NAME == 'bitcoin': self.COINBASE_NONCE_LENGTH = 8
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
@@ -388,8 +387,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
             
             if pow_hash <= share_info['bits'].target and header_hash not in received_header_hashes:
                 last_txout_nonce = pack.IntType(8*self.COINBASE_NONCE_LENGTH).unpack(coinbase_nonce)
-                if self.node.net.NAME == 'bitcoin':
-                    last_txout_nonce = (last_txout_nonce%2**32*2**32)|(last_txout_nonce>>32) # XXX
                 share = get_share(header, last_txout_nonce)
                 
                 print 'GOT SHARE! %s %s prev %s age %.2fs%s' % (
@@ -412,7 +409,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 except:
                     log.err(None, 'Error forwarding block solution:')
                 
-                self.share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time)
+                self.share_received.happened(bitcoin_data.target_to_average_attempts(share.target), not on_time, share.hash)
             
             if pow_hash > target:
                 print 'Worker %s submitted share with hash > target:' % (user,)
