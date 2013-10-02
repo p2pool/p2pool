@@ -323,6 +323,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in node.tracker.tails for x in node.tracker.reverse.get(t, set())]))
     new_root.putChild('verified_tails', WebInterface(lambda: ['%064x' % x for t in node.tracker.verified.tails for x in node.tracker.verified.reverse.get(t, set())]))
     new_root.putChild('best_share_hash', WebInterface(lambda: '%064x' % node.best_share_var.value))
+    new_root.putChild('my_share_hashes', WebInterface(lambda: ['%064x' % my_share_hash for my_share_hash in wb.my_share_hashes]))
     def get_share_data(share_hash_str):
         if int(share_hash_str, 16) not in node.tracker.items:
             return ''
@@ -352,33 +353,20 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         'last_month': graph.DataViewDescription(300, 60*60*24*30),
         'last_year': graph.DataViewDescription(300, 60*60*24*365.25),
     }
-    def build_peers(ds_name, ds_desc, dv_name, dv_desc, obj):
-        if not obj:
-            last_bin_end = 0
-            bins = dv_desc.bin_count*[{}]
-        else:
-            incoming_peers = obj['incoming_peers'][dv_name]
-            outgoing_peers = obj['outgoing_peers'][dv_name]
-            assert incoming_peers['last_bin_end'] == outgoing_peers['last_bin_end']
-            last_bin_end = incoming_peers['last_bin_end']
-            assert len(incoming_peers['bins']) == len(outgoing_peers['bins']) == dv_desc.bin_count
-            bins = [dict(incoming=inc.get('null', (0, 0)), outgoing=out.get('null', (0, 0))) for inc, out in zip(incoming_peers['bins'], outgoing_peers['bins'])]
-        return graph.DataView(dv_desc, ds_desc, last_bin_end, bins)
     hd = graph.HistoryDatabase.from_obj({
         'local_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
         'local_dead_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_dead_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
-        'local_orphan_share_hash_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False),
+        'local_share_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False,
+            multivalues=True, multivalue_undefined_means_0=True,
+            default_func=graph.make_multivalue_migrator(dict(good='local_share_hash_rate', dead='local_dead_share_hash_rate', orphan='local_orphan_share_hash_rate'),
+                post_func=lambda bins: [dict((k, (v[0] - (sum(bin.get(rem_k, (0, 0))[0] for rem_k in ['dead', 'orphan']) if k == 'good' else 0), v[1])) for k, v in bin.iteritems()) for bin in bins])),
         'pool_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
         'current_payout': graph.DataStreamDescription(dataview_descriptions),
         'current_payouts': graph.DataStreamDescription(dataview_descriptions, multivalues=True),
-        'peers': graph.DataStreamDescription(dataview_descriptions, multivalues=True, default_func=build_peers),
+        'peers': graph.DataStreamDescription(dataview_descriptions, multivalues=True, default_func=graph.make_multivalue_migrator(dict(incoming='incoming_peers', outgoing='outgoing_peers'))),
         'miner_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
         'miner_dead_hash_rates': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
-        'desired_versions': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
-            multivalue_undefined_means_0=True),
         'desired_version_rates': graph.DataStreamDescription(dataview_descriptions, multivalues=True,
             multivalue_undefined_means_0=True),
         'traffic_rate': graph.DataStreamDescription(dataview_descriptions, is_gauge=False, multivalues=True),
@@ -401,18 +389,19 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     @wb.share_received.watch
     def _(work, dead, share_hash):
         t = time.time()
-        hd.datastreams['local_share_hash_rate'].add_datum(t, work)
-        if dead:
-            hd.datastreams['local_dead_share_hash_rate'].add_datum(t, work)
+        if not dead:
+            hd.datastreams['local_share_hash_rates'].add_datum(t, dict(good=work))
+        else:
+            hd.datastreams['local_share_hash_rates'].add_datum(t, dict(dead=work))
         def later():
             res = node.tracker.is_child_of(share_hash, node.best_share_var.value)
-            if res is None: return # share isn't connected to sharechain?
+            if res is None: res = False # share isn't connected to sharechain? assume orphaned
             if res and dead: # share was DOA, but is now in sharechain
-                # remove from DOA graph
-                hd.datastreams['local_dead_share_hash_rate'].add_datum(t, -work)
+                # move from dead to good
+                hd.datastreams['local_share_hash_rates'].add_datum(t, dict(dead=-work, good=work))
             elif not res and not dead: # share wasn't DOA, and isn't in sharechain
-                # add to orphan graph
-                hd.datastreams['local_orphan_share_hash_rate'].add_datum(t, work)
+                # move from good to orphan
+                hd.datastreams['local_share_hash_rates'].add_datum(t, dict(good=-work, orphan=work))
         reactor.callLater(200, later)
     @node.p2p_node.traffic_happened.watch
     def _(name, bytes):
@@ -440,7 +429,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         
         vs = p2pool_data.get_desired_version_counts(node.tracker, node.best_share_var.value, lookbehind)
         vs_total = sum(vs.itervalues())
-        hd.datastreams['desired_versions'].add_datum(t, dict((str(k), v/vs_total) for k, v in vs.iteritems()))
         hd.datastreams['desired_version_rates'].add_datum(t, dict((str(k), v/vs_total*pool_total) for k, v in vs.iteritems()))
         try:
             hd.datastreams['memory_usage'].add_datum(t, memory.resident())
