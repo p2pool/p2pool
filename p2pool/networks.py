@@ -248,19 +248,19 @@ nets = dict(
     ),
     bytecoin=math.Object(
         PARENT=networks.nets['bytecoin'],
-        SHARE_PERIOD=10, # seconds
-        CHAIN_LENGTH=24*60*60//10, # shares
-        REAL_CHAIN_LENGTH=24*60*60//10, # shares
-        TARGET_LOOKBEHIND=200, # shares
+        SHARE_PERIOD=30, # seconds
+        CHAIN_LENGTH=24*60*60//30, # shares
+        REAL_CHAIN_LENGTH=24*60*60//30, # shares
+        TARGET_LOOKBEHIND=10, # shares
         SPREAD=12, # blocks
-        IDENTIFIER='ff37d5b8c6923410'.decode('hex'),
-        PREFIX='ff08c1a53ef629b0'.decode('hex'),
+        IDENTIFIER='b3f956dceaab0c5d'.decode('hex'),
+        PREFIX='2671ae5f267aafb6'.decode('hex'),
         P2P_PORT=8743,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=9743,
-        BOOTSTRAP_ADDRS='rav3n.dtdns.net seed.bytecoin.cc:16333 seed01.bytecoin.cc:16333 seed02.bytecoin.cc:16333'.split(' '),
+        BOOTSTRAP_ADDRS='rav3n.dtdns.net'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
