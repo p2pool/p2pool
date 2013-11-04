@@ -59,7 +59,7 @@ class Protocol(p2protocol.Protocol):
         if hasattr(self.factory, 'gotConnection'):
             self.factory.gotConnection(self)
         
-        self.pinger = deferral.RobustLoopingCall(self.send_ping)
+        self.pinger = deferral.RobustLoopingCall(self.send_ping, nonce=1234)
         self.pinger.start(30)
     
     message_inv = pack.ComposedType([
@@ -128,8 +128,16 @@ class Protocol(p2protocol.Protocol):
             self.get_block_header.got_response(bitcoin_data.hash256(bitcoin_data.block_header_type.pack(header)), header)
         self.factory.new_headers.happened([header['header'] for header in headers])
     
-    message_ping = pack.ComposedType([])
-    def handle_ping(self):
+    message_ping = pack.ComposedType([
+        ('nonce', pack.IntType(64)),
+    ])
+    def handle_ping(self, nonce):
+        self.send_pong(nonce=nonce)
+    
+    message_pong = pack.ComposedType([
+        ('nonce', pack.IntType(64)),
+    ])
+    def handle_pong(self, nonce):
         pass
     
     message_alert = pack.ComposedType([
