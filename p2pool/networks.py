@@ -97,9 +97,8 @@ nets = dict(
         WORKER_PORT=9322,
         BOOTSTRAP_ADDRS='seed1.p2pool.terracoin.org seed2.p2pool.terracoin.org forre.st vps.forre.st 93.97.192.93 66.90.73.83 67.83.108.0 219.84.64.174 24.167.17.248 109.74.195.142 83.211.86.49 94.23.34.145 168.7.116.243 94.174.40.189:9344 89.79.79.195 portals94.ns01.us'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
-	VERSION_CHECK=lambda v: 80002 <= v,
-	VERSION_WARNING=lambda v: 'Upgrade Terracoin to >= 0.8.0.2!' if v < 80002 else None,
-
+        VERSION_CHECK=lambda v: 80002 <= v,
+        VERSION_WARNING=lambda v: 'Upgrade Terracoin to >= 0.8.0.2!' if v < 80002 else None,
     ),
     terracoin_testnet=math.Object(
         PARENT=networks.nets['terracoin_testnet'],
@@ -118,6 +117,7 @@ nets = dict(
         BOOTSTRAP_ADDRS='seed1.p2pool.terracoin.org seed2.p2pool.terracoin.org forre.st vps.forre.st'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
+        VERSION_WARNING=lambda v: 'Upgrade Terracoin to >= 0.8.0.1!' if v < 80001 else None,
     ),
     stablecoin=math.Object(
         PARENT=networks.nets['stablecoin'],
