@@ -2,13 +2,13 @@ Requirements:
 -------------------------
 Generic:
 * Bitcoin >=0.8.5
-* Python
-* Twisted
-* python-argparse (for Python <=2.6)
+* Python >=2.6
+* Twisted >=10.0.0
+* python-argparse (for Python =2.6)
 
 Linux:
 * sudo apt-get install python-zope.interface python-twisted python-twisted-web
-* sudo apt-get install python-argparse # if on Python 2.6 or older
+* sudo apt-get install python-argparse # if on Python 2.6
 
 Windows:
 * Install Python 2.7: http://www.python.org/getit/
