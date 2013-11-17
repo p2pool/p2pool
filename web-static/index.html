@@ -9,6 +9,25 @@
         <script type="text/javascript">
             // based on goblin's p2pool-stats project
             
+            function format_dt(dt) {
+                var pairs = [
+                    [365.2425*60*60*24, 'years'],
+                    [60*60*24, 'days'],
+                    [60*60, 'hours'],
+                    [60, 'minutes'],
+                    [1, 'seconds'],
+                ];
+                
+                for(var i in pairs) {
+                	var value = pairs[i][0];
+                	var name = pairs[i][1];
+                	
+                	if(dt > value) break;
+            	}
+            	
+            	return d3.format('.1f')(dt/value) + ' ' + name;
+            }
+            
             function values(o){ res = []; for(var x in o) res.push(o[x]); return res; }
             
             d3.json('../local_stats', function(local_stats) {
@@ -25,7 +44,7 @@
                 d3.select('#shares_dead').text(local_stats.shares.dead);
                 
                 d3.select('#efficiency').text(local_stats.efficiency != null ? d3.format('.4p')(local_stats.efficiency) : '???')
-                d3.select('#uptime_days').text(d3.format('.3f')(local_stats.uptime / 60 / 60 / 24));
+                d3.select('#uptime').text(format_dt(local_stats.uptime));
                 d3.select('#block_value').text(local_stats.block_value);
                 
                 d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
@@ -33,7 +52,7 @@
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
                 
                 var time_to_share = local_stats.attempts_to_share/local;
-                d3.select('#time_to_share').text(d3.format('.3r')(time_to_share/3600) + " hours");
+                d3.select('#time_to_share').text(format_dt(time_to_share));
                 
                 d3.json('../global_stats', function(global_stats) {
                     d3.select('#pool_rate').text(d3.format('.3s')(global_stats.pool_hash_rate) + 'H/s');
@@ -41,7 +60,7 @@
                     d3.select('#difficulty').text(d3.format('.3r')(global_stats.min_difficulty));
                     
                     var time_to_block = local_stats.attempts_to_block/global_stats.pool_hash_rate;
-                    d3.select('#time_to_block').text(d3.format('.3r')(time_to_block/3600) + " hours");
+                    d3.select('#time_to_block').text(format_dt(time_to_block));
                     
                     d3.select('#expected_payout_amount').text(d3.format('.3r')(local/global_stats.pool_hash_rate*local_stats.block_value*(1-local_stats.donation_proportion)));
                 });
@@ -102,7 +121,7 @@
         <p><a href="graphs.html">Graphs</a></p>
         <p>Version: <span id="version"></span></p>
         <p>Pool rate: <span id="pool_rate"></span> (<span id="pool_stale"></span> DOA+orphan) Share difficulty: <span id="difficulty"></span></p>
-        <p>Node uptime: <span id="uptime_days"></span> days Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
+        <p>Node uptime: <span id="uptime"></span> Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA) Expected time to share: <span id="time_to_share"></span></p>
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
         <p>Payout if a block were found NOW: <span id="payout_amount"></span> <span class="symbol"></span> to <a id="payout_addr"></a>. Expected after mining for 24 hours:  <span id="expected_payout_amount"></span> <span class="symbol"></span> per block.</p>
