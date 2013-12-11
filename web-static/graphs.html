@@ -54,7 +54,7 @@
 				<span class="icon-bar"></span>
 				<span class="icon-bar"></span>
 			  </button>
-			  <a class="brand" href="/">P2Pool pool (<span class="symbol upper"></span>)</a>
+			  <a class="brand" href="/">Rav3n_pl P2Pool pool (<span class="symbol upper"></span>) node</a>
 			  <div class="nav-collapse collapse">
 				<ul class="nav">
 				  <li><a href="index.html">Stats</a></li>
@@ -98,11 +98,6 @@
 			</div>
 			<br/>
 			<div class="well" style="width:1000px"> 	
-				<h2>Local rate reflected in shares</h2>
-				<svg id="local_shares"></svg>
-			</div>
-			<br/>
-			<div class="well" style="width:1000px"> 	
 				<h2>Current payout to default address</h2>
 				<svg id="payout"></svg>
 			</div>
@@ -110,11 +105,6 @@
 			<div class="well" style="width:1000px"> 	
 				<h2>Pool rate</h2>
 				<svg id="pool"></svg>
-			</div>
-			<br/>
-			<div class="well" style="width:1000px"> 	
-				<h2>Peers</h2>
-				<svg id="peers"></svg>
 			</div>
 			<br/>
 			<div class="well" style="width:1000px"> 	
@@ -450,20 +440,12 @@
                     {"url": "/web/graph_data/local_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
                     {"url": "/web/graph_data/local_dead_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
                 ]);
-                plot_later(d3.select("#local_shares"), "H/s", "H", [
-                    {"url": "/web/graph_data/local_share_hash_rate/last_" + lowerperiod, "color": "#0000FF", "label": "Total"},
-                    //{"url": getData("/web/graph_data/local_dead_share_hash_rate/last_" + lowerperiod, "color": "#FF0000", "label": "Dead"}
-                ]);
                 plot_later(d3.select("#payout"), currency_info.symbol, null, [
                     {"url": "/web/graph_data/current_payout/last_" + lowerperiod, "color": "#0000FF"}
                 ]);
                 d3.json("/web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
                     plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data), true);
                 });
-                plot_later(d3.select("#peers"), "", null, [
-                    {"url": "/web/graph_data/outgoing_peers/last_" + lowerperiod, "color": "#FF0000", "label": "Outgoing"},
-                    {"url": "/web/graph_data/incoming_peers/last_" + lowerperiod, "color": "#0000FF", "label": "Incoming"}
-                ], true);
                 
                 d3.json("/web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
                     d3.json("/web/graph_data/miner_dead_hash_rates/last_" + lowerperiod, function(dead_data) {
