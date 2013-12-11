@@ -228,24 +228,6 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-    ppcoin=math.Object(
-        PARENT=networks.nets['ppcoin'],
-        SHARE_PERIOD=30, # seconds
-        CHAIN_LENGTH=12*60*60//20, # shares
-        REAL_CHAIN_LENGTH=12*60*60//20, # shares
-        TARGET_LOOKBEHIND=20, # shares
-        SPREAD=5, # blocks
-        IDENTIFIER='ac12335c7a81a13f'.decode('hex'),
-        PREFIX='c2f69ac44d5fd37b'.decode('hex'),
-        P2P_PORT=9073,
-        MIN_TARGET=0,
-        MAX_TARGET=2**256//2**32 - 1,
-        PERSIST=False,
-        WORKER_PORT=9074,
-        BOOTSTRAP_ADDRS='rav3n.dtdns.net'.split(' '),
-        ANNOUNCE_CHANNEL='#p2pool-alt',
-        VERSION_CHECK=lambda v: True,
-    ),
     bytecoin=math.Object(
         PARENT=networks.nets['bytecoin'],
         SHARE_PERIOD=30, # seconds
