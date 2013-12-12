@@ -1,26 +1,28 @@
 # === makefile ------------------------------------------------------------===
 
 ROOT=$(shell pwd)
-CACHE_ROOT=${ROOT}/.cache
-PKG_ROOT=${ROOT}/.pkg
+CACHE=${ROOT}/.cache
+PYENV=${ROOT}/.pyenv
+CONF=${ROOT}/conf
+APP_NAME=p2pool
 
 -include Makefile.local
 
 .PHONY: all
-all: ${PKG_ROOT}/.stamp-h
+all: python-env
 
 .PHONY: check
 check: all
-	"${PKG_ROOT}"/bin/coverage run "${PKG_ROOT}"/bin/trial p2pool
-	"${PKG_ROOT}"/bin/coverage xml -o build/report/coverage.xml
+	"${PYENV}"/bin/coverage run "${PYENV}"/bin/trial p2pool
+	"${PYENV}"/bin/coverage xml -o build/report/coverage.xml
 
 .PHONY: run
 run: all
-	"${PKG_ROOT}"/bin/python run_p2pool.py
+	"${PYENV}"/bin/python run_p2pool.py
 
 .PHONY: shell
 shell: all
-	"${PKG_ROOT}"/bin/ipython
+	"${PYENV}"/bin/ipython
 
 .PHONY: mostlyclean
 mostlyclean:
@@ -29,11 +31,11 @@ mostlyclean:
 
 .PHONY: clean
 clean: mostlyclean
-	-rm -rf "${PKG_ROOT}"
+	-rm -rf "${PYENV}"
 
 .PHONY: distclean
 distclean: clean
-	-rm -rf "${CACHE_ROOT}"
+	-rm -rf "${CACHE}"
 
 .PHONY: maintainer-clean
 maintainer-clean: distclean
@@ -45,55 +47,73 @@ dist:
 
 # ===--------------------------------------------------------------------===
 
-${CACHE_ROOT}/virtualenv/virtualenv-1.10.1.tar.gz:
-	mkdir -p ${CACHE_ROOT}/virtualenv
-	sh -c "cd ${CACHE_ROOT}/virtualenv && curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.10.1.tar.gz"
+${CACHE}/pyenv/virtualenv-1.11.6.tar.gz:
+	mkdir -p "${CACHE}"/pyenv
+	curl -L 'https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.11.6.tar.gz' >'$@' || { rm -f '$@'; exit 1; }
 
-${PKG_ROOT}/.stamp-h: conf/requirements*.pip ${CACHE_ROOT}/virtualenv/virtualenv-1.10.1.tar.gz
-	# Because build and run-time dependencies are not thoroughly tracked,
-	# it is entirely possible that rebuilding the development environment
-	# on top of an existing one could result in a broken build. For the
-	# sake of consistency and preventing unnecessary, difficult-to-debug
-	# problems, the entire development environment is rebuilt from scratch
-	# everytime this make target is selected.
-	${MAKE} clean
+${CACHE}/pyenv/pyenv-1.11.6-base.tar.gz: ${CACHE}/pyenv/virtualenv-1.11.6.tar.gz
+	-rm -rf "${PYENV}"
+	mkdir -p "${PYENV}"
 	
-	# The ``${PKG_ROOT}`` directory, if it exists, is removed by the
-	# ``clean`` target. The PyPI cache is nonexistant if this is a freshly
-	# checked-out repository, or if the ``distclean`` target has been run.
-	# This might cause problems with build scripts executed later which
-	# assume their existence, so they are created now if they don't
-	# already exist.
-	mkdir -p "${PKG_ROOT}"
-	mkdir -p "${CACHE_ROOT}"/pypi
-	
-	# ``virtualenv`` is used to create a separate Python installation for
-	# this project in ``${PKG_ROOT}``.
+	# virtualenv is used to create a separate Python installation
+	# for this project in ${PYENV}.
 	tar \
-	  -C "${CACHE_ROOT}"/virtualenv --gzip \
-	  -xf "${CACHE_ROOT}"/virtualenv/virtualenv-1.10.1.tar.gz
-	python "${CACHE_ROOT}"/virtualenv/virtualenv-1.10.1/virtualenv.py \
-	  --clear \
-	  --distribute \
-	  --never-download \
-	  --prompt="(p2pool) " \
-	  "${PKG_ROOT}"
-	-rm -rf "${CACHE_ROOT}"/virtualenv/virtualenv-1.10.1
+	    -C "${CACHE}"/pyenv --gzip \
+	    -xf "${CACHE}"/pyenv/virtualenv-1.11.6.tar.gz
+	python "${CACHE}"/pyenv/virtualenv-1.11.6/virtualenv.py \
+	    --clear \
+	    --distribute \
+	    --never-download \
+	    --prompt="(${APP_NAME}) " \
+	    "${PYENV}"
+	-rm -rf "${CACHE}"/pyenv/virtualenv-1.11.6
 	
-	# readline is installed here to get around a bug on Mac OS X which is
-	# causing readline to not build properly if installed from pip.
-	"${PKG_ROOT}"/bin/easy_install readline
+	# Snapshot the Python environment
+	tar -C "${PYENV}" --gzip -cf "$@" .
+	rm -rf "${PYENV}"
+
+${CACHE}/pyenv/pyenv-1.11.6-extras.tar.gz: ${CACHE}/pyenv/pyenv-1.11.6-base.tar.gz ${ROOT}/requirements.txt ${CONF}/requirements*.txt
+	-rm -rf "${PYENV}"
+	mkdir -p "${PYENV}"
+	mkdir -p "${CACHE}"/pypi
+	
+	# Uncompress saved Python environment
+	tar -C "${PYENV}" --gzip -xf "${CACHE}"/pyenv/pyenv-1.11.6-base.tar.gz
+	find "${PYENV}" -not -type d -print0 >"${ROOT}"/.pkglist
+	
+	# readline is installed here to get around a bug on Mac OS X
+	# which is causing readline to not build properly if installed
+	# from pip, and the fact that a different package must be used
+	# to support it on Windows/Cygwin.
+	if [ "x`uname -s`" = "xCygwin" ]; then \
+	    "${PYENV}"/bin/pip install pyreadline; \
+	else \
+	    "${PYENV}"/bin/easy_install readline; \
+	fi
 	
 	# pip is used to install Python dependencies for this project.
-	for reqfile in conf/requirements*.pip; do \
-	  "${PKG_ROOT}"/bin/python "${PKG_ROOT}"/bin/pip install \
-	    --download-cache="${CACHE_ROOT}"/pypi \
-	    -r $$reqfile; \
+	for reqfile in "${ROOT}"/requirements.txt \
+	               "${CONF}"/requirements*.txt; do \
+	    "${PYENV}"/bin/python "${PYENV}"/bin/pip install \
+	        --download-cache="${CACHE}"/pypi \
+	        -r "$$reqfile" || exit 1; \
 	done
 	
-	# All done!
-	touch "${PKG_ROOT}"/.stamp-h
+	# Snapshot the Python environment
+	cat "${ROOT}"/.pkglist | xargs -0 rm -rf
+	tar -C "${PYENV}" --gzip -cf "$@" .
+	rm -rf "${PYENV}" "${ROOT}"/.pkglist
 
-# ===--------------------------------------------------------------------===
-# End of File
-# ===--------------------------------------------------------------------===
+.PHONY:
+python-env: ${PYENV}/.stamp-h
+
+${PYENV}/.stamp-h: ${CACHE}/pyenv/pyenv-1.11.6-base.tar.gz ${CACHE}/pyenv/pyenv-1.11.6-extras.tar.gz
+	-rm -rf "${PYENV}"
+	mkdir -p "${PYENV}"
+	
+	# Uncompress saved Python environment
+	tar -C "${PYENV}" --gzip -xf "${CACHE}"/pyenv/pyenv-1.11.6-base.tar.gz
+	tar -C "${PYENV}" --gzip -xf "${CACHE}"/pyenv/pyenv-1.11.6-extras.tar.gz
+	
+	# All done!
+	touch "$@"
