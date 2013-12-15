@@ -316,7 +316,7 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=9555,
-        BOOTSTRAP_ADDRS='rav3n.dtdns.net p2pool.org'.split(' '),
+        BOOTSTRAP_ADDRS='doge.dtdns.net pool.hostv.pl rav3n.dtdns.net p2pool.org'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
