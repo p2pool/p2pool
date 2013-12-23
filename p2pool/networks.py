@@ -214,20 +214,20 @@ nets = dict(
 
     casinocoin=math.Object(
         PARENT=networks.nets['casinocoin'],
-        SHARE_PERIOD=15, # seconds target spacing
-        CHAIN_LENGTH=24*60*60//15, # shares
-        REAL_CHAIN_LENGTH=3*60*60//15, # shares
-        TARGET_LOOKBEHIND=200, # shares coinbase maturity
-        SPREAD=60, # blocks
-        IDENTIFIER='7696C5EF0B281C0E'.decode('hex'),
-        PREFIX='4C2E2CD651764B73'.decode('hex'),
+        SHARE_PERIOD=5, # seconds target spacing
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=60, # shares coinbase maturity
+        SPREAD=10, # blocks
+        IDENTIFIER='7696C5EF0B281C1F'.decode('hex'),
+        PREFIX='4C2E2CD651764B8F'.decode('hex'),
         P2P_PORT=23640,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=8840,
-        BOOTSTRAP_ADDRS='csc.xpool.net'.split(' '),
-        ANNOUNCE_CHANNEL='#xpool',
+        BOOTSTRAP_ADDRS='csc.xpool.net bigiron.homelinux.com'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
 
