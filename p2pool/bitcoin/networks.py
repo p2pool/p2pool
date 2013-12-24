@@ -399,9 +399,9 @@ nets = dict(
         BLOCK_PERIOD=60, # s
         SYMBOL='CAT',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'CatCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Catcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.catcoin'), 'catcoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://catcoin.net/block/', #dummy for now
-        ADDRESS_EXPLORER_URL_PREFIX='http://catcoin.net/address/',
-        TX_EXPLORER_URL_PREFIX='http://catcoin.net/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://catchain.info/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://catcoin.info/address/',
+        TX_EXPLORER_URL_PREFIX='http://catcoin.info/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
