@@ -387,7 +387,7 @@ nets = dict(
     ),
     catcoin=math.Object(
         P2P_PREFIX='fcc1b7dc'.decode('hex'),
-        P2P_PORT=9333,
+        P2P_PORT=9933,
         ADDRESS_VERSION=21,
         RPC_PORT=9332,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
