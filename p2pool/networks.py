@@ -181,9 +181,9 @@ nets = dict(
         CHAIN_LENGTH=24*60*60//10, # shares
         REAL_CHAIN_LENGTH=3*60*60//15, # shares
         TARGET_LOOKBEHIND=200, # shares coinbase maturity
-        SPREAD=90, # blocks
-        IDENTIFIER='7696CF5EB2F68CC3'.decode('hex'),
-        PREFIX='4C2307E841C11D7F'.decode('hex'),
+        SPREAD=45, # blocks
+        IDENTIFIER='7696CF5EB2F68C88'.decode('hex'),
+        PREFIX='4C2307E841C11FDD'.decode('hex'),
         P2P_PORT=23610,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
@@ -211,6 +211,26 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+
+    casinocoin=math.Object(
+        PARENT=networks.nets['casinocoin'],
+        SHARE_PERIOD=5, # seconds target spacing
+        CHAIN_LENGTH=3*60*60//5, # shares (3 hr PPLNS)
+        REAL_CHAIN_LENGTH=3*60*60//5, # shares (3 hr PPLNS)
+        TARGET_LOOKBEHIND=60, # shares coinbase maturity (5 min diff adj)
+        SPREAD=60, # blocks (share valid up to 60 blocks - better for smaller miners)
+        IDENTIFIER='7696C5EF0B281C2F'.decode('hex'),
+        PREFIX='4C2E2CD651764B9F'.decode('hex'),
+        P2P_PORT=23640,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8840,
+        BOOTSTRAP_ADDRS='csc.xpool.net bigiron.homelinux.com'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+
     doubloons=math.Object(
         PARENT=networks.nets['doubloons'],
         SHARE_PERIOD=15, # seconds target spacing
@@ -334,7 +354,7 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=9565,
-        BOOTSTRAP_ADDRS='doge.dtdns.net pool.hostv.pl rav3n.dtdns.net p2pool.org'.split(' '),
+        BOOTSTRAP_ADDRS='p2pool.gotgeeks.com doge.dtdns.net pool.hostv.pl solidpool.org rav3n.dtdns.net p2pool.org'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
