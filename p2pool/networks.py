@@ -356,6 +356,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    dubstepcoin=math.Object(
+        PARENT=networks.nets['dubstepcoin'],
+        SHARE_PERIOD=25, # seconds target spacing
+        CHAIN_LENGTH=12*60*60//25, # shares
+        REAL_CHAIN_LENGTH=12*60*60//25, # shares
+        TARGET_LOOKBEHIND=20, # shares coinbase maturity
+        SPREAD=20, # blocks
+        IDENTIFIER='dcb7c1fcfbc0b6db'.decode('hex'),
+        PREFIX='bd6b0cbcffc1f0fd'.decode('hex'),
+        P2P_PORT=8033,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9033,
+        BOOTSTRAP_ADDRS='p2pool.gotgeeks.com doge.dtdns.net pool.hostv.pl rav3n.dtdns.net p2pool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 
 )
