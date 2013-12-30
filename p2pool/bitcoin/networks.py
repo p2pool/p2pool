@@ -420,9 +420,9 @@ nets = dict(
         BLOCK_PERIOD=90, # s
         SYMBOL='MOON',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'MoonCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Mooncoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.mooncoin'), 'mooncoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://mooncoin.info/block/', #dummy for now
-        ADDRESS_EXPLORER_URL_PREFIX='http://mooncoin.info/address/',
-        TX_EXPLORER_URL_PREFIX='http://mooncoin.info/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://moonchain.info/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://moonchain.info/address/',
+        TX_EXPLORER_URL_PREFIX='http://moonchain.info/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
