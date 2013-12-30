@@ -358,7 +358,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-
+    mooncoin=math.Object( #565
+        PARENT=networks.nets['mooncoin'],
+        SHARE_PERIOD=25, # seconds target spacing
+        CHAIN_LENGTH=12*60*60//25, # shares
+        REAL_CHAIN_LENGTH=12*60*60//25, # shares
+        TARGET_LOOKBEHIND=20, # shares coinbase maturity
+        SPREAD=10, # blocks
+        IDENTIFIER='e8e8c0c0f7f7f9f9'.decode('hex'),
+        PREFIX='c0c0e8e8f7f7f9f9'.decode('hex'),
+        P2P_PORT=8664,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9664,
+        BOOTSTRAP_ADDRS='p2pool.gotgeeks.com doge.dtdns.net pool.hostv.pl solidpool.org rav3n.dtdns.net p2pool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():
