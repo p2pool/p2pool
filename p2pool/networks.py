@@ -412,7 +412,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-
+    luckycoin=math.Object(
+        PARENT=networks.nets['luckycoin'],
+        SHARE_PERIOD=10,
+        CHAIN_LENGTH=12*60*60//10,
+        REAL_CHAIN_LENGTH=12*60*60//10,
+        TARGET_LOOKBEHIND=20,
+        SPREAD=50,
+        IDENTIFIER='cdbb6c0fbc0b6dcb'.decode('hex'),
+        PREFIX='bbcd0f0f6d6dbcbc'.decode('hex'),
+        P2P_PORT=8817,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9817,
+        BOOTSTRAP_ADDRS='rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dndns.net solidpool.net'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
