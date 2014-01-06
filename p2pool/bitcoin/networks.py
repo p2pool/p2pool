@@ -275,7 +275,7 @@ nets = dict(
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'casinocoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/casinocoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.casinocoin'), 'casinocoin.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/address/',
-		TX_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/transaction/',
+	TX_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/transaction/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
@@ -448,6 +448,27 @@ nets = dict(
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
     ),
+    dubstepcoin=math.Object(
+        P2P_PREFIX='fbc0b6db'.decode('hex'),
+        P2P_PORT=62030,
+        ADDRESS_VERSION=29,
+        RPC_PORT=62040,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'dubstepcoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 200*100000000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=180, # s
+        SYMBOL='WUBS',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'DubstepCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Dubstepcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.dubstepcoin'), 'dubstepcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://wub.info/block/', #dummy for now
+        ADDRESS_EXPLORER_URL_PREFIX='http://wub.info/address/',
+        TX_EXPLORER_URL_PREFIX='http://wub.info/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
+    ),
     monacoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'), #pchmessagestart
         P2P_PORT=9401,
@@ -462,9 +483,9 @@ nets = dict(
         BLOCK_PERIOD=90, # s
         SYMBOL='MONA',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'monacoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Monacoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.monacoin'), 'monacoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://monachain.info/block/', #dummy for now
-        ADDRESS_EXPLORER_URL_PREFIX='http://monachain.info/address/',
-        TX_EXPLORER_URL_PREFIX='http://monachain.info/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://monacoin.org/crawler/block_crawler.php?block_hash=',
+        ADDRESS_EXPLORER_URL_PREFIX='http://monacoin.org/crawler/block_crawler.php?address=',  #dummy for now, not supported by explorer
+        TX_EXPLORER_URL_PREFIX='http://monacoin.org/crawler/block_crawler.php?transaction=',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
