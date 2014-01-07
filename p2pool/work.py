@@ -222,7 +222,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         previous_share = self.node.tracker.items[self.node.best_share_var.value] if self.node.best_share_var.value is not None else None
         if previous_share is None:
-            share_type = p2pool_data.Share
+            share_type = p2pool_data.NewShare
         else:
             previous_share_type = type(previous_share)
             
