@@ -596,7 +596,7 @@ nets = dict(
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
     ),
-    aliencoin=math.Object( #NEED SOURCES
+    aliencoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'), #pchmessagestart
         P2P_PORT=55421,
         ADDRESS_VERSION=9, #pubkey_address
@@ -610,9 +610,9 @@ nets = dict(
         BLOCK_PERIOD=30, # s
         SYMBOL='ALN',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'aliencoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/aliencoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.aliencoin'), 'aliencoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://aliencoin.info/block/', #dummy
-        ADDRESS_EXPLORER_URL_PREFIX='http://aliencoin.info/address/',
-        TX_EXPLORER_URL_PREFIX='http://aliencoin.info/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://cryptexplorer.com/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://cryptexplorer.com/address/',
+        TX_EXPLORER_URL_PREFIX='http://cryptexplorer.com/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
