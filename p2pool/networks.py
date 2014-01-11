@@ -538,6 +538,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    aliencoin=math.Object(
+        PARENT=networks.nets['aleincoin'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='adfae1f0cf01040f'.decode('hex'),
+        PREFIX='16fa0eb62b8524aa'.decode('hex'),
+        P2P_PORT=8242,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9242,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dndns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():
