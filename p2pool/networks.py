@@ -521,7 +521,7 @@ nets = dict(
         VERSION_CHECK=lambda v: True,
     ),
     aliencoin=math.Object(
-        PARENT=networks.nets['aleincoin'],
+        PARENT=networks.nets['aliencoin'],
         SHARE_PERIOD=5, # seconds
         CHAIN_LENGTH=12*60*60//5, # shares
         REAL_CHAIN_LENGTH=12*60*60//5, # shares
