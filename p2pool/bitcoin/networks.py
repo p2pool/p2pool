@@ -598,9 +598,9 @@ nets = dict(
     ),
     aliencoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'), #pchmessagestart
-        P2P_PORT=55421,
-        ADDRESS_VERSION=9, #pubkey_address
-        RPC_PORT=55422,
+        P2P_PORT=55112,
+        ADDRESS_VERSION=23, #pubkey_address
+        RPC_PORT=11082,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             'aliencoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
