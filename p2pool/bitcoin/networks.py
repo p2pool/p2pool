@@ -619,7 +619,7 @@ nets = dict(
     ),
     usde=math.Object(
         P2P_PREFIX='d9d9f9bd'.decode('hex'), #pchmessagestart
-        P2P_PORT=58449,
+        P2P_PORT=54449,
         ADDRESS_VERSION=38, #pubkey_address
         RPC_PORT=54448,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
