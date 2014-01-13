@@ -657,7 +657,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.00000001,
+        DUST_THRESHOLD=0,
     ),
 )
 for net_name, net in nets.iteritems():
