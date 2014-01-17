@@ -17,7 +17,7 @@ import p2pool, p2pool.data as p2pool_data
 class WorkerBridge(worker_interface.WorkerBridge):
     COINBASE_NONCE_LENGTH = 8
     
-    def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee):
+    def __init__(self, node, my_pubkey_hash, donation_percentage, merged_urls, worker_fee, share_rate, share_rate_type):
         worker_interface.WorkerBridge.__init__(self)
         self.recent_shares_ts_work = []
         
@@ -25,6 +25,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.my_pubkey_hash = my_pubkey_hash
         self.donation_percentage = donation_percentage
         self.worker_fee = worker_fee
+        self.share_rate = share_rate
+        self.share_rate_type = share_rate_type
         
         self.net = self.node.net.PARENT
         self.running = True
@@ -174,7 +176,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         if time.time() > self.current_work.value['last_update'] + 60:
             raise jsonrpc.Error_for_code(-12345)(u'lost contact with bitcoind')
         user, pubkey_hash, desired_share_target, desired_pseudoshare_target = self.get_user_details(user)
-        return pubkey_hash, desired_share_target, desired_pseudoshare_target
+        return user, pubkey_hash, desired_share_target, desired_pseudoshare_target
     
     def _estimate_local_hash_rate(self):
         if len(self.recent_shares_ts_work) == 50:
@@ -200,7 +202,22 @@ class WorkerBridge(worker_interface.WorkerBridge):
             addr_hash_rates[datum['pubkey_hash']] = addr_hash_rates.get(datum['pubkey_hash'], 0) + datum['work']/dt
         return addr_hash_rates
     
-    def get_work(self, pubkey_hash, desired_share_target, desired_pseudoshare_target):
+    def get_local_addr_rate(self, pubkey_hash):
+        addr_hash_rate = 0
+        datums, dt = self.local_addr_rate_monitor.get_datums_in_last()
+        for datum in datums:
+            addr_hash_rate = addr_hash_rate + datum['work']/dt
+        return addr_hash_rate
+    
+    def get_miner_rate(self, miner):
+        miner_hash_rate = 0
+        datums, dt = self.local_rate_monitor.get_datums_in_last()
+        for datum in datums:
+            if datum['user'] == miner:
+                miner_hash_rate = miner_hash_rate + datum['work']/dt
+        return miner_hash_rate
+    
+    def get_work(self, user, pubkey_hash, desired_share_target, desired_pseudoshare_target):
         if self.node.best_share_var.value is None and self.node.net.PERSIST:
             raise jsonrpc.Error_for_code(-12345)(u'p2pool is downloading shares')
         
@@ -298,10 +315,21 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         if desired_pseudoshare_target is None:
             target = 2**256-1
-            local_hash_rate = self._estimate_local_hash_rate()
-            if local_hash_rate is not None:
-                target = min(target,
-                    bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
+            if self.share_rate is not None:
+                if self.share_rate_type == 'address': # per-address
+                    if local_addr_rates is not None:
+                        local_rate = local_addr_rates.get(pubkey_hash, 0)
+                    else:
+                        local_rate = self.get_local_addr_rate(pubkey_hash)
+                else: # per-miner
+                    local_rate = self.get_miner_rate(user)
+                if local_rate > 0:
+                    target = min(target, bitcoin_data.average_attempts_to_target(local_rate * 60 / self.share_rate))
+            else: # per-node
+                local_hash_rate = self._estimate_local_hash_rate()
+                if local_hash_rate is not None:
+                    target = min(target,
+                        bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
         else:
             target = desired_pseudoshare_target
         target = max(target, share_info['bits'].target)

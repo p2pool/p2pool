@@ -210,7 +210,13 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee)
+        if args.address_share_rate is not None:
+            share_rate_type = 'address'
+            share_rate = args.address_share_rate
+        else:
+            share_rate_type = 'miner'
+            share_rate = args.miner_share_rate
+        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, share_rate, share_rate_type)
         web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
         worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('static/'))
@@ -424,6 +430,12 @@ def run():
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
+    worker_group.add_argument('--miner-share-rate', metavar='SHARES_PER_MINUTE',
+        help='number of psuedoshares per minute for each miner',
+        type=float, action='store', default=None, dest='miner_share_rate')
+    worker_group.add_argument('--address-share-rate', metavar='SHARES_PER_MINUTE',
+        help='number of psuedoshares per minute for each address',
+        type=float, action='store', default=None, dest='address_share_rate')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
