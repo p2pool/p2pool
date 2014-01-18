@@ -216,7 +216,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         else:
             share_rate_type = 'miner'
             share_rate = args.miner_share_rate
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, share_rate, share_rate_type)
+        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args.min_difficulty, share_rate, share_rate_type)
         web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
         worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('static/'))
@@ -436,6 +436,9 @@ def run():
     worker_group.add_argument('--address-share-rate', metavar='SHARES_PER_MINUTE',
         help='number of psuedoshares per minute for each address',
         type=float, action='store', default=None, dest='address_share_rate')
+    worker_group.add_argument('--min-difficulty', metavar='DIFFICULTY',
+        help='minium difficulty for miners',
+        type=int, action='store', default=1, dest='min_difficulty')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
