@@ -438,6 +438,7 @@ class OkayTracker(forest.Tracker):
     
     def think(self, block_rel_height_func, previous_block, bits, known_txs):
         desired = set()
+        bad_peer_addresses = set()
         
         # O(len(self.heads))
         #   make 'unverified heads' set?
@@ -464,6 +465,9 @@ class OkayTracker(forest.Tracker):
         for bad in bads:
             assert bad not in self.verified.items
             assert bad in self.heads
+            bad_share = self.items[bad]
+            if bad_share.peer_addr is not None:
+                bad_peer_addresses.add(bad_share.peer_addr)
             if p2pool.DEBUG:
                 print "BAD", bad
             self.remove(bad)
@@ -527,7 +531,7 @@ class OkayTracker(forest.Tracker):
             for peer_addr, hash, ts, targ in desired:
                 print '   ', None if peer_addr is None else '%s:%i' % peer_addr, format_hash(hash), math.format_dt(time.time() - ts), bitcoin_data.target_to_difficulty(targ), ts >= timestamp_cutoff, targ <= target_cutoff
         
-        return best, [(peer_addr, hash) for peer_addr, hash, ts, targ in desired if ts >= timestamp_cutoff], decorated_heads
+        return best, [(peer_addr, hash) for peer_addr, hash, ts, targ in desired if ts >= timestamp_cutoff], decorated_heads, bad_peer_addresses
     
     def score(self, share_hash, block_rel_height_func):
         # returns approximate lower bound on chain's hashrate in the last self.net.CHAIN_LENGTH*15//16*self.net.SHARE_PERIOD time
