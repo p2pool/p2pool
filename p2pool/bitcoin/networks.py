@@ -649,7 +649,7 @@ nets = dict(
         )),
         SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
-        BLOCK_PERIOD=600, # s
+        BLOCK_PERIOD=60, # s
         SYMBOL='PLC',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'polcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/polcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.polcoin'), 'polcoin.conf'),
         BLOCK_EXPLORER_URL_PREFIX='http://plcexplorer.com/block/', #dummy

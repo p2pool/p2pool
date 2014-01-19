@@ -558,13 +558,13 @@ nets = dict(
     ),
     polcoin=math.Object(
         PARENT=networks.nets['polcoin'],
-        SHARE_PERIOD=30, # seconds
+        SHARE_PERIOD=10, # seconds
         CHAIN_LENGTH=12*60*60//30, # shares
         REAL_CHAIN_LENGTH=12*60*60//30, # shares
-        TARGET_LOOKBEHIND=10, # shares
+        TARGET_LOOKBEHIND=20, # shares
         SPREAD=50, # blocks
-        IDENTIFIER='fffefcaaa5725982'.decode('hex'),
-        PREFIX='eeeae0bb331144a0'.decode('hex'),
+        IDENTIFIER='f1f2f3aaa512598f'.decode('hex'),
+        PREFIX='e1e2e3b4381a47a0'.decode('hex'),
         P2P_PORT=8883,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**32 - 1,
