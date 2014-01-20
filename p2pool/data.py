@@ -430,7 +430,7 @@ class OkayTracker(forest.Tracker):
         try:
             share.check(self)
         except:
-            log.err(None, 'Share check failed: %064x -> %064x' % (share.hash, share.previous_hash))
+            log.err(None, 'Share check failed: %064x -> %064x' % (share.hash, share.previous_hash if share.previous_hash is not None else 0))
             return False
         else:
             self.verified.add(share)
