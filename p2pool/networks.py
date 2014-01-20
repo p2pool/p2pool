@@ -574,6 +574,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    coin42=math.Object(
+        PARENT=networks.nets['coin42'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='ff42c01442c0c0ff'.decode('hex'),
+        PREFIX='ee42c014aa42c014'.decode('hex'),
+        P2P_PORT=8042,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9042,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dndns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():
