@@ -445,15 +445,14 @@ class OkayTracker(forest.Tracker):
         # for each overall head, attempt verification
         # if it fails, attempt on parent, and repeat
         # if no successful verification because of lack of parents, request parent
-        bads = set()
+        bads = []
         for head in set(self.heads) - set(self.verified.heads):
             head_height, last = self.get_height_and_last(head)
             
             for share in self.get_chain(head, head_height if last is None else min(5, max(0, head_height - self.net.CHAIN_LENGTH))):
                 if self.attempt_verify(share):
                     break
-                if share.hash in self.heads:
-                    bads.add(share.hash)
+                bads.append(share.hash)
             else:
                 if last is not None:
                     desired.add((
@@ -464,13 +463,16 @@ class OkayTracker(forest.Tracker):
                     ))
         for bad in bads:
             assert bad not in self.verified.items
-            assert bad in self.heads
+            #assert bad in self.heads
             bad_share = self.items[bad]
             if bad_share.peer_addr is not None:
                 bad_peer_addresses.add(bad_share.peer_addr)
             if p2pool.DEBUG:
                 print "BAD", bad
-            self.remove(bad)
+            try:
+                self.remove(bad)
+            except NotImplementedError:
+                pass
         
         # try to get at least CHAIN_LENGTH height for each verified head, requesting parents if needed
         for head in list(self.verified.heads):
