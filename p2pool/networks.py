@@ -8,6 +8,24 @@ from p2pool.util import math
 # changes can be done by changing one, then the other
 
 nets = dict(
+    argentum=math.Object(
+        PARENT=networks.nets['argentum'],
+        SHARE_PERIOD=10, # seconds
+        CHAIN_LENGTH=12*60*60//10, # shares
+        REAL_CHAIN_LENGTH=12*60*60//10, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='6d3511cbbed25932'.decode('hex'),
+        PREFIX='f63832c5c86038dd'.decode('hex'),
+        P2P_PORT=18012,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8012,
+        BOOTSTRAP_ADDRS='p2poolmining.org:8012 althash.com:11121 coinworld.us:7775'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
     bitcoin=math.Object(
         PARENT=networks.nets['bitcoin'],
         SHARE_PERIOD=30, # seconds
