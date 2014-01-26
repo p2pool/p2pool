@@ -628,7 +628,25 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-
+    argentum=math.Object(
+        PARENT=networks.nets['argentum'],
+        SHARE_PERIOD=10, # seconds
+        CHAIN_LENGTH=12*60*60//10, # shares
+        REAL_CHAIN_LENGTH=12*60*60//10, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='6d3511cbbed25932'.decode('hex'),
+        PREFIX='f63832c5c86038dd'.decode('hex'),
+        P2P_PORT=18012,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8012,
+        BOOTSTRAP_ADDRS='p2pool.name p2poolmining.org althash.com coinworld.us'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+    
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
