@@ -16,7 +16,6 @@ nets = dict(
             'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='BTC',
@@ -37,7 +36,6 @@ nets = dict(
             'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='tBTC',
@@ -58,7 +56,6 @@ nets = dict(
             'litecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=150, # s
         SYMBOL='LTC',
@@ -79,7 +76,6 @@ nets = dict(
             'litecoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=150, # s
         SYMBOL='tLTC',
@@ -100,7 +96,6 @@ nets = dict(
             'terracoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 20*100000000 >> (height + 1)//1050000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=120, # s
         SYMBOL='TRC',
@@ -121,7 +116,6 @@ nets = dict(
             'terracoinaddress' in (yield bitcoind.rpc_help()) and
             (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 20*100000000 >> (height + 1)//1050000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=120, # s
         SYMBOL='tTRC',
@@ -142,7 +136,6 @@ nets = dict(
             'StableCoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 25*100000000 >> (height + 1)//3000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=45,
         SYMBOL='SBC',
@@ -163,7 +156,6 @@ nets = dict(
             'zetacoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1000*100000000 >> (height + 1)//80640,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=30, # s
         SYMBOL='ZET',
@@ -184,7 +176,6 @@ nets = dict(
             'feathercoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 200*100000000 >> (height + 1)//3360000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=150, # s
         SYMBOL='FTC',
@@ -205,7 +196,6 @@ nets = dict(
             'digitalcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 15*10000000 >> (height + 1)//4730400,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=40, # s targetspacing
         SYMBOL='DGC',
@@ -226,7 +216,6 @@ nets = dict(
             'worldcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 32*10000000 >> (height + 1)//2650000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=15, # s targetspacing
         SYMBOL='WDC',
@@ -247,7 +236,6 @@ nets = dict(
             'doubloons address' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1*10000000 >> (height + 1)//1080000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s targetspacing
         SYMBOL='DBL',
@@ -268,7 +256,6 @@ nets = dict(
             'casinocoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//3153600,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s targetspacing
         SYMBOL='CSC',
@@ -289,7 +276,6 @@ nets = dict(
             'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=600, # s
         SYMBOL='BTE',
@@ -310,7 +296,6 @@ nets = dict(
             'asiccoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height * 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=45, # s
         SYMBOL='ASC',
@@ -331,7 +316,6 @@ nets = dict(
             'joulecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 16*100000000 >> (height * 1)//1401600,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=45, # s
         SYMBOL='XJO',
@@ -352,7 +336,6 @@ nets = dict(
             'unobtaniumaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 0.001*100000000 if height<2000  else 1*100000000 >> (height * 1)//120000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=180, # s
         SYMBOL='Un',
@@ -373,7 +356,6 @@ nets = dict(
             'dogecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: (1000000 if height < 100000 else 500000 if height < 200000 else 250000 if height < 300000 else 125000 if height < 400000 else 62500 if height < 500000 else 31250 if height < 600000 else 10000)*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='DOGE',
@@ -394,7 +376,6 @@ nets = dict(
             'billioncoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1000*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='BIL',
@@ -415,7 +396,6 @@ nets = dict(
             'tomooncoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 2000000*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=90, # s
         SYMBOL='MOON',
@@ -436,7 +416,6 @@ nets = dict(
             'catcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='CAT',
@@ -457,7 +436,6 @@ nets = dict(
             'dubstepcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 200*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=180, # s
         SYMBOL='WUBS',
@@ -478,7 +456,6 @@ nets = dict(
             'monacoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=90, # s
         SYMBOL='MONA',
@@ -499,7 +476,6 @@ nets = dict(
             'luckycoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 88*100000000 >> (height + 1)//1036800,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60,
         SYMBOL='LKY',
@@ -520,7 +496,6 @@ nets = dict(
             'giftcoinaddress' in (yield bitcoind.rpc_help()) and 
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=300,
         SYMBOL='GFT',
@@ -542,7 +517,6 @@ nets = dict(
             'pesetacoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 166386*100000 >> (height + 1)//840000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='PTC',
@@ -563,7 +537,6 @@ nets = dict(
             'lennycoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 100*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=180, # s
         SYMBOL='LENNY',
@@ -584,7 +557,6 @@ nets = dict(
             'coinyecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 666666*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=90, # s
         SYMBOL='COYE',
@@ -605,7 +577,6 @@ nets = dict(
             'aliencoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 40*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s
         SYMBOL='ALN',
@@ -626,7 +597,6 @@ nets = dict(
             'usdeaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1000*100000000 if height>1000 else 100*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='USDe',
@@ -647,7 +617,6 @@ nets = dict(
             'ronpaulcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=120, # s
         SYMBOL='RPC',
@@ -668,7 +637,6 @@ nets = dict(
             'polcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
         POW_FUNC=data.hash256,
         BLOCK_PERIOD=60, # s
         SYMBOL='PLC',
@@ -689,7 +657,6 @@ nets = dict(
             '42address' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 0.00004200*100000000 if height>420 else 0.00000010*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=42, # s
         SYMBOL='42c',
@@ -710,7 +677,6 @@ nets = dict(
             'FoxCoin' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 250*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='FOX',
