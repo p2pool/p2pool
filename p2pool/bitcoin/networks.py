@@ -373,7 +373,7 @@ nets = dict(
             'dogecoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 10000*100000000,
+        SUBSIDY_FUNC=lambda height: (1000000 if height < 100000 else 500000 if height < 200000 else 250000 if height < 300000 else 125000 if height < 400000 else 62500 if height < 500000 else 31250 if height < 600000 else 10000)*100000000
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='DOGE',
