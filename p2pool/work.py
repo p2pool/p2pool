@@ -100,7 +100,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
-                    subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.node.bitcoind_work.value['height']),
+                    subsidy=self.node.bitcoind_work.value['subsidy'],
                     last_update=self.node.bitcoind_work.value['last_update'],
                 )
             
@@ -288,7 +288,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 desired_other_transaction_hashes_and_fees=zip(tx_hashes, self.current_work.value['transaction_fees']),
                 net=self.node.net,
                 known_txs=tx_map,
-                base_subsidy=self.node.net.PARENT.SUBSIDY_FUNC(self.current_work.value['height']),
+                base_subsidy=self.node.bitcoind_work.value['subsidy'],
             )
         
         packed_gentx = bitcoin_data.tx_type.pack(gentx)
