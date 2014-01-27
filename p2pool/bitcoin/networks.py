@@ -13,7 +13,7 @@ nets = dict(
         ADDRESS_VERSION=0,
         RPC_PORT=8332,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'bitcoinaddress' in (yield bitcoind.rpc_help()) and
+            0 == (yield bitcoind.rpc_getblock('000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f'))['height'] and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
