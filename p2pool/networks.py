@@ -642,11 +642,29 @@ nets = dict(
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=8012,
-        BOOTSTRAP_ADDRS='p2pool.name p2poolmining.org althash.com coinworld.us'.split(' '),
+        BOOTSTRAP_ADDRS='p2pool.name p2poolmining.org althash.com coinworld.us p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
-    
+    smartcoin=math.Object(
+        PARENT=networks.nets['smartcoin'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='defadefaced0ced0'.decode('hex'),
+        PREFIX='d0cededefafac0ce'.decode('hex'),
+        P2P_PORT=8585,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9585,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
