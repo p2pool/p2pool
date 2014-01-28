@@ -731,6 +731,7 @@ nets = dict(
             'Argentumaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+	SUBSIDY_FUNC=lambda height: 1*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=120, # s
         SYMBOL='ARG',
@@ -753,6 +754,7 @@ nets = dict(
             'smartcoin' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+	SUBSIDY_FUNC=lambda height: 64*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=40, # s
         SYMBOL='SMC',
@@ -775,6 +777,7 @@ nets = dict(
             'kittehcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
+	SUBSIDY_FUNC=lambda height: 1000*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s
         SYMBOL='MEOW',
