@@ -802,9 +802,9 @@ nets = dict(
     ),
     leafcoin=math.Object(
         P2P_PREFIX='aaaaaacc'.decode('hex'), #pchmessagestart
-        P2P_PORT=33813,
+        P2P_PORT=22813,
         ADDRESS_VERSION=95, #pubkey_address
-        RPC_PORT=33812,
+        RPC_PORT=22812,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             'leafcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
