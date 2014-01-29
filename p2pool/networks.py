@@ -628,6 +628,60 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    argentum=math.Object(
+        PARENT=networks.nets['argentum'],
+        SHARE_PERIOD=10, # seconds
+        CHAIN_LENGTH=12*60*60//10, # shares
+        REAL_CHAIN_LENGTH=12*60*60//10, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='6d3511cbbed25932'.decode('hex'),
+        PREFIX='f63832c5c86038dd'.decode('hex'),
+        P2P_PORT=18012,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=8012,
+        BOOTSTRAP_ADDRS='p2pool.name p2poolmining.org althash.com coinworld.us p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+    smartcoin=math.Object(
+        PARENT=networks.nets['smartcoin'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='defadefaced0ced0'.decode('hex'),
+        PREFIX='d0cededefafac0ce'.decode('hex'),
+        P2P_PORT=8585,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9585,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
+    kittehcoin=math.Object(
+        PARENT=networks.nets['kittehcoin'],
+        SHARE_PERIOD=5, # seconds
+        CHAIN_LENGTH=12*60*60//5, # shares
+        REAL_CHAIN_LENGTH=12*60*60//5, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=50, # blocks
+        IDENTIFIER='c0c1c2e3e6e9f1aa'.decode('hex'),
+        PREFIX='f1c3e9a023e0f077'.decode('hex'),
+        P2P_PORT=8566,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9566,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():

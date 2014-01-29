@@ -277,7 +277,7 @@ nets = dict(
             'casinocoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 50*10000000 >> (height + 1)//3153600,
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//3153600,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s targetspacing
         SYMBOL='CSC',
@@ -730,6 +730,75 @@ nets = dict(
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.00001,
+    ),
+    argentum=math.Object(
+        P2P_PREFIX='fbc1b8dc'.decode('hex'), #pchmessagestart
+        P2P_PORT=13580,
+        ADDRESS_VERSION=23, #pubkey_address
+        RPC_PORT=13581,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'Argentumaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+	SUBSIDY_FUNC=lambda height: 1*100000000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=120, # s
+        SYMBOL='ARG',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'argentum') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Argentum/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.Argentum'), 'Argentum.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://arg.webboise.com/chain/Argentum/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://arg.webboise.com/chain/Argentum/address/',
+        TX_EXPLORER_URL_PREFIX='http://arg.webboise.com/chain/Argentum/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0,
+    ),
+    smartcoin=math.Object(
+        P2P_PREFIX='defaced0'.decode('hex'), #pchmessagestart
+        P2P_PORT=58585,
+        ADDRESS_VERSION=63, #pubkey_address
+        RPC_PORT=58583,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'smartcoin' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+	SUBSIDY_FUNC=lambda height: 64*100000000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=40, # s
+        SYMBOL='SMC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'smartcoin') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/smartcoin/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.smartcoin'), 'smartcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://altexplorer.net/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://altexplorer.net/address/',
+        TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0,
+    ),
+    kittehcoin=math.Object(
+        P2P_PREFIX='c0c0c0c0'.decode('hex'), #pchmessagestart
+        P2P_PORT=22566,
+        ADDRESS_VERSION=45, #pubkey_address
+        RPC_PORT=22565,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'kittehcoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+	SUBSIDY_FUNC=lambda height: 1000*100000000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=30, # s
+        SYMBOL='MEOW',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'kittehcoin') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/kittehcoin/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.kittehcoin'), 'kittehcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://kitexplorer.tk/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://kitexplorer.tk/address/',
+        TX_EXPLORER_URL_PREFIX='http://kitexplorer.tk/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.000001,
     ),
 
 )
