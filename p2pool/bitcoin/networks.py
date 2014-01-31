@@ -214,7 +214,7 @@ nets = dict(
             'digitalcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 15*10000000 >> (height + 1)//4730400,
+        SUBSIDY_FUNC=lambda height: 15*100000000 >> (height + 1)//4730400,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=40, # s targetspacing
         SYMBOL='DGC',
@@ -222,7 +222,7 @@ nets = dict(
         BLOCK_EXPLORER_URL_PREFIX='http://dgc.cryptocoinexplorer.com/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://dgc.cryptocoinexplorer.com/address/',
         TX_EXPLORER_URL_PREFIX='http://dgc.cryptocoinexplorer.com/transaction/',
-        SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
     ),
@@ -235,7 +235,7 @@ nets = dict(
             'worldcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 32*10000000 >> (height + 1)//2650000,
+        SUBSIDY_FUNC=lambda height: 32*100000000 >> (height + 1)//2650000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=15, # s targetspacing
         SYMBOL='WDC',
@@ -243,7 +243,7 @@ nets = dict(
         BLOCK_EXPLORER_URL_PREFIX='http://wdc.cryptocoinexplorer.com/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://wdc.cryptocoinexplorer.com/address/',
         TX_EXPLORER_URL_PREFIX='http://wdc.cryptocoinexplorer.com/transaction/',
-        SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
     ),
@@ -256,7 +256,7 @@ nets = dict(
             'doubloons address' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 1*10000000 >> (height + 1)//1080000,
+        SUBSIDY_FUNC=lambda height: 1*100000000 >> (height + 1)//1080000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=30, # s targetspacing
         SYMBOL='DBL',
@@ -264,7 +264,7 @@ nets = dict(
         BLOCK_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/address/',
         TX_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/transaction/',
-        SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
     ),
@@ -285,7 +285,7 @@ nets = dict(
         BLOCK_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/block/',
         ADDRESS_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/address/',
 	TX_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/transaction/',
-        SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=1e8,
     ),
