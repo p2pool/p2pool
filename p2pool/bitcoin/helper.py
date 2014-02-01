@@ -39,6 +39,14 @@ def getwork(bitcoind, use_getblocktemplate=False):
             print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
             raise deferral.RetrySilentlyException()
     packed_transactions = [(x['data'] if isinstance(x, dict) else x).decode('hex') for x in work['transactions']]
+
+    transactions=map(bitcoin_data.tx_type.unpack, packed_transactions)
+    transaction_hashes=map(bitcoin_data.hash256, packed_transactions)
+    txn_timestamp = 0
+    for tx in transactions:
+        if tx.timestamp > txn_timestamp:
+            txn_timestamp = tx.timestamp
+
     if 'height' not in work:
         work['height'] = (yield bitcoind.rpc_getblock(work['previousblockhash']))['height'] + 1
     elif p2pool.DEBUG:
@@ -46,11 +54,12 @@ def getwork(bitcoind, use_getblocktemplate=False):
     defer.returnValue(dict(
         version=work['version'],
         previous_block=int(work['previousblockhash'], 16),
-        transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
-        transaction_hashes=map(bitcoin_data.hash256, packed_transactions),
+        transactions=transactions,
+        transaction_hashes=transaction_hashes,
         transaction_fees=[x.get('fee', None) if isinstance(x, dict) else None for x in work['transactions']],
         subsidy=work['coinbasevalue'],
         time=work['time'] if 'time' in work else work['curtime'],
+        txn_timestamp=txn_timestamp,
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
         height=work['height'],
@@ -62,7 +71,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
 @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
 def submit_block_p2p(block, factory, net):
     if factory.conn.value is None:
-        print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, bitcoin_data.hash256(bitcoin_data.block_header_type.pack(block['header'])))
+        print >>sys.stderr, 'No bitcoind connection when block submittal attempted! %s%064x' % (net.PARENT.BLOCK_EXPLORER_URL_PREFIX, bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(block['header'])))
         raise deferral.RetrySilentlyException()
     factory.conn.value.send_block(block=block)
 
@@ -70,15 +79,12 @@ def submit_block_p2p(block, factory, net):
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
     if bitcoind_work.value['use_getblocktemplate']:
-        try:
-            result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
-        except jsonrpc.Error_for_code(-32601): # Method not found, for older litecoin versions
-            result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
+        result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
         success = result is None
     else:
         result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
         success = result
-    success_expected = net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
+    success_expected = bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(block['header'])) <= block['header']['bits'].target
     if (not success and success_expected and not ignore_failure) or (success and not success_expected):
         print >>sys.stderr, 'Block submittal result: %s (%r) Expected: %s' % (success, result, success_expected)
 

@@ -80,7 +80,7 @@ class P2PNode(p2p.Node):
         return shares
     
     def handle_bestblock(self, header, peer):
-        if self.node.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(header)) > header['bits'].target:
+        if self.node.net.PARENT.scrypt(bitcoin_data.block_header_type.pack(header)) > header['bits'].target:
             raise p2p.PeerMisbehavingError('received block header fails PoW test')
         self.node.handle_header(header)
     
@@ -145,6 +145,9 @@ class P2PNode(p2p.Node):
         
         @self.node.tracker.verified.added.watch
         def _(share):
+            if share.timestamp < share.min_header['timestamp']:
+                return
+
             if not (share.pow_hash <= share.header['bits'].target):
                 return
             
@@ -189,24 +192,28 @@ class Node(object):
                     self.bitcoind_work.set((yield helper.getwork(self.bitcoind, self.bitcoind_work.value['use_getblocktemplate'])))
                 except:
                     log.err()
-                yield defer.DeferredList([flag, deferral.sleep(15)], fireOnOneCallback=True)
+                yield defer.DeferredList([flag, deferral.sleep(5)], fireOnOneCallback=True)
         work_poller()
         
         # PEER WORK
         
         self.best_block_header = variable.Variable(None)
+        self.pow_subsidy = 0
         def handle_header(new_header):
+            self.pow_bits = self.bitcoind_work.value['bits']
+            self.pow_subsidy = self.bitcoind_work.value['subsidy']
+
             # check that header matches current target
-            if not (self.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(new_header)) <= self.bitcoind_work.value['bits'].target):
+            if not (bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(new_header)) <= self.bitcoind_work.value['bits'].target):
                 return
             bitcoind_best_block = self.bitcoind_work.value['previous_block']
             if (self.best_block_header.value is None
                 or (
                     new_header['previous_block'] == bitcoind_best_block and
-                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(self.best_block_header.value)) == bitcoind_best_block
+                    bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(self.best_block_header.value)) == bitcoind_best_block
                 ) # new is child of current and previous is current
                 or (
-                    bitcoin_data.hash256(bitcoin_data.block_header_type.pack(new_header)) == bitcoind_best_block and
+                    bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(new_header)) == bitcoind_best_block and
                     self.best_block_header.value['previous_block'] != bitcoind_best_block
                 )): # new is current and previous is not a child of current
                 self.best_block_header.set(new_header)
@@ -245,6 +252,10 @@ class Node(object):
         # add p2p transactions from bitcoind to known_txs
         @self.factory.new_tx.watch
         def _(tx):
+            if tx.timestamp > time.time() + 3600:
+                return
+            if tx.timestamp > self.bitcoind_work.value['txn_timestamp']:
+                self.bitcoind_work.value['txn_timestamp'] = tx.timestamp
             new_known_txs = dict(self.known_txs_var.value)
             new_known_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))] = tx
             self.known_txs_var.set(new_known_txs)

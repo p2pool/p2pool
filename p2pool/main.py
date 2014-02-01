@@ -30,7 +30,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
     try:
         print 'p2pool (version %s)' % (p2pool.__version__,)
         print
-        
+
         @defer.inlineCallbacks
         def connect_p2p():
             # connect to bitcoind over bitcoin-p2p
@@ -326,7 +326,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             shares, stale_orphan_shares, stale_doa_shares,
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
-                            node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8, net.PARENT.SYMBOL,
+                            node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-6, net.PARENT.SYMBOL,
                         )
                         this_str += '\n Pool: %sH/s Stale rate: %.1f%% Expected time to block: %s' % (
                             math.format(int(real_att_s)),
@@ -364,8 +364,8 @@ def run():
     parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
     parser.add_argument('--version', action='version', version=p2pool.__version__)
     parser.add_argument('--net',
-        help='use specified network (default: bitcoin)',
-        action='store', choices=sorted(realnets), default='bitcoin', dest='net_name')
+        help='use specified network (default: novacoin)',
+        action='store', choices=sorted(realnets), default='novacoin', dest='net_name')
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')

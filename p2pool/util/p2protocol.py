@@ -87,7 +87,7 @@ class Protocol(protocol.Protocol):
         type_ = getattr(self, 'message_' + command, None)
         if type_ is None:
             raise ValueError('invalid command')
-        #print 'SEND', command, repr(payload2)[:500]
+        #print 'SEND', self._message_prefix.encode('hex'), command, repr(payload2)[:500]
         payload = type_.pack(payload2)
         if len(payload) > self._max_payload_length:
             raise TooLong('payload too long')
