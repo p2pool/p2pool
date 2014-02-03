@@ -80,7 +80,7 @@ class P2PNode(p2p.Node):
         return shares
     
     def handle_bestblock(self, header, peer):
-        if self.node.net.PARENT.scrypt(bitcoin_data.block_header_type.pack(header)) > header['bits'].target:
+        if bitcoin_data.scrypt(bitcoin_data.block_header_type.pack(header)) > header['bits'].target:
             raise p2p.PeerMisbehavingError('received block header fails PoW test')
         self.node.handle_header(header)
     
