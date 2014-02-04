@@ -17,12 +17,12 @@ nets = dict(
         SPREAD=3, # blocks
         IDENTIFIER='e037d5b8c6923610'.decode('hex'),
         PREFIX='7208c1a53ef659b0'.decode('hex'),
-        P2P_PORT=9777,
+        P2P_PORT=8777,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=True,
         WORKER_PORT=8336,
-        BOOTSTRAP_ADDRS=''.split(' '),
+        BOOTSTRAP_ADDRS='81.200.245.198 81.200.241.54 85.234.62.99'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: v >= 60011,
     ),
@@ -35,7 +35,7 @@ nets = dict(
         SPREAD=3, # blocks
         IDENTIFIER='e037d5b8c7923110'.decode('hex'),
         PREFIX='7208c1a54ef619b0'.decode('hex'),
-        P2P_PORT=19777,
+        P2P_PORT=18777,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
