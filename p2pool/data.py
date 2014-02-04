@@ -49,7 +49,7 @@ def load_share(share, net, peer_addr):
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
-DONATION_SCRIPT = bitcoin_data.pubkey_hash_to_script2(1242320440330127026527917315978635769218557336395)
+DONATION_SCRIPT  = '410418ca0d3ae9712c1640692030f4774d66428edce1d75790d470d2e460fd03327141279a73beb92cdcbd64204a90901d135b6e5e6f9d299517424c5ab08d4fac22ac'.decode('hex')
 
 class Share(object):
     VERSION = 13
@@ -319,8 +319,8 @@ class Share(object):
         share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], [(h, None) for h in other_tx_hashes], self.net, last_txout_nonce=self.contents['last_txout_nonce'])
         assert other_tx_hashes2 == other_tx_hashes
 # workaround
-#        if share_info != self.share_info:
-#            raise ValueError('share_info invalid')
+        if share_info != self.share_info:
+            raise ValueError('share_info invalid')
         if bitcoin_data.hash256(bitcoin_data.tx_type.pack(gentx)) != self.gentx_hash:
             raise ValueError('''gentx doesn't match hash_link''')
         
