@@ -443,6 +443,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
-    web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
+    web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))
     
     return web_root
