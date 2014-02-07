@@ -49,7 +49,7 @@ def load_share(share, net, peer_addr):
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
-DONATION_SCRIPT  = '410418ca0d3ae9712c1640692030f4774d66428edce1d75790d470d2e460fd03327141279a73beb92cdcbd64204a90901d135b6e5e6f9d299517424c5ab08d4fac22ac'.decode('hex')
+DONATION_SCRIPT  = '41043b253cc0b5c8ce26f24b84bb955bec955cbb4643f19ab7ea073884f22874abdafc42040b97efec3c9eeb29ce69022a96cc1772f8bc805f78af0d3dc5c441db5fac'.decode('hex')
 
 class Share(object):
     VERSION = 13
