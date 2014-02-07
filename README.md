@@ -67,7 +67,7 @@ Run for additional options.
 
 Donations towards further development:
 -------------------------
-    4FuBfHMoSZ7fvQpwGyt6WoCmejEdHKHzLS
+    4MRHGnDQVwgC2nacnEieJrrv97RNYZBm6i
 
 Official wiki :
 -------------------------
