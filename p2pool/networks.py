@@ -131,16 +131,17 @@ nets = dict(
         TARGET_LOOKBEHIND=60, # shares
         SPREAD=150, # blocks
         NEW_SPREAD=150, # blocks
-        IDENTIFIER='3bcc5afe1939ff7c'.decode('hex'),
-        PREFIX='50879b32a0b48a21'.decode('hex'),
+        IDENTIFIER='fadeb86bdda7a3ee'.decode('hex'),
+        PREFIX='613b4e17dbc03239'.decode('hex'),
         P2P_PORT=23650,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
-        PERSIST=True,
+        PERSIST=False,
         WORKER_PORT=5150,
-        BOOTSTRAP_ADDRS='190.191.141.145 75.135.81.210 69.57.165.193 168.61.25.9'.split(' '),
-        ANNOUNCE_CHANNEL='#p2pool-alt',
+        BOOTSTRAP_ADDRS='fst.inetrader.com www.coin-mining.net crunchpool.mooo.com'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-fst',
         VERSION_CHECK=lambda v: True,
+        VERSION_WARNING=lambda v: 'Upgrade Fastcoin to >= 0.8.5.1!' if v < 70002 else None,
     ),
 
 )
