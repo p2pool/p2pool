@@ -139,6 +139,8 @@ class Share(object):
                 this = tx_hash_to_this[tx_hash]
             else:
                 if known_txs is not None:
+                    if known_txs[tx_hash]['timestamp'] > desired_timestamp - 30:
+                        continue
                     this_size = bitcoin_data.tx_type.packed_size(known_txs[tx_hash])
                     if new_transaction_size + this_size > 50000: # only allow 50 kB of new txns/share
                         break
