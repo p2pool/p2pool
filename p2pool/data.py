@@ -152,10 +152,10 @@ class Share(object):
         removed_fees = [fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash not in included_transactions]
         definite_fees = sum(0 if fee is None else fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash in included_transactions)
         if None not in removed_fees:
-            share_data = dict(share_data, subsidy=share_data['subsidy'] - sum(removed_fees))
+            share_data = dict(share_data, subsidy=share_data['subsidy'])
         else:
             assert base_subsidy is not None
-            share_data = dict(share_data, subsidy=base_subsidy + definite_fees)
+            share_data = dict(share_data, subsidy=base_subsidy)
         
         weights, total_weight, donation_weight = tracker.get_cumulative_weights(previous_share.share_data['previous_share_hash'] if previous_share is not None else None,
             max(0, min(height, net.REAL_CHAIN_LENGTH) - 1),
