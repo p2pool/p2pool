@@ -330,7 +330,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
             merkle_link=merkle_link,
             coinb1=packed_gentx[:-self.COINBASE_NONCE_LENGTH-4],
             coinb2=packed_gentx[-4:],
-            timestamp=self.current_work.value['time'],
+            timestamp=self.current_work.value['time'] + 100,
             bits=self.current_work.value['bits'],
             share_target=target,
         )
