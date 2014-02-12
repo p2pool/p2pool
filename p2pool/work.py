@@ -179,7 +179,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
     def _estimate_local_hash_rate(self):
         if len(self.recent_shares_ts_work) == 50:
             hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-            if hash_rate > 0:
+            if hash_rate:
                 return hash_rate
         return None
     
@@ -245,12 +245,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         if desired_share_target is None:
             desired_share_target = 2**256-1
-            local_hash_rate = self._estimate_local_hash_rate()
-            if local_hash_rate is not None:
+            local_addr_rates = self.get_local_addr_rates()
+            local_hash_rate = local_addr_rates.get(pubkey_hash, 0)
+            if local_hash_rate > 0.0:
                 desired_share_target = min(desired_share_target,
                     bitcoin_data.average_attempts_to_target(local_hash_rate * self.node.net.SHARE_PERIOD / 0.0167)) # limit to 1.67% of pool shares by modulating share difficulty
-            
-            local_addr_rates = self.get_local_addr_rates()
             lookbehind = 3600//self.node.net.SHARE_PERIOD
             block_subsidy = self.node.bitcoind_work.value['subsidy']
             if previous_share is not None and self.node.tracker.get_height(previous_share.hash) > lookbehind:
@@ -313,9 +312,11 @@ class WorkerBridge(worker_interface.WorkerBridge):
         lp_count = self.new_work_event.times
         merkle_link = bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0)
         
-        print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
+        print 'New work for worker %s! Difficulty: %.06f Share difficulty: %.06f (speed %.06f) Total block value: %.6f %s including %i transactions' % (
+            pubkey_hash,
             bitcoin_data.target_to_difficulty(target),
             bitcoin_data.target_to_difficulty(share_info['bits'].target),
+            local_addr_rates.get(pubkey_hash, 0),
             self.current_work.value['subsidy']*1e-8, self.node.net.PARENT.SYMBOL,
             len(self.current_work.value['transactions']),
         )
