@@ -32,7 +32,7 @@ class Protocol(p2protocol.Protocol):
                 port=self.transport.getHost().port,
             ),
             nonce=random.randrange(2**64),
-            sub_version_num='P2pool /LKY:', #'/P2Pool:%s/' % (p2pool.__version__,),
+            sub_version_num='P2pool /LKY: /AKC:', #'/P2Pool:%s/' % (p2pool.__version__,),
             start_height=0,
         )
     
