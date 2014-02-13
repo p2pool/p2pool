@@ -36,6 +36,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.removed_unstales_var = variable.Variable((0, 0, 0))
         self.removed_doa_unstales_var = variable.Variable(0)
         
+        self.last_work_shares = variable.Variable( {} )
         
         self.my_share_hashes = set()
         self.my_doa_share_hashes = set()
@@ -319,6 +320,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
             self.current_work.value['subsidy']*1e-8, self.node.net.PARENT.SYMBOL,
             len(self.current_work.value['transactions']),
         )
+
+        #need this for stats
+        self.last_work_shares.value[bitcoin_data.pubkey_hash_to_address(pubkey_hash, self.node.net.PARENT)]=share_info['bits']
         
         ba = dict(
             version=min(self.current_work.value['version'], 2),
