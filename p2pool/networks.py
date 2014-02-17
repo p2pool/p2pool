@@ -807,6 +807,24 @@ nets = dict(
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
+    polishcoin=math.Object(
+        PARENT=networks.nets['polishcoin'],
+        SHARE_PERIOD=10, # seconds
+        CHAIN_LENGTH=4*60*60//10, # shares
+        REAL_CHAIN_LENGTH=4*60*60//10, # shares
+        TARGET_LOOKBEHIND=20, # shares
+        SPREAD=120, # blocks
+        IDENTIFIER='a0ffe405a16b99fb'.decode('hex'),
+        PREFIX='afa00aeffe4004c9'.decode('hex'),
+        P2P_PORT=4823,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=False,
+        WORKER_PORT=9995,
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net doge.dtdns.net pool.hostv.pl p2pool.org p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org taken.pl'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-alt',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():
