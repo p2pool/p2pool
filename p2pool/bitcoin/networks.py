@@ -788,7 +788,7 @@ nets = dict(
         )),
 	SUBSIDY_FUNC=lambda height: 1000*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
-        BLOCK_PERIOD=30, # s
+        BLOCK_PERIOD=60, # s
         SYMBOL='MEOW',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'kittehcoin') 
 		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/kittehcoin/') 
