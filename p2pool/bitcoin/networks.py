@@ -954,7 +954,7 @@ nets = dict(
     ),
     polishcoin=math.Object(
         P2P_PREFIX='fcd9b7dd'.decode('hex'), #pchmessagestart
-        P2P_PORT=4822,
+        P2P_PORT=4824,
         ADDRESS_VERSION=22, #pubkey_address
         RPC_PORT=4822,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
