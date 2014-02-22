@@ -176,19 +176,19 @@ nets = dict(
     ),
     digitalcoin=math.Object(
         PARENT=networks.nets['digitalcoin'],
-        SHARE_PERIOD=15, # seconds target spacing
+        SHARE_PERIOD=10, # seconds target spacing
         CHAIN_LENGTH=24*60*60//10, # shares
-        REAL_CHAIN_LENGTH=3*60*60//15, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
         TARGET_LOOKBEHIND=200, # shares coinbase maturity
         SPREAD=45, # blocks
-        IDENTIFIER='7696CF5EB2F68C88'.decode('hex'),
-        PREFIX='4C2307E841C11FDD'.decode('hex'),
+        IDENTIFIER='797EC5BC40AFA22E'.decode('hex'),
+        PREFIX='23CD74AF85036A9F'.decode('hex'),
         P2P_PORT=23610,
         MIN_TARGET=0,
         MAX_TARGET=2**256//2**20 - 1,
         PERSIST=False,
         WORKER_PORT=8810,
-        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net doge.dtdns.net pool.hostv.pl p2pool.org p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org dgc.xpool.net'.split(' '),
+        BOOTSTRAP_ADDRS='p2pool-eu.gotgeeks.com p2pool-us.gotgeeks.com rav3n.dtdns.net doge.dtdns.net pool.hostv.pl p2pool.org p2pool.gotgeeks.com p2pool.dtdns.net solidpool.org xpool.net'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
