@@ -976,7 +976,7 @@ nets = dict(
         DUST_THRESHOLD=0.03e8,
     ),
     Coin=math.Object(
-        P2P_PREFIX='aac5bfd1'.decode('hex'), #pchmessagestart
+        P2P_PREFIX='a9c5bdd1'.decode('hex'), #pchmessagestart
         P2P_PORT=24057,
         ADDRESS_VERSION=28, #pubkey_address
         RPC_PORT=24055,
