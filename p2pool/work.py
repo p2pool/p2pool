@@ -333,8 +333,12 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
             difficulty = bitcoin_data.target_to_difficulty(target)
             rounded_difficulty = 1
-            while (rounded_difficulty + rounded_difficulty * 2) / 2 < difficulty:
-                rounded_difficulty = rounded_difficulty * 2
+            if difficulty >= 1:
+                while (rounded_difficulty + rounded_difficulty * 2) / 2 < difficulty:
+                    rounded_difficulty = rounded_difficulty * 2
+            else:
+                while (rounded_difficulty + rounded_difficulty / 2) / 2 >= difficulty:
+                    rounded_difficulty = rounded_difficulty / 2
             target = bitcoin_data.difficulty_to_target(rounded_difficulty)
         else:
             target = desired_pseudoshare_target

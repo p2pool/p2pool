@@ -438,7 +438,7 @@ def run():
         type=float, action='store', default=None, dest='address_share_rate')
     worker_group.add_argument('--min-difficulty', metavar='DIFFICULTY',
         help='minium difficulty for miners',
-        type=int, action='store', default=1, dest='min_difficulty')
+        type=float, action='store', default=1.0, dest='min_difficulty')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
