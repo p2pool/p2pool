@@ -43,9 +43,10 @@ Official wiki :
 -------------------------
 https://en.bitcoin.it/wiki/P2Pool
 
-Alternate web front end :
+Alternate web front ends :
 -------------------------
 * https://github.com/hardcpp/P2PoolExtendedFrontEnd
+* https://github.com/johndoe75/p2pool-node-status
 
 Notes for Litecoin:
 =========================
