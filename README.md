@@ -94,6 +94,11 @@ and restart litecoind:
     rpcport=10332
     port=10333
 
+Notes for DigiByte:
+-------------------------
+Digibyte implements a custom subsidy function, that you need to build in order to successfully
+run your P2Pool node. See digibyte_subsidy/README.txt for installation details.
+
 Sponsors:
 -------------------------
 
