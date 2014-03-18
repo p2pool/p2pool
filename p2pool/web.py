@@ -103,7 +103,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             pool_nonstale_hash_rate=nonstale_hash_rate,
             pool_hash_rate=nonstale_hash_rate/(1 - stale_prop),
             pool_stale_prop=stale_prop,
-            min_difficulty=bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target),
+            min_difficulty=bitcoin_data.target_to_difficulty_alt(node.tracker.items[node.best_share_var.value].max_target, node.net.PARENT.DUMB_SCRYPT_DIFF),
         )
     
     def get_local_stats():
@@ -192,7 +192,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     def decent_height():
         return min(node.tracker.get_height(node.best_share_var.value), 720)
     web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, decent_height())/(1-p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, decent_height()))))
-    web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target)))
+    web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty_alt(node.tracker.items[node.best_share_var.value].max_target, node.net.PARENT.DUMB_SCRYPT_DIFF)))
     web_root.putChild('users', WebInterface(get_users))
     web_root.putChild('user_stales', WebInterface(lambda: dict((bitcoin_data.pubkey_hash_to_address(ph, node.net.PARENT), prop) for ph, prop in
         p2pool_data.get_user_stale_props(node.tracker, node.best_share_var.value, node.tracker.get_height(node.best_share_var.value)).iteritems())))
@@ -443,6 +443,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
-    web_root.putChild('static', static.File(os.path.join(os.path.dirname(sys.argv[0]), 'web-static')))
+    web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))
     
     return web_root

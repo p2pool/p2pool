@@ -150,13 +150,13 @@ class WorkerBridge(worker_interface.WorkerBridge):
         for symbol, parameter in zip(contents2[::2], contents2[1::2]):
             if symbol == '+':
                 try:
-                    desired_pseudoshare_target = bitcoin_data.difficulty_to_target(float(parameter))
+                    desired_pseudoshare_target = bitcoin_data.difficulty_to_target_alt(float(parameter), self.node.net.PARENT.DUMB_SCRYPT_DIFF)
                 except:
                     if p2pool.DEBUG:
                         log.err()
             elif symbol == '/':
                 try:
-                    desired_share_target = bitcoin_data.difficulty_to_target(float(parameter))
+                    desired_share_target = bitcoin_data.difficulty_to_target_alt(float(parameter), self.node.net.PARENT.DUMB_SCRYPT_DIFF)
                 except:
                     if p2pool.DEBUG:
                         log.err()
@@ -182,7 +182,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
     def _estimate_local_hash_rate(self):
         if len(self.recent_shares_ts_work) == 50:
             hash_rate = sum(work for ts, work in self.recent_shares_ts_work[1:])//(self.recent_shares_ts_work[-1][0] - self.recent_shares_ts_work[0][0])
-            if hash_rate:
+            if hash_rate > 0:
                 return hash_rate
         return None
     
@@ -352,8 +352,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         merkle_link = bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0)
         
         print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
-            bitcoin_data.target_to_difficulty(target),
-            bitcoin_data.target_to_difficulty(share_info['bits'].target),
+            bitcoin_data.target_to_difficulty_alt(target, self.node.net.PARENT.DUMB_SCRYPT_DIFF),
+            bitcoin_data.target_to_difficulty_alt(share_info['bits'].target, self.node.net.PARENT.DUMB_SCRYPT_DIFF),
             self.current_work.value['subsidy']*1e-8, self.node.net.PARENT.SYMBOL,
             len(self.current_work.value['transactions']),
         )
