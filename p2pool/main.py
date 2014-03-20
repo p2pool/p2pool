@@ -289,7 +289,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                     print 'IRC connection lost:', reason.getErrorMessage()
             class IRCClientFactory(protocol.ReconnectingClientFactory):
                 protocol = IRCClient
-            reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory())
+            reactor.connectTCP("irc.freenode.net", 6667, IRCClientFactory(), bindAddress=(worker_endpoint[0], 0))
         
         @defer.inlineCallbacks
         def status_thread():

@@ -72,13 +72,15 @@ add_dicts = add_dicts_ext()
 
 mult_dict = lambda c, x: dict((k, c*v) for k, v in x.iteritems())
 
-def format(x):
+def format(x, add_space=False):
     prefixes = 'kMGTPEZY'
     count = 0
     while x >= 100000 and count < len(prefixes) - 2:
         x = x//1000
         count += 1
     s = '' if count == 0 else prefixes[count - 1]
+    if add_space and s:
+        s = ' ' + s
     return '%i' % (x,) + s
 
 def format_dt(dt):
