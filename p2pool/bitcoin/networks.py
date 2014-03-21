@@ -640,9 +640,9 @@ nets = dict(
         BLOCK_PERIOD=60, # s
         SYMBOL='USDe',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'usde') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/usde/') if platform.system() == 'Darwin' else os.path.expanduser('~/.usde'), 'usde.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://usdeexplorer.com/block/', #dummy
-        ADDRESS_EXPLORER_URL_PREFIX='http://usdeexplorer.com/address/',
-        TX_EXPLORER_URL_PREFIX='http://usdeexplorer.com/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://altexplorer.net/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='https://altexplorer.net/address/',
+        TX_EXPLORER_URL_PREFIX='https://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
@@ -788,7 +788,7 @@ nets = dict(
         )),
 	SUBSIDY_FUNC=lambda height: 1000*100000000,
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
-        BLOCK_PERIOD=30, # s
+        BLOCK_PERIOD=60, # s
         SYMBOL='MEOW',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'kittehcoin') 
 		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/kittehcoin/') 
@@ -816,9 +816,9 @@ nets = dict(
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'LeafCoin') 
 		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Leafcoin/') 
 		if platform.system() == 'Darwin' else os.path.expanduser('~/.leafcoin'), 'leafcoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://explorer.leafco.in/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://explorer.leafco.in/address/',
-        TX_EXPLORER_URL_PREFIX='http://explorer.leafco.in/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer2.leafco.in/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://explorer2.leafco.in/address/',
+        TX_EXPLORER_URL_PREFIX='http://explorer2.leafco.in/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.03e8,
@@ -860,9 +860,9 @@ nets = dict(
         BLOCK_PERIOD=60, # s
         SYMBOL='RDD',
         CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Reddcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Reddcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.reddcoin'), 'reddcoin.conf'),
-        BLOCK_EXPLORER_URL_PREFIX='http://altexplorer.net/block/',
-        ADDRESS_EXPLORER_URL_PREFIX='http://altexplorer.net/address/',
-        TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
+        BLOCK_EXPLORER_URL_PREFIX='http://cryptexplorer.com/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://cryptexplorer.com/address/',
+        TX_EXPLORER_URL_PREFIX='http://cryptexplorer.com/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0,
@@ -917,7 +917,7 @@ nets = dict(
             'digibyteaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
-        SUBSIDY_FUNC=lambda height: 8000*100000000 >> (height + 1)//1051200,
+        SUBSIDY_FUNC=lambda height: __import__('digibyte_subsidy').GetBlockBaseValue(height),
         POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
         BLOCK_PERIOD=60, # s
         SYMBOL='DGB',
@@ -929,6 +929,97 @@ nets = dict(
         DUMB_SCRYPT_DIFF=2**16,
         DUST_THRESHOLD=0.0001,
     ),
+    antikeiser=math.Object(
+        P2P_PREFIX='fbc0c0c0'.decode('hex'), #pchmessagestart
+        P2P_PORT=39919,
+        ADDRESS_VERSION=23, #pubkey_address
+        RPC_PORT=39918,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'antikeiser' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 40000*100000000 >> (height + 1)//12000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=120, # seconds
+        SYMBOL='AKC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'AntiKeiserCoin') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/AntiKesierCoin/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.antikeisercoin'), 'antikeisercoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://altexplorer.net/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://altexplorer.net/address/',
+        TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
+    ),
+    polishcoin=math.Object(
+        P2P_PREFIX='fcd9b7dd'.decode('hex'), #pchmessagestart
+        P2P_PORT=4824,
+        ADDRESS_VERSION=22, #pubkey_address
+        RPC_PORT=4822,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'polishcoin' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 100*150000000 >> (height + 1)//750000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # seconds
+        SYMBOL='PCC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'PolishCoin') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/PolishCoin/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.polishcoin'), 'polishcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://altexplorer.net/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://altexplorer.net/address/',
+        TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
+    ),
+    Coin=math.Object(
+        P2P_PREFIX='a9c5bdd1'.decode('hex'), #pchmessagestart
+        P2P_PORT=24057,
+        ADDRESS_VERSION=28, #pubkey_address
+        RPC_PORT=24055,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'Coinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 0*1200000000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # seconds
+        SYMBOL='COIN',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Coin') 
+		if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Coin/') 
+		if platform.system() == 'Darwin' else os.path.expanduser('~/.Coin'), 'Coin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer.coin-project.org/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://explorer.coin-project.org/address/',
+        TX_EXPLORER_URL_PREFIX='http://explorer.coin-project.org/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
+    ),
+    fckbankscoin=math.Object(
+        P2P_PREFIX='fcd9b7dd'.decode('hex'), #stripped from fckbankscoind's main.cpp -> pchMessageStart[4] = { 0xfc, 0xd9, 0xb7, 0xdd };
+        P2P_PORT=21779, #fckbankscoind 's p2p port
+        ADDRESS_VERSION=36, #look again in the sourcecode in the file base58.h, and find the value of PUBKEY_ADDRESS.
+        RPC_PORT=21778, #fckbankscoind 's rpc port
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'fckbankscoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 100000*100000000 >> (height + 1)//100000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=60, # one block generation time
+        SYMBOL='FCK',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'fckbankscoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/fckbankscoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.fckbankscoin'), 'fckbankscoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer.fckbanks.org/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://explorer.fckbanks.org/address/',
+        TX_EXPLORER_URL_PREFIX='http://explorer.fckbanks.org/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1), #??
+        DUMB_SCRYPT_DIFF=2**16, #??
+        DUST_THRESHOLD=0.03e8, #??
+    ),
+
 
 )
 for net_name, net in nets.iteritems():
