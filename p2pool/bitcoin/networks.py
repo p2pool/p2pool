@@ -161,7 +161,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://sbc.blockexplorer.io/tx/',
 	SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     zetacoin=math.Object(
         P2P_PREFIX='fab503df'.decode('hex'), #chainparams.cpp pchMessageStart
@@ -182,7 +182,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://bit.usr.sh:2750/tx/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     feathercoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -203,7 +203,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://cryptocoinexplorer.com:5750/transaction/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     digitalcoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -224,7 +224,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://dgc.cryptocoinexplorer.com/transaction/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     worldcoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -245,7 +245,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://wdc.cryptocoinexplorer.com/transaction/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     doubloons=math.Object(
         P2P_PREFIX='fcd9b7dd'.decode('hex'),
@@ -266,7 +266,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://explorer.doubloons.net/transaction/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     casinocoin=math.Object(
         P2P_PREFIX='fac3b6da'.decode('hex'),
@@ -287,7 +287,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://casinocoin.mooo.com/transaction/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     bytecoin=math.Object(
         P2P_PREFIX='f9beef69'.decode('hex'),
@@ -308,7 +308,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://blockexplorer.bytecoin.in/transaction/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     asiccoin=math.Object(
         P2P_PREFIX='fab5e8db'.decode('hex'),
@@ -329,7 +329,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://bit.usr.sh:2750/tx/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     joulecoin=math.Object(
         P2P_PREFIX='a5c07955'.decode('hex'),
@@ -350,7 +350,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://xjo-explorer.cryptohaus.com:2750/tx/',
         SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.001e8,
     ),
     unobtanium=math.Object(
         P2P_PREFIX='03d5b503'.decode('hex'), #messagestart
@@ -371,7 +371,7 @@ nets = dict(
 	TX_EXPLORER_URL_PREFIX='http://bit.usr.sh:2750/tx/',
 	SANE_TARGET_RANGE=(2**256//2**32//1000 - 1, 2**256//2**32 - 1),
         DUMB_SCRYPT_DIFF=1,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.00001e8,
     ),
     dogecoin=math.Object(
         P2P_PREFIX='c0c0c0c0'.decode('hex'),
@@ -666,7 +666,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://cryptexplorer.com/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0,
+        DUST_THRESHOLD=0.0001e8,
     ),
     polcoin=math.Object(
         P2P_PREFIX='a5725982'.decode('hex'), #pchmessagestart
@@ -729,7 +729,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.00001,
+        DUST_THRESHOLD=0.001e8,
     ),
     argentum=math.Object(
         P2P_PREFIX='fbc1b8dc'.decode('hex'), #pchmessagestart
@@ -752,7 +752,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://arg.webboise.com/chain/Argentum/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0,
+        DUST_THRESHOLD=0.0001e8,
     ),
     smartcoin=math.Object(
         P2P_PREFIX='defaced0'.decode('hex'), #pchmessagestart
@@ -775,7 +775,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0,
+        DUST_THRESHOLD=0.0001e8,
     ),
     kittehcoin=math.Object(
         P2P_PREFIX='c0c0c0c0'.decode('hex'), #pchmessagestart
@@ -798,7 +798,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://kitexplorer.tk/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.000001,
+        DUST_THRESHOLD=0.00001e8,
     ),
     leafcoin=math.Object(
         P2P_PREFIX='aaaaaacc'.decode('hex'), #pchmessagestart
@@ -844,7 +844,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.0001,
+        DUST_THRESHOLD=0.001e8,
     ),
     reddcoin=math.Object(
         P2P_PREFIX='fbc0b6db'.decode('hex'),
@@ -906,7 +906,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.0001,
+        DUST_THRESHOLD=0.0001e8,
     ),
     digibyte=math.Object(
         P2P_PREFIX='fac3b6da'.decode('hex'), #pchmessagestart
@@ -927,7 +927,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://altexplorer.net/tx/',
         SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=0.0001,
+        DUST_THRESHOLD=0.0001e8,
     ),
     antikeiser=math.Object(
         P2P_PREFIX='fbc0c0c0'.decode('hex'), #pchmessagestart
