@@ -206,7 +206,7 @@ nets = dict(
         TX_EXPLORER_URL_PREFIX='http://fst.webboise.com/tx/',
         SANE_TARGET_RANGE=(2**256//100000000 - 1, 2**256//1000 - 1),
         DUMB_SCRYPT_DIFF=2**16,
-        DUST_THRESHOLD=1e8,
+        DUST_THRESHOLD=0.03e8,
     ),
 
 )
