@@ -143,6 +143,43 @@ nets = dict(
         VERSION_CHECK=lambda v: True,
         VERSION_WARNING=lambda v: 'Upgrade Fastcoin to >= 0.8.5.1!' if v < 70002 else None,
     ),
+    nrjcoin=math.Object(
+        PARENT=networks.nets['nrjcoin'],
+        SHARE_PERIOD=15, # seconds
+        CHAIN_LENGTH=24*60*60//10, # shares
+        REAL_CHAIN_LENGTH=24*60*60//10, # shares
+        TARGET_LOOKBEHIND=200, # shares
+        SPREAD=3, # blocks
+        IDENTIFIER='e037d5b8c6923410'.decode('hex'),
+        PREFIX='7208c1a53ef629b0'.decode('hex'),
+        P2P_PORT=10338,
+        MIN_TARGET=0,
+        MAX_TARGET=2**256//2**20 - 1,
+        PERSIST=True,
+        WORKER_PORT=10327,
+        BOOTSTRAP_ADDRS='p2pool.nrjcoin.net p2pool.nrjcoin.org dnsseed.nrjcoin.info dnsseed.cluentio.com'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-nrc',
+        VERSION_CHECK=lambda v: True,
+        VERSION_WARNING=lambda v: 'Upgrade nrjcoin to >=0.8.5.1!' if v < 80501 else None,
+    ),
+    nrjcoin_testnet=math.Object(
+        PARENT=networks.nets['nrjcoin_testnet'],
+        SHARE_PERIOD=4, # seconds
+        CHAIN_LENGTH=20*60//3, # shares
+        REAL_CHAIN_LENGTH=20*60//3, # shares
+        TARGET_LOOKBEHIND=200, # shares
+        SPREAD=3, # blocks
+        IDENTIFIER='cca5e24ec6408b1e'.decode('hex'),
+        PREFIX='ad9614f6466a39cf'.decode('hex'),
+        P2P_PORT=20338,
+        MIN_TARGET=2**256//50 - 1,
+        MAX_TARGET=2**256//50 - 1,
+        PERSIST=False,
+        WORKER_PORT=20327,
+        BOOTSTRAP_ADDRS='testnet-seed.nrjcoin.org testnet-seed.nrjcoin.net testnet-seed.nrjcoin.info'.split(' '),
+        ANNOUNCE_CHANNEL='#p2pool-anr',
+        VERSION_CHECK=lambda v: True,
+    ),
 
 )
 for net_name, net in nets.iteritems():

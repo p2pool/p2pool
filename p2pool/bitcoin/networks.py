@@ -209,6 +209,49 @@ nets = dict(
         DUST_THRESHOLD=0.03e8,
     ),
 
+    nrjcoin=math.Object(
+        P2P_PREFIX='fbc0b6db'.decode('hex'),
+        P2P_PORT=10333,
+        ADDRESS_VERSION=53,
+        RPC_PORT=10332,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'nrjcoinaddress' in (yield bitcoind.rpc_help()) and
+            not (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=150, # s
+        SYMBOL='NRC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Nrjcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Nrjcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.nrjcoin'), 'nrjcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://explorer.nrjcoin.info/home/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://explorer.nrjcoin.info/home/address/',
+        TX_EXPLORER_URL_PREFIX='http://explorer.nrjcoin.info/home/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=0.03e8,
+    ),
+    nrjcoin_testnet=math.Object(
+        P2P_PREFIX='fcc1b7dc'.decode('hex'),
+        P2P_PORT=20333,
+        ADDRESS_VERSION=111,
+        RPC_PORT=20332,
+        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
+            'nrjcoinaddress' in (yield bitcoind.rpc_help()) and
+            (yield bitcoind.rpc_getinfo())['testnet']
+        )),
+        SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//840000,
+        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
+        BLOCK_PERIOD=150, # s
+        SYMBOL='tNRC',
+        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Nrjcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Nrjcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.nrjcoin'), 'nrjcoin.conf'),
+        BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-nrjcoin-testnet-explorer/block/',
+        ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-nrjcoin-testnet-explorer/address/',
+        TX_EXPLORER_URL_PREFIX='http://nonexistent-nrjcoin-testnet-explorer/tx/',
+        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256 - 1),
+        DUMB_SCRYPT_DIFF=2**16,
+        DUST_THRESHOLD=1e8,
+    ),
+
 )
 for net_name, net in nets.iteritems():
     net.NAME = net_name
