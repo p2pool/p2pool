@@ -895,7 +895,7 @@ nets = dict(
         MAX_TARGET=2**256//2**32 - 1,
         PERSIST=False,
         WORKER_PORT=9179,
-        BOOTSTRAP_ADDRS='rav3n.dtdns.net pool.hostv.pl p2pool.org solidpool.org taken.pl'.split(' '),
+        BOOTSTRAP_ADDRS='23.95.9.59 rav3n.dtdns.net pool.hostv.pl p2pool.org solidpool.org taken.pl'.split(' '),
         ANNOUNCE_CHANNEL='#p2pool-alt',
         VERSION_CHECK=lambda v: True,
     ),
