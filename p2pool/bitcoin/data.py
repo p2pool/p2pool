@@ -258,12 +258,9 @@ def pubkey_to_address(pubkey, net):
 
 def address_to_pubkey_hash(address, net):
     x = human_address_type.unpack(base58_decode(address))
-    if x['version'] == net.ADDRESS_VERSION:
-        return x['pubkey_hash']
-    elif x['version'] == net.ADDRESS_VERSION + 5:
-        return x['pubkey_hash'] # XXX script hash - handle specially
-    else:
-        raise ValueError('address not for this net! %r' % (address,))
+    if x['version'] != net.ADDRESS_VERSION:
+        raise ValueError('address not for this net!')
+    return x['pubkey_hash']
 
 # transactions
 
