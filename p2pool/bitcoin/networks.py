@@ -3,17 +3,9 @@ import platform
 
 from twisted.internet import defer
 
-from . import data
-from p2pool.util import math, pack, jsonrpc
+from . import data, helper
+from p2pool.util import math, pack
 
-@defer.inlineCallbacks
-def check_genesis_block(bitcoind, genesis_block_hash):
-    try:
-        yield bitcoind.rpc_getblock(genesis_block_hash)
-    except jsonrpc.Error_for_code(-5):
-        defer.returnValue(False)
-    else:
-        defer.returnValue(True)
 
 nets = dict(
     bitcoin=math.Object(
@@ -22,7 +14,7 @@ nets = dict(
         ADDRESS_VERSION=0,
         RPC_PORT=8332,
         RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            (yield check_genesis_block(bitcoind, '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')) and
+            (yield helper.check_genesis_block(bitcoind, '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         )),
         SUBSIDY_FUNC=lambda height: 50*100000000 >> (height + 1)//210000,
