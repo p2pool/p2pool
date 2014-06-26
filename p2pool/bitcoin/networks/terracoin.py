@@ -20,9 +20,9 @@ POW_FUNC = data.hash256
 BLOCK_PERIOD = 120 # s
 SYMBOL = 'TRC'
 CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Terracoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Terracoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.terracoin'), 'terracoin.conf')
-BLOCK_EXPLORER_URL_PREFIX = 'http://trc.cryptocoinexplorer.com/block/'
-ADDRESS_EXPLORER_URL_PREFIX = 'http://trc.cryptocoinexplorer.com/address/'
-TX_EXPLORER_URL_PREFIX = 'http://trc.cryptocoinexplorer.com/tx/'
+BLOCK_EXPLORER_URL_PREFIX = 'http://bitinfocharts.com/terracoin/blockhash/'
+ADDRESS_EXPLORER_URL_PREFIX = 'http://bitinfocharts.com/terracoin/address/'
+TX_EXPLORER_URL_PREFIX = 'http://bitinfocharts.com/terracoin/tx/'
 SANE_TARGET_RANGE = (2**256//2**32//1000 - 1, 2**256//2**32 - 1)
 DUMB_SCRYPT_DIFF = 1
 DUST_THRESHOLD = 1e8
