@@ -20,9 +20,9 @@ POW_FUNC = data.hash256
 BLOCK_PERIOD = 600 # s
 SYMBOL = 'tBTC'
 CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Bitcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Bitcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.bitcoin'), 'bitcoin.conf')
-BLOCK_EXPLORER_URL_PREFIX = 'http://blockexplorer.com/testnet/block/'
-ADDRESS_EXPLORER_URL_PREFIX = 'http://blockexplorer.com/testnet/address/'
-TX_EXPLORER_URL_PREFIX = 'http://blockexplorer.com/testnet/tx/'
+BLOCK_EXPLORER_URL_PREFIX = 'http://tbtc.blockr.io/block/info/'
+ADDRESS_EXPLORER_URL_PREFIX = 'http://tbtc.blockr.io/address/info/'
+TX_EXPLORER_URL_PREFIX = 'http://tbtc.blockr.io/tx/info/'
 SANE_TARGET_RANGE = (2**256//2**32//1000 - 1, 2**256//2**32 - 1)
 DUMB_SCRYPT_DIFF = 1
 DUST_THRESHOLD = 1e8
