@@ -1,4 +1,4 @@
-Requirements:
+Requirements & Installation:
 -------------------------
 Generic:
 * Bitcoin >=0.8.5
@@ -9,6 +9,8 @@ Generic:
 Linux:
 * sudo apt-get install python-zope.interface python-twisted python-twisted-web
 * sudo apt-get install python-argparse # if on Python 2.6
+* cd p2pool
+* make
 
 Windows:
 * Install Python 2.7: http://www.python.org/getit/
@@ -37,7 +39,7 @@ Run for additional options.
 
 Donations towards further development:
 -------------------------
-    1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+    1Fi7YbpTYjHynUqbh1vwPcAqAqwQzeC1gw
 
 Official wiki :
 -------------------------
@@ -45,7 +47,7 @@ https://en.bitcoin.it/wiki/P2Pool
 
 Alternate web front end :
 -------------------------
-* https://github.com/hardcpp/P2PoolExtendedFrontEnd
+* https://github.com/jramos/p2pool-node-status
 
 Notes for Litecoin:
 =========================
