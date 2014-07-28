@@ -9,6 +9,7 @@ Generic:
 Linux:
 * sudo apt-get install python-zope.interface python-twisted python-twisted-web
 * sudo apt-get install python-argparse # if on Python 2.6
+* git clone git@github.com:jramos/p2pool.git
 * cd p2pool
 * make
 
