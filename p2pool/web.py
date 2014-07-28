@@ -322,8 +322,12 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     def get_block(block_hash_str):
         block = node.bitcoind.rpc_getblock(block_hash_str)
         return block
-
     new_root.putChild('block', WebInterface(lambda block_hash_str: get_block(block_hash_str)))
+
+    def get_rawtransaction(transaction_hash_str):
+        rawtransaction = node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)
+        return rawtransaction
+    new_root.putChild('rawtransaction', WebInterface(lambda transaction_hash_str: get_rawtransaction(transaction_hash_str)))
 
     new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.heads]))
     new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.verified.heads]))
