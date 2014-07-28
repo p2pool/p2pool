@@ -1,4 +1,4 @@
-Requirements & Installation:
+Requirements & Installation :
 -------------------------
 Generic:
 * Bitcoin >=0.8.5
@@ -21,7 +21,7 @@ Windows:
 * Install python win32 api wmi wrapper: https://pypi.python.org/pypi/WMI/#downloads
 * Unzip the files into C:\Python27\Lib\site-packages
 
-Running P2Pool:
+Running P2Pool :
 -------------------------
 To use P2Pool, you must be running your own local bitcoind. For standard
 configurations, using P2Pool should be as simple as:
