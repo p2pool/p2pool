@@ -38,27 +38,57 @@ Run for additional options.
 
     python run_p2pool.py --help
 
-Litecoin:
+Web Interface :
+-------------------------
+* https://github.com/jramos/p2pool-node-status
+
+JSON API :
+-------------------------
+
+P2Pool exposes a JSON API to allow retrieving statistics about the node and the global P2Pool network. The endpoints are as follows:
+
+* /rate
+* /difficulty
+* /users
+* /user_stales
+* /fee
+* /current_payouts
+* /patron_sendmany - Gives sendmany outputs for fair donations to P2Pool
+* /global_stats
+* /local_stats
+* /peer_addresses
+* /peer\_txpool\_sizes
+* /pings
+* /peer_versions
+* /payout_addr
+* /recent_blocks
+* /uptime
+* /stale_rates
+* /web/log
+* /web/share/<share-id>
+
+This fork includes additional endpoints for use with the [p2pool-node-status](https://github.com/jramos/p2pool-node-status) web interface.
+
+* /web/block/<block-id>
+* /web/rawtransaction/<transaction-id>
+
+Official Wiki :
+-------------------------
+https://en.bitcoin.it/wiki/P2Pool
+
+Litecoin :
 -------------------------
 
 For Litecoin instructions, please see the [Litecoin README](README.LITECOIN.md).
 
-Donations towards further development:
--------------------------
-    1Fi7YbpTYjHynUqbh1vwPcAqAqwQzeC1gw
-
-Official wiki :
--------------------------
-https://en.bitcoin.it/wiki/P2Pool
-
-Alternate web front end :
--------------------------
-* https://github.com/jramos/p2pool-node-status
-
-Sponsors:
+Sponsors :
 -------------------------
 
 Thanks to:
 * The Bitcoin Foundation for its generous support of P2Pool
 * The Litecoin Project for its generous donations to P2Pool
 
+Donations :
+-------------------------
+    Forrest Voight, BTC 1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+    Justin Ramos, BTC 1Fi7YbpTYjHynUqbh1vwPcAqAqwQzeC1gw
