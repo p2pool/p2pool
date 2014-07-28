@@ -318,6 +318,13 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             ),
         )
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
+    
+    def get_block(block_hash_str):
+        block = node.bitcoind.rpc_getblock(block_hash_str)
+        return block
+
+    new_root.putChild('block', WebInterface(lambda block_hash_str: get_block(block_hash_str)))
+
     new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.heads]))
     new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.verified.heads]))
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in node.tracker.tails for x in node.tracker.reverse.get(t, set())]))
