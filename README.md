@@ -163,6 +163,15 @@ P2Pool exposes a JSON API to allow retrieving statistics about the node and the 
 * /stale_rates
 * /web/log
 * /web/share/&lt;share-hash&gt;
+* /web/heads
+* /web/verified_heads
+* /web/tails
+* /web/verified_tails
+* /web/best\_share\_hash
+* /web/my\_share\_hashes
+* /web/share_data
+* /web/currency_info
+* /web/version
 
 This fork includes additional endpoints for use with the [p2pool-node-status](https://github.com/jramos/p2pool-node-status) web interface.
 
