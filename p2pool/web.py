@@ -191,6 +191,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     
     def decent_height():
         return min(node.tracker.get_height(node.best_share_var.value), 720)
+
     web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, decent_height())/(1-p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, decent_height()))))
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target)))
     web_root.putChild('users', WebInterface(get_users))
@@ -318,17 +319,6 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             ),
         )
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
-    
-    def get_block(block_hash_str):
-        block = node.bitcoind.rpc_getblock(block_hash_str)
-        return block
-    new_root.putChild('block', WebInterface(lambda block_hash_str: get_block(block_hash_str)))
-
-    def get_rawtransaction(transaction_hash_str):
-        rawtransaction = node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)
-        return rawtransaction
-    new_root.putChild('rawtransaction', WebInterface(lambda transaction_hash_str: get_rawtransaction(transaction_hash_str)))
-
     new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.heads]))
     new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.verified.heads]))
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in node.tracker.tails for x in node.tracker.reverse.get(t, set())]))
@@ -454,6 +444,16 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
+    # expose various bitcoind RPC commands
+    bitcoind_root = resource.Resource()
+    bitcoind_root.putChild('block',             WebInterface(lambda block_hash_str: node.bitcoind.rpc_getblock(block_hash_str)))
+    bitcoind_root.putChild('rawtransaction',    WebInterface(lambda transaction_hash_str: node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)))
+    bitcoind_root.putChild('getblockchaininfo', WebInterface(node.bitcoind.rpc_getblockchaininfo))
+    bitcoind_root.putChild('getinfo',           WebInterface(node.bitcoind.rpc_getinfo))
+    bitcoind_root.putChild('getmininginfo',     WebInterface(node.bitcoind.rpc_getmininginfo))
+    bitcoind_root.putChild('getpeerinfo',       WebInterface(node.bitcoind.rpc_getpeerinfo))
+    web_root.putChild('bitcoind', bitcoind_root)
+
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))
     
     return web_root
