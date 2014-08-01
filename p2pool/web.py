@@ -447,11 +447,11 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     # expose various bitcoind RPC commands
     bitcoind_root = resource.Resource()
     bitcoind_root.putChild('block',             WebInterface(lambda block_hash_str: node.bitcoind.rpc_getblock(block_hash_str)))
-    bitcoind_root.putChild('rawtransaction',    WebInterface(lambda transaction_hash_str: node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)))
     bitcoind_root.putChild('getblockchaininfo', WebInterface(node.bitcoind.rpc_getblockchaininfo))
     bitcoind_root.putChild('getinfo',           WebInterface(node.bitcoind.rpc_getinfo))
     bitcoind_root.putChild('getmininginfo',     WebInterface(node.bitcoind.rpc_getmininginfo))
     bitcoind_root.putChild('getpeerinfo',       WebInterface(node.bitcoind.rpc_getpeerinfo))
+    bitcoind_root.putChild('rawtransaction',    WebInterface(lambda transaction_hash_str: node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)))
     web_root.putChild('bitcoind', bitcoind_root)
 
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))

@@ -175,8 +175,12 @@ P2Pool exposes a JSON API to allow retrieving statistics about the node and the 
 
 This fork includes additional endpoints for use with the [p2pool-node-status](https://github.com/jramos/p2pool-node-status) web interface.
 
-* /web/block/&lt;block-hash&gt;
-* /web/rawtransaction/&lt;tx-hash&gt;
+* /bitcoind/block/&lt;block-hash&gt;
+* /bitcoind/getblockchaininfo
+* /bitcoind/getinfo
+* /bitcoind/getmininginfo
+* /bitcoind/getpeerinfo
+* /bitcoind/rawtransaction/&lt;tx-hash&gt;
 
 Official Wiki :
 -------------------------
