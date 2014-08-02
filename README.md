@@ -202,3 +202,8 @@ Donations :
 -------------------------
     Forrest Voight, BTC 1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
     Justin Ramos, BTC 1Fi7YbpTYjHynUqbh1vwPcAqAqwQzeC1gw
+
+License :
+-------------------------
+
+Code released under [the GPLv3 license](COPYING).
