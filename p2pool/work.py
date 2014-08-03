@@ -169,7 +169,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
     	    height = self.node.tracker.get_height(self.node.best_share_var.value)
     	    if height > 5: # we want at least 6 shares in chain
     	        stale_prop = p2pool_data.get_average_stale_prop(self.node.tracker, self.node.best_share_var.value, min(60*60//self.node.net.SHARE_PERIOD, height))
-    		    pool_rate = p2pool_data.get_pool_attempts_per_second(self.node.tracker, self.node.best_share_var.value, min(height - 1, 60*60//self.node.net.SHARE_PERIOD)) / (1 - stale_prop)
+                pool_rate = p2pool_data.get_pool_attempts_per_second(self.node.tracker, self.node.best_share_var.value, min(height - 1, 60*60//self.node.net.SHARE_PERIOD)) / (1 - stale_prop)
 	
     	if set_adaptive_pseudo or set_adaptive_target: # calculate user's hashrate
     	    datums, dt = self.local_rate_monitor.get_datums_in_last()
