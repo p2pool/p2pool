@@ -191,11 +191,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
             desired_pseudoshare_target = None
             if user_rate is not None:
                 if user_rate:
-                    desired_pseudoshare_target = 20 * (2**256 // user_rate // (10*60)) # min 20 pseudoshares per 10 minutes
+                    # min 20 pseudoshares per 10 minutes
+                    desired_pseudoshare_target = 20 * (2**256 // user_rate // (10*60))
 	
-        if desired_share_target is None:
-            desired_share_target = 2**256 - 1
-
         if random.uniform(0, 100) < self.worker_fee:
             pubkey_hash = self.my_pubkey_hash
         else:
