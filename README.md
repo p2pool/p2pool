@@ -55,6 +55,7 @@ Option Reference :
                          [-n ADDR[:PORT]] [--disable-upnp] [--max-conns CONNS]
                          [--outgoing-conns CONNS] [--disable-advertise]
                          [-w PORT or ADDR:PORT] [-f FEE_PERCENTAGE]
+                         [-d DIFFICULTY]
                          [--bitcoind-config-path BITCOIND_CONFIG_PATH]
                          [--bitcoind-address BITCOIND_ADDRESS]
                          [--bitcoind-rpc-port BITCOIND_RPC_PORT]
@@ -117,6 +118,9 @@ Option Reference :
                             this percentage fee to mine on your p2pool instance.
                             Amount displayed at http://127.0.0.1:WORKER_PORT/fee
                             (default: 0)
+      -d DIFFICULTY, --difficulty DIFFICULTY
+                            set difficulty policy: D - default, A - adaptive, F -
+                            force adaptive (ignore miner's request)
     
     bitcoind interface:
       --bitcoind-config-path BITCOIND_CONFIG_PATH
