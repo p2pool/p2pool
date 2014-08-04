@@ -24,7 +24,7 @@ Windows:
 Note :
 -------------------------
 
-This P2Pool fork includes the adaptive difficulty patch from [https://github.com/baloo-kiev/p2pool-adaptive](https://github.com/baloo-kiev/p2pool-adaptive/commit/10e59b9564740c6b039380b5b86fdf8071543f48).
+This P2Pool fork includes the adaptive difficulty patch from [https://github.com/baloo-kiev/p2pool-adaptive](https://github.com/baloo-kiev/p2pool-adaptive/commit/10e59b9564740c6b039380b5b86fdf8071543f48). By default, adaptive difficuly is used but miner overrides are allowed.
 
 Running P2Pool :
 -------------------------
