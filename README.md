@@ -148,6 +148,10 @@ Web Interface :
 -------------------------
 * https://github.com/jramos/p2pool-node-status
 
+### Installation :
+
+    git submodule update
+
 JSON API :
 -------------------------
 
