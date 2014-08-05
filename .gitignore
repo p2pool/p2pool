@@ -11,5 +11,3 @@ Makefile.local
 .coverage
 build/
 ltc_scrypt.so
-
-/web-static/

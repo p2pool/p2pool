@@ -1,0 +1,3 @@
+[submodule "web-static"]
+	path = web-static
+	url = https://github.com/jramos/p2pool-node-status
