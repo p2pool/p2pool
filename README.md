@@ -182,7 +182,7 @@ P2Pool exposes a JSON API to allow retrieving statistics about the node and the 
 * /web/verified_tails
 * /web/best\_share\_hash
 * /web/my\_share\_hashes
-* /web/share_data
+* /web/share_data/&lt;share-hash&gt;
 * /web/currency_info
 * /web/version
 
