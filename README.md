@@ -146,7 +146,8 @@ Option Reference
 
 Web Interface
 -------------------------
-* https://github.com/jramos/p2pool-node-status
+
+[https://github.com/jramos/p2pool-node-status](https://github.com/jramos/p2pool-node-status)
 
 ### Installation
 
