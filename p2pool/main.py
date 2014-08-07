@@ -508,9 +508,6 @@ def run():
     if args.p2pool_port is None:
         args.p2pool_port = net.P2P_PORT
     
-    if args.p2pool_outgoing_conns > 10:
-        parser.error('''--outgoing-conns can't be more than 10''')
-    
     if args.worker_endpoint is None:
         worker_endpoint = '', net.WORKER_PORT
     elif ':' not in args.worker_endpoint:
