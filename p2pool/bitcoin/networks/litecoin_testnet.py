@@ -21,8 +21,8 @@ BLOCK_PERIOD = 150 # s
 SYMBOL = 'tLTC'
 CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Litecoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Litecoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.litecoin'), 'litecoin.conf')
 BLOCK_EXPLORER_URL_PREFIX = 'http://nonexistent-litecoin-testnet-explorer/block/'
-ADDRESS_EXPLORER_URL_PREFIX = 'http://nonexistent-litecoin-testnet-explorer/address/'
-TX_EXPLORER_URL_PREFIX = 'http://nonexistent-litecoin-testnet-explorer/tx/'
+ADDRESS_EXPLORER_URL_PREFIX = 'https://chain.so/address/LTCTEST/'
+TX_EXPLORER_URL_PREFIX = 'https://chain.so/tx/LTCTEST/'
 SANE_TARGET_RANGE = (2**256//1000000000 - 1, 2**256 - 1)
 DUMB_SCRYPT_DIFF = 2**16
 DUST_THRESHOLD = 1e8
