@@ -160,8 +160,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
                         log.err()
 
 	
-        set_adaptive_target = (self.diff_policy == 'F') or ((self.diff_policy == 'D') and (desired_share_target is None))
-        set_adaptive_pseudo = (self.diff_policy == 'F') or ((self.diff_policy == 'D') and (desired_pseudoshare_target is None))
+        set_adaptive_target = (self.diff_policy == 'F') or ((self.diff_policy == 'A') and (desired_share_target is None))
+        set_adaptive_pseudo = (self.diff_policy == 'F') or ((self.diff_policy == 'A') and (desired_pseudoshare_target is None))
         user_rate = None
         pool_rate = None
         
