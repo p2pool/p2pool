@@ -130,6 +130,11 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         
         miner_hash_rates, miner_dead_hash_rates = wb.get_local_rates()
         (stale_orphan_shares, stale_doa_shares), shares, _ = wb.get_stale_counts()
+
+        unknown_shares = 0
+        for share_hash_str in wb.my_share_hashes:
+            if int(share_hash_str, 16) not in node.tracker.items:
+                unknown_shares += 1
         
         return dict(
             my_hash_rates_in_last_hour=dict(
@@ -162,6 +167,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 total=shares,
                 orphan=stale_orphan_shares,
                 dead=stale_doa_shares,
+                unknown=unknown_shares,
             ),
             uptime=time.time() - start_time,
             attempts_to_share=bitcoin_data.target_to_average_attempts(node.tracker.items[node.best_share_var.value].max_target),
