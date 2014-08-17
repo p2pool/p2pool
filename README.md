@@ -21,11 +21,6 @@ Windows:
 * Install python win32 api wmi wrapper: https://pypi.python.org/pypi/WMI/#downloads
 * Unzip the files into C:\Python27\Lib\site-packages
 
-Note
--------------------------
-
-This P2Pool fork incorporates the adaptive difficulty patch from [https://github.com/baloo-kiev/p2pool-adaptive](https://github.com/baloo-kiev/p2pool-adaptive/commit/10e59b9564740c6b039380b5b86fdf8071543f48) By default, the standard p2pool difficulty is used. When started with the ``-A`` option, adaptive difficuly is used but miner overrides are allowed. When started with the ``-F`` option, adaptive difficulty is forced.
-
 Running P2Pool
 -------------------------
 To use P2Pool, you must be running your own local bitcoind. For standard
