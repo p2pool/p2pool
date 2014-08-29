@@ -23,6 +23,7 @@ import bitcoin.p2p as bitcoin_p2p, bitcoin.data as bitcoin_data
 from bitcoin import stratum, worker_interface, helper
 from util import fixargparse, jsonrpc, variable, deferral, math, logging, switchprotocol
 from . import networks, web, work
+from relaynetwork import RelayNetworkToP2PManager
 import p2pool, p2pool.data as p2pool_data, p2pool.node as p2pool_node
 
 @defer.inlineCallbacks
@@ -113,6 +114,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print "    ...done loading %i shares (%i verified)!" % (len(shares), len(known_verified))
         print
         
+        if args.relay_network_node is not None:
+            RelayNetworkToP2PManager(args.relay_network_node, (args.bitcoind_address, args.bitcoind_p2p_port))
         
         print 'Initializing work...'
         
@@ -393,6 +396,9 @@ def run():
     parser.add_argument('--irc-announce',
         help='announce any blocks found on irc://irc.freenode.net/#p2pool',
         action='store_true', default=False, dest='irc_announce')
+    parser.add_argument('--relay-network',
+        help='connect to the Bitcoin Relay Network for an expedited and backup block relay mechanism',
+        type=str, action='store', default=None, dest='relay_network_node')
     parser.add_argument('--no-bugreport',
         help='disable submitting caught exceptions to the author',
         action='store_true', default=False, dest='no_bugreport')
@@ -455,6 +461,9 @@ def run():
     
     net_name = args.net_name + ('_testnet' if args.testnet else '')
     net = networks.nets[net_name]
+
+    if net_name != "bitcoin" and args.relay_network_node is not None:
+        parser.error('Cannot use the relay network except on bitcoin mainnet')
     
     datadir_path = os.path.join((os.path.join(os.path.dirname(sys.argv[0]), 'data') if args.datadir is None else args.datadir), net_name)
     if not os.path.exists(datadir_path):
