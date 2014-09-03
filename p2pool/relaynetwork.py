@@ -13,11 +13,12 @@ try:
 	from collections import OrderedDict # Python 3.1
 except ImportError:
 	from ordereddict import OrderedDict # PIP
-try:
-	from bitcoin.core import CBlockHeader, CBlock, CTransaction, b2lx
-	deserialize_utils = True
-except ImportError:
-	deserialize_utils = False
+
+#try:
+#	from bitcoin.core import CBlockHeader, CBlock, CTransaction, b2lx
+#	deserialize_utils = True
+#except ImportError:
+deserialize_utils = False
 
 try:
 	import __pypy__
@@ -167,7 +168,7 @@ class RelayNetworkClient:
 					version = sock_recv(self.relay_sock, msg_header[2])
 					if version != self.VERSION_STRING:
 						raise ProtocolError("Got back unknown version type " + str(version))
-					print("Connected to relay node with protocol version " + str(version))
+					print("RELAY NETWORK: Connected to relay node with protocol version " + str(version))
 				elif msg_header[1] == self.BLOCK_TYPE:
 					if msg_header[2] > 10000:
 						raise ProtocolError("Got a BLOCK message with far too many transactions: " + str(msg_header[2]))
@@ -204,8 +205,8 @@ class RelayNetworkClient:
 							if deserialize_utils:
 								transaction = CTransaction.deserialize(transaction_data)
 								print("Got in-block full transaction: " + str(b2lx(transaction.GetHash())) + " of length " + str(data_length))
-							else:
-								print("Got in-block full transaction of length " + str(data_length))
+							#else:
+								#print("Got in-block full transaction of length " + str(data_length))
 							block_data += transaction_data
 						else:
 							transaction_data = self.recv_transaction_cache.get_by_index(index)
@@ -221,7 +222,7 @@ class RelayNetworkClient:
 						block = CBlock.deserialize(block_data)
 						print("Deserialized full block " + str(b2lx(block.GetHash())))
 					else:
-						print("Got full block with " + str(msg_header[2]) + " transactions in " + str(wire_bytes) + " wire bytes")
+						print("RELAY NETWORK: Got full block with " + str(msg_header[2]) + " transactions in " + str(wire_bytes) + " wire bytes")
 
 					if unpack('>3I', sock_recv(self.relay_sock, 3 * 4)) != (self.MAGIC_BYTES, self.END_BLOCK_TYPE, 0):
 						raise ProtocolError("Invalid END_BLOCK message after block")
@@ -237,24 +238,23 @@ class RelayNetworkClient:
 					if deserialize_utils:
 						transaction = CTransaction.deserialize(transaction_data)
 						print("Got transaction: " + str(b2lx(transaction.GetHash())))
-					else:
-						print("Got transaction of length " + str(msg_header[2]))
+					#else:
+						#print("Got transaction of length " + str(msg_header[2]))
 
 				elif msg_header[1] == self.MAX_VERSION_TYPE:
 					version = sock_recv(self.relay_sock, msg_header[2])
-					print("Relay network now uses version " + str(version) + " (PLEASE UPGRADE)")
-
+					print("RELAY NETWORK: Relay network now uses version " + str(version) + " (PLEASE UPGRADE)")
 				else:
 					raise ProtocolError("Unknown message type: " + str(msg_header[1]))
 
 		except (OSError, socket.error) as err:
-			print("Lost connect to relay node:", err)
+			print("RELAY NETWORK: Lost connect to relay node:", err)
 			self.reconnect()
 		except ProtocolError as err:
-			print("Error processing data from relay node:", err)
+			print("RELAY NETWORK: Error processing data from relay node:", err)
 			self.reconnect()
 		except Exception as err:
-			print("Unknown error processing data from relay node:", err)
+			print("RELAY NETWORK: Unknown error processing data from relay node:", err)
 			self.reconnect()
 
 	def provide_transaction(self, transaction_data):
@@ -277,10 +277,10 @@ class RelayNetworkClient:
 			if deserialize_utils:
 				transaction = CTransaction.deserialize(transaction_data)
 				print("Sent transaction " + str(b2lx(transaction.GetHash())) + " of size " + str(len(transaction_data)))
-			else:
-				print("Sent transaction of size " + str(len(transaction_data)))
+			#else:
+				#print("Sent transaction of size " + str(len(transaction_data)))
 		except (OSError, socket.error) as err:
-			print("Failed to send to relay node: ", err)
+			print("RELAY NETWORK: Failed to send to relay node: ", err)
 			self.relay_sock.shutdown(socket.SHUT_RDWR)
 
 		self.send_lock.release()
@@ -327,9 +327,9 @@ class RelayNetworkClient:
 				block = CBlock.deserialize(block_data)
 				print("Sent block " + str(b2lx(block.GetHash())) + " of size " + str(len(block_data)) + " with " + str(len(send_data)) + " bytes on the wire")
 			else:
-				print("Sent block of size " + str(len(block_data)) + " with " + str(len(send_data)) + " bytes on the wire")
+				print("RELAY NETWORK: Sent block of size " + str(len(block_data)) + " with " + str(len(send_data)) + " bytes on the wire")
 		except (OSError, socket.error) as err:
-			print("Failed to send to relay node: ", err)
+			print("RELAY NETWORK: Failed to send to relay node: ", err)
 			self.relay_sock.shutdown(socket.SHUT_RDWR)
 		finally:
 			self.send_lock.release()
@@ -387,10 +387,10 @@ class BitcoinP2PRelayer:
 					raise ProtocolError("Invalid message checksum")
 
 				if command == b'version':
-					print("Connected to bitcoind with protocol version " + str(unpack('<i', data[0:4])[0]))
+					print("RELAY NETWORK: Connected to bitcoind with protocol version " + str(unpack('<i', data[0:4])[0]))
 					self.send_message(b'verack', b'')
 				elif command == b'verack':
-					print("Finished connect handshake with bitcoind")
+					print("RELAY NETWORK: Finished connect handshake with bitcoind")
 				elif command == b'ping':
 					self.send_message(b'pong', data)
 				elif command == b'inv':
@@ -401,32 +401,32 @@ class BitcoinP2PRelayer:
 					self.data_recipient.provide_transaction(data)
 
 		except (OSError, socket.error, struct.error) as err:
-			print("Lost connect to bitcoind node:", err)
+			print("RELAY NETWORK: Lost connect to bitcoind node:", err)
 			self.reconnect()
 		except ProtocolError as err:
-			print("Error processing data from bitcoind node:", err)
+			print("RELAY NETWORK: Error processing data from bitcoind node:", err)
 			self.reconnect()
 		except Exception as err:
-			print("Unknown error processing data from bitcoind node:", err)
+			print("RELAY NETWORK: Unknown error processing data from bitcoind node:", err)
 			self.reconnect()
 
 	def provide_block_header(self, header_data):
 		try:
 			self.send_message(b'inv', b'\x01\x02\x00\x00\x00' + sha256(sha256(header_data).digest()).digest())
 		except (OSError, socket.error) as err:
-			print("Failed to send transaction to bitcoind node: ", err)
+			print("RELAY NETWORK: Failed to send transaction to bitcoind node: ", err)
 
 	def provide_block(self, block_data):
 		try:
 			self.send_message(b'block', block_data)
 		except (OSError, socket.error) as err:
-			print("Failed to send block to bitcoind node: ", err)
+			print("RELAY NETWORK: Failed to send block to bitcoind node: ", err)
 
 	def provide_transaction(self, transaction_data):
 		try:
 			self.send_message(b'tx', transaction_data)
 		except (OSError, socket.error) as err:
-			print("Failed to send transaction to bitcoind node: ", err)
+			print("RELAY NETWORK: Failed to send transaction to bitcoind node: ", err)
 
 
 class RelayNetworkToP2PManager:
