@@ -74,11 +74,21 @@
                 d3.selectAll('.symbol').text(currency_info.symbol);
                 
                 d3.json('../current_payouts', function(pays) {
+                    var totamount=0.0;
+
                     d3.json('../payout_addr', function(addr) {
                         d3.select('#payout_addr').text(addr).attr('href', currency_info.address_explorer_url_prefix + addr);
                         d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
                     });
-                    
+                    d3.json('../payout_addrs', function(addrs) {
+                        d3.select('#payout_addrs').text(addrs);
+
+                        for (var i in addrs) {
+                        	totamount = totamount + (addrs[i] in pays ? pays[addrs[i]] : 0);
+                        }
+	                d3.select('#payout_totamount').text(totamount);
+                    });
+
                     var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
                     
                     var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
@@ -124,7 +134,7 @@
         <p>Node uptime: <span id="uptime"></span> Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA) Expected time to share: <span id="time_to_share"></span></p>
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
-        <p>Payout if a block were found NOW: <span id="payout_amount"></span> <span class="symbol"></span> to <a id="payout_addr"></a>. Expected after mining for 24 hours:  <span id="expected_payout_amount"></span> <span class="symbol"></span> per block.</p>
+        <p>Payout if a block were found NOW: <span id="payout_totamount"></span> <span class="symbol"></span> to <a id="payout_addrs"></a>. Expected after mining for 24 hours:  <span id="expected_payout_amount"></span> <span class="symbol"></span> per block.</p>
         <p>Current block value: <span id="block_value"></span> <span class="symbol"></span> Expected time to block: <span id="time_to_block"></span></p>
         <div id="warnings"></div>
         
