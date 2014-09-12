@@ -7,7 +7,8 @@
 /_trial_temp*
 Makefile.local
 .cache/
-.pkg/
+.pkglist
+.pyenv/
 .coverage
 build/
 ltc_scrypt.so
