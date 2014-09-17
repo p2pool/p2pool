@@ -228,10 +228,20 @@ def target_to_difficulty(target):
     if target >= 2**256: warnings.warn('target >= 2**256!')
     return (0xffff0000 * 2**(256-64) + 1)/(target + 1)
 
+def target_to_difficulty_alt(target, modifier):
+    assert 0 <= target and isinstance(target, (int, long)), target
+    if target >= 2**256: warnings.warn('target >= 2**256!')
+    return ((0xffff0000 * 2**(256-64) + 1)/(target + 1)) * modifier
+
 def difficulty_to_target(difficulty):
     assert difficulty >= 0
     if difficulty == 0: return 2**256-1
     return min(int((0xffff0000 * 2**(256-64) + 1)/difficulty - 1 + 0.5), 2**256-1)
+
+def difficulty_to_target_alt(difficulty, modifier):
+    assert difficulty >= 0
+    if difficulty == 0: return 2**256-1
+    return min(int((0xffff0000 * 2**(256-64) + 1)/(difficulty / modifier) - 1 + 0.5), 2**256-1)
 
 # human addresses
 
