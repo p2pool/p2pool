@@ -210,7 +210,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee)
         if args.address_share_rate is not None:
             share_rate_type = 'address'
             share_rate = args.address_share_rate
