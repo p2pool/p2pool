@@ -39,11 +39,11 @@ Donations towards further development:
 -------------------------
     1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
 
-Official wiki :
+Official wiki:
 -------------------------
 https://en.bitcoin.it/wiki/P2Pool
 
-Alternate web front end :
+Alternate web frontend:
 -------------------------
 * https://github.com/hardcpp/P2PoolExtendedFrontEnd
 
