@@ -25,6 +25,52 @@ from util import fixargparse, jsonrpc, variable, deferral, math, logging, switch
 from . import networks, web, work
 import p2pool, p2pool.data as p2pool_data, p2pool.node as p2pool_node
 
+class keypool():
+    keys = []
+    keyweights = []
+    stamp = time.time()
+    payouttotal = 0.0
+
+    def addkey(self, n):
+        self.keys.append(n)
+        self.keyweights.append(random.uniform(0,100.0))
+    def delkey(self, n):
+        try:
+            i=self.keys.index(n)
+            self.keys.pop(i)
+            self.keyweights.pop(i)
+        except:
+            pass
+
+    def weighted(self):
+        choice=random.uniform(0,sum(self.keyweights))
+        tot = 0.0
+        ind = 0
+        for i in (self.keyweights):
+            tot += i
+            if tot >= choice:
+                return ind
+            ind += 1
+        return ind
+
+    def popleft(self):
+        if (len(self.keys) > 0):
+            dummyval=self.keys.pop(0)
+        if (len(self.keyweights) > 0):
+            dummyval=self.keyweights.pop(0)
+
+    def updatestamp(self, n):
+        self.stamp = n
+
+    def paytotal(self):
+        self.payouttotal = 0.0
+        for i in range(len(pubkeys.keys)):
+            self.payouttotal += node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)*1e-8
+        return self.payouttotal
+
+    def getpaytotal(self):
+        return self.payouttotal
+
 @defer.inlineCallbacks
 def main(args, net, datadir_path, merged_urls, worker_endpoint):
     try:
@@ -99,7 +145,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
             print
         elif args.address != 'dynamic':
-            pubkeys = []
+            pubkeys = keypool()
+            pubkeys.addkey(args.pubkey_hash)
             my_pubkey_hash = args.pubkey_hash
             print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
             print
@@ -109,52 +156,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             if args.numaddresses < 2:
                 print ' ERROR: Can not use fewer than 2 addresses in dynamic mode. Resetting to 2.'
                 args.numaddresses = 2
-            class keypool():
-                keys = []
-                keyweights = []
-                stamp = time.time()
-                payouttotal = 0.0
-
-                def addkey(self, n):
-                    self.keys.append(n)
-                    self.keyweights.append(random.uniform(0,100.0))
-                def delkey(self, n):
-                    try:
-                        i=self.keys.index(n)
-                        self.keys.pop(i)
-                        self.keyweights.pop(i)
-                    except:
-                        pass
-
-                def weighted(self):
-                    choice=random.uniform(0,sum(self.keyweights))
-                    tot = 0.0
-                    ind = 0
-                    for i in (self.keyweights):
-                        tot += i
-                        if tot >= choice:
-                            return ind
-                        ind += 1
-                    return ind
-
-                def popleft(self):
-                    if (len(self.keys) > 0):
-                        dummyval=self.keys.pop(0)
-                    if (len(self.keyweights) > 0):
-                        dummyval=self.keyweights.pop(0)
-
-                def updatestamp(self, n):
-                    self.stamp = n
-
-                def paytotal(self):
-                    self.payouttotal = 0.0
-                    for i in range(len(pubkeys.keys)):
-                        self.payouttotal += node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)*1e-8
-                    return self.payouttotal
-
-                def getpaytotal(self):
-                    return self.payouttotal
-
             pubkeys = keypool()
             for i in range(args.numaddresses):
                 address = yield deferral.retry('Error getting a dynamic address from bitcoind:', 5)(lambda: bitcoind.rpc_getnewaddress('p2pool'))()
@@ -391,14 +392,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         
                         paystr = ''
                         paytot = 0.0
-                        if args.address == 'dynamic':
-                            for i in range(len(pubkeys.keys)):
-                                curtot = node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)
-                                paytot += curtot*1e-8
-                                paystr += "(%.4f)" % (curtot*1e-8,)
-                            paystr += "=%.4f" % (paytot,)
-                        else:
-                            paystr = "%.4f" % (node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)*1e-8,)
+                        for i in range(len(pubkeys.keys)):
+                            curtot = node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)
+                            paytot += curtot*1e-8
+                            paystr += "(%.4f)" % (curtot*1e-8,)
+                        paystr += "=%.4f" % (paytot,)
                         this_str += '\n Shares: %i (%i orphan, %i dead) Stale rate: %s Efficiency: %s Current payout: %s %s' % (
                             shares, stale_orphan_shares, stale_doa_shares,
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
