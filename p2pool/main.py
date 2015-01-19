@@ -118,6 +118,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             factory = yield connect_p2p()
         
         print 'Determining payout address...'
+        pubkeys = keypool()
         if args.pubkey_hash is None and args.address != 'dynamic':
             address_path = os.path.join(datadir_path, 'cached_payout_address')
             
@@ -144,19 +145,18 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             my_pubkey_hash = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
             print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
             print
+            pubkeys.addkey(my_pubkey_hash)
         elif args.address != 'dynamic':
-            pubkeys = keypool()
-            pubkeys.addkey(args.pubkey_hash)
             my_pubkey_hash = args.pubkey_hash
             print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
             print
+            pubkeys.addkey(my_pubkey_hash)
         else:
             print '    Entering dynamic address mode.'
 
             if args.numaddresses < 2:
                 print ' ERROR: Can not use fewer than 2 addresses in dynamic mode. Resetting to 2.'
                 args.numaddresses = 2
-            pubkeys = keypool()
             for i in range(args.numaddresses):
                 address = yield deferral.retry('Error getting a dynamic address from bitcoind:', 5)(lambda: bitcoind.rpc_getnewaddress('p2pool'))()
                 new_pubkey = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
