@@ -174,9 +174,21 @@
                     .text('Show/hide table')
                     .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
                     .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
-                
-                
-                var w = 700;
+				
+                var currwidth = document.documentElement.clientWidth;
+                var timeOut = null;
+                window.onresize = function(){
+                    if (timeOut != null) 
+                        clearTimeout(timeOut);
+                    timeOut = setTimeout(function(){
+                        if (currwidth != document.documentElement.clientWidth){
+                             window.location.href=window.location.href;
+                        };
+                    currwidth = document.documentElement.clientWidth;
+                    }, 250);
+                }; 
+				
+                var w = currwidth;
                 var h = 300;
                 var margin_v = 40;
                 var margin_h = 180;
