@@ -6,7 +6,6 @@ import platform
 
 from distutils.core import setup
 from distutils.sysconfig import get_python_lib
-import py2exe
 
 version = __import__('p2pool').__version__
 im64 = '64' in platform.architecture()[0]
@@ -45,7 +44,11 @@ try:
                 'web-static/share.html',
             ]),
         ],
-
+        install_requires=[
+            'Twisted>=12.2.0',
+            'argparse>=1.2.1',
+            'pyOpenSSL>=0.13',
+        ],
         console=['run_p2pool.py'],
         options=dict(py2exe=dict(
             bundle_files=bundle,

@@ -7,6 +7,7 @@ import p2pool
 from p2pool.bitcoin import data as bitcoin_data
 from p2pool.util import deferral, jsonrpc
 
+
 @deferral.retry('Error while checking Bitcoin connection:', 1)
 @defer.inlineCallbacks
 def check(bitcoind, net):
@@ -16,6 +17,7 @@ def check(bitcoind, net):
     if not net.VERSION_CHECK((yield bitcoind.rpc_getinfo())['version']):
         print >>sys.stderr, '    Bitcoin version too old! Upgrade to 0.6.4 or newer!'
         raise deferral.RetrySilentlyException()
+
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
@@ -29,13 +31,13 @@ def getwork(bitcoind, use_getblocktemplate=False):
         start = time.time()
         work = yield go()
         end = time.time()
-    except jsonrpc.Error_for_code(-32601): # Method not found
+    except jsonrpc.Error_for_code(-32601):  # Method not found
         use_getblocktemplate = not use_getblocktemplate
         try:
             start = time.time()
             work = yield go()
             end = time.time()
-        except jsonrpc.Error_for_code(-32601): # Method not found
+        except jsonrpc.Error_for_code(-32601):  # Method not found
             print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
             raise deferral.RetrySilentlyException()
     packed_transactions = [(x['data'] if isinstance(x, dict) else x).decode('hex') for x in work['transactions']]
@@ -59,6 +61,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         latency=end - start,
     ))
 
+
 @deferral.retry('Error submitting primary block: (will retry)', 10, 10)
 def submit_block_p2p(block, factory, net):
     if factory.conn.value is None:
@@ -66,13 +69,14 @@ def submit_block_p2p(block, factory, net):
         raise deferral.RetrySilentlyException()
     factory.conn.value.send_block(block=block)
 
+
 @deferral.retry('Error submitting block: (will retry)', 10, 10)
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
     if bitcoind_work.value['use_getblocktemplate']:
         try:
             result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
-        except jsonrpc.Error_for_code(-32601): # Method not found, for older litecoin versions
+        except jsonrpc.Error_for_code(-32601):  # Method not found, for older litecoin versions
             result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
         success = result is None
     else:
@@ -82,9 +86,11 @@ def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
     if (not success and success_expected and not ignore_failure) or (success and not success_expected):
         print >>sys.stderr, 'Block submittal result: %s (%r) Expected: %s' % (success, result, success_expected)
 
+
 def submit_block(block, ignore_failure, factory, bitcoind, bitcoind_work, net):
     submit_block_p2p(block, factory, net)
     submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net)
+
 
 @defer.inlineCallbacks
 def check_genesis_block(bitcoind, genesis_block_hash):
