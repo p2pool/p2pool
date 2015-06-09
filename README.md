@@ -43,21 +43,22 @@ Option Reference
 
     usage: run_p2pool.py [-h] [--version]
                          [--net {bitcoin,fastcoin,litecoin,terracoin}] [--testnet]
-                         [--debug] [-a ADDRESS] [--datadir DATADIR]
+                         [--debug] [-a ADDRESS] [-i NUMADDRESSES]
+                         [-t TIMEADDRESSES] [--datadir DATADIR]
                          [--logfile LOGFILE] [--merged MERGED_URLS]
                          [--give-author DONATION_PERCENTAGE] [--iocp]
                          [--irc-announce] [--no-bugreport] [--p2pool-port PORT]
                          [-n ADDR[:PORT]] [--disable-upnp] [--max-conns CONNS]
-                         [--outgoing-conns CONNS] [--disable-advertise]
-                         [-w PORT or ADDR:PORT] [-f FEE_PERCENTAGE]
-                         [-d DIFFICULTY]
+                         [--outgoing-conns CONNS] [--external-ip ADDR[:PORT]]
+                         [--disable-advertise] [-w PORT or ADDR:PORT]
+                         [-f FEE_PERCENTAGE]
                          [--bitcoind-config-path BITCOIND_CONFIG_PATH]
                          [--bitcoind-address BITCOIND_ADDRESS]
                          [--bitcoind-rpc-port BITCOIND_RPC_PORT]
                          [--bitcoind-rpc-ssl]
                          [--bitcoind-p2p-port BITCOIND_P2P_PORT]
                          [BITCOIND_RPCUSERPASS [BITCOIND_RPCUSERPASS ...]]
-    
+
     optional arguments:
       -h, --help            show this help message and exit
       --version             show program's version number and exit
@@ -67,7 +68,13 @@ Option Reference
       --debug               enable debugging mode
       -a ADDRESS, --address ADDRESS
                             generate payouts to this address (default: <address
-                            requested from bitcoind>)
+                            requested from bitcoind>), or (dynamic)
+      -i NUMADDRESSES, --numaddresses NUMADDRESSES
+                            number of bitcoin auto-generated addresses to maintain
+                            for getwork dynamic address allocation
+      -t TIMEADDRESSES, --timeaddresses TIMEADDRESSES
+                            seconds between acquisition of new address and removal
+                            of single old (default: 2 days or 172800s)
       --datadir DATADIR     store data in this directory (default: <directory
                             run_p2pool.py is in>/data)
       --logfile LOGFILE     log to this file (default: data/<NET>/log)
@@ -88,7 +95,7 @@ Option Reference
                             for incoming connections. useful for running a dark
                             node, along with multiple -n ADDR's and --outgoing-
                             conns 0
-    
+
     p2pool interface:
       --p2pool-port PORT    use port PORT to listen for connections (forward this
                             port from your router!) (default: bitcoin:9333,
@@ -100,7 +107,11 @@ Option Reference
       --max-conns CONNS     maximum incoming connections (default: 40)
       --outgoing-conns CONNS
                             outgoing connections (default: 6)
-    
+      --external-ip ADDR[:PORT]
+                            specify your own public IP address instead of asking
+                            peers to discover it, useful for running dual WAN or
+                            asymmetric routing
+
     worker interface:
       -w PORT or ADDR:PORT, --worker-port PORT or ADDR:PORT
                             listen on PORT on interface with ADDR for RPC
@@ -113,10 +124,7 @@ Option Reference
                             this percentage fee to mine on your p2pool instance.
                             Amount displayed at http://127.0.0.1:WORKER_PORT/fee
                             (default: 0)
-      -d DIFFICULTY, --difficulty DIFFICULTY
-                            set difficulty policy: D - default, A - adaptive, F -
-                            force adaptive (ignore miner's request)
-    
+
     bitcoind interface:
       --bitcoind-config-path BITCOIND_CONFIG_PATH
                             custom configuration file path (when bitcoind -conf
@@ -216,7 +224,6 @@ License:
 -------------------------
 
 [Available here](COPYING)
-
 
 Donations
 -------------------------

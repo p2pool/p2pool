@@ -25,6 +25,52 @@ from util import fixargparse, jsonrpc, variable, deferral, math, logging, switch
 from . import networks, web, work
 import p2pool, p2pool.data as p2pool_data, p2pool.node as p2pool_node
 
+class keypool():
+    keys = []
+    keyweights = []
+    stamp = time.time()
+    payouttotal = 0.0
+
+    def addkey(self, n):
+        self.keys.append(n)
+        self.keyweights.append(random.uniform(0,100.0))
+    def delkey(self, n):
+        try:
+            i=self.keys.index(n)
+            self.keys.pop(i)
+            self.keyweights.pop(i)
+        except:
+            pass
+
+    def weighted(self):
+        choice=random.uniform(0,sum(self.keyweights))
+        tot = 0.0
+        ind = 0
+        for i in (self.keyweights):
+            tot += i
+            if tot >= choice:
+                return ind
+            ind += 1
+        return ind
+
+    def popleft(self):
+        if (len(self.keys) > 0):
+            dummyval=self.keys.pop(0)
+        if (len(self.keyweights) > 0):
+            dummyval=self.keyweights.pop(0)
+
+    def updatestamp(self, n):
+        self.stamp = n
+
+    def paytotal(self):
+        self.payouttotal = 0.0
+        for i in range(len(pubkeys.keys)):
+            self.payouttotal += node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)*1e-8
+        return self.payouttotal
+
+    def getpaytotal(self):
+        return self.payouttotal
+
 @defer.inlineCallbacks
 def main(args, net, datadir_path, merged_urls, worker_endpoint):
     try:
@@ -72,7 +118,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             factory = yield connect_p2p()
         
         print 'Determining payout address...'
-        if args.pubkey_hash is None:
+        pubkeys = keypool()
+        if args.pubkey_hash is None and args.address != 'dynamic':
             address_path = os.path.join(datadir_path, 'cached_payout_address')
             
             if os.path.exists(address_path):
@@ -96,10 +143,31 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 f.write(address)
             
             my_pubkey_hash = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
-        else:
+            print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
+            print
+            pubkeys.addkey(my_pubkey_hash)
+        elif args.address != 'dynamic':
             my_pubkey_hash = args.pubkey_hash
-        print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
-        print
+            print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
+            print
+            pubkeys.addkey(my_pubkey_hash)
+        else:
+            print '    Entering dynamic address mode.'
+
+            if args.numaddresses < 2:
+                print ' ERROR: Can not use fewer than 2 addresses in dynamic mode. Resetting to 2.'
+                args.numaddresses = 2
+            for i in range(args.numaddresses):
+                address = yield deferral.retry('Error getting a dynamic address from bitcoind:', 5)(lambda: bitcoind.rpc_getnewaddress('p2pool'))()
+                new_pubkey = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
+                pubkeys.addkey(new_pubkey)
+
+            pubkeys.updatestamp(time.time())
+
+            my_pubkey_hash = pubkeys.keys[0]
+
+            for i in range(len(pubkeys.keys)):
+                print '    ...payout %d: %s' % (i, bitcoin_data.pubkey_hash_to_address(pubkeys.keys[i], net.PARENT),)
         
         print "Loading shares..."
         shares = {}
@@ -178,6 +246,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             connect_addrs=connect_addrs,
             desired_outgoing_conns=args.p2pool_outgoing_conns,
             advertise_ip=args.advertise_ip,
+            external_ip=args.p2pool_external_ip,
         )
         node.p2p_node.start()
         
@@ -210,12 +279,11 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args.diff_policy)
+        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args, pubkeys, bitcoind)
         web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
-        worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('static/'))
+        worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
         web_serverfactory = server.Site(web_root)
-        
         
         serverfactory = switchprotocol.FirstByteSwitchFactory({'{': stratum.StratumServerFactory(caching_wb)}, web_serverfactory)
         deferral.retry('Error binding to worker port:', traceback=False)(reactor.listenTCP)(worker_endpoint[1], serverfactory, interface=worker_endpoint[0])
@@ -322,11 +390,18 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         stale_prop = p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, min(60*60//net.SHARE_PERIOD, height))
                         real_att_s = p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, min(height - 1, 60*60//net.SHARE_PERIOD)) / (1 - stale_prop)
                         
-                        this_str += '\n Shares: %i (%i orphan, %i dead) Stale rate: %s Efficiency: %s Current payout: %.4f %s' % (
+                        paystr = ''
+                        paytot = 0.0
+                        for i in range(len(pubkeys.keys)):
+                            curtot = node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)
+                            paytot += curtot*1e-8
+                            paystr += "(%.4f)" % (curtot*1e-8,)
+                        paystr += "=%.4f" % (paytot,)
+                        this_str += '\n Shares: %i (%i orphan, %i dead) Stale rate: %s Efficiency: %s Current payout: %s %s' % (
                             shares, stale_orphan_shares, stale_doa_shares,
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95),
                             math.format_binomial_conf(stale_orphan_shares + stale_doa_shares, shares, 0.95, lambda x: (1 - x)/(1 - stale_prop)),
-                            node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(my_pubkey_hash), 0)*1e-8, net.PARENT.SYMBOL,
+                            paystr, net.PARENT.SYMBOL,
                         )
                         this_str += '\n Pool: %sH/s Stale rate: %.1f%% Expected time to block: %s' % (
                             math.format(int(real_att_s)),
@@ -373,8 +448,14 @@ def run():
         help='enable debugging mode',
         action='store_const', const=True, default=False, dest='debug')
     parser.add_argument('-a', '--address',
-        help='generate payouts to this address (default: <address requested from bitcoind>)',
+        help='generate payouts to this address (default: <address requested from bitcoind>), or (dynamic)',
         type=str, action='store', default=None, dest='address')
+    parser.add_argument('-i', '--numaddresses',
+        help='number of bitcoin auto-generated addresses to maintain for getwork dynamic address allocation',
+        type=int, action='store', default=2, dest='numaddresses')
+    parser.add_argument('-t', '--timeaddresses',
+        help='seconds between acquisition of new address and removal of single old (default: 2 days or 172800s)',
+        type=int, action='store', default=172800, dest='timeaddresses')
     parser.add_argument('--datadir',
         help='store data in this directory (default: <directory run_p2pool.py is in>/data)',
         type=str, action='store', default=None, dest='datadir')
@@ -413,6 +494,9 @@ def run():
     p2pool_group.add_argument('--outgoing-conns', metavar='CONNS',
         help='outgoing connections (default: 6)',
         type=int, action='store', default=6, dest='p2pool_outgoing_conns')
+    p2pool_group.add_argument('--external-ip', metavar='ADDR[:PORT]',
+        help='specify your own public IP address instead of asking peers to discover it, useful for running dual WAN or asymmetric routing',
+        type=str, action='store', default=None, dest='p2pool_external_ip')
     parser.add_argument('--disable-advertise',
         help='''don't advertise local IP address as being available for incoming connections. useful for running a dark node, along with multiple -n ADDR's and --outgoing-conns 0''',
         action='store_false', default=True, dest='advertise_ip')
@@ -424,9 +508,6 @@ def run():
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
-    worker_group.add_argument('-d', '--difficulty', metavar='DIFFICULTY',
-        help='''set difficulty policy: D - default, A - adaptive, F - force adaptive (ignore miner's request)''',
-        type=str, action='store', default='D', dest='diff_policy')
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-config-path', metavar='BITCOIND_CONFIG_PATH',
         help='custom configuration file path (when bitcoind -conf option used)',
@@ -518,7 +599,7 @@ def run():
         addr, port = args.worker_endpoint.rsplit(':', 1)
         worker_endpoint = addr, int(port)
     
-    if args.address is not None:
+    if args.address is not None and args.address != 'dynamic':
         try:
             args.pubkey_hash = bitcoin_data.address_to_pubkey_hash(args.address, net.PARENT)
         except Exception, e:

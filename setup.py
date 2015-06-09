@@ -11,6 +11,12 @@ import py2exe
 version = __import__('p2pool').__version__
 im64 = '64' in platform.architecture()[0]
 
+extra_includes = []
+import p2pool.networks
+extra_includes.extend('p2pool.networks.' + x for x in p2pool.networks.nets)
+import p2pool.bitcoin.networks
+extra_includes.extend('p2pool.bitcoin.networks.' + x for x in p2pool.bitcoin.networks.nets)
+
 if os.path.exists('INITBAK'):
     os.remove('INITBAK')
 os.rename(os.path.join('p2pool', '__init__.py'), 'INITBAK')
@@ -44,7 +50,7 @@ try:
         options=dict(py2exe=dict(
             bundle_files=bundle,
             dll_excludes=['w9xpopen.exe', "mswsock.dll", "MSWSOCK.dll"],
-            includes=['twisted.web.resource', 'ltc_scrypt'],
+            includes=['twisted.web.resource', 'ltc_scrypt'] + extra_includes,
         )),
         zipfile=None,
     )

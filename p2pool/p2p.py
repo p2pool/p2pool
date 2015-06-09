@@ -104,6 +104,33 @@ class Protocol(p2protocol.Protocol):
         print 'Connection timed out, disconnecting from %s:%i' % self.addr
         self.disconnect()
     
+    def sendAdvertisement(self):
+        if self.node.serverfactory.listen_port is not None:
+            host=self.node.external_ip
+            port=self.node.serverfactory.listen_port.getHost().port
+            if host is not None:
+                if ':' in host:
+                    host, port_str = host.split(':')
+                    port = int(port_str)
+                if p2pool.DEBUG:
+                    print 'Advertising for incoming connections: %s:%i' % (host, port)
+                # Advertise given external IP address, just as if there were another peer behind us, with that address, who asked us to advertise it for them
+                self.send_addrs(addrs=[
+                    dict(
+                        address=dict(
+                            services=self.other_services,
+                            address=host,
+                            port=port,
+                        ),
+                        timestamp=int(time.time()),
+                    ),
+                ])
+            else:
+                if p2pool.DEBUG:
+                    print 'Advertising for incoming connections'
+                # Ask peer to advertise what it believes our IP address to be
+                self.send_addrme(port=port)
+
     message_version = pack.ComposedType([
         ('version', pack.IntType(32)),
         ('services', pack.IntType(64)),
@@ -153,7 +180,7 @@ class Protocol(p2protocol.Protocol):
         
         if self.node.advertise_ip:
             self._stop_thread2 = deferral.run_repeatedly(lambda: [
-                self.send_addrme(port=self.node.serverfactory.listen_port.getHost().port) if self.node.serverfactory.listen_port is not None else None,
+                self.sendAdvertisement(),
             random.expovariate(1/(100*len(self.node.peers) + 1))][-1])
         
         if best_share_hash is not None:
@@ -582,7 +609,7 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({}), advertise_ip=True):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({}), advertise_ip=True, external_ip=None):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
@@ -592,6 +619,7 @@ class Node(object):
         self.known_txs_var = known_txs_var
         self.mining_txs_var = mining_txs_var
         self.advertise_ip = advertise_ip
+        self.external_ip = external_ip
         
         self.traffic_happened = variable.Event()
         self.nonce = random.randrange(2**64)
