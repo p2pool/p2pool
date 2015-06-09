@@ -99,11 +99,15 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         
         nonstale_hash_rate = p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, lookbehind)
         stale_prop = p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, lookbehind)
+        diff = bitcoin_data.target_to_difficulty(wb.current_work.value['bits'].target)
+
         return dict(
             pool_nonstale_hash_rate=nonstale_hash_rate,
             pool_hash_rate=nonstale_hash_rate/(1 - stale_prop),
             pool_stale_prop=stale_prop,
             min_difficulty=bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target),
+            network_block_difficulty=diff,
+            network_hashrate=(diff * 2**32 // node.net.PARENT.BLOCK_PERIOD),
         )
     
     def get_local_stats():
@@ -136,6 +140,10 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             if share_hash_str not in node.tracker.items:
                 unknown_shares += 1
         
+        miner_last_difficulties = {}
+        for addr in wb.last_work_shares.value:
+            miner_last_difficulties[addr] = bitcoin_data.target_to_difficulty(wb.last_work_shares.value[addr].target)
+        
         return dict(
             my_hash_rates_in_last_hour=dict(
                 note="DEPRECATED",
@@ -157,6 +165,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             ),
             miner_hash_rates=miner_hash_rates,
             miner_dead_hash_rates=miner_dead_hash_rates,
+            miner_last_difficulties=miner_last_difficulties,
             efficiency_if_miner_perfect=(1 - stale_orphan_shares/shares)/(1 - global_stale_prop) if shares else None, # ignores dead shares because those are miner's fault and indicated by pseudoshare rejection
             efficiency=(1 - (stale_orphan_shares+stale_doa_shares)/shares)/(1 - global_stale_prop) if shares else None,
             peers=dict(
@@ -222,6 +231,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     ))))
     web_root.putChild('peer_versions', WebInterface(lambda: dict(('%s:%i' % peer.addr, peer.other_sub_version) for peer in node.p2p_node.peers.itervalues())))
     web_root.putChild('payout_addr', WebInterface(lambda: bitcoin_data.pubkey_hash_to_address(wb.my_pubkey_hash, node.net.PARENT)))
+    web_root.putChild('payout_addrs', WebInterface(lambda: list(('%s' % bitcoin_data.pubkey_hash_to_address(add, node.net.PARENT)) for add in wb.pubkeys.keys)))
     web_root.putChild('recent_blocks', WebInterface(lambda: [dict(
         ts=s.timestamp,
         hash='%064x' % s.header_hash,
@@ -253,6 +263,9 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         (stale_orphan_shares, stale_doa_shares), shares, _ = wb.get_stale_counts()
         miner_hash_rates, miner_dead_hash_rates = wb.get_local_rates()
         
+        my_current_payout=0.0
+        for add in wb.pubkeys.keys:
+            my_current_payout+=node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(add), 0)*1e-8
         stat_log.append(dict(
             time=time.time(),
             pool_hash_rate=p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, lookbehind)/(1-global_stale_prop),
@@ -262,7 +275,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             shares=shares,
             stale_shares=stale_orphan_shares + stale_doa_shares,
             stale_shares_breakdown=dict(orphan=stale_orphan_shares, doa=stale_doa_shares),
-            current_payout=node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(wb.my_pubkey_hash), 0)*1e-8,
+            current_payout=my_current_payout,
             peers=dict(
                 incoming=sum(1 for peer in node.p2p_node.peers.itervalues() if peer.incoming),
                 outgoing=sum(1 for peer in node.p2p_node.peers.itervalues() if not peer.incoming),
@@ -424,7 +437,10 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['pool_rates'].add_datum(t, pool_rates)
         
         current_txouts = node.get_current_txouts()
-        hd.datastreams['current_payout'].add_datum(t, current_txouts.get(bitcoin_data.pubkey_hash_to_script2(wb.my_pubkey_hash), 0)*1e-8)
+        my_current_payouts = 0.0
+        for add in wb.pubkeys.keys:
+             my_current_payouts += current_txouts.get(bitcoin_data.pubkey_hash_to_script2(add), 0)*1e-8
+        hd.datastreams['current_payout'].add_datum(t, my_current_payouts)
         miner_hash_rates, miner_dead_hash_rates = wb.get_local_rates()
         current_txouts_by_address = dict((bitcoin_data.script2_to_address(script, node.net.PARENT), amount) for script, amount in current_txouts.iteritems())
         hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-8) for user in miner_hash_rates if user in current_txouts_by_address))
