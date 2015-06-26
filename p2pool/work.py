@@ -369,7 +369,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         self.last_work_shares.value[bitcoin_data.pubkey_hash_to_address(pubkey_hash, self.node.net.PARENT)]=share_info['bits']
         
         ba = dict(
-            version=min(self.current_work.value['version'], 2),
+            version=min(self.current_work.value['version'], 3),
             previous_block=self.current_work.value['previous_block'],
             merkle_link=merkle_link,
             coinb1=packed_gentx[:-self.COINBASE_NONCE_LENGTH-4],
