@@ -9,7 +9,7 @@ from twisted.python import failure
 from twisted.trial import unittest
 from twisted.web import client, resource, server
 
-from p2pool import data, node, work
+from p2pool import data, node, work, main
 from p2pool.bitcoin import data as bitcoin_data, networks, worker_interface
 from p2pool.util import deferral, jsonrpc, math, variable
 
@@ -154,8 +154,8 @@ class MiniNode(object):
         
         self.n.p2p_node = node.P2PNode(self.n, port=0, max_incoming_conns=1000000, addr_store={}, connect_addrs=[('127.0.0.1', peer_port) for peer_port in peer_ports])
         self.n.p2p_node.start()
-        
-        wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=merged_urls, worker_fee=3)
+
+        wb = work.WorkerBridge(node=self.n, my_pubkey_hash=random.randrange(2**160), donation_percentage=random.uniform(0, 10), merged_urls=merged_urls, worker_fee=3, args=math.Object(donation_percentage=random.uniform(0, 10), address='foo', worker_fee=3, timeaddresses=1000), pubkeys=main.keypool(), bitcoind=bitcoind)
         self.wb = wb
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
@@ -182,7 +182,7 @@ class Test(unittest.TestCase):
         n = node.Node(bitd, bitd, [], [], mynet)
         yield n.start()
         
-        wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[('http://127.0.0.1:%i' % (mm_port.getHost().port,), '')], worker_fee=3)
+        wb = work.WorkerBridge(node=n, my_pubkey_hash=42, donation_percentage=2, merged_urls=[('http://127.0.0.1:%i' % (mm_port.getHost().port,), '')], worker_fee=3, args=math.Object(donation_percentage=2, address='foo', worker_fee=3, timeaddresses=1000), pubkeys=main.keypool(), bitcoind=bitd)
         web_root = resource.Resource()
         worker_interface.WorkerInterface(wb).attach_to(web_root)
         port = reactor.listenTCP(0, server.Site(web_root))
@@ -241,7 +241,7 @@ class Test(unittest.TestCase):
         # crawl web pages
         from p2pool import web
         stop_event = variable.Event()
-        web2_root = web.get_web_root(nodes[0].wb, tempfile.mkdtemp(), variable.Variable(None), stop_event)
+        web2_root = web.get_web_root(nodes[0].wb, tempfile.mkdtemp(), variable.Variable({'errors': '', 'version': 100000}), stop_event)
         web2_port = reactor.listenTCP(0, server.Site(web2_root))
         for name in web2_root.listNames() + ['web/' + x for x in web2_root.getChildWithDefault('web', None).listNames()]:
             if name in ['web/graph_data', 'web/share', 'web/share_data']: continue
