@@ -508,7 +508,6 @@ def run():
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
-    
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-config-path', metavar='BITCOIND_CONFIG_PATH',
         help='custom configuration file path (when bitcoind -conf option used)',
@@ -591,9 +590,6 @@ def run():
     
     if args.p2pool_port is None:
         args.p2pool_port = net.P2P_PORT
-    
-    if args.p2pool_outgoing_conns > 10:
-        parser.error('''--outgoing-conns can't be more than 10''')
     
     if args.worker_endpoint is None:
         worker_endpoint = '', net.WORKER_PORT

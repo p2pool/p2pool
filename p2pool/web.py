@@ -135,6 +135,11 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         miner_hash_rates, miner_dead_hash_rates = wb.get_local_rates()
         (stale_orphan_shares, stale_doa_shares), shares, _ = wb.get_stale_counts()
 
+        unknown_shares = 0
+        for share_hash_str in wb.my_share_hashes:
+            if share_hash_str not in node.tracker.items:
+                unknown_shares += 1
+        
         miner_last_difficulties = {}
         for addr in wb.last_work_shares.value:
             miner_last_difficulties[addr] = bitcoin_data.target_to_difficulty(wb.last_work_shares.value[addr].target)
@@ -171,6 +176,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 total=shares,
                 orphan=stale_orphan_shares,
                 dead=stale_doa_shares,
+                unknown=unknown_shares,
             ),
             uptime=time.time() - start_time,
             attempts_to_share=bitcoin_data.target_to_average_attempts(node.tracker.items[node.best_share_var.value].max_target),
@@ -200,6 +206,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     
     def decent_height():
         return min(node.tracker.get_height(node.best_share_var.value), 720)
+
     web_root.putChild('rate', WebInterface(lambda: p2pool_data.get_pool_attempts_per_second(node.tracker, node.best_share_var.value, decent_height())/(1-p2pool_data.get_average_stale_prop(node.tracker, node.best_share_var.value, decent_height()))))
     web_root.putChild('difficulty', WebInterface(lambda: bitcoin_data.target_to_difficulty(node.tracker.items[node.best_share_var.value].max_target)))
     web_root.putChild('users', WebInterface(get_users))
@@ -230,7 +237,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hash='%064x' % s.header_hash,
         number=p2pool_data.parse_bip0034(s.share_data['coinbase'])[0],
         share='%064x' % s.hash,
-    ) for s in node.tracker.get_chain(node.best_share_var.value, min(node.tracker.get_height(node.best_share_var.value), 24*60*60//node.net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
+    ) for s in node.tracker.get_chain(node.best_share_var.value, min(node.tracker.get_height(node.best_share_var.value), 30*24*60*60//node.net.SHARE_PERIOD)) if s.pow_hash <= s.header['bits'].target]))
     web_root.putChild('uptime', WebInterface(lambda: time.time() - start_time))
     web_root.putChild('stale_rates', WebInterface(lambda: p2pool_data.get_stale_counts(node.tracker, node.best_share_var.value, decent_height(), rates=True)))
     
@@ -459,6 +466,16 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
+    # expose various bitcoind RPC commands
+    bitcoind_root = resource.Resource()
+    bitcoind_root.putChild('block',             WebInterface(lambda block_hash_str: node.bitcoind.rpc_getblock(block_hash_str)))
+    bitcoind_root.putChild('getblockchaininfo', WebInterface(node.bitcoind.rpc_getblockchaininfo))
+    bitcoind_root.putChild('getinfo',           WebInterface(node.bitcoind.rpc_getinfo))
+    bitcoind_root.putChild('getmininginfo',     WebInterface(node.bitcoind.rpc_getmininginfo))
+    bitcoind_root.putChild('getpeerinfo',       WebInterface(node.bitcoind.rpc_getpeerinfo))
+    bitcoind_root.putChild('rawtransaction',    WebInterface(lambda transaction_hash_str: node.bitcoind.rpc_getrawtransaction(transaction_hash_str, 1)))
+    web_root.putChild('bitcoind', bitcoind_root)
+
     web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))
     
     return web_root
