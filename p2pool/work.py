@@ -275,7 +275,6 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 upgraded = counts.get(successor_type.VERSION, 0)/sum(counts.itervalues())
                 if upgraded > .65:
                     print 'Switchover imminent. Upgraded: %.3f%% Threshold: %.3f%%' % (upgraded*100, 95)
-                print 
                 # Share -> NewShare only valid if 95% of hashes in [net.CHAIN_LENGTH*9//10, net.CHAIN_LENGTH] for new version
                 if counts.get(successor_type.VERSION, 0) > sum(counts.itervalues())*95//100:
                     share_type = successor_type
