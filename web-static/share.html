@@ -39,6 +39,9 @@
                     var parent = b.append('p')
                         parent.append('span').text('Parent: ');
                         parent.append('a').attr('href', '#' + share.parent).text(share.parent.substr(-8));
+                    var far_parent = b.append('p')
+                        far_parent.append('span').text('Far parent: ');
+                        far_parent.append('a').attr('href', '#' + share.far_parent).text(share.far_parent.substr(-8));
                     var children = b.append('p');
                         children.append('span').text('Children: ');
                         children.selectAll().data(share.children).enter().append('span').text(' ').append('a')
