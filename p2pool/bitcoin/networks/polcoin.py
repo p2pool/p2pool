@@ -20,9 +20,9 @@ POW_FUNC = data.hash256
 BLOCK_PERIOD = 60 # s
 SYMBOL = 'PLC'
 CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'polcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/polcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.polcoin'), 'polcoin.conf')
-BLOCK_EXPLORER_URL_PREFIX = 'http://abe.explorer.e-waluty.net.pl:81/block/'
-ADDRESS_EXPLORER_URL_PREFIX = 'http://abe.explorer.e-waluty.net.pl:81/address/'
-TX_EXPLORER_URL_PREFIX = 'http://abe.explorer.e-waluty.net.pl:81/tx/'
+BLOCK_EXPLORER_URL_PREFIX = 'http://explorer.e-waluty.net.pl/PLC/block_hash/'
+ADDRESS_EXPLORER_URL_PREFIX = 'http://explorer.e-waluty.net.pl/PLC/address/'
+TX_EXPLORER_URL_PREFIX = 'http://explorer.e-waluty.net.pl/PLC/transaction/'
 SANE_TARGET_RANGE = (2**256//2**32//1000 - 1, 2**256//2**32 - 1)
 DUMB_SCRYPT_DIFF = 1
 DUST_THRESHOLD = 0.001e8
