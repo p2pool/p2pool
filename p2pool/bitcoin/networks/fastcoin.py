@@ -20,9 +20,9 @@ POW_FUNC = lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoW
 BLOCK_PERIOD = 12 # s
 SYMBOL = 'FST'
 CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Fastcoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Fastcoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.fastcoin'), 'fastcoin.conf')
-BLOCK_EXPLORER_URL_PREFIX = 'http://fst.webboise.com/block/'
-ADDRESS_EXPLORER_URL_PREFIX = 'http://fst.webboise.com/address/'
-TX_EXPLORER_URL_PREFIX = 'http://fst.webboise.com/tx/'
+BLOCK_EXPLORER_URL_PREFIX = 'http://fst.blockexp.info/block/'
+ADDRESS_EXPLORER_URL_PREFIX = 'http://fst.blockexp.info/address/'
+TX_EXPLORER_URL_PREFIX = 'http://fst.blockexp.info/tx/'
 SANE_TARGET_RANGE = (2**256//100000000 - 1, 2**256//1000 - 1)
 DUMB_SCRYPT_DIFF = 2**16
 DUST_THRESHOLD = 0.03e8
