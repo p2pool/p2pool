@@ -91,11 +91,11 @@
                 <button id="cur_currency" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     USD <span class="caret"></span>
                 </button>
-                <ul class="dropdown-menu">
-                    <li><a href="javascript:ChangeCurrency('USD', 'currencyUSD');">USD</a></li>
-                    <li><a href="javascript:ChangeCurrency('EUR', 'currencyEUR');">EUR</a></li>
+                <ul id="currency_dd" class="dropdown-menu" on >
+                    <li><a href="javascript:ChangeCurrency('USD', 'currencyUSD');">US Dollar</a></li>
                 </ul>
-            </div>
+            </div> 
+            <span id="err_currency"></span>
 
 		</center>
         <script>
@@ -106,8 +106,6 @@
 			$('#scale' + period).addClass('active');
 			
 			currency = keys[1];
-			$('#currency_menu li').removeClass('active');
-			$('#currency' + currency).addClass('active');
             $('#cur_currency').html(currency + "<span class=\"caret\">");
 
             d3.json('/web/currency_info', function(currency_info) {
@@ -181,13 +179,21 @@
                 d3.json('/web/version', function(version) {
 					d3.selectAll('#version').text(version);
 			    });
-                
-                // Get current USD prive from BitPay
-                d3.json( "https://bitpay.com/rates/" + currency, function( json ) {
-                    price = json.data.rate;
-                });
-
+                populateCurrencies();
+                getBitPayPrice();
             }
+                
+                // Get current USD price from BitPay
+                function getBitPayPrice() {
+                    var jqxhr = $.getJSON( "https://bitpay.com/rates/" + currency, function(json) {
+                        price = json.data.rate;
+                    })
+                        .fail(function(error) {
+                            error = JSON.parse(error.responseText);
+                            $('#err_currency').text(error.error);
+                            currency = 'USD';
+                        });
+                }
         
             function compose() {
                 var funcs = arguments;
@@ -573,16 +579,34 @@
             keys = window.location.search.substr(1).split("/");
             period = keys[0];
             currency = keys[1];
-            if(period.length < 3) {
+            if(!currency) {
                 window.location.search = "Day/USD";
             } else {
                 d3.json('/web/currency_info', function(currency_info) {
                     change_period(period, currency_info);
                 });
             }
+            
+            // function to populate the currencies list
+            function populateCurrencies() {
+                d3.select("#currency_dd").selectAll("*").remove();
+                currencies.forEach(function(currency) {
+                    li = d3.select("#currency_dd").append("li");
+                    linka = li.append("a");
+                    desiredLink = 'javascript:ChangeCurrency("' + currency.name + '", "currency' + currency.name.toUpperCase() + '");';
+                    linka.attr('href',desiredLink);
+                    linka.text(currency.desc);
+                })
+            }
         </script>
         <script type="text/javascript">
         var price = '0.00';
+        
+        // This is where you add other currencies
+        var currencies = [
+            {name: "USD", desc: "US Dollar"},
+            {name: "EUR", desc: "Euro"},
+        ];
 
 		$(document).ready(function() {
 			LoadData();

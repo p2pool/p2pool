@@ -18,6 +18,11 @@ Windows:
 * Install python win32 api wmi wrapper: https://pypi.python.org/pypi/WMI/#downloads
 * Unzip the files into C:\Python27\Lib\site-packages
 
+Configuring P2Pool:
+-------------------------
+This version uses BitPay's API to display payouts in your local currency.
+It comes with USD and EUR, if you would like to add more you can do so to the table at the bottom of graphs.html in the web-static directory.
+
 Running P2Pool:
 -------------------------
 To use P2Pool, you must be running your own local bitcoind. For standard
