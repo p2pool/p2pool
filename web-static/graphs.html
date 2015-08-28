@@ -472,7 +472,7 @@
                             });
                             div.append("svg:svg").each(function(u) {
                                 plot(d3.select(this), currency_info.symbol, null, [
-                                    {"data": current_payouts.map(function(d){ return [d[0], u in d[1] ? d[1][u] : d[3], d[2]] }), "color": "#0000FF"}
+                                    {"data": current_payouts.map(function(d){ return [d[0], u in d[1] ? d[1][u] : d[3], d[2]] }), "color": "#0000FF", "label": "Current"}
                                 ]);
                             });
                         });
