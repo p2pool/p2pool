@@ -157,7 +157,7 @@
 			    });
                 
                 // Get current USD prive from BitPay
-                $d3.json( "https://bitpay.com/rates/" + punit, function( json ) {
+                d3.json( "https://bitpay.com/rates/" + punit, function( json ) {
                     price = json.data.rate;
                 });
 
