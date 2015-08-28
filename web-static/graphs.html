@@ -200,7 +200,10 @@
                     first_tr.append('th').text('Date');
                     first_tr.append('th').text(line.label + '/(' + unit + ')');
                     // add USD from bitstamp
-                    first_tr.append('th').text(line.label + '/(USD)');
+                    if (unit == 'BTC') {
+                        var tab = 'BTC';
+                        first_tr.append('th').text(line.label + '/(USD)');
+                    }
                     
                     var new_data = []
                     for(var j = 0; j < line.data.length; ++j)
@@ -210,7 +213,9 @@
                     tr.append('td').text(function(datum){return new Date(1000*datum[0]).toString()});
                     tr.append('td').text(function(datum){return d3.format(".3s")(datum[1])});
                     // add USD from bitstamp
-                    tr.append('td').text(function(datum){return d3.format(".3s")(datum[1]*price)});
+                    if (tab == 'BTC') {
+                        tr.append('td').text(function(datum){return d3.format(".3s")(datum[1]*price)});
+                    }
                 }
                 d3.select(table_div).append('div').attr('style', 'clear:both');
                 
