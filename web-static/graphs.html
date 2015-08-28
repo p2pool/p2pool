@@ -142,8 +142,28 @@
 				<svg id="memory_usage"></svg>
 			</div>
 		</center>
-		
+        <div style="border-bottom: 1px solid #ddd;"></div>
+            <center>
+		        <tt>P2Pool version: <span id="version"></span></tt><br/>
+                <tt>Interface by hardcpp (fixes and price by drazisil) <a href="https://github.com/hardcpp/P2PoolExtendedFrontEnd">https://github.com/hardcpp/P2PoolExtendedFrontEnd</a></tt><br/>
+                <tt>Donate if you love it (LTC LdKxw2JewLdo1atDsQ33LiCG9ZUDQ4XmPb) (BTC 1FBa12SPET7YRGHoTXyawp1EBJyFPzju31)</tt><br>
+                <tt>BTC to USD Price from <a href="https://bitpay.com/api" title="BitPay Api">BitPay.com</a></tt>
+        </center>
         <script type="text/javascript">
+        
+            function LoadData() {
+                d3.json('/web/version', function(version) {
+					d3.selectAll('#version').text(version);
+			    });
+                
+                // Get current USD prive from BitPay
+                $d3.json( "https://bitpay.com/rates/" + punit, function( json ) {
+                    price = json.data.rate;
+                });
+
+            }
+            
+        
             function compose() {
                 var funcs = arguments;
                 return function(x) {
@@ -171,10 +191,6 @@
             var price = '0.00';
             var punit = 'usd';
 
-            // Get current USD prive from BitPay
-            $.getJSON( "https://bitpay.com/rates/" + punit, function( json ) {
-                price = json.data.rate;
-            });
             
             function plot(g, unit, total_unit, lines, stack) {
                 
@@ -541,6 +557,11 @@
                     change_period(period, currency_info);
                 });
             }
+        </script>
+        <script type="text/javascript">
+		$(document).ready(function() {
+			LoadData();
+		});
         </script>
     </body>
 </html>
