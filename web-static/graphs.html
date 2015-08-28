@@ -168,7 +168,17 @@
                 return {"area": top, "mean": bottom==0?null:top/bottom};
             }
             
+            var price = '0.00';
+            var punit = 'usd';
+
             function plot(g, unit, total_unit, lines, stack) {
+                
+                // Get current USD prive from BitPay
+                $.getJSON( "https://bitpay.com/rates/" + punit, function( json ) {
+                    //console.log( "JSON Data: " + json.data.rate );
+                    price = json.data.rate;
+                });
+            
                 // lines is a list of objects which have attributes data, color, and label
                 
                 var table_div = document.createElement("div");
@@ -189,6 +199,8 @@
                     var first_tr = table_sel.insert('tr');
                     first_tr.append('th').text('Date');
                     first_tr.append('th').text(line.label + '/(' + unit + ')');
+                    // add USD from bitstamp
+                    first_tr.append('th').text(line.label + '/(USD)');
                     
                     var new_data = []
                     for(var j = 0; j < line.data.length; ++j)
@@ -197,6 +209,8 @@
                     var tr = table_sel.selectAll().data(new_data).enter().append('tr');
                     tr.append('td').text(function(datum){return new Date(1000*datum[0]).toString()});
                     tr.append('td').text(function(datum){return d3.format(".3s")(datum[1])});
+                    // add USD from bitstamp
+                    tr.append('td').text(function(datum){return d3.format(".3s")(datum[1]*price)});
                 }
                 d3.select(table_div).append('div').attr('style', 'clear:both');
                 
