@@ -171,14 +171,13 @@
             var price = '0.00';
             var punit = 'usd';
 
+            // Get current USD prive from BitPay
+            $.getJSON( "https://bitpay.com/rates/" + punit, function( json ) {
+                price = json.data.rate;
+            });
+            
             function plot(g, unit, total_unit, lines, stack) {
                 
-                // Get current USD prive from BitPay
-                $.getJSON( "https://bitpay.com/rates/" + punit, function( json ) {
-                    //console.log( "JSON Data: " + json.data.rate );
-                    price = json.data.rate;
-                });
-            
                 // lines is a list of objects which have attributes data, color, and label
                 
                 var table_div = document.createElement("div");
