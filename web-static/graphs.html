@@ -35,12 +35,21 @@
 	    <link href="css/bootstrap-responsive.css" rel="stylesheet">
 		
 		<script>
+            function ChangeCurrency(c_Currency, c_Sender)
+			{
+				currency=c_Currency;
+				$('#currency_menu li').removeClass('active');
+				$('#' + c_Sender).addClass('active');
+                document.location.href =  "?" + period + "/" + currency;
+			}
+
+        
 			function ChangeCurrentPeriod(p_Period, p_Sender)
 			{
 				period=p_Period;
 				$('#scale_menu li').removeClass('active');
 				$('#' + p_Sender).addClass('active');
-				document.location.href =  "?" + period;
+				document.location.href =  "?" + period + "/" + currency;
 			}
         </script>
     </head>
@@ -78,13 +87,30 @@
 				</ul>
 			  </div>
 			</div>
+            Currency <div class="btn-group">
+                <button id="cur_currency" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    USD <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a href="javascript:ChangeCurrency('USD', 'currencyUSD');">USD</a></li>
+                    <li><a href="javascript:ChangeCurrency('EUR', 'currencyEUR');">EUR</a></li>
+                </ul>
+            </div>
+
 		</center>
-		<script>
-			period = window.location.search.substr(1);
+        <script>
+            keys = window.location.search.substr(1).split("/");
+        
+			period = keys[0];
 			$('#scale_menu li').removeClass('active');
 			$('#scale' + period).addClass('active');
 			
-			d3.json('/web/currency_info', function(currency_info) {
+			currency = keys[1];
+			$('#currency_menu li').removeClass('active');
+			$('#currency' + currency).addClass('active');
+            $('#cur_currency').html(currency + "<span class=\"caret\">");
+
+            d3.json('/web/currency_info', function(currency_info) {
 				d3.selectAll('.symbol').text(currency_info.symbol);
 			});
 		</script>
@@ -157,12 +183,11 @@
 			    });
                 
                 // Get current USD prive from BitPay
-                d3.json( "https://bitpay.com/rates/" + punit, function( json ) {
+                d3.json( "https://bitpay.com/rates/" + currency, function( json ) {
                     price = json.data.rate;
                 });
 
             }
-            
         
             function compose() {
                 var funcs = arguments;
@@ -187,10 +212,6 @@
                 }
                 return {"area": top, "mean": bottom==0?null:top/bottom};
             }
-            
-            var price = '0.00';
-            var punit = 'usd';
-
             
             function plot(g, unit, total_unit, lines, stack) {
                 
@@ -217,7 +238,7 @@
                     // add USD from bitstamp
                     if (unit == 'BTC') {
                         var tab = 'BTC';
-                        first_tr.append('th').text(line.label + '/(USD)');
+                        first_tr.append('th').text(line.label + '/(' + currency.toUpperCase() + ')');
                     }
                     
                     var new_data = []
@@ -549,9 +570,11 @@
                 .text(function(period) { return period })
                 .attr('href', function(period){ return "?" + period })
                 .attr("style", function(d, i) { return (i == 0 ? "" : "margin-left:.4em;") + "color:blue;text-decoration:underline;cursor:pointer" });
-            period = window.location.search.substr(1);
+            keys = window.location.search.substr(1).split("/");
+            period = keys[0];
+            currency = keys[1];
             if(period.length < 3) {
-                window.location.search = "Day";
+                window.location.search = "Day/USD";
             } else {
                 d3.json('/web/currency_info', function(currency_info) {
                     change_period(period, currency_info);
@@ -559,6 +582,8 @@
             }
         </script>
         <script type="text/javascript">
+        var price = '0.00';
+
 		$(document).ready(function() {
 			LoadData();
 		});
