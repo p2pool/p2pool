@@ -37,7 +37,9 @@ Run for additional options.
 
 Donations towards further development:
 -------------------------
-    1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+    drazisil: 1CMmcUre9Nhs2ndinA1MDfdhxsSN4Eracq
+    forrestv: 1HNeqi3pJRNvXybNX4FKzZgYJsdTSqJTbk
+    hardcpp:  1FBa12SPET7YRGHoTXyawp1EBJyFPzju31
 
 Official wiki:
 -------------------------
