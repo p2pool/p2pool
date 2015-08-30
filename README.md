@@ -23,7 +23,7 @@ Configuring P2Pool:
 This version uses BitPay's API to display payouts in your local currency.
 It comes with USD and EUR, if you would like to add more you can do so to the table at the bottom of graphs.html in the web-static directory.
 
-BitPay's API supports all <a href="http://www.currency-iso.org/dam/downloads/lists/list_one.xml">ISO 4217 country codes</a>.
+
 
 Running P2Pool:
 -------------------------
