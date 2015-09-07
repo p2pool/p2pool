@@ -452,7 +452,7 @@
                     plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data), true);
                 });
                 d3.json("../web/graph_data/peers/last_" + lowerperiod, function(data) {
-                    plot(d3.select('#peers'), '', null, data_to_lines(data, function(line){ return line.label == "incoming" }), true);
+                    plot(d3.select('#peers'), 'Total', null, data_to_lines(data, function(line){ return line.label == "incoming" }), true);
                 });
                 
                 d3.json("../web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
