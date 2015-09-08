@@ -30,7 +30,7 @@
             
             function values(o){ res = []; for(var x in o) res.push(o[x]); return res; }
             
-            d3.json('/local_stats', function(local_stats) {
+            d3.json('../local_stats', function(local_stats) {
                 d3.select('#peers_in').text(local_stats.peers.incoming);
                 d3.select('#peers_out').text(local_stats.peers.outgoing);
                 
@@ -54,7 +54,7 @@
                 var time_to_share = local_stats.attempts_to_share/local;
                 d3.select('#time_to_share').text(format_dt(time_to_share));
                 
-                d3.json('/global_stats', function(global_stats) {
+                d3.json('../global_stats', function(global_stats) {
                     d3.select('#pool_rate').text(d3.format('.3s')(global_stats.pool_hash_rate) + 'H/s');
                     d3.select('#pool_stale').text(d3.format('.2p')(global_stats.pool_stale_prop));
                     d3.select('#difficulty').text(d3.format('.3r')(global_stats.min_difficulty));
@@ -66,21 +66,21 @@
                 });
             });
             
-            d3.json('/web/version', function(version) {
+            d3.json('../web/version', function(version) {
                 d3.selectAll('#version').text(version);
             });
             
-            d3.json('/web/currency_info', function(currency_info) {
+            d3.json('../web/currency_info', function(currency_info) {
                 d3.selectAll('.symbol').text(currency_info.symbol);
                 
-                d3.json('/current_payouts', function(pays) {
+                d3.json('../current_payouts', function(pays) {
                     var totamount=0.0;
 
-                    d3.json('/payout_addr', function(addr) {
+                    d3.json('../payout_addr', function(addr) {
                         d3.select('#payout_addr').text(addr).attr('href', currency_info.address_explorer_url_prefix + addr);
                         d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
                     });
-                    d3.json('/payout_addrs', function(addrs) {
+                    d3.json('../payout_addrs', function(addrs) {
                         d3.select('#payout_addrs').text(addrs);
 
                         for (var i in addrs) {
@@ -100,7 +100,7 @@
                     total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
                 });
                 
-                d3.json('/recent_blocks', function(blocks) {
+                d3.json('../recent_blocks', function(blocks) {
                     var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
                     tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
                     tr.append('td').text(function(block){return block.number});
@@ -109,7 +109,7 @@
                 });
             });
             
-            d3.json('/web/best_share_hash', function(c) {
+            d3.json('../web/best_share_hash', function(c) {
                 d3.select('#best_share').append('a').attr('href', 'share.html#' + c).text(c.substr(-8));
             });
             
@@ -119,11 +119,11 @@
                     d3.select(id).selectAll().data(d).enter().append('span').text(' ').append('a').attr('href', function(c){return 'share.html#' + c}).text(function(c){return c.substr(-8)});
                 });
             }
-            fill('/web/verified_heads', '#verified_heads');
-            fill('/web/heads', '#heads');
-            fill('/web/verified_tails', '#verified_tails');
-            fill('/web/tails', '#tails');
-            fill('/web/my_share_hashes', '#my_share_hashes');
+            fill('../web/verified_heads', '#verified_heads');
+            fill('../web/heads', '#heads');
+            fill('../web/verified_tails', '#verified_tails');
+            fill('../web/tails', '#tails');
+            fill('../web/my_share_hashes', '#my_share_hashes');
         </script>
     </head>
     <body>
