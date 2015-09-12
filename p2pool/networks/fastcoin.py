@@ -15,7 +15,7 @@ MIN_TARGET = 0
 MAX_TARGET = 2**256//2**20 - 1
 PERSIST = True
 WORKER_PORT = 5150
-BOOTSTRAP_ADDRS = 'fst.inetrader.com'.split(' ')
+BOOTSTRAP_ADDRS = 'inetrader.com'.split(' ')
 ANNOUNCE_CHANNEL = '#p2pool-fst'
 VERSION_CHECK = lambda v: True
-VERSION_WARNING = lambda v: 'Upgrade Fastcoin to >= 0.8.5.1!' if v < 70002 else None
+VERSION_WARNING = lambda v: 'Upgrade Fastcoin to >= 0.10.2.2!' if v < 100202 else None
