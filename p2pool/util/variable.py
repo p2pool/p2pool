@@ -83,3 +83,22 @@ class Variable(object):
     
     def get_not_none(self):
         return self.get_when_satisfies(lambda val: val is not None)
+
+class VariableDict(Variable):
+    def __init__(self, value):
+        Variable.__init__(self, value)
+        self.added = Event()
+        self.removed = Event()
+    
+    def add(self, values):
+        new_items = dict([item for item in values.iteritems() if not item[0] in self.value or self.value[item[0]] != item[1]])
+        self.value.update(values)
+        self.added.happened(new_items)
+        # XXX call self.changed and self.transitioned
+    
+    def remove(self, values):
+        gone_items = dict([item for item in values.iteritems() if item[0] in self.value])
+        for key in gone_keys:
+            del self.values[key]
+        self.removed.happened(new_items)
+        # XXX call self.changed and self.transitioned
