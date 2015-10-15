@@ -33,7 +33,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
 
         self.donation_percentage = args.donation_percentage
         self.worker_fee = args.worker_fee
-        
+        self.diff_policy = args.diff_policy                  if args.diff_policy in ['A', 'F'] else 'D'
+
         self.net = self.node.net.PARENT
         self.running = True
         self.pseudoshare_received = variable.Event()
@@ -185,6 +186,44 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 except:
                     if p2pool.DEBUG:
                         log.err()
+
+# ======
+        set_adaptive_target = (self.diff_policy == 'F') or ((self.diff_policy == 'D') and (desired_share_target is None))
+        set_adaptive_pseudo = (self.diff_policy == 'F') or ((self.diff_policy == 'D') and (desired_pseudoshare_target is None))
+        user_rate = None
+        pool_rate = None
+    
+        if set_adaptive_target: # calculate pool hashrate
+            height = self.node.tracker.get_height(self.node.best_share_var.value)
+            if height > 5: # we want at least 6 shares in chain
+                stale_prop = p2pool_data.get_average_stale_prop(self.node.tracker, self.node.best_share_var.value, min(60*60//self.node.net.SHARE_PERIOD, height))
+                pool_rate = p2pool_data.get_pool_attempts_per_second(self.node.tracker, self.node.best_share_var.value, min(height - 1, 60*60//self.node.net.SHARE_PERIOD)) / (1 - stale_prop)
+    
+        if set_adaptive_pseudo or set_adaptive_target: # calculate user's hashrate
+            datums, dt = self.local_rate_monitor.get_datums_in_last()
+            npoints = sum(datum['user'] == user for datum in datums)
+            if npoints > 5: # at least 6 hashrate datums for the user
+                user_rate = 0
+                for datum in datums:
+                    if datum['user'] == user:
+                        user_rate += datum['work']/dt
+    
+        if set_adaptive_target:
+            desired_share_target = None
+            if user_rate is not None and pool_rate is not None:
+                if user_rate and pool_rate:
+                     # min 20 shares per block AND min 20 shares per chain
+                    desired_share_target = 20 * (max(self.node.bitcoind_work.value['bits'].target * pool_rate, 2**256 // (self.node.net.CHAIN_LENGTH * self.node.net.SHARE_PERIOD)) // user_rate)
+    
+        if set_adaptive_pseudo:
+            desired_pseudoshare_target = None
+            if user_rate is not None:
+                if user_rate:
+                    desired_pseudoshare_target = 20 * (2**256 // user_rate // (10*60)) # min 20 pseudoshares per 10 minutes
+    
+        if desired_share_target is None:
+            desired_share_target = 2**265 - 1
+# ======
 
         if self.args.address == 'dynamic':
             i = self.pubkeys.weighted()

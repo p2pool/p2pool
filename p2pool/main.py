@@ -508,6 +508,9 @@ def run():
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
+    worker_group.add_argument('-d', '--difficulty', metavar='DIFFICULTY',
+        help='''set difficulty policy: D - default, A - adaptive, F - force adaptive (ignore miner's request)''',
+        type=str, action='store', default='D', dest='diff_policy')
     
     bitcoind_group = parser.add_argument_group('bitcoind interface')
     bitcoind_group.add_argument('--bitcoind-config-path', metavar='BITCOIND_CONFIG_PATH',
