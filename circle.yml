@@ -1,6 +1,3 @@
-machine:
-  python:
-    version: 3.3.3
 dependencies:
   pre:
     - pip install http://sourceforge.net/projects/py2exe/files/latest/download?source=files
