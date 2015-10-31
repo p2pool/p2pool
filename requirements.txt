@@ -1,4 +1,4 @@
 Twisted>=12.2.0
 argparse>=1.2.1
 pyOpenSSL>=0.13
-py2exe_py27>=0.6.9
+py2exe_py2>=0.6.9
