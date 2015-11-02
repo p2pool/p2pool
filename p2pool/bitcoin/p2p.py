@@ -18,7 +18,7 @@ class Protocol(p2protocol.Protocol):
     
     def connectionMade(self):
         if p2pool.DEBUG:
-            print >>sys.stout, 'Bitcoin connection made, sending version...'
+            print >>sys.stdout, 'Bitcoin connection made, sending version...'
 
         self.send_version(
             version=70002,
