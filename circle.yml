@@ -8,7 +8,7 @@ general:
       - circleci-testing
 dependencies:
   override:
-    - pip install
+    - pip install -r requirements.txt
 test:
   override:
     - trial p2pool
