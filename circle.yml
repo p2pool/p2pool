@@ -17,5 +17,13 @@ dependencies:
 test:
   pre:
     - mkdir /home/ubuntu/.bitcoin
+    - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
+    - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
+    - bitcoind -regtest -daemon 
+    - sleep 5
+    - bitcoin-cli -regtest setgenerate true 50
+    #run checks that bitcoind is running
+    - bitcoin-cli -regtest getinfo
+    - bitcoin-cli -regtest getblockhash 20
   override:
     - trial p2pool
