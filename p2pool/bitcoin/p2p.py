@@ -17,6 +17,9 @@ class Protocol(p2protocol.Protocol):
         p2protocol.Protocol.__init__(self, net.P2P_PREFIX, 1000000, ignore_trailing_payload=True)
     
     def connectionMade(self):
+        if p2pool.DEBUG:
+            print >>sys.stout, 'Bitcoin connection made, sending version...'
+
         self.send_version(
             version=70002,
             services=1,
