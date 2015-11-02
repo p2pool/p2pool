@@ -16,6 +16,6 @@ dependencies:
     - pip install -r requirements.txt
 test:
   pre:
-    - mkdir /home/circleci/.bitcoin
+    - mkdir /home/ubuntu/.bitcoin
   override:
     - trial p2pool
