@@ -96,7 +96,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if args.testnet: # establish p2p connection first if testnet so bitcoind can work without connections
             factory = yield connect_p2p()
             
-         if args.regtest: # establish p2p connection first if regtest so bitcoind can work without connections
+        if args.regtest: # establish p2p connection first if regtest so bitcoind can work without connections
             factory = yield connect_p2p()
         
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
