@@ -6,7 +6,7 @@ from p2pool.bitcoin import networks
 # REAL_CHAIN_LENGTH must be changed in sync with all other clients
 # changes can be done by changing one, then the other
 
-PARENT = networks.nets['bitcoin']
+PARENT = networks.nets['bitcoin_regtest']
 SHARE_PERIOD = 30 # seconds
 CHAIN_LENGTH = 24*60*60//10 # shares
 REAL_CHAIN_LENGTH = 24*60*60//10 # shares
