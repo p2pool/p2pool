@@ -8,7 +8,7 @@ general:
       - circleci-testing
 dependencies:
   pre:
-    - sudo apt-get screen
+    - sudo apt-get install screen
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
     - sudo apt-get update -q
     - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
