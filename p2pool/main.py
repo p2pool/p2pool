@@ -94,6 +94,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         if args.testnet: # establish p2p connection first if testnet so bitcoind can work without connections
             factory = yield connect_p2p()
+            
+        if args.regtest: # establish p2p connection first if regtest so bitcoind can work without connections
+            factory = yield connect_p2p()
         
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = '%s://%s:%i/' % ('https' if args.bitcoind_rpc_ssl else 'http', args.bitcoind_address, args.bitcoind_rpc_port)
@@ -117,6 +120,9 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if not args.testnet:
             factory = yield connect_p2p()
         
+        if not args.regtest:
+            factory = yield connect_p2p()
+
         print 'Determining payout address...'
         pubkeys = keypool()
         if args.pubkey_hash is None and args.address != 'dynamic':
@@ -444,6 +450,9 @@ def run():
     parser.add_argument('--testnet',
         help='''use the network's testnet''',
         action='store_const', const=True, default=False, dest='testnet')
+    parser.add_argument('--regtest',
+        help='''use the network's regtest''',
+        action='store_const', const=True, default=False, dest='regtest')
     parser.add_argument('--debug',
         help='enable debugging mode',
         action='store_const', const=True, default=False, dest='debug')
@@ -539,6 +548,10 @@ def run():
     
     net_name = args.net_name + ('_testnet' if args.testnet else '')
     net = networks.nets[net_name]
+    
+    net_name = args.net_name + ('_regtest' if args.regtest else '')
+    net = networks.nets[net_name]
+
     
     datadir_path = os.path.join((os.path.join(os.path.dirname(sys.argv[0]), 'data') if args.datadir is None else args.datadir), net_name)
     if not os.path.exists(datadir_path):
