@@ -50,10 +50,14 @@ class Protocol(p2protocol.Protocol):
         ('start_height', pack.IntType(32)),
     ])
     def handle_version(self, version, services, time, addr_to, addr_from, nonce, sub_version_num, start_height):
+        if p2pool.DEBUG:
+            print >>sys.stdout, 'Bitcoin connection made, handling version...'
         self.send_verack()
     
     message_verack = pack.ComposedType([])
     def handle_verack(self):
+        if p2pool.DEBUG:
+            print >>sys.stdout, 'Bitcoin connection made, handling version ack...'
         self.get_block = deferral.ReplyMatcher(lambda hash: self.send_getdata(requests=[dict(type='block', hash=hash)]))
         self.get_block_header = deferral.ReplyMatcher(lambda hash: self.send_getheaders(version=1, have=[], last=hash))
         
