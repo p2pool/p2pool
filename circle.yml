@@ -1,6 +1,9 @@
 machine:
   python:
     version: 3.3.3
+dependencies:
+  override:
+    - pip install
 test:
   override:
     - trial p2pool
