@@ -1,6 +1,11 @@
 machine:
   python:
-    version: 3.3.3
+    version: 2.7.6
+general:
+  branches:
+    only:
+      - master
+      - circleci-testing
 dependencies:
   override:
     - pip install
