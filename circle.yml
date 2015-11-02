@@ -1,0 +1,14 @@
+machine:
+  python:
+    version: 2.7.6
+general:
+  branches:
+    only:
+      - master
+      - circleci-testing
+dependencies:
+  override:
+    - pip install -r requirements.txt
+test:
+  override:
+    - trial p2pool
