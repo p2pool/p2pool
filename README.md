@@ -1,3 +1,5 @@
+[![Circle CI](https://circleci.com/gh/drazisil/p2pool.svg?style=svg)](https://circleci.com/gh/drazisil/p2pool) [![Circle CI](https://circleci.com/gh/drazisil/p2pool/tree/circleci-testing.svg?style=svg)](https://circleci.com/gh/drazisil/p2pool/tree/circleci-testing)
+
 Requirements:
 -------------------------
 Generic:
