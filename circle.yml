@@ -28,6 +28,6 @@ test:
     - bitcoin-cli --regtest getblockhash 20
     - python run_p2pool.py --regtest --irc-announce:
         background: true
-    - sleep 45
+    - sleep 60
   override:
     - trial p2pool/test/test_p2p_regtest.py
