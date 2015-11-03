@@ -5,6 +5,9 @@ general:
   branches:
     only:
       - feature-bitcoin-regtest
+  artifacts:
+    #- "coverage" # relative to the user's home directory
+    - nohup.out
 dependencies:
   pre:
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
@@ -17,7 +20,8 @@ test:
     - mkdir /home/ubuntu/.bitcoin
     - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
     - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
-    - bitcoind --regtest --daemon
+    - bitcoind --regtest --daemon:
+        background: true
     - sleep 5
     - bitcoin-cli --regtest setgenerate true 50
     #run checks that bitcoind is running
