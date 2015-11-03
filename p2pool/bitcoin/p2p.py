@@ -159,8 +159,6 @@ class Protocol(p2protocol.Protocol):
             self.factory.gotConnection(None)
         if hasattr(self, 'pinger'):
             self.pinger.stop()
-        if p2pool.DEBUG:
-            print >>sys.stderr, 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol
@@ -181,11 +179,7 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return p
 
     def gotConnection(self, conn):
-        if p2pool.DEBUG:
-            print >>sys.stdout, 'connection made, setting connection true.'
         self.conn.set(conn)
 
     def getProtocol(self):
-        if p2pool.DEBUG:
-            print >>sys.stdout, 'Checking connection status: ', self.conn.get_not_none()
         return self.conn.get_not_none()

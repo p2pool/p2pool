@@ -7,12 +7,13 @@ from .. import data, helper
 from p2pool.util import pack
 
 
-P2P_PREFIX = 'f9beb4d9'.decode('hex')
+P2P_PREFIX = 'fabfb5da'.decode('hex')
 P2P_PORT = 18444
-ADDRESS_VERSION = 0
+# Regtest uses the same address version as testnet
+ADDRESS_VERSION = 111
 RPC_PORT = 18332
 RPC_CHECK = defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            (yield helper.check_genesis_block(bitcoind, '0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206')) and
+            'bitcoinaddress' in (yield bitcoind.rpc_help()) and
             not (yield bitcoind.rpc_getinfo())['testnet']
         ))
 SUBSIDY_FUNC = lambda height: 50*100000000 >> (height + 1)//210000
