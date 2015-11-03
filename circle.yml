@@ -1,18 +1,31 @@
 machine:
+<<<<<<< HEAD
   python:
+=======
+   python:
+>>>>>>> master
     version: 2.7.6
 general:
   branches:
     only:
+<<<<<<< HEAD
       - master
       - circleci-testing
 dependencies:
   pre:
     - sudo apt-get install screen
+=======
+      - feature-bitcoin-regtest
+  artifacts:
+    #- "coverage" # relative to the user's home directory
+dependencies:
+  pre:
+>>>>>>> master
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
     - sudo apt-get update -q
     - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
   override:
+<<<<<<< HEAD
     - pip install -r requirements.txt
 test:
   pre:
@@ -27,3 +40,25 @@ test:
     - bitcoin-cli -regtest getblockhash 20
   override:
     - trial p2pool
+=======
+    - pip install -q -r requirements.txt
+test:
+  pre:
+    # setup and launch bitcoind
+    - mkdir /home/ubuntu/.bitcoin
+    - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
+    - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
+    - bitcoind --regtest --daemon:
+        background: true
+    - sleep 5
+    # run checks that bitcoind is running
+    - bitcoin-cli --regtest setgenerate true 50
+    - bitcoin-cli --regtest getinfo
+    - bitcoin-cli --regtest getblockhash 20
+    # launch p2pool to test against
+    - python run_p2pool.py --regtest --debug --irc-announce:
+        background: true
+    - sleep 60
+  override:
+    - trial p2pool/test/test_p2p_regtest.py
+>>>>>>> master
