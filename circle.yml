@@ -7,7 +7,6 @@ general:
       - feature-bitcoin-regtest
   artifacts:
     #- "coverage" # relative to the user's home directory
-    - nohup.out
 dependencies:
   pre:
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
