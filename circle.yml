@@ -13,20 +13,24 @@ dependencies:
     - sudo apt-get update -q
     - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
   override:
-    - pip install -r requirements.txt
+    - pip install -q -r requirements.txt
 test:
   pre:
+    # Are we starting with a empty home directory?
+    - ls -lah /home/ubuntu/
+    # setup and launch bitcoind
     - mkdir /home/ubuntu/.bitcoin
     - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
     - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
     - bitcoind --regtest --daemon:
         background: true
     - sleep 5
+    # run checks that bitcoind is running
     - bitcoin-cli --regtest setgenerate true 50
-    #run checks that bitcoind is running
     - bitcoin-cli --regtest getinfo
     - bitcoin-cli --regtest getblockhash 20
-    - python run_p2pool.py --regtest --irc-announce:
+    # launch p2pool to test against
+    - python run_p2pool.py --regtest --verbose --debug --irc-announce:
         background: true
     - sleep 60
   override:
