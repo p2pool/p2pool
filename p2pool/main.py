@@ -81,7 +81,6 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         def connect_p2p():
             # connect to bitcoind over bitcoin-p2p
             print '''Testing bitcoind P2P connection to '%s:%s'...''' % (args.bitcoind_address, args.bitcoind_p2p_port)
-            print net.PARENT
             factory = bitcoin_p2p.ClientFactory(net.PARENT)
             reactor.connectTCP(args.bitcoind_address, args.bitcoind_p2p_port, factory)
             def long():
@@ -96,8 +95,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         if args.testnet: # establish p2p connection first if testnet so bitcoind can work without connections
             factory = yield connect_p2p()
             
-        if args.regtest: # establish p2p connection first if regtest so bitcoind can work without connections
-            factory = yield connect_p2p()
+#        if args.regtest: # establish p2p connection first if regtest so bitcoind can work without connections
+#            factory = yield connect_p2p()
         
         # connect to bitcoind over JSON-RPC and do initial getmemorypool
         url = '%s://%s:%i/' % ('https' if args.bitcoind_rpc_ssl else 'http', args.bitcoind_address, args.bitcoind_rpc_port)
