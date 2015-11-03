@@ -7,10 +7,9 @@ general:
       - feature-bitcoin-regtest
 dependencies:
   pre:
-    - sudo apt-get install screen
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
-    - sudo apt-get update -q
-    - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
+    - sudo apt-get autoremove -y && sudo apt-get update -q
+    - sudo apt-get install --no-install-recommends --no-upgrade -qq screen bitcoind
   override:
     - pip install -r requirements.txt
 test:
@@ -25,6 +24,6 @@ test:
     - bitcoin-cli --regtest getinfo
     - bitcoin-cli --regtest getblockhash 20
     - screen -dmS p2pool python run_p2pool.py --regtest --irc-announce
-    - sleep 30
+    - sleep 45
   override:
     - trial p2pool/test/test_p2p_regtest.py
