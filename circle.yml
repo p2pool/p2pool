@@ -1,3 +1,30 @@
- machine:
+machine:
    python:
-     version: 3.3.3
+    version: 2.7.6
+general:
+  branches:
+    only:
+      - feature-bitcoin-regtest
+dependencies:
+  pre:
+    - sudo apt-get install screen
+    - sudo apt-add-repository ppa:bitcoin/bitcoin -y
+    - sudo apt-get update -q
+    - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
+  override:
+    - pip install -r requirements.txt
+test:
+  pre:
+    - mkdir /home/ubuntu/.bitcoin
+    - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
+    - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
+    - bitcoind --regtest --daemon
+    - sleep 5
+    - bitcoin-cli --regtest setgenerate true 50
+    #run checks that bitcoind is running
+    - bitcoin-cli --regtest getinfo
+    - bitcoin-cli --regtest getblockhash 20
+    - screen python run_p2pool.py --regtest
+    - sleep 5
+  override:
+    - trial p2pool/test/test_p2p_regtest.py
