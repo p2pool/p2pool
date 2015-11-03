@@ -181,6 +181,8 @@ class ClientFactory(protocol.ReconnectingClientFactory):
         return p
     
     def gotConnection(self, conn):
+        if p2pool.DEBUG:
+            print >>sys.stdout, 'connection made, setting connection true.'
         self.conn.set(conn)
     
     def getProtocol(self):
