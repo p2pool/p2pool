@@ -559,7 +559,7 @@ def run():
     if args.regtest:
         net_name_suffix = '_regtest'
 
-    net_name = args.net_name + net_name_sufix
+    net_name = args.net_name + net_name_suffix
 
     net = networks.nets[net_name]
 
