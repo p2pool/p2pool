@@ -23,8 +23,8 @@ test:
     #run checks that bitcoind is running
     - bitcoin-cli --regtest getinfo
     - bitcoin-cli --regtest getblockhash 20
-    - screen -dmS p2pool -L python run_p2pool.py --regtest --irc-announce
+    - screen -L -dmS p2pool python run_p2pool.py --regtest --irc-announce
     - sleep 60
-    - ls $PWD
+    - cat screenlog.0
   override:
     - trial p2pool/test/test_p2p_regtest.py
