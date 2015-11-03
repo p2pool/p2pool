@@ -8,7 +8,7 @@ general:
 dependencies:
   pre:
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
-    - sudo apt-get autoremove -y && sudo apt-get update -q
+    - sudo apt-get update -q
     - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
   override:
     - pip install -r requirements.txt
