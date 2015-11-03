@@ -441,8 +441,10 @@ def run():
         print 'Pausing for 3 seconds...'
         time.sleep(3)
 
+    # Initial filter of nets to remove _testnet
     realnets = dict((name, net) for name, net in networks.nets.iteritems() if '_testnet' not in name)
 
+    # second filter to remove _regtest
     realnets = dict((name, net) for name, net in realnets.iteritems() if '_regtest' not in name)
 
     parser = fixargparse.FixedArgumentParser(description='p2pool (version %s)' % (p2pool.__version__,), fromfile_prefix_chars='@')
@@ -549,14 +551,15 @@ def run():
     else:
         p2pool.DEBUG = False
 
-    net_name_2 = ''
+    # Set the network name suffix if either testnet or regtest
+    net_name_suffix = ''
 
     if args.testnet:
-        net_name_2 = '_testnet'
+        net_name_suffix = '_testnet'
     if args.regtest:
-        net_name_2 = '_regtest'
+        net_name_suffix = '_regtest'
 
-    net_name = args.net_name + net_name_2
+    net_name = args.net_name + net_name_sufix
 
     net = networks.nets[net_name]
 
