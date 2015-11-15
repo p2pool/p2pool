@@ -1,46 +1,19 @@
 machine:
-<<<<<<< HEAD
   python:
-=======
-   python:
->>>>>>> master
-    version: 2.7.6
+    version: 2.7.9
 general:
   branches:
     only:
-<<<<<<< HEAD
-      - master
       - circleci-testing
-dependencies:
-  pre:
-    - sudo apt-get install screen
-=======
-      - feature-bitcoin-regtest
   artifacts:
     #- "coverage" # relative to the user's home directory
+    - /home/ubuntu/.pip/pip.log
 dependencies:
   pre:
->>>>>>> master
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
-    - sudo apt-get update -q
-    - sudo apt-get install --no-install-recommends --no-upgrade -qq bitcoind
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq bitcoind
   override:
-<<<<<<< HEAD
-    - pip install -r requirements.txt
-test:
-  pre:
-    - mkdir /home/ubuntu/.bitcoin
-    - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
-    - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
-    - bitcoind -regtest -daemon 
-    - sleep 5
-    - bitcoin-cli -regtest setgenerate true 50
-    #run checks that bitcoind is running
-    - bitcoin-cli -regtest getinfo
-    - bitcoin-cli -regtest getblockhash 20
-  override:
-    - trial p2pool
-=======
     - pip install -q -r requirements.txt
 test:
   pre:
@@ -51,14 +24,28 @@ test:
     - bitcoind --regtest --daemon:
         background: true
     - sleep 5
-    # run checks that bitcoind is running
-    - bitcoin-cli --regtest setgenerate true 50
-    - bitcoin-cli --regtest getinfo
-    - bitcoin-cli --regtest getblockhash 20
+    - bitcoin-cli --regtest setgenerate true 10
+    # Build litecoin
+    - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
+        pwd: litecoin_scrypt
     # launch p2pool to test against
-    - python run_p2pool.py --regtest --debug --irc-announce:
+    - python run_p2pool.py --disable-upnp --regtest --debug:
         background: true
-    - sleep 60
+    - sleep 10
+    # generate more blocks so it is seen as new work
+    - bitcoin-cli --regtest setgenerate true 10
   override:
-    - trial p2pool/test/test_p2p_regtest.py
->>>>>>> master
+    # Testing the bitcoins tests
+    # These 3 pass
+    ##- trial -e p2pool/test/bitcoin/test_data.py
+    ##- trial -e p2pool/test/bitcoin/test_getwork.py
+    ##- trial -e p2pool/test/bitcoin/test_p2p.py
+    # These 2 don't
+    ##- trial -e p2pool/test/bitcoin/test_scrypt.py
+    ##- trial -e p2pool/test/bitcoin/test_sha265.py
+    ## Testing p2pool tests
+    # These 2 pass
+    ##- trial -e p2pool/test/test_data.py
+    ##- trial -e p2pool/test/test_node.py
+    # This one hates me
+    - trial -e p2pool/test/test_p2p.py

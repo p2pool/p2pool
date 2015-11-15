@@ -1,8 +1,4 @@
-Twisted>=12.2.0
+Twisted>=15.2.0
 argparse>=1.2.1
-service_identity
 pyOpenSSL>=0.13
-<<<<<<< HEAD
-=======
 service_identity
->>>>>>> master
