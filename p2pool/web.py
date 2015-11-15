@@ -331,6 +331,14 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 other_transaction_hashes=['%064x' % x for x in share.get_other_tx_hashes(node.tracker)],
             ),
         )
+
+    def get_share_address(share_hash_str):
+        if int(share_hash_str, 16) not in node.tracker.items:
+            return None
+        share = node.tracker.items[int(share_hash_str, 16)]
+        return bitcoin_data.script2_to_address(share.new_script, node.net.PARENT)
+
+    new_root.putChild('payout_address', WebInterface(lambda share_hash_str: get_share_address(share_hash_str)))
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
     new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.heads]))
     new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.verified.heads]))

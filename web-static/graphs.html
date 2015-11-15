@@ -21,19 +21,19 @@
                 stroke-width: 1;
                 shape-rendering: crispEdges;
             }
-            
+
             .plotline {
                 stroke-width: 1.4;
                 fill: none;
             }
-            
+
             text {
                 font-family: Sans-serif;
                 font-size: 12px;
             }
 	    </style>
 	    <link href="css/bootstrap-responsive.css" rel="stylesheet">
-		
+
 		<script>
             function ChangeCurrency(c_Currency, c_Sender)
 			{
@@ -43,7 +43,7 @@
                 document.location.href =  "?" + period + "/" + currency;
 			}
 
-        
+
 			function ChangeCurrentPeriod(p_Period, p_Sender)
 			{
 				period=p_Period;
@@ -53,7 +53,7 @@
 			}
         </script>
     </head>
-    
+
     <body>
 		<div class="navbar navbar-inverse navbar-fixed-top">
 		  <div class="navbar-inner">
@@ -101,17 +101,17 @@
                 <ul id="currency_dd" class="dropdown-menu" on >
                     <li><a href="javascript:ChangeCurrency('USD', 'currencyUSD');">US Dollar</a></li>
                 </ul>
-            </div> 
+            </div>
             <span id="err_currency"></span>
 
 		</center>
         <script>
             keys = window.location.search.substr(1).split("/");
-        
+
 			period = keys[0];
 			$('#scale_menu li').removeClass('active');
 			$('#scale' + period).addClass('active');
-			
+
 			currency = keys[1];
             $('#cur_currency').html(currency + "<span class=\"caret\">");
 
@@ -120,23 +120,23 @@
 			});
 		</script>
         <p style="display: none">Periods: <span id="period_chooser"></span> Current: <span id="period_current"></span></p>
-        
+
         <div id="warnings"></div>
     <div class="tab-content">
 	  	<div class="tab-pane active" id="node">
 
 		<center>
-			<div class="well" style="width:1000px"> 
+			<div class="well" style="width:1000px">
 				<h2>Local rate</h2>
 				<svg id="local"></svg>
 			</div>
 			<br/>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Local rate reflected in shares</h2>
 				<svg id="local_shares"></svg>
 			</div>
 			<br/>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Pool rate</h2>
 				<svg id="pool"></svg>
 			</div>
@@ -145,7 +145,7 @@
         </div>
         <div class="tab-pane" id="payouts">
         <center>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Current payout to default address</h2>
 				<svg id="payout"></svg>
 			</div>
@@ -154,7 +154,7 @@
         </div>
         <div class="tab-pane" id="minergraphs">
         <center>
-            <div class="well" style="width:1000px"> 	
+            <div class="well" style="width:1000px">
 				<h2>Miners</h2>
 				<div id="miners"></div>
 			</div>
@@ -162,17 +162,17 @@
         </div>
         <div class="tab-pane" id="network">
         <center>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Peers</h2>
 				<svg id="peers"></svg>
 			</div>
 			<br/>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Traffic rate</h2>
 				<svg id="traffic_rate"></svg>
 			</div>
 			<br/>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Desired version rates</h2>
 				<svg id="desired_version_rates"></svg>
 			</div>
@@ -181,12 +181,12 @@
         </div>
 	  	<div class="tab-pane" id="system">
         <center>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Bitcoind GetBlockTemplate Latency</h2>
 				<svg id="getwork_latency"></svg>
 			</div>
 			<br/>
-			<div class="well" style="width:1000px"> 	
+			<div class="well" style="width:1000px">
 				<h2>Memory Usage</h2>
 				<svg id="memory_usage"></svg>
 			</div>
@@ -201,7 +201,7 @@
 	</center>
         </div>
         <script type="text/javascript">
-        
+
             function LoadData() {
                 d3.json('../web/version', function(version) {
 					d3.selectAll('#version').text(version);
@@ -209,7 +209,7 @@
                 populateCurrencies();
                 getBitPayPrice();
             }
-                
+
                 // Get current USD price from BitPay
                 function getBitPayPrice() {
                     var jqxhr = $.getJSON( "https://bitpay.com/rates/" + currency, function(json) {
@@ -221,7 +221,7 @@
                             currency = 'USD';
                         });
                 }
-        
+
             function compose() {
                 var funcs = arguments;
                 return function(x) {
@@ -234,7 +234,7 @@
             function itemgetter(i) { return function(x) { return x[i]; } }
             function as_date(x) { return new Date(1000*x); }
             function not_null(x) { return x != null; }
-            
+
             function get_area_mean(data) {
                 var top = 0;
                 var bottom = 0;
@@ -245,26 +245,26 @@
                 }
                 return {"area": top, "mean": bottom==0?null:top/bottom};
             }
-            
+
             function plot(g, unit, total_unit, lines, stack) {
-                
+
                 // lines is a list of objects which have attributes data, color, and label
-                
+
                 var table_div = document.createElement("div");
                 g.node().parentNode.insertBefore(table_div, g.node().nextSibling);
                 table_div.style.display = "none";
-                
+
                 var showhide = document.createElement("p");
                 g.node().parentNode.insertBefore(showhide, g.node().nextSibling);
                 d3.select(showhide).append("a")
                     .text('Show/hide table')
                     .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
                     .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
-                
+
                 for(var i = 0; i < lines.length; ++i) {
                     var line = lines[i];
                     var table_sel = d3.select(table_div).append('table').attr('border', 1).attr('style', 'float:left');
-                    
+
                     var first_tr = table_sel.insert('tr');
                     first_tr.append('th').text('Date');
                     first_tr.append('th').text(line.label + '/(' + unit + ')');
@@ -273,7 +273,7 @@
                         var tab = 'BTC';
                         first_tr.append('th').text(line.label + '/(' + currency.toUpperCase() + ')');
                     }
-                    
+
                     var new_data = []
                     for(var j = 0; j < line.data.length; ++j)
                         if(j % 7 == 3)
@@ -287,41 +287,41 @@
                     }
                 }
                 d3.select(table_div).append('div').attr('style', 'clear:both');
-                
+
                 d3.select(table_div).append('p').append("a")
                     .text('Show/hide table')
                     .on('click', function() { table_div.style.display = table_div.style.display == "block" ? "none" : "block" })
                     .attr("style", "color:blue;text-decoration:underline;cursor:pointer");
-                
-                
+
+
                 var w = 1000;
                 var h = 300;
                 var margin_v = 40;
                 var margin_h = 140;
-                
+
                 var x = d3.time.scale().domain([
                     as_date(d3.min(lines, function(line) { return d3.min(line.data, itemgetter(0)); })),
                     as_date(d3.max(lines, function(line) { return d3.max(line.data, itemgetter(0)); }))
                 ]).range([0 + margin_h, w - margin_h]);
-                
-                
+
+
                 g.attr("width", w).attr("height", h);
                 g.selectAll("*").remove();
-                
-                if(stack) {                   
+
+                if(stack) {
                     var data = d3.layout.stack()
                         .x(itemgetter(0))
                         .y(itemgetter(1))
                         .values(function(line){ return line.data })
                         (lines);
-                    
+
                     var y = d3.scale.linear().domain([
                         0,
                         d3.max(data, function(d) { return d3.max(d.data, function(d) { return d.y0 + d.y; }) })
                     ]).range([h - margin_v, margin_v]);
-                    
+
                     var y_abs = d3.scale.linear().domain([0, 1]).range([h - margin_v, margin_v]);
-                    
+
                     g.selectAll().data(lines).enter().append("svg:path")
                         .attr("d", function(line){
                             return d3.svg.area()
@@ -334,7 +334,7 @@
                         .style("fill", function(line){return line.color})
                         .attr("stroke", function(line){return line.color})
                         .attr("class", "plotline");
-                    
+
                     var total = 0;
                     var total_area = 0;
                     for(var i = 0; i < lines.length; ++i) {
@@ -345,7 +345,7 @@
                             total_area += stats.area;
                         }
                     }
-                    
+
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
@@ -407,7 +407,7 @@
                         0,
                         d3.max(lines, function(line) { return d3.max(line.data, itemgetter(1)); } )
                     ]).range([h - margin_v, margin_v]);
-                    
+
                     g.selectAll().data(lines).enter().append("svg:path")
                         .attr("d", function(line) {
                             return d3.svg.line()
@@ -418,7 +418,7 @@
                         })
                         .style("stroke", function(line) { return line.color })
                         .attr("class", "plotline");
-                    
+
                     for(var i = 0; i < lines.length; ++i) {
                         var line = lines[i];
                         var stats = get_area_mean(line.data);
@@ -448,15 +448,15 @@
                         }
                     }
                 }
-                
+
                 // x axis
-                
+
                 g.append("svg:line")
                     .attr("x1", margin_h)
                     .attr("y1", h - margin_v)
                     .attr("x2", w - margin_h)
                     .attr("y2", h - margin_v);
-                
+
                 g.selectAll()
                     .data(x.ticks(13))
                     .enter().append("svg:g")
@@ -466,7 +466,7 @@
                     .attr("text-anchor", "middle")
                     .attr("dominant-baseline", "central")
                     .text(x.tickFormat(13));
-                
+
                 g.selectAll()
                     .data(x.ticks(13))
                     .enter().append("svg:line")
@@ -474,15 +474,15 @@
                     .attr("y1", h - margin_v)
                     .attr("x2", x)
                     .attr("y2", h - margin_v + 5);
-                
+
                 // y axis
-                
+
                 g.append("svg:line")
                     .attr("x1", margin_h)
                     .attr("y1", h - margin_v)
                     .attr("x2", margin_h)
                     .attr("y2", margin_v);
-                
+
                 g.selectAll()
                     .data(y.ticks(6))
                     .enter().append("svg:line")
@@ -490,7 +490,7 @@
                     .attr("y1", y)
                     .attr("x2", margin_h)
                     .attr("y2", y);
-                
+
                 g.selectAll()
                     .data(y.ticks(6))
                     .enter().append("svg:text")
@@ -511,12 +511,12 @@
                     });
                 });
             }
-            
+
             function data_to_lines(data, sort_key) {
                 var vers = {}; for(var i = 0; i < data.length; ++i) if(data[i][1] != null) for(var v in data[i][1]) if(data[i][1][v] != data[i][3]) vers[v] = null;
                 var verlist = []; for(var v in vers) verlist.push(v);
                 verlist.sort();
-                
+
                 lines = [];
                 for(var i = 0; i < verlist.length; i++) {
                     lines.push({
@@ -530,7 +530,7 @@
                 lines.sort(function(a, b){ return sort_key(a) - sort_key(b) });
                 return lines;
             }
-            
+
             function change_period(period, currency_info) {
                 d3.select("#period_current").text(period);
                 var lowerperiod = period.toLowerCase();
@@ -547,10 +547,10 @@
                 d3.json("../web/graph_data/pool_rates/last_" + lowerperiod, function(data) {
                     plot(d3.select('#pool'), 'H/s', 'H', data_to_lines(data), true);
                 });
-		d3.json("../web/graph_data/peers/last_" + lowerperiod, function(data) {
+                d3.json("../web/graph_data/peers/last_" + lowerperiod, function(data) {
                     plot(d3.select('#peers'), 'Total', null, data_to_lines(data, function(line){ return line.label == "incoming" }), true);
                 });
-                
+
                 d3.json("../web/graph_data/miner_hash_rates/last_" + lowerperiod, function(data) {
                     d3.json("../web/graph_data/miner_dead_hash_rates/last_" + lowerperiod, function(dead_data) {
                         d3.json("../web/graph_data/current_payouts/last_" + lowerperiod, function(current_payouts) {
@@ -574,30 +574,30 @@
                         });
                     });
                 });
-                
+
                 d3.json("../web/graph_data/desired_version_rates/last_" + lowerperiod, function(data) {
                     plot(d3.select('#desired_version_rates'), 'H/s', 'H', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
-                
+
                 d3.json("../web/graph_data/traffic_rate/last_" + lowerperiod, function(data) {
                     plot(d3.select('#traffic_rate'), 'B/s', 'B', data_to_lines(data, function(line){ return parseInt(line.label) }), true);
                 });
-                
+
                 plot_later(d3.select("#getwork_latency"), "s", null, [
                     {"url": "../web/graph_data/getwork_latency/last_" + lowerperiod, "color": "#FF0000", "label": "Getwork Latency"}
                 ], false);
-                
+
                 plot_later(d3.select("#memory_usage"), "B", null, [
                     {"url": "../web/graph_data/memory_usage/last_" + lowerperiod, "color": "#FF0000", "label": "Memory Usage"}
                 ], false);
             }
-            
+
             d3.json('../local_stats', function(local_stats) {
                 d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
                     .text(function(w){ return 'Warning: ' + w })
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
             })
-            
+
             periods = ["Hour", "Day", "Week", "Month", "Year"];
             d3.select("#period_chooser").selectAll().data(periods).enter().append("a")
                 .text(function(period) { return period })
@@ -613,7 +613,7 @@
                     change_period(period, currency_info);
                 });
             }
-            
+
             // function to populate the currencies list
             function populateCurrencies() {
                 d3.select("#currency_dd").selectAll("*").remove();
@@ -628,7 +628,7 @@
         </script>
         <script type="text/javascript">
         var price = '0.00';
-        
+
         // This is where you add other currencies
         var currencies = [
             {name: "USD", desc: "US Dollar"},
