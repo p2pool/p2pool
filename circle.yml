@@ -31,7 +31,6 @@ test:
     # generate more blocks so it is seen as new work
     - bitcoin-cli --regtest setgenerate true 10
   override:
-    - mkdir -p $CIRCLE_TEST_REPORTS/junit:
-        parallel: true
-    - trial --reporter=subunit p2pool | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml:
-        parallel: true
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit
+    - trial --reporter=subunit p2pool.test.test_p2p | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml:
+    - ls _trial_temp
