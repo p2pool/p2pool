@@ -19,7 +19,7 @@ test:
     # Make sure we have the correct version
     - bitcoin-cli -regtest getnetworkinfo
     # Generate some blocks
-    - bitcoin-cli -regtest generate 10
+    - bitcoin-cli -regtest setgenerate true 10
     # Build litecoin
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
         pwd: litecoin_scrypt
@@ -29,7 +29,7 @@ test:
     - sleep 10
     - bitcoin-cli -regtest getmininginfo
     # generate more blocks so it is seen as new work
-    - bitcoin-cli -regtest generate 10
+    - bitcoin-cli -regtest setgenerate true 10
   override:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit
     # This line works in local
