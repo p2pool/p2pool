@@ -29,8 +29,8 @@ class Test(unittest.TestCase):
         n.start()
         try:
             yield df
-        except:
-            pass
+        except as e:
+            throw e
             yield n.stop()
         finally:
             yield n.stop()
