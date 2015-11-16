@@ -25,9 +25,9 @@ test:
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
         pwd: litecoin_scrypt
     # launch p2pool to test against
-    # - python run_p2pool.py --disable-upnp --regtest --debug:
-    #    background: true
-    # - sleep 10
+    - python run_p2pool.py --disable-upnp --regtest --debug:
+        background: true
+    - sleep 10
     # generate more blocks so it is seen as new work
     - bitcoin-cli --regtest setgenerate true 10
   override:
