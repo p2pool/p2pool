@@ -1,11 +1,6 @@
 machine:
   python:
     version: 2.7.9
-general:
-  branches:
-    only:
-      - master
-      - circleci-testing
 dependencies:
   pre:
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
