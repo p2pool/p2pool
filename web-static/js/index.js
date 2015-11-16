@@ -1,36 +1,23 @@
-<!DOCTYPE html>
-<html ng-app="p2pool" ng-controller="p2pool-controller as p2pool">
-    <head>
-        <meta charset="UTF-8">
-        <title>P2Pool</title>
-        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
-        <script type="text/javascript" src="d3.v2.min.js"></script>
-	    <link href="css/bootstrap.css" rel="stylesheet">
-		<link href="css/jquery.jqplot.min.css" rel="stylesheet">
-		<link href="css/p2pool.css" rel="stylesheet">
-		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-		<script src="js/bootstrap.min.js"></script>
-		<script src="js/jquery.jqplot.min.js"></script>
-		<script class="include" src="js/jqplot.pieRenderer.min.js"></script>
-        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
-        <script src="js/p2pool.js"></script>
-	    <style>
-            </style>
-	    <link href="css/bootstrap-responsive.css" rel="stylesheet">
-        <script type="text/javascript">
             // based on goblin's p2pool-stats project
 			var period = "day";
-            var payouts = [];
+            var siteTitle = "Drazisil's P2Pool";
 
 			function LoadData()
 			{
+				$("#blocks").html("<tr><th>ID</th><th>Time</th><th>Hash / Explorer link</th><th>Share</th></tr>");
+				$("#payouts").html("<tr><th>address</th><th>amount in <span class=\"symbol\"></span></th></tr>");
+                $("#miners").html("<tr><th>Miner</th><th>Hashrate</th><th>Dead hashrate</th></tr>");
 				function values(o){ res = []; for(var x in o) res.push(o[x]); return res; }
 				
-			    d3.json('../web/currency_info', function(currency_info) {
+				d3.json('/web/version', function(version) {
+					d3.selectAll('#version').text(version);
+			    });
+			    
+			    d3.json('/web/currency_info', function(currency_info) {
+				d3.selectAll('.symbol').text(currency_info.symbol);
 				
-				d3.json('../current_payouts', function(pays) {
+				d3.json('/current_payouts', function(pays) {
 				    d3.json('/payout_addr', function(addr) {
-                        payouts = pays;
 				        d3.select('#payout_addr').text(addr);
 				        d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
 				    });
@@ -46,12 +33,12 @@
 				    total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
 				});
 				
-				d3.json('../recent_blocks', function(blocks) {
+				d3.json('/recent_blocks', function(blocks) {
 				    var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
 				    tr.append('td').text(function(block){return block.number});
 				    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
 				    tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return currency_info.block_explorer_url_prefix + block.hash});
-				    tr.append('td').append('a').text('→').attr('href', function(block){return 'share.html#' + block.share});
+				    tr.append('td').append('a').text('->').attr('href', function(block){return 'share.html#' + block.share});
 				});
 			    });
 			    
@@ -60,7 +47,7 @@
 				$("#heads").html("");
 				$("#verified_tails").html("");
 				$("#tails").html("");
-			    d3.json('../web/best_share_hash', function(c) {
+			    d3.json('/web/best_share_hash', function(c) {
 				d3.select('#best_share').append('a').attr('href', 'share.html#' + c).text(c.substr(-8));
 			    });
 			    
@@ -71,10 +58,10 @@
 				});
 			    }
 				
-			    fill('../web/verified_heads', '#verified_heads');
-			    fill('../web/heads', '#heads');
-			    fill('../web/verified_tails', '#verified_tails');
-			    fill('../web/tails', '#tails');
+			    fill('/web/verified_heads', '#verified_heads');
+			    fill('/web/heads', '#heads');
+			    fill('/web/verified_tails', '#verified_tails');
+			    fill('/web/tails', '#tails');
 			    fill('../web/my_share_hashes', '#my_share_hashes');
 			}
                         var plot1;
@@ -83,7 +70,7 @@
 			{
 				function values(o){ res = []; for(var x in o) res.push(o[x]); return res; }
 
-				d3.json('../local_stats', function(local_stats) {
+				d3.json('/local_stats', function(local_stats) {
 					d3.select('#peers_in').text(local_stats.peers.incoming);
 					d3.select('#peers_out').text(local_stats.peers.outgoing);
 					
@@ -175,12 +162,11 @@
                         miner.hash=local_stats.miner_hash_rates[i];
                         miners.push(miner)
                     };
-                    $("#miners").html("<tr><th>Miner</th><th>Hashrate</th><th>Dead hashrate</th><th>Pending Payout</th></tr>");
+                    $("#miners").html("<tr><th>Miner</th><th>Hashrate</th><th>Dead hashrate</th></tr>");
                     var tr = d3.select("#miners").selectAll().data(miners).enter().append('tr');
                     tr.append('td').text(function(miner){return miner.miner_name});
                     tr.append('td').text(function(miner){return d3.format('.3s')(miner.hash) +'H/s'});
                     tr.append('td').text(function(miner){return local_stats.miner_dead_hash_rates[miner.miner_name] != null ? d3.format('.3s')(local_stats.miner_dead_hash_rates[miner.miner_name]) + 'H/s' : '0H/s'});
-                    tr.append('td').text(function(miner){return payouts[miner.miner_name] != null ? d3.format('3.5')(payouts[miner.miner_name]) + ' BTC' : '0'});
 
                     document.title=d3.format('.3s')(local) + 'H/s (' + d3.format('.2p')(local_dead/local) + ') | ' + local_stats.shares.total + ' shares | ' + siteTitle;
 				
@@ -188,8 +174,8 @@
 
                 /// pool speed grapg
 				plot_later(d3.select("#main-local"), "H/s", "H", [
-                    {"url": "../web/graph_data/local_hash_rate/last_" + period, "color": "#0000FF", "label": "Total"},
-                    {"url": "../web/graph_data/local_dead_hash_rate/last_" + period, "color": "#FF0000", "label": "Dead"}
+                    {"url": "/web/graph_data/local_hash_rate/last_" + period, "color": "#0000FF", "label": "Total"},
+                    {"url": "/web/graph_data/local_dead_hash_rate/last_" + period, "color": "#FF0000", "label": "Dead"}
                 ],1000,300);
 
 		}
@@ -209,147 +195,9 @@
 				UpdateData();
 			}
 		}
-        </script>
-    </head>
-    <body>
 
-    <div class="navbar navbar-inverse navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container">
-          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="brand" id="pagetitle" href="/static/">{{p2pool.site_title}} (<span class="upper">{{p2pool.frontpage.currency_info.symbol}}</span>)</a>
-          <div class="nav-collapse collapse">
-            <ul class="nav">
-			  <li class="active"><a href="./">Stats</a></li>
-			  <li><a href="graphs.html">Graph</a></li>
-              <li><a href="credits.html">Credits</a></li>
-            </ul>
-          </div><!--/.nav-collapse -->
-        </div>
-      </div>
-    </div>
-
-	<ul class="nav nav-tabs" id="myTab">
-	  	<li class="active"><a href="#stats" data-toggle="tab"><i class="icon-user"></i>&nbsp;Pool stats</a></li>
-	  	<li><a href="#shares" data-toggle="tab"><i class="icon-refresh"></i>&nbsp;Share explorer</a></li>
-	  	<li><a href="#lastblocks" data-toggle="tab"><i class="icon-list-alt"></i>&nbsp;Last blocks</a></li>
-        <li><a href="#activeminers" data-toggle="tab"><i class="icon-flag"></i> Active miners</a></li>
-		<li><a href="#mainnodepayout" data-toggle="tab"><i class="icon-download-alt"></i>&nbsp;Payout</a></li>
-	</ul>
-        <div class="center">
-				<div class="navbar" style="width: 560px;">
-				  <div class="navbar-inner">
-				    <a class="brand" href="javascript:void(0)">Scale</a>
-				    <ul class="nav" id="scale_menu">
-				      <li id="scale1"><a href="javascript:ChangeCurrentPeriod('hour', 'scale1');">Hour</a></li>
-				      <li id="scale2" class="active"><a href="javascript:ChangeCurrentPeriod('day', 'scale2');">Day</a></li>
-				      <li id="scale3"><a href="javascript:ChangeCurrentPeriod('week', 'scale3');">Week</a></li>
-				      <li id="scale4"><a href="javascript:ChangeCurrentPeriod('month', 'scale4');">Month</a></li>
-				      <li id="scale5"><a href="javascript:ChangeCurrentPeriod('year', 'scale5');">Year</a></li>
-				      <li><input type="checkbox" name="autorefresh" id="autorefresh" /><label for="autorefresh">Auto-refresh</label></li>
-				    </ul>
-				  </div>
-				</div>
-            </div>
-	<div class="tab-content">
-	  	<div class="tab-pane active" id="stats">
-            <div class="center">
-				<div class="well" style="width:1000px">
-                <h2>Node Hashrate</h2>
-				<svg id="main-local"></svg></div>
-				<br/>
-				<div class="well" style="width:1300px">
-					<table class="table table-striped" style="width: 1300px">
-						<tbody>
-							<tr>
-							  <td><h5>Local rate</h5></td>
-							  <td><span id="local_rate" class="label"></span> (<span id="local_doa"></span> DOA)</td>
-							  <td></td>
-							  <td><h5>Expected time to share</h5></td>
-							  <td><span id="time_to_share" class="label"></span> (<span id="time_to_share_minute"></span> minutes)</td>
-							</tr>
-							<tr>
-							  <td><h5>Shares</h5></td>
-							  <td><span id="shares_total" class="label"></span> total (<span id="shares_orphan" class="label label-warning"></span> orphaned, <span id="shares_dead" class="label label-warning"></span> dead) Efficiency: <span class="label label-info" id="efficiency"></span></td>
-							  <td></td>
-							  <td><h5>Payout if a block were found NOW</h5></td>
-							  <td><span id="payout_amount" class="label"></span> {{p2pool.currency_info_symbol}}</td>
-							</tr>
-							<tr>
-							  <td><h5>Pool rate</h5></td>
-							  <td><span id="pool_rate" class="label label-inverse"></span> (<span id="pool_stale"></span> DOA+orphan)</td>
-							  <td></td>
-							  <td><h5>Share difficulty</h5></td>
-							  <td><span id="difficulty" class="label label-inverse"></span></td>
-							</tr>
-							<tr>
-							  <td><h5>Node uptime</h5></td>
-							  <td><span id="uptime_days" class="label label-inverse"></span> (<span id="uptime_hours"></span> hours)</td>
-							  <td></td>
-							  <td><h5>Peers</h5></td>
-							  <td><span id="peers_out"></span> out, <span id="peers_in"></span> in</td>
-							</tr>
-                            <tr>
-							  <td><h5>Current block value</h5></td>
-							  <td><span id="block_value" class="label label-inverse"></span> {{p2pool.frontpage.currency_info.symbol}}</td>
-							  <td></td>
-							  <td><h5>Expected time to block</h5></td>
-							  <td><span id="time_to_block" class="label"></span></td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-				<br/>
-				<div style="width: 1340px">
-					<div class="well" style="width:600px; float: left">
-						<h4>Local Shares</h4>
-						<div id="ShareChart" width="450" height="450"></div>
-					</div>
-					<div class="well" style="width:600px; float: right">
-						<h4>Global pool speed</h4>
-						<div id="SpeedChart" width="450" height="450"></div>
-					</div>
-				</div>
-				
-			</div>
-		</div>
-	  	<div class="tab-pane" id="shares">
-			<p>Best share: <span id="best_share"></span></p>
-			<p>Verified heads: <span id="verified_heads"></span></p>
-			<p>Heads: <span id="heads"></span></p>
-			<p>Verified tails: <span id="verified_tails"></span></p>
-			<p>Tails: <span id="tails"></span></p>
-			<p>My Shares: <span id="my_share_hashes"></span></p>
-		</div>
-	  	<div class="tab-pane" id="lastblocks">
-			<table id="blocks" class="table table-striped table-hover">
-			    <tr><th>ID</th><th>Time</th><th>Hash / Explorer link</th><th>Share</th></tr>
-			</table>
-		</div>
-        <div class="tab-pane fade" id="activeminers">
-            <table id="miners" class="table table-striped">
-            <tr><th>Miner</th><th>Hashrate</th><th>Dead hashrate</th><th>Pending Payout</th></tr>
-            </table>
-    </div>
-	  	<div class="tab-pane" id="mainnodepayout">
-			<table class="table table-striped table-hover" id="payouts">
-			    <tr><th>Address</th><th>Amount in {{p2pool.frontpage.currency_info.symbol}}</th></tr>
-			</table>
-		</div>
-	</div>
-	<div style="border-bottom: 1px solid #ddd;"></div>
-    <div class="center footer">
-        P2Pool version: {{p2pool.frontpage.version}}<br/>
-		Interface by Drazisil <a href="https://github.com/drazisil/P2PoolExtendedFrontEnd">https://github.com/drazisil/P2PoolExtendedFrontEnd</a><br/>
-		Donate if you love it (BTC 1CMmcUre9Nhs2ndinA1MDfdhxsSN4Eracq)
-	</div>
-		<br/>
-		<script type="text/javascript">
-            function compose() {
+        
+                    function compose() {
                 var funcs = arguments;
                 return function(x) {
                     for(var i = funcs.length-1; i >= 0; i--) {
@@ -577,6 +425,7 @@
                     .attr("y1", h - margin_v)
                     .attr("x2", x)
                     .attr("y2", h - margin_v + 5);
+                
                 // y axis
                 
                 g.append("svg:line")
@@ -632,17 +481,3 @@
                 lines.sort(function(a, b){ return sort_key(a) - sort_key(b) });
                 return lines;
             }
-            </script>    
-		<script type="text/javascript">
-        var siteTitle = "Drazisil's P2Pool";
-        
-		$(document).ready(function() {
-            //$("#pagetitle").text(function(){return (siteTitle != null) ? (siteTitle + " (BTC)") : ("P2Pool (BTC)")});
-			LoadData();
-		  	UpdateData();
-			setInterval("AutoRefresh()", 5 * 1000);
-		    	$('#myTab a:first').tab('show');
-		});
-        </script>
-	</body>
-</html>
