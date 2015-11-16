@@ -24,7 +24,10 @@ class Test(unittest.TestCase):
                     stops=[],
                 ).chainDeferred(self.df)
 
-        df = defer.Deferred()
+        df = DeferredWrapperWithTimeout()
+        d.addCallback(testCallback)
+        dw.addTimeoutCallback(reactor, 100, testTimeout, "to")
+        reactor.callLater(2, d.callback, "cb")
         n = MyNode(df)
         n.start()
         try:
@@ -77,3 +80,43 @@ class Test(unittest.TestCase):
             yield n.stop()
         finally:
             p2p.Protocol.max_remembered_txs_size //= 10
+
+# Credit Corey @ http://stackoverflow.com/a/19019648/335583
+class DeferredWrapperWithTimeout(object):
+    '''
+    Holds a deferred that allows a specified function to be called-back
+    if the deferred does not fire before some specified timeout.
+    '''
+    def __init__(self, canceller=None):
+        self._def = defer.Deferred(canceller)
+
+    def _finish(self, r, t):
+        '''
+        Function to be called (internally) after the Deferred
+        has fired, in order to cancel the timeout.
+        '''
+        if ( (t!=None) and (t.active()) ):
+            t.cancel()
+        return r
+
+    def getDeferred(self):
+        return self._def
+
+    def addTimeoutCallback(self, reactr, timeout,
+                           callUponTimeout, *args, **kw):
+        '''
+        The function 'callUponTimeout' (with optional args or keywords)
+        will be called after 'timeout' seconds, unless the Deferred fires.
+        '''
+
+        def timeoutCallback():
+            self._def.cancel()
+            callUponTimeout(*args, **kw)
+        toc = reactr.callLater(timeout, timeoutCallback)
+        return self._def.addCallback(self._finish, toc)
+
+def testCallback(x=None):
+    print "called"
+
+def testTimeout(x=None):
+    print "timedout"
