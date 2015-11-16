@@ -24,11 +24,7 @@ class Test(unittest.TestCase):
                     stops=[],
                 ).chainDeferred(self.df)
 
-        df = DeferredWrapperWithTimeout()
-        d  = df.getDeferred()
-        d.addCallback(testCallback)
-        df.addTimeoutCallback(reactor, 100, testTimeout, "to")
-        reactor.callLater(2, d.callback, "cb")
+        df = defer.Deferred()
         n = MyNode(df)
         n.start()
         try:
