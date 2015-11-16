@@ -1,14 +1,6 @@
 machine:
   python:
     version: 2.7.9
-general:
-  branches:
-    only:
-      - master
-      - circleci-testing
-  artifacts:
-    - "coverage" # relative to the user's home directory
-    - /home/ubuntu/.pip/pip.log
 dependencies:
   pre:
     - sudo apt-add-repository ppa:bitcoin/bitcoin -y
