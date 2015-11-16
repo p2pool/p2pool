@@ -6,7 +6,7 @@ general:
     only:
       - circleci-testing
   artifacts:
-    #- "coverage" # relative to the user's home directory
+    - "coverage" # relative to the user's home directory
     - /home/ubuntu/.pip/pip.log
 dependencies:
   pre:
@@ -24,6 +24,7 @@ test:
     - bitcoind --regtest --daemon:
         background: true
     - sleep 5
+    - bitcoin-cli --regtest getmininginfo
     - bitcoin-cli --regtest setgenerate true 10
     # Build litecoin
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
@@ -35,17 +36,7 @@ test:
     # generate more blocks so it is seen as new work
     - bitcoin-cli --regtest setgenerate true 10
   override:
-    # Testing the bitcoins tests
-    # These 3 pass
-    ##- trial -e p2pool/test/bitcoin/test_data.py
-    ##- trial -e p2pool/test/bitcoin/test_getwork.py
-    ##- trial -e p2pool/test/bitcoin/test_p2p.py
-    # These 2 don't
-    ##- trial -e p2pool/test/bitcoin/test_scrypt.py
-    ##- trial -e p2pool/test/bitcoin/test_sha265.py
-    ## Testing p2pool tests
-    # These 2 pass
-    ##- trial -e p2pool/test/test_data.py
-    ##- trial -e p2pool/test/test_node.py
-    # This one hates me
-    - trial -e p2pool/test/test_p2p.py
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit
+    - trial --reporter=subunit p2pool | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
+
+    - trial --unclean-warnings -e --temp-directory=coverage --coverage p2pool
