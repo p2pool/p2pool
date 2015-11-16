@@ -27,7 +27,7 @@ class Test(unittest.TestCase):
         df = DeferredWrapperWithTimeout()
         d  = df.getDeferred()
         d.addCallback(testCallback)
-        dw.addTimeoutCallback(reactor, 100, testTimeout, "to")
+        df.addTimeoutCallback(reactor, 100, testTimeout, "to")
         reactor.callLater(2, d.callback, "cb")
         n = MyNode(df)
         n.start()
