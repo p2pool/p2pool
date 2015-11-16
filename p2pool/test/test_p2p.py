@@ -20,8 +20,7 @@ class Test(unittest.TestCase):
             def handle_share_hashes(self, hashes, peer):
                 peer.get_shares(
                     hashes=[hashes[0]],
-                    # running into some timing issues here when we test on ci. Parents was 5, testing reducing it.
-                    parents=3,
+                    parents=5,
                     stops=[],
                 ).chainDeferred(self.df)
 
