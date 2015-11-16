@@ -25,6 +25,7 @@ class Test(unittest.TestCase):
                 ).chainDeferred(self.df)
 
         df = DeferredWrapperWithTimeout()
+        d  = dw.getDeferred()
         d.addCallback(testCallback)
         dw.addTimeoutCallback(reactor, 100, testTimeout, "to")
         reactor.callLater(2, d.callback, "cb")
@@ -32,6 +33,9 @@ class Test(unittest.TestCase):
         n.start()
         try:
             yield df
+        except:
+            pass
+            yield n.stop()
         finally:
             yield n.stop()
 
