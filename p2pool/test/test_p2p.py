@@ -13,7 +13,7 @@ class Test(unittest.TestCase):
     def test_sharereq(self):
         class MyNode(p2p.Node):
             def __init__(self, df):
-                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 9333)]), 0, 0, 0, 0)
+                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 19333)]), 0, 0, 0, 0)
 
                 self.df = df
 
@@ -36,7 +36,7 @@ class Test(unittest.TestCase):
     def test_tx_limit(self):
         class MyNode(p2p.Node):
             def __init__(self, df):
-                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 9333)]), 0, 0, 0, 0)
+                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 19333)]), 0, 0, 0, 0)
 
                 self.df = df
                 self.sent_time = 0
