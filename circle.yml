@@ -24,7 +24,7 @@ test:
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
         pwd: litecoin_scrypt
     # launch p2pool to test against
-    - python run_p2pool.py --regtest
+    - python run_p2pool.py --regtest:
         background: true
     - sleep 10
     - bitcoin-cli -regtest getmininginfo
