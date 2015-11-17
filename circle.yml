@@ -18,8 +18,9 @@ test:
     - sleep 5
     # Make sure we have the correct version
     - bitcoin-cli -regtest getnetworkinfo
+    - bitcoin-cli -regtest getmininginfo
     # Generate some blocks
-    - bitcoin-cli -regtest setgenerate true 10
+    - bitcoin-cli -regtest setgenerate true 5
     # Build litecoin
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
         pwd: litecoin_scrypt
@@ -27,9 +28,6 @@ test:
     - python run_p2pool.py --regtest:
         background: true
     - sleep 10
-    - bitcoin-cli -regtest getmininginfo
-    # generate more blocks so it is seen as new work
-    - bitcoin-cli -regtest setgenerate true 10
   override:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit
     # run the tests without coverage or metadata
