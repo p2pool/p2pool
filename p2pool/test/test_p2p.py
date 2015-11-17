@@ -1,4 +1,4 @@
-import random
+import random, subprocess
 
 from twisted.internet import defer, endpoints, protocol, reactor
 from twisted.trial import unittest
@@ -11,6 +11,7 @@ from p2pool.util import deferral
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_sharereq(self):
+        #https://github.com/drazisil/p2pool/blob/master/p2pool/p2p.py#L611
         class MyNode(p2p.Node):
             def __init__(self, df):
                 p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 19333)]), 0, 0, 0, 0)
