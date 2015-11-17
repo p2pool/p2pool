@@ -33,6 +33,6 @@ test:
   override:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit
     # run the tests
-    - trial --corvage --reporter=subunit p2pool.test.test_p2p | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
+    - trial --coverage --reporter=subunit p2pool.test.test_p2p | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
     # This line copies the test results
     - cp -R _trial_temp/test.log $CIRCLE_TEST_REPORTS/trial_test.log.txt
