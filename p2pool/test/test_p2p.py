@@ -28,14 +28,14 @@ class Test(unittest.TestCase):
         df = defer.Deferred()
         n = MyNode(df)
         n.start()
-        if os.environ['CIRCLE']:
+        if os.environ.get('CIRCLE') == True:
             # attempt to create shares
-            print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+            subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
         try:
             yield df
-            if os.environ['CIRCLE']:
+            if os.environ.get('CIRCLE') == True:
                 # attempt to create shares
-                print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+                subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
         finally:
             yield n.stop()
 
