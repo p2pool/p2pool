@@ -24,17 +24,15 @@ test:
     - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
         pwd: litecoin_scrypt
     # launch p2pool to test against
-    #- python run_p2pool.py --regtest:
-    #    background: true
+    - python run_p2pool.py --regtest:
+        background: true
     - sleep 10
     - bitcoin-cli -regtest getmininginfo
     # generate more blocks so it is seen as new work
     - bitcoin-cli -regtest setgenerate true 10
   override:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit
-    # This line works in local
-    - trial -e p2pool.test.test_p2p
-    # This line is a pain
-    #- trial --reporter=subunit p2pool.test.test_p2p | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
+    # run the tests
+     trial --corvage --reporter=subunit p2pool.test.test_p2p | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
     # This line copies the test results
     - cp -R _trial_temp/test.log $CIRCLE_TEST_REPORTS/trial_test.log.txt
