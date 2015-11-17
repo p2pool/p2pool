@@ -28,6 +28,7 @@ class Test(unittest.TestCase):
         df = defer.Deferred()
         n = MyNode(df)
         n.start()
+        print os.environ.get('CIRCLE')
         if os.environ.get('CIRCLE') == True:
             print "Running on circle, generate shares"
             # attempt to create shares
