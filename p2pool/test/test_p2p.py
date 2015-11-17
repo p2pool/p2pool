@@ -32,6 +32,7 @@ class Test(unittest.TestCase):
         print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
         try:
             yield df
+            subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
         finally:
             yield n.stop()
 
