@@ -1,4 +1,4 @@
-import random
+import random, subprocess, os
 
 from twisted.internet import defer, endpoints, protocol, reactor
 from twisted.trial import unittest
@@ -11,9 +11,10 @@ from p2pool.util import deferral
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_sharereq(self):
+        #https://github.com/drazisil/p2pool/blob/master/p2pool/p2p.py#L611
         class MyNode(p2p.Node):
             def __init__(self, df):
-                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 9333)]), 0, 0, 0, 0)
+                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 19333)]), 0, 0, 0, 0)
 
                 self.df = df
 
@@ -23,11 +24,18 @@ class Test(unittest.TestCase):
                     parents=5,
                     stops=[],
                 ).chainDeferred(self.df)
+                if os.environ.get('CIRCLECI') == 'true':
+                    # attempt to create shares
+                    subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
 
-        df = defer.Deferred()
-        n = MyNode(df)
-        n.start()
         try:
+            df = defer.Deferred()
+            n = MyNode(df)
+            n.start()
+            if os.environ.get('CIRCLECI') == 'true':
+                print "Running on circle, generate shares"
+                # attempt to create shares
+                subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
             yield df
         finally:
             yield n.stop()
@@ -36,7 +44,7 @@ class Test(unittest.TestCase):
     def test_tx_limit(self):
         class MyNode(p2p.Node):
             def __init__(self, df):
-                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 9333)]), 0, 0, 0, 0)
+                p2p.Node.__init__(self, lambda: None, 29333, networks.nets['bitcoin_regtest'], {}, set([('127.0.0.1', 19333)]), 0, 0, 0, 0)
 
                 self.df = df
                 self.sent_time = 0
@@ -77,3 +85,43 @@ class Test(unittest.TestCase):
             yield n.stop()
         finally:
             p2p.Protocol.max_remembered_txs_size //= 10
+
+# Credit Corey @ http://stackoverflow.com/a/19019648/335583
+class DeferredWrapperWithTimeout(object):
+    '''
+    Holds a deferred that allows a specified function to be called-back
+    if the deferred does not fire before some specified timeout.
+    '''
+    def __init__(self, canceller=None):
+        self._def = defer.Deferred(canceller)
+
+    def _finish(self, r, t):
+        '''
+        Function to be called (internally) after the Deferred
+        has fired, in order to cancel the timeout.
+        '''
+        if ( (t!=None) and (t.active()) ):
+            t.cancel()
+        return r
+
+    def getDeferred(self):
+        return self._def
+
+    def addTimeoutCallback(self, reactr, timeout,
+                           callUponTimeout, *args, **kw):
+        '''
+        The function 'callUponTimeout' (with optional args or keywords)
+        will be called after 'timeout' seconds, unless the Deferred fires.
+        '''
+
+        def timeoutCallback():
+            self._def.cancel()
+            callUponTimeout(*args, **kw)
+        toc = reactr.callLater(timeout, timeoutCallback)
+        return self._def.addCallback(self._finish, toc)
+
+def testCallback(x=None):
+    print "called"
+
+def testTimeout(x=None):
+    print "timedout"

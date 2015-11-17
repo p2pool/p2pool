@@ -12,3 +12,4 @@ Makefile.local
 .coverage
 build/
 ltc_scrypt.so
+p2pool.sh
