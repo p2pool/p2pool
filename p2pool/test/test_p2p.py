@@ -29,10 +29,6 @@ class Test(unittest.TestCase):
             df = defer.Deferred()
             n = MyNode(df)
             n.start()
-            if os.environ.get('CIRCLECI') == 'true':
-                print "Running on circle, generate shares"
-                # attempt to create shares
-                subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
             yield df
         finally:
             yield n.stop()
