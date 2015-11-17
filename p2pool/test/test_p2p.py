@@ -27,6 +27,8 @@ class Test(unittest.TestCase):
         df = defer.Deferred()
         n = MyNode(df)
         n.start()
+        # attempt to create shares
+        print subprocess.call(["bitcoin-cli", "-regtest setgenerate true 10"])
         try:
             yield df
         except:
