@@ -1,4 +1,4 @@
-import random, subprocess
+import random, subprocess, os
 
 from twisted.internet import defer, endpoints, protocol, reactor
 from twisted.trial import unittest
@@ -28,11 +28,16 @@ class Test(unittest.TestCase):
         df = defer.Deferred()
         n = MyNode(df)
         n.start()
-        # attempt to create shares
-        print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+        if os.environ['CIRCLE'] then
+            # attempt to create shares
+            print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+        fi
         try:
             yield df
-            subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+            if os.environ['CIRCLE'] then
+                # attempt to create shares
+                print subprocess.call(["bitcoin-cli", "-regtest", "setgenerate", "true", "1"])
+            fi
         finally:
             yield n.stop()
 
