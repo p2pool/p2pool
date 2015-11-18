@@ -1,3 +1,6 @@
-Twisted>=12.2.0
+Twisted>=15.2.0
 argparse>=1.2.1
 pyOpenSSL>=0.13
+service_identity
+python-subunit
+junitxml

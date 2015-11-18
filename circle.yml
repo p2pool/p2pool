@@ -1,0 +1,44 @@
+machine:
+  python:
+    version: 2.7.9
+dependencies:
+  pre:
+    - sudo apt-add-repository ppa:bitcoin/bitcoin -y
+    - sudo apt-get update -qq && sudo apt-get install -qq bitcoind
+  override:
+    - pip install -q -r requirements.txt
+test:
+  pre:
+    # setup and launch bitcoind
+    - mkdir /home/ubuntu/.bitcoin
+    - cp test-data/bitcoin.conf /home/ubuntu/.bitcoin/.
+    - chmod 600 /home/ubuntu/.bitcoin/bitcoin.conf
+    - bitcoind -regtest -daemon:
+        background: true
+    - sleep 5
+    # Make sure we have the correct version
+    - bitcoin-cli -regtest getnetworkinfo
+    - bitcoin-cli -regtest getmininginfo
+    # Generate some blocks
+    - bitcoin-cli -regtest setgenerate true 5
+    # Build litecoin
+    - sudo python setup.py install && cp build/*/ltc_scrypt.so ../:
+        pwd: litecoin_scrypt
+    # setup the data dir and shares
+    - mkdir data
+    - cp test-data/bitcoin_regtest.tar.gz data/
+    - tar -xvzf bitcoin_regtest.tar.gz:
+        pwd: data
+    # launch p2pool to test against
+    - python run_p2pool.py --regtest:
+        background: true
+    - sleep 10
+  override:
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit
+    # run the tests without coverage or metadata
+    # - trial p2pool.test.test_p2p
+    # - trial p2pool.test.test_node
+    # run the tests with metadata
+    - trial --reporter=subunit p2pool | subunit-1to2  | subunit2junitxml --no-passthrough --output-to=$CIRCLE_TEST_REPORTS/junit/results.xml
+    # This line copies the test results
+    - cp -R _trial_temp/test.log $CIRCLE_TEST_REPORTS/trial_test.log.txt
