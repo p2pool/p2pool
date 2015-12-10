@@ -14,12 +14,12 @@ def check(bitcoind, net):
         print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
         raise deferral.RetrySilentlyException()
     try:
-		if not any(item['id'] == 'bip65' for item in (yield bitcoind.rpc_getblockchaininfo())['softforks']):
-			print 'Bitcoin version too old.'
-			raise deferral.RetrySilentlyException()
+        if not any(item['id'] == 'bip65' for item in (yield bitcoind.rpc_getblockchaininfo())['softforks']):
+            print 'Bitcoin version too old.'
+            raise deferral.RetrySilentlyException()
     except:
-		print 'Bitcoin version too old.'
-		raise deferral.RetrySilentlyException()
+        print 'Bitcoin version too old.'
+        raise deferral.RetrySilentlyException()
 
 @deferral.retry('Error getting work from bitcoind:', 3)
 @defer.inlineCallbacks
