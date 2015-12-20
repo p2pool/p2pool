@@ -283,7 +283,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     share_type = previous_share_type
         
         if desired_share_target is None:
-            desired_share_target = 2**256-1
+            desired_share_target = bitcoin_data.difficulty_to_target(float(1.0 / self.node.net.PARENT.DUMB_SCRYPT_DIFF))
             local_hash_rate = self._estimate_local_hash_rate()
             if local_hash_rate is not None:
                 desired_share_target = min(desired_share_target,
