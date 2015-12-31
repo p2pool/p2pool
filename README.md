@@ -1,7 +1,7 @@
 Requirements:
 -------------------------
 Generic:
-* Bitcoin >=0.8.5
+* Bitcoin >=0.11.1
 * Python >=2.6
 * Twisted >=10.0.0
 * python-argparse (for Python =2.6)
