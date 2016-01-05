@@ -68,7 +68,7 @@ In bash type this:
     cd litecoin_scrypt
     C:\Python27\python.exe setup.py build --compile=mingw32 install
 
-Windows (microsoft visual c++)
+Windows (Microsoft Visual C++)
 * Open visual studio console
 
 In bash type this:
