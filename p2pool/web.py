@@ -45,7 +45,7 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Event()):
+def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Event(), static_dir=None):
     node = wb.node
     start_time = time.time()
     
@@ -468,6 +468,8 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hd.datastreams['getwork_latency'].add_datum(time.time(), new_work['latency'])
     new_root.putChild('graph_data', WebInterface(lambda source, view: hd.datastreams[source].dataviews[view].get_data(time.time())))
     
-    web_root.putChild('static', static.File(os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')))
+    if static_dir is None:
+        static_dir = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')
+    web_root.putChild('static', static.File(static_dir))
     
     return web_root
