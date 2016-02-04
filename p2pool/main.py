@@ -280,7 +280,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
         wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args, pubkeys, bitcoind)
-        web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var)
+        web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var, static_dir=args.web_static)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
         worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
         web_serverfactory = server.Site(web_root)
@@ -462,6 +462,9 @@ def run():
     parser.add_argument('--logfile',
         help='''log to this file (default: data/<NET>/log)''',
         type=str, action='store', default=None, dest='logfile')
+    parser.add_argument('--web-static',
+        help='use an alternative web frontend in this directory (otherwise use the built-in frontend)',
+        type=str, action='store', default=None, dest='web_static')
     parser.add_argument('--merged',
         help='call getauxblock on this url to get work for merged mining (example: http://ncuser:ncpass@127.0.0.1:10332/)',
         type=str, action='append', default=[], dest='merged_urls')
