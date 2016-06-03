@@ -22,8 +22,12 @@ def check(bitcoind, net):
         raise deferral.RetrySilentlyException()
     
     try:
-        softforks_supported = set(item['id'] for item in (yield bitcoind.rpc_getblockchaininfo()).get('softforks', []))
-        softforks_supported |= set(item['id'] for item in (yield bitcoind.rpc_getblockchaininfo()).get('bip9_softforks', []))
+        blockchaininfo = yield bitcoind.rpc_getblockchaininfo()
+        softforks_supported = set(item['id'] for item in blockchaininfo.get('softforks', []))
+        try:
+            softforks_supported |= set(item['id'] for item in blockchaininfo.get('bip9_softforks', []))
+        except TypeError: # https://github.com/bitcoin/bitcoin/pull/7863
+            softforks_supported |= set(item for item in blockchaininfo.get('bip9_softforks', []))
     except jsonrpc.Error_for_code(-32601): # Method not found
         softforks_supported = set()
     if getattr(net, 'SOFTFORKS_REQUIRED', set()) - softforks_supported:
