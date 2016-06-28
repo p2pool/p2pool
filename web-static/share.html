@@ -68,7 +68,8 @@
                         block.append('span').text('Hash: ')
                         block.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.hash).text(share.block.hash);
                     b.append('h3').text('Header');
-                    b.append('p').text('Version: ' + share.block.header.version);
+                    b.append('p').text('Version (dec): ' + share.block.header.version);
+                    b.append('p').text('Version (hex): ' + share.block.header.version.toString(16));
                     var prevblock = b.append('p')
                         prevblock.append('span').text('Previous block: ');
                         prevblock.append('a').attr('href', currency_info.block_explorer_url_prefix + share.block.header.previous_block).text(share.block.header.previous_block);
