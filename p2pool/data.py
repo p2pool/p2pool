@@ -304,18 +304,16 @@ class BaseShare(object):
     
     def check(self, tracker):
         from p2pool import p2p
+        counts = None
         if self.share_data['previous_share_hash'] is not None:
             previous_share = tracker.items[self.share_data['previous_share_hash']]
+            counts = get_desired_version_counts(tracker, tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
             if type(self) is type(previous_share):
                 pass
             elif type(self) is type(previous_share).SUCCESSOR:
                 if tracker.get_height(previous_share.hash) < self.net.CHAIN_LENGTH:
-                    from p2pool import p2p
                     raise p2p.PeerMisbehavingError('switch without enough history')
-                
                 # switch only valid if 60% of hashes in [self.net.CHAIN_LENGTH*9//10, self.net.CHAIN_LENGTH] for new version
-                counts = get_desired_version_counts(tracker,
-                    tracker.get_nth_parent_hash(previous_share.hash, self.net.CHAIN_LENGTH*9//10), self.net.CHAIN_LENGTH//10)
                 if counts.get(self.VERSION, 0) < sum(counts.itervalues())*60//100:
                     raise p2p.PeerMisbehavingError('switch without enough hash power upgraded')
             else:
@@ -333,6 +331,8 @@ class BaseShare(object):
         if bitcoin_data.calculate_merkle_link([None] + other_tx_hashes, 0) != self.merkle_link:
             raise ValueError('merkle_link and other_tx_hashes do not match')
         
+        update_min_protocol_version(counts, self)
+
         return gentx # only used by as_block
     
     def get_other_tx_hashes(self, tracker):
@@ -567,6 +567,14 @@ class OkayTracker(forest.Tracker):
             self.verified.get_chain(end_point, self.net.CHAIN_LENGTH//16))
         
         return self.net.CHAIN_LENGTH, self.verified.get_delta(share_hash, end_point).work/((0 - block_height + 1)*self.net.PARENT.BLOCK_PERIOD)
+
+def update_min_protocol_version(counts, share):
+    minpver = getattr(share.net, 'MINIMUM_PROTOCOL_VERSION', 1400)
+    newminpver = getattr(share.net, 'NEW_MINIMUM_PROTOCOL_VERSION', minpver)
+    if (counts is not None) and (type(share) is NewShare) and (minpver < newminpver):
+            if counts.get(share.VERSION, 0) >= sum(counts.itervalues())*95//100:
+                share.net.MINIMUM_PROTOCOL_VERSION = newminpver # Reject peers running obsolete nodes
+                print 'Setting MINIMUM_PROTOCOL_VERSION = %d' % (newminpver)
 
 def get_pool_attempts_per_second(tracker, previous_share_hash, dist, min_work=False, integer=False):
     assert dist >= 2
