@@ -71,13 +71,8 @@ class Type(object):
         return obj
     
     def pack(self, obj):
-        data = self._pack(obj)
-        
-        if p2pool.DEBUG:
-            if self._unpack(data) != obj:
-                raise AssertionError((self._unpack(data), obj))
-        
-        return data
+        # No check since obj can have more keys than our type
+        return self._pack(obj)
     
     def packed_size(self, obj):
         if hasattr(obj, '_packed_size') and obj._packed_size is not None:
@@ -296,7 +291,7 @@ class ComposedType(Type):
         return item, file
     
     def write(self, file, item):
-        assert set(item.keys()) == self.field_names, (set(item.keys()) - self.field_names, self.field_names - set(item.keys()))
+        assert set(item.keys()) >= self.field_names
         for key, type_ in self.fields:
             file = type_.write(file, item[key])
         return file
