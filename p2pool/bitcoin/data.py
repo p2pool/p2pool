@@ -91,22 +91,79 @@ address_type = pack.ComposedType([
     ('port', pack.IntType(16, 'big')),
 ])
 
-tx_type = pack.ComposedType([
-    ('version', pack.IntType(32)),
-    ('tx_ins', pack.ListType(pack.ComposedType([
-        ('previous_output', pack.PossiblyNoneType(dict(hash=0, index=2**32 - 1), pack.ComposedType([
-            ('hash', pack.IntType(256)),
-            ('index', pack.IntType(32)),
-        ]))),
-        ('script', pack.VarStrType()),
-        ('sequence', pack.PossiblyNoneType(2**32 - 1, pack.IntType(32))),
+def is_segwit_tx(tx):
+    return tx.get('marker', -1) == 0 and tx.get('flag', -1) >= 1
+
+tx_in_type = pack.ComposedType([
+    ('previous_output', pack.PossiblyNoneType(dict(hash=0, index=2**32 - 1), pack.ComposedType([
+        ('hash', pack.IntType(256)),
+        ('index', pack.IntType(32)),
     ]))),
-    ('tx_outs', pack.ListType(pack.ComposedType([
-        ('value', pack.IntType(64)),
-        ('script', pack.VarStrType()),
-    ]))),
-    ('lock_time', pack.IntType(32)),
+    ('script', pack.VarStrType()),
+    ('sequence', pack.PossiblyNoneType(2**32 - 1, pack.IntType(32))),
 ])
+
+tx_out_type = pack.ComposedType([
+    ('value', pack.IntType(64)),
+    ('script', pack.VarStrType()),
+])
+
+tx_id_type = pack.ComposedType([
+    ('version', pack.IntType(32)),
+    ('tx_ins', pack.ListType(tx_in_type)),
+    ('tx_outs', pack.ListType(tx_out_type)),
+    ('lock_time', pack.IntType(32))
+])
+
+class TransactionType(pack.Type):
+    _int_type = pack.IntType(32)
+    _varint_type = pack.VarIntType()
+    _witness_type = pack.ListType(pack.VarStrType())
+    _wtx_type = pack.ComposedType([
+        ('flag', pack.IntType(8)),
+        ('tx_ins', pack.ListType(tx_in_type)),
+        ('tx_outs', pack.ListType(tx_out_type))
+    ])
+    _ntx_type = pack.ComposedType([
+        ('tx_outs', pack.ListType(tx_out_type)),
+        ('lock_time', _int_type)
+    ])
+    _write_type = pack.ComposedType([
+        ('version', _int_type),
+        ('marker', pack.IntType(8)),
+        ('flag', pack.IntType(8)),
+        ('tx_ins', pack.ListType(tx_in_type)),
+        ('tx_outs', pack.ListType(tx_out_type))
+    ])
+
+    def read(self, file):
+        version, file = self._int_type.read(file)
+        marker, file = self._varint_type.read(file)
+        if marker == 0:
+            next, file = self._wtx_type.read(file)
+            witness = [None]*len(next['tx_ins'])
+            for i in xrange(len(next['tx_ins'])):
+                witness[i], file = self._witness_type.read(file)
+            locktime, file = self._int_type.read(file)
+            return dict(version=version, marker=marker, flag=next['flag'], tx_ins=next['tx_ins'], tx_outs=next['tx_outs'], witness=witness, lock_time=locktime), file
+        else:
+            tx_ins = [None]*marker
+            for i in xrange(marker):
+                tx_ins[i], file = tx_in_type.read(file)
+            next, file = self._ntx_type.read(file)
+            return dict(version=version, tx_ins=tx_ins, tx_outs=next['tx_outs'], lock_time=next['lock_time']), file
+    
+    def write(self, file, item):
+        if is_segwit_tx(item):
+            assert len(item['tx_ins']) == len(item['witness'])
+            res = self._write_type.pack(item)
+            for w in item['witness']:
+                res += self._witness_type.pack(w)
+            res += self._int_type.pack(item['lock_time'])
+            return file, res
+        return tx_id_type.write(file, item)
+
+tx_type = TransactionType()
 
 merkle_link_type = pack.ComposedType([
     ('branch', pack.ListType(pack.IntType(256))),
@@ -114,7 +171,7 @@ merkle_link_type = pack.ComposedType([
 ])
 
 merkle_tx_type = pack.ComposedType([
-    ('tx', tx_type),
+    ('tx', tx_id_type), # used only in aux_pow_type
     ('block_hash', pack.IntType(256)),
     ('merkle_link', merkle_link_type),
 ])
@@ -131,6 +188,11 @@ block_header_type = pack.ComposedType([
 block_type = pack.ComposedType([
     ('header', block_header_type),
     ('txs', pack.ListType(tx_type)),
+])
+
+stripped_block_type = pack.ComposedType([
+    ('header', block_header_type),
+    ('txs', pack.ListType(tx_id_type)),
 ])
 
 # merged mining
@@ -263,6 +325,22 @@ def address_to_pubkey_hash(address, net):
     return x['pubkey_hash']
 
 # transactions
+
+def get_witness_commitment_hash(witness_root_hash, witness_reserved_value):
+    return hash256(merkle_record_type.pack(dict(left=witness_root_hash, right=witness_reserved_value)))
+
+def get_wtxid(tx, txid=None, txhash=None):
+    has_witness = False
+    if is_segwit_tx(tx):
+        assert len(tx['tx_ins']) == len(tx['witness'])
+        has_witness = any(len(w) > 0 for w in tx['witness'])
+    if has_witness:
+        return hash256(tx_type.pack(tx)) if txhash is None else txhash
+    else:
+        return hash256(tx_id_type.pack(tx)) if txid is None else txid
+
+def get_txid(tx):
+    return hash256(tx_id_type.pack(tx))
 
 def pubkey_to_script2(pubkey):
     assert len(pubkey) <= 75
