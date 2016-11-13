@@ -13,10 +13,11 @@ MIN_TARGET = 0
 MAX_TARGET = 2**256//2**32 - 1
 PERSIST = False
 WORKER_PORT = 19332
-BOOTSTRAP_ADDRS = 'forre.st vps.forre.st liteco.in'.split(' ')
+BOOTSTRAP_ADDRS = 'forre.st vps.forre.st liteco.in 78.158.149.247'.split(' ')
 ANNOUNCE_CHANNEL = '#p2pool-alt'
 VERSION_CHECK = lambda v: None if 100000 <= v else 'Bitcoin version too old. Upgrade to 0.11.2 or newer!' # not a bug. BIP65 support is ensured by SOFTFORKS_REQUIRED
 VERSION_WARNING = lambda v: None
-SOFTFORKS_REQUIRED = set(['bip65', 'csv'])
-MINIMUM_PROTOCOL_VERSION = 1500
-NEW_MINIMUM_PROTOCOL_VERSION = 1600
+SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit'])
+MINIMUM_PROTOCOL_VERSION = 1600
+NEW_MINIMUM_PROTOCOL_VERSION = 1700
+SEGWIT_ACTIVATION_VERSION = 15
