@@ -69,7 +69,10 @@ class BaseShare(object):
     VERSION = 0
     VOTING_VERSION = 0
     SUCCESSOR = None
-    
+
+    MAX_BLOCK_WEIGHT = 4000000
+    MAX_NEW_TXS_SIZE = 50000
+
     small_block_header_type = pack.ComposedType([
         ('version', pack.VarIntType()),
         ('previous_block', pack.PossiblyNoneType(0, pack.IntType(256))),
@@ -166,7 +169,7 @@ class BaseShare(object):
             else:
                 if known_txs is not None:
                     this_size = bitcoin_data.tx_type.packed_size(known_txs[tx_hash])
-                    if new_transaction_size + this_size > 50000: # only allow 50 kB of new txns/share
+                    if new_transaction_size + this_size > cls.MAX_NEW_TXS_SIZE: # limit the size of new txns/share
                         break
                     new_transaction_size += this_size
                 new_transaction_hashes.append(tx_hash)
@@ -411,11 +414,11 @@ class BaseShare(object):
         else:
             all_txs_size = sum(bitcoin_data.tx_type.packed_size(tx) for tx in other_txs)
             stripped_txs_size = sum(bitcoin_data.tx_id_type.packed_size(tx) for tx in other_txs)
-            if all_txs_size + 3 * stripped_txs_size > 4000000:
+            if all_txs_size + 3 * stripped_txs_size > self.MAX_BLOCK_WEIGHT:
                 return True, 'txs over block size limit'
             
             new_txs_size = sum(bitcoin_data.tx_type.packed_size(known_txs[tx_hash]) for tx_hash in self.share_info['new_transaction_hashes'])
-            if new_txs_size > 50000:
+            if new_txs_size > self.MAX_NEW_TXS_SIZE:
                 return True, 'new txs over limit'
         
         return False, None
@@ -430,6 +433,7 @@ class NewShare(BaseShare):
     VERSION = 17
     VOTING_VERSION = 17
     SUCCESSOR = None
+    MAX_NEW_TXS_SIZE = 100000
 
 class Share(BaseShare):
     VERSION = 16
