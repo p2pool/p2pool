@@ -161,7 +161,7 @@ class NewShare(object):
             transaction_hash_refs.extend(this)
             other_transaction_hashes.append(tx_hash)
         
-        print "Generating a share with %i bytes (%i new) and %i transactions (%i new)" % \
+        if all_transaction_size: print "Generating a share with %i bytes (%i new) and %i transactions (%i new)" % \
            (all_transaction_size, new_transaction_size, len(other_transaction_hashes)+len(new_transaction_hashes), len(new_transaction_hashes))
 
         included_transactions = set(other_transaction_hashes)

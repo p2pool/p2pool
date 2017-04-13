@@ -142,6 +142,7 @@ class Protocol(p2protocol.Protocol):
         ('best_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
+        print "Peer %s:%s says protocol version is %s, client version %s" % (addr_from['address'], addr_from['port'], version, sub_version)
         if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
         if version < getattr(self.node.net, 'MINIMUM_PROTOCOL_VERSION', 1400):
@@ -300,7 +301,6 @@ class Protocol(p2protocol.Protocol):
                             print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
                             self.disconnect()
                             return
-                    tx_size = bitcoin_data.tx_type()
                     txs.append(tx)
             else:
                 txs = None
@@ -324,12 +324,14 @@ class Protocol(p2protocol.Protocol):
                 if x is not None:
                     tx_hashes.update(x)
         
-        hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
-        all_hashes = share.share_info['new_transaction_hashes']
-        new_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
-        all_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in all_hashes)
+            hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
+            all_hashes = share.share_info['new_transaction_hashes']
+            new_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+            all_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in all_hashes)
+            print "Sending a share with %i txs (%i new) totaling %i msg bytes (%i new)" % (len(all_hashes), len(hashes_to_send), all_tx_size, new_tx_size)
 
-        print "Sending a share with %i txs (%i new) totaling %i msg bytes (%i new)" % (len(all_hashes), len(hashes_to_send), all_tx_size, new_tx_size)
+        hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
+        new_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
 
         new_remote_remembered_txs_size = self.remote_remembered_txs_size + new_tx_size
         if new_remote_remembered_txs_size > self.max_remembered_txs_size:
