@@ -24,4 +24,4 @@ ANNOUNCE_CHANNEL = '#p2pool'
 VERSION_CHECK = lambda v: None if 100000 <= v else 'Bitcoin version too old. Upgrade to 0.11.2 or newer!' # not a bug. BIP65 support is ensured by SOFTFORKS_REQUIRED
 VERSION_WARNING = lambda v: None
 SOFTFORKS_REQUIRED = set(['bip65', 'csv'])
-MINIMUM_PROTOCOL_VERSION = 1600
+MINIMUM_PROTOCOL_VERSION = 1701 # 1700 is currently used by the segwit support PR; we need to refuse to connect to those

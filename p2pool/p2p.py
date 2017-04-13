@@ -25,9 +25,9 @@ def fragment(f, **kwargs):
         fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
-    VERSION = 1600
+    VERSION = 1701
     
-    max_remembered_txs_size = 2500000
+    max_remembered_txs_size = 25000000
     
     def __init__(self, node, incoming):
         p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
