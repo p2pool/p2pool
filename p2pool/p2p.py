@@ -30,7 +30,7 @@ class Protocol(p2protocol.Protocol):
     max_remembered_txs_size = 25000000
     
     def __init__(self, node, incoming):
-        p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
+        p2protocol.Protocol.__init__(self, node.net.PREFIX, 8000000, node.traffic_happened)
         self.node = node
         self.incoming = incoming
         
