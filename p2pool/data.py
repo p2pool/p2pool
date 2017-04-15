@@ -162,7 +162,7 @@ class NewShare(object):
             other_transaction_hashes.append(tx_hash)
         
         if all_transaction_size: print "Generating a share with %i bytes (%i new) and %i transactions (%i new)" % \
-           (all_transaction_size, new_transaction_size, len(other_transaction_hashes)+len(new_transaction_hashes), len(new_transaction_hashes))
+           (all_transaction_size, new_transaction_size, len(other_transaction_hashes), len(new_transaction_hashes))
 
         included_transactions = set(other_transaction_hashes)
         removed_fees = [fee for tx_hash, fee in desired_other_transaction_hashes_and_fees if tx_hash not in included_transactions]

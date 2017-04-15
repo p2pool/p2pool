@@ -57,8 +57,8 @@ class StratumRPCMiningProvider(object):
     
     def rpc_submit(self, worker_name, job_id, extranonce2, ntime, nonce):
         if job_id not in self.handler_map:
-            print >>sys.stderr, '''Couldn't link returned work's job id with its handler. \nThis should only happen if this process was recently restarted!\nAsking miner to reconnect so it gets new work.'''
-            self.other.svc_client.rpc_reconnect().addErrback(lambda err: None)
+            print >>sys.stderr, '''Couldn't link returned work's job id with its handler. This should only happen if this process was recently restarted!'''
+            #self.other.svc_client.rpc_reconnect().addErrback(lambda err: None)
             return False
         x, got_response = self.handler_map[job_id]
         coinb_nonce = extranonce2.decode('hex')
