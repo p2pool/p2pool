@@ -361,9 +361,6 @@ class NewShare(object):
         return [known_txs[tx_hash] for tx_hash in other_tx_hashes]
     
     def should_punish_reason(self, previous_block, bits, tracker, known_txs):
-        if (self.header['previous_block'], self.header['bits']) != (previous_block, bits) and self.header_hash != previous_block and self.peer_addr is not None:
-            return True, 'Block-stale detected! height(%x) < height(%x) or %08x != %08x' % (self.header['previous_block'], previous_block, self.header['bits'].bits, bits.bits)
-        
         if self.pow_hash <= self.header['bits'].target:
             return -1, 'block solution'
         
@@ -374,10 +371,6 @@ class NewShare(object):
             all_txs_size = sum(bitcoin_data.tx_type.packed_size(tx) for tx in other_txs)
             if all_txs_size > 1000000:
                 return True, 'txs over block size limit'
-            
-            new_txs_size = sum(bitcoin_data.tx_type.packed_size(known_txs[tx_hash]) for tx_hash in self.share_info['new_transaction_hashes'])
-            if new_txs_size > 1000000:
-                return True, 'new txs over limit'
         
         return False, None
     
