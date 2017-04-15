@@ -341,6 +341,14 @@ class WorkerBridge(worker_interface.WorkerBridge):
             if local_hash_rate is not None:
                 target = min(target,
                     bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
+            else:
+                # If we don't yet have an estimated node hashrate, then we still need to not undershoot the difficulty.
+                # Otherwise, we might get 1 PH/s of hashrate on difficulty settings appropriate for 1 GH/s.
+                # 1/100th the difficulty of a full share should be a reasonable upper bound. That way, if
+                # one node has the whole p2pool hashrate, it will still only need to process one pseudoshare
+                # every 0.3 seconds.
+                target = min(target, 100 * bitcoin_data.average_attempts_to_target((bitcoin_data.target_to_average_attempts(
+                    self.node.bitcoind_work.value['bits'].target)*self.node.net.SPREAD)*self.node.net.PARENT.DUST_THRESHOLD/block_subsidy))
         else:
             target = desired_pseudoshare_target
         target = max(target, share_info['bits'].target)
