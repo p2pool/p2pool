@@ -194,15 +194,22 @@ class NewShare(object):
             far_share_hash=None if last is None and height < 99 else tracker.get_nth_parent_hash(share_data['previous_share_hash'], 99),
             max_bits=max_bits,
             bits=bits,
-            timestamp=math.clip(desired_timestamp, (
-                (previous_share.timestamp + net.SHARE_PERIOD) - (net.SHARE_PERIOD - 1), # = previous_share.timestamp + 1
-                (previous_share.timestamp + net.SHARE_PERIOD) + (net.SHARE_PERIOD - 1),
-            )) if previous_share is not None else desired_timestamp,
+            timestamp=max(desired_timestamp, (previous_share.timestamp + 1)) if previous_share is not None else desired_timestamp,
             new_transaction_hashes=new_transaction_hashes,
             transaction_hash_refs=transaction_hash_refs,
             absheight=((previous_share.absheight if previous_share is not None else 0) + 1) % 2**32,
             abswork=((previous_share.abswork if previous_share is not None else 0) + bitcoin_data.target_to_average_attempts(bits.target)) % 2**128,
         )
+
+        if desired_timestamp > previous_share.timestamp + 180:
+            print "Warning: Previous share's timestamp is %i seconds old." % int(desired_timestamp - previous_share.timestamp)
+            print "Make sure your system clock is accurate, and ensure that you're connected to decent peers."
+            print "If your clock is more than 300 seconds behind, it can result in orphaned shares."
+            print "(It's also possible that this share is just taking a long time to mine.)"
+        if previous_share.timestamp > int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0))) + 3:
+            print "WARNING! Previous share's timestamp is %i seconds in the future. This is not normal." % \
+                   int(previous_share.timestamp - (int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0)))))
+            print "Make sure your system clock is accurate. Errors beyond 300 sec result in orphaned shares."
         
         gentx = dict(
             version=1,
@@ -314,6 +321,11 @@ class NewShare(object):
     
     def check(self, tracker):
         from p2pool import p2p
+
+        if self.timestamp > int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0))) + 300:
+            raise ValueError("Share timestamp is %i seconds in the future! Check your system clock." % \
+                self.timestamp - int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0))))
+
         if self.share_data['previous_share_hash'] is not None:
             previous_share = tracker.items[self.share_data['previous_share_hash']]
             if type(self) is type(previous_share):
