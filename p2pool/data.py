@@ -55,14 +55,16 @@ def load_share(share, net, peer_addr):
         return Share(net, peer_addr, Share.share_type.unpack(share['contents']))
     elif share['type'] == NewShare.VERSION:
         return NewShare(net, peer_addr, NewShare.share_type.unpack(share['contents']))
+    elif share['type'] == MiddleShare.VERSION:
+        return MiddleShare(net, peer_addr, NewShare.share_type.unpack(share['contents']))
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
 DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
 
 class NewShare(object):
-    VERSION = 17
-    VOTING_VERSION = 17
+    VERSION = 32
+    VOTING_VERSION = 32
     SUCCESSOR = None
     
     small_block_header_type = pack.ComposedType([
@@ -399,6 +401,11 @@ class Share(NewShare):
     VERSION = 16
     VOTING_VERSION = 16
     SUCCESSOR = NewShare
+
+class MiddleShare(NewShare):
+    VERSION = 17
+    VOTING_VERSION = 17
+    SUCCESSOR = None
 
 class WeightsSkipList(forest.TrackerSkipList):
     # share_count, weights, total_weight
