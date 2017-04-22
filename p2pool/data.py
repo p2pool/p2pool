@@ -397,15 +397,15 @@ class NewShare(object):
             return None # not all txs present
         return dict(header=self.header, txs=[self.check(tracker)] + other_txs)
 
-class Share(NewShare):
-    VERSION = 16
-    VOTING_VERSION = 16
-    SUCCESSOR = NewShare
-
 class MiddleShare(NewShare):
     VERSION = 17
     VOTING_VERSION = 17
-    SUCCESSOR = None
+    SUCCESSOR = NewShare
+
+class Share(NewShare):
+    VERSION = 16
+    VOTING_VERSION = 16
+    SUCCESSOR = MiddleShare
 
 class WeightsSkipList(forest.TrackerSkipList):
     # share_count, weights, total_weight
