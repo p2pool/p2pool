@@ -48,15 +48,11 @@ share_type = pack.ComposedType([
 
 def load_share(share, net, peer_addr):
     assert peer_addr is None or isinstance(peer_addr, tuple)
-    if share['type'] < Share.VERSION:
+    if share['type'] in share_versions:
+        return share_versions[share['type']](net, peer_addr, Share.share_type.unpack(share['contents']))
+    elif share['type'] < Share.VERSION:
         from p2pool import p2p
         raise p2p.PeerMisbehavingError('sent an obsolete share')
-    elif share['type'] == Share.VERSION:
-        return Share(net, peer_addr, Share.share_type.unpack(share['contents']))
-    elif share['type'] == NewShare.VERSION:
-        return NewShare(net, peer_addr, NewShare.share_type.unpack(share['contents']))
-    elif share['type'] == MiddleShare.VERSION:
-        return MiddleShare(net, peer_addr, NewShare.share_type.unpack(share['contents']))
     else:
         raise ValueError('unknown share type: %r' % (share['type'],))
 
@@ -407,6 +403,8 @@ class Share(NewShare):
     VOTING_VERSION = 16
     SUCCESSOR = MiddleShare
 
+share_versions = {s.VERSION:s for s in [NewShare, MiddleShare, Share]}
+
 class WeightsSkipList(forest.TrackerSkipList):
     # share_count, weights, total_weight
     
@@ -641,7 +639,7 @@ def get_warnings(tracker, best_share, net, bitcoind_getinfo, bitcoind_work_value
     desired_version_counts = get_desired_version_counts(tracker, best_share,
         min(net.CHAIN_LENGTH, 60*60//net.SHARE_PERIOD, tracker.get_height(best_share)))
     majority_desired_version = max(desired_version_counts, key=lambda k: desired_version_counts[k])
-    if majority_desired_version > (Share.SUCCESSOR if Share.SUCCESSOR is not None else Share).VOTING_VERSION and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
+    if majority_desired_version not in share_versions and desired_version_counts[majority_desired_version] > sum(desired_version_counts.itervalues())/2:
         res.append('A MAJORITY OF SHARES CONTAIN A VOTE FOR AN UNSUPPORTED SHARE IMPLEMENTATION! (v%i with %i%% support)\n'
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
