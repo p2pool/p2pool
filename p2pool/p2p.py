@@ -327,7 +327,7 @@ class Protocol(p2protocol.Protocol):
             
         self.node.handle_shares(result, self)
     
-    def sendShares(self, shares, tracker, known_txs, include_txs_with=[], attempt=0):
+    def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
         tx_hashes = set()
         for share in shares:
             if share.VERSION >= 13:
@@ -338,10 +338,6 @@ class Protocol(p2protocol.Protocol):
                         ktxset   = set(known_txs)
                         missing = newset - ktxset
                         print "Missing %i of %i transactions for broadcast" % (len(missing), len(newset))
-                        if attempt < 5:
-                            print "Scheduling another broadcast attempt in %i seconds" % (2**attempt)
-                            reactor.callLater(2.0**attempt, self.sendShares, shares, tracker, known_txs, include_txs_with, attempt+1)
-
                     assert tx_hash in known_txs, 'tried to broadcast share without knowing all its new transactions'
                     if tx_hash not in self.remote_tx_hashes:
                         tx_hashes.add(tx_hash)
