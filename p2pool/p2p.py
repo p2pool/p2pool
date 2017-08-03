@@ -25,12 +25,12 @@ def fragment(f, **kwargs):
         fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
-    VERSION = 1600
+    VERSION = 3200
     
-    max_remembered_txs_size = 2500000
+    max_remembered_txs_size = 25000000
     
     def __init__(self, node, incoming):
-        p2protocol.Protocol.__init__(self, node.net.PREFIX, 1000000, node.traffic_happened)
+        p2protocol.Protocol.__init__(self, node.net.PREFIX, 8000000, node.traffic_happened)
         self.node = node
         self.incoming = incoming
         
@@ -142,6 +142,7 @@ class Protocol(p2protocol.Protocol):
         ('best_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
+        print "Peer %s:%s says protocol version is %s, client version %s" % (addr_from['address'], addr_from['port'], version, sub_version)
         if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
         if version < getattr(self.node.net, 'MINIMUM_PROTOCOL_VERSION', 1400):
@@ -186,6 +187,24 @@ class Protocol(p2protocol.Protocol):
         if best_share_hash is not None:
             self.node.handle_share_hashes([best_share_hash], self)
         
+        def add_to_remote_view_of_my_known_txs(added):
+            if added:
+                self.send_have_tx(tx_hashes=list(added.keys()))
+        
+        watch_id0 = self.node.known_txs_var.added.watch(add_to_remote_view_of_my_known_txs)
+        self.connection_lost_event.watch(lambda: self.node.known_txs_var.added.unwatch(watch_id0))
+        
+        def remove_from_remote_view_of_my_known_txs(removed):
+            if removed:
+                self.send_losing_tx(tx_hashes=list(removed.keys()))
+                
+                # cache forgotten txs here for a little while so latency of "losing_tx" packets doesn't cause problems
+                key = max(self.known_txs_cache) + 1 if self.known_txs_cache else 0
+                self.known_txs_cache[key] = removed #dict((h, before[h]) for h in removed)
+                reactor.callLater(20, self.known_txs_cache.pop, key)
+        watch_id1 = self.node.known_txs_var.removed.watch(remove_from_remote_view_of_my_known_txs)
+        self.connection_lost_event.watch(lambda: self.node.known_txs_var.removed.unwatch(watch_id1))
+        
         def update_remote_view_of_my_known_txs(before, after):
             added = set(after) - set(before)
             removed = set(before) - set(after)
@@ -198,8 +217,8 @@ class Protocol(p2protocol.Protocol):
                 key = max(self.known_txs_cache) + 1 if self.known_txs_cache else 0
                 self.known_txs_cache[key] = dict((h, before[h]) for h in removed)
                 reactor.callLater(20, self.known_txs_cache.pop, key)
-        watch_id = self.node.known_txs_var.transitioned.watch(update_remote_view_of_my_known_txs)
-        self.connection_lost_event.watch(lambda: self.node.known_txs_var.transitioned.unwatch(watch_id))
+        watch_id2 = self.node.known_txs_var.transitioned.watch(update_remote_view_of_my_known_txs)
+        self.connection_lost_event.watch(lambda: self.node.known_txs_var.transitioned.unwatch(watch_id2))
         
         self.send_have_tx(tx_hashes=self.node.known_txs_var.value.keys())
         
@@ -314,6 +333,11 @@ class Protocol(p2protocol.Protocol):
             if share.VERSION >= 13:
                 # send full transaction for every new_transaction_hash that peer does not know
                 for tx_hash in share.share_info['new_transaction_hashes']:
+                    if not tx_hash in known_txs:
+                        newset   = set(share.share_info['new_transaction_hashes'])
+                        ktxset   = set(known_txs)
+                        missing = newset - ktxset
+                        print "Missing %i of %i transactions for broadcast" % (len(missing), len(newset))
                     assert tx_hash in known_txs, 'tried to broadcast share without knowing all its new transactions'
                     if tx_hash not in self.remote_tx_hashes:
                         tx_hashes.add(tx_hash)
@@ -323,9 +347,16 @@ class Protocol(p2protocol.Protocol):
                 if x is not None:
                     tx_hashes.update(x)
         
+            hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
+            all_hashes = share.share_info['new_transaction_hashes']
+            new_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+            all_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in all_hashes)
+            print "Sending a share with %i txs (%i new) totaling %i msg bytes (%i new)" % (len(all_hashes), len(hashes_to_send), all_tx_size, new_tx_size)
+
         hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
-        
-        new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+        new_tx_size = sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+
+        new_remote_remembered_txs_size = self.remote_remembered_txs_size + new_tx_size
         if new_remote_remembered_txs_size > self.max_remembered_txs_size:
             raise ValueError('shares have too many txs')
         self.remote_remembered_txs_size = new_remote_remembered_txs_size
@@ -336,7 +367,7 @@ class Protocol(p2protocol.Protocol):
         
         self.send_forget_tx(tx_hashes=hashes_to_send)
         
-        self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+        self.remote_remembered_txs_size -= new_tx_size
     
     
     message_sharereq = pack.ComposedType([
@@ -415,7 +446,7 @@ class Protocol(p2protocol.Protocol):
             
             self.remembered_txs[tx_hash] = tx
             self.remembered_txs_size += 100 + bitcoin_data.tx_type.packed_size(tx)
-        new_known_txs = dict(self.node.known_txs_var.value)
+        added_known_txs = {}
         warned = False
         for tx in txs:
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
@@ -430,8 +461,8 @@ class Protocol(p2protocol.Protocol):
             
             self.remembered_txs[tx_hash] = tx
             self.remembered_txs_size += 100 + bitcoin_data.tx_type.packed_size(tx)
-            new_known_txs[tx_hash] = tx
-        self.node.known_txs_var.set(new_known_txs)
+            added_known_txs[tx_hash] = tx
+        self.node.known_txs_var.add(added_known_txs)
         if self.remembered_txs_size >= self.max_remembered_txs_size:
             raise PeerMisbehavingError('too much transaction data stored')
     message_forget_tx = pack.ComposedType([
@@ -609,7 +640,7 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({}), advertise_ip=True, external_ip=None):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.VariableDict({}), mining_txs_var=variable.VariableDict({}), mining2_txs_var=variable.VariableDict({}), advertise_ip=True, external_ip=None):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
@@ -618,6 +649,7 @@ class Node(object):
         self.preferred_storage = preferred_storage
         self.known_txs_var = known_txs_var
         self.mining_txs_var = mining_txs_var
+        self.mining2_txs_var = mining2_txs_var
         self.advertise_ip = advertise_ip
         self.external_ip = external_ip
         

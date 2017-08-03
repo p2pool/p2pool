@@ -220,7 +220,7 @@ class RateMonitor(object):
         start_time = time.time() - self.max_lookback_time
         for i, (ts, datum) in enumerate(self.datums):
             if ts > start_time:
-                self.datums[:] = self.datums[i:]
+                del self.datums[:i]
                 return
     
     def get_datums_in_last(self, dt=None):

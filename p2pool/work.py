@@ -107,7 +107,9 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     bits=bb['bits'], # not always true
                     coinbaseflags='',
                     height=t['height'] + 1,
-                    time=bb['timestamp'] + 600, # better way?
+                    # while time.time() is usually UTC, it's not defined as such and is not portable,
+                    # and can differ by leap seconds true UTC on some platforms.
+                    time=max(int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0)) + 0.5), bb['timestamp'] + 1),
                     transactions=[],
                     transaction_fees=[],
                     merkle_link=bitcoin_data.calculate_merkle_link([None], 0),
@@ -259,6 +261,8 @@ class WorkerBridge(worker_interface.WorkerBridge):
         
         tx_hashes = [bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)) for tx in self.current_work.value['transactions']]
         tx_map = dict(zip(tx_hashes, self.current_work.value['transactions']))
+
+        self.node.mining2_txs_var.set(tx_map) # let node.py know not to evict these transactions
         
         previous_share = self.node.tracker.items[self.node.best_share_var.value] if self.node.best_share_var.value is not None else None
         if previous_share is None:
@@ -321,7 +325,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     desired_version=(share_type.SUCCESSOR if share_type.SUCCESSOR is not None else share_type).VOTING_VERSION,
                 ),
                 block_target=self.current_work.value['bits'].target,
-                desired_timestamp=int(time.time() + 0.5),
+                desired_timestamp=int(time.mktime(time.gmtime()) - time.mktime(time.gmtime(0)) + 0.5),
                 desired_target=desired_share_target,
                 ref_merkle_link=dict(branch=[], index=0),
                 desired_other_transaction_hashes_and_fees=zip(tx_hashes, self.current_work.value['transaction_fees']),
@@ -341,6 +345,14 @@ class WorkerBridge(worker_interface.WorkerBridge):
             if local_hash_rate is not None:
                 target = min(target,
                     bitcoin_data.average_attempts_to_target(local_hash_rate * 1)) # limit to 1 share response every second by modulating pseudoshare difficulty
+            else:
+                # If we don't yet have an estimated node hashrate, then we still need to not undershoot the difficulty.
+                # Otherwise, we might get 1 PH/s of hashrate on difficulty settings appropriate for 1 GH/s.
+                # 1/100th the difficulty of a full share should be a reasonable upper bound. That way, if
+                # one node has the whole p2pool hashrate, it will still only need to process one pseudoshare
+                # every 0.3 seconds.
+                target = min(target, 1000 * bitcoin_data.average_attempts_to_target((bitcoin_data.target_to_average_attempts(
+                    self.node.bitcoind_work.value['bits'].target)*self.node.net.SPREAD)*self.node.net.PARENT.DUST_THRESHOLD/block_subsidy))
         else:
             target = desired_pseudoshare_target
         target = max(target, share_info['bits'].target)
@@ -357,11 +369,13 @@ class WorkerBridge(worker_interface.WorkerBridge):
         else:
             current_time = time.time()
             if (current_time - print_throttle) > 5.0:
-                print 'New work for worker! Difficulty: %.06f Share difficulty: %.06f Total block value: %.6f %s including %i transactions' % (
+                print 'New work for %s! Diff: %.02f Share diff: %.02f Block value: %.2f %s (%i tx, %.0f kB)' % (
+                    bitcoin_data.pubkey_hash_to_address(pubkey_hash, self.node.net.PARENT),
                     bitcoin_data.target_to_difficulty(target),
                     bitcoin_data.target_to_difficulty(share_info['bits'].target),
                     self.current_work.value['subsidy']*1e-8, self.node.net.PARENT.SYMBOL,
                     len(self.current_work.value['transactions']),
+                    sum(map(bitcoin_data.tx_type.packed_size, self.current_work.value['transactions']))/1000.,
                 )
                 print_throttle = time.time()
 
@@ -443,6 +457,17 @@ class WorkerBridge(worker_interface.WorkerBridge):
                     time.time() - getwork_time,
                     ' DEAD ON ARRIVAL' if not on_time else '',
                 )
+
+                # node.py will sometimes forget transactions if bitcoind's work has changed since this stratum
+                # job was assigned. Fortunately, the tx_map is still in in our scope from this job, so we can use that
+                # to refill it if needed.
+
+                known_txs = self.node.known_txs_var.value
+                missing = {hsh:val for (hsh, val) in tx_map.iteritems() if not hsh in known_txs}
+                if missing:
+                    print "Warning: %i transactions were erroneously evicted from known_txs_var. Refilling now." % len(missing)
+                    self.node.known_txs_var.add(missing)
+
                 self.my_share_hashes.add(share.hash)
                 if not on_time:
                     self.my_doa_share_hashes.add(share.hash)
