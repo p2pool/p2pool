@@ -91,18 +91,14 @@ class VariableDict(Variable):
         self.removed = Event()
     
     def add(self, values):
-        oldvalue = self.value
-        new_items = dict([item for item in values.iteritems() if item[0] not in self.value or self.value[item[0]] != item[1]])
+        new_items = dict([item for item in values.iteritems() if not item[0] in self.value or self.value[item[0]] != item[1]])
         self.value.update(values)
         self.added.happened(new_items)
-        self.changed.happened(self.value)
-        self.transitioned.happened(oldvalue, self.value)
+        # XXX call self.changed and self.transitioned
     
     def remove(self, values):
-        oldvalue = self.value
         gone_items = dict([item for item in values.iteritems() if item[0] in self.value])
-        for key in gone_items:
+        for key in gone_keys:
             del self.values[key]
-        self.removed.happened(gone_items)
-        self.changed.happened(self.value)
-        self.transitioned.happened(oldvalue, self.value)
+        self.removed.happened(new_items)
+        # XXX call self.changed and self.transitioned
