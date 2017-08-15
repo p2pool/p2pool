@@ -195,10 +195,16 @@ class Node(object):
         # PEER WORK
         
         self.best_block_header = variable.Variable(None)
-        def handle_header(new_header):
+        def handle_header(new_header, valid=False):
+            new_hash = self.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(new_header))
             # check that header matches current target
-            if not (self.net.PARENT.POW_FUNC(bitcoin_data.block_header_type.pack(new_header)) <= self.bitcoind_work.value['bits'].target):
+            if new_hash > self.bitcoind_work.value['bits'].target:
                 return
+            if not valid:
+                try:
+                    _ = (yield self.bitcoind.rpc_getblockheader(new_hash))
+                except:
+                    return
             bitcoind_best_block = self.bitcoind_work.value['previous_block']
             if (self.best_block_header.value is None
                 or (
@@ -215,7 +221,7 @@ class Node(object):
         def poll_header():
             if self.factory.conn.value is None:
                 return
-            handle_header((yield self.factory.conn.value.get_block_header(self.bitcoind_work.value['previous_block'])))
+            handle_header((yield self.factory.conn.value.get_block_header(self.bitcoind_work.value['previous_block'])), True)
         self.bitcoind_work.changed.watch(lambda _: poll_header())
         yield deferral.retry('Error while requesting best block header:')(poll_header)()
         
