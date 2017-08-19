@@ -45,7 +45,7 @@ https://en.bitcoin.it/wiki/P2Pool
 
 Alternate web frontend:
 -------------------------
-* https://github.com/hardcpp/P2PoolExtendedFrontEnd
+https://github.com/hardcpp/P2PoolExtendedFrontEnd
 
 Notes for Litecoin:
 =========================
