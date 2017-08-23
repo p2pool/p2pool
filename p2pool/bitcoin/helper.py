@@ -39,7 +39,7 @@ def check(bitcoind, net):
 def getwork(bitcoind, use_getblocktemplate=False):
     def go():
         if use_getblocktemplate:
-            return bitcoind.rpc_getblocktemplate(dict(mode='template'))
+            return bitcoind.rpc_getblocktemplate(dict(mode='template', rules=['segwit']))
         else:
             return bitcoind.rpc_getmemorypool()
     try:
@@ -71,6 +71,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
         height=work['height'],
+        rules=work.get('rules', []),
         last_update=time.time(),
         use_getblocktemplate=use_getblocktemplate,
         latency=end - start,
@@ -86,9 +87,11 @@ def submit_block_p2p(block, factory, net):
 @deferral.retry('Error submitting block: (will retry)', 10, 10)
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
+    segwit_rules = set(['!segwit', 'segwit'])
+    segwit_activated = len(segwit_rules - set(bitcoind_work.value['rules'])) < len(segwit_rules)
     if bitcoind_work.value['use_getblocktemplate']:
         try:
-            result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
+            result = yield bitcoind.rpc_submitblock((bitcoin_data.block_type if segwit_activated else bitcoin_data.stripped_block_type).pack(block).encode('hex'))
         except jsonrpc.Error_for_code(-32601): # Method not found, for older litecoin versions
             result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
         success = result is None

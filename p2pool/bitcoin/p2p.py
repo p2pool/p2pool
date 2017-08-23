@@ -146,6 +146,16 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_alert(self, message, signature):
         pass # print 'ALERT:', (message, signature)
+
+    message_reject = pack.ComposedType([
+        ('message', pack.VarStrType()),
+        ('ccode', pack.IntType(8)),
+        ('reason', pack.VarStrType()),
+        ('data', pack.IntType(256)),
+    ])
+    def handle_reject(self, message, ccode, reason, data):
+        if p2pool.DEBUG:
+            print >>sys.stderr, 'Received reject message (%s): %s' % (message, reason)
     
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):

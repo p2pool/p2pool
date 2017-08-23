@@ -17,3 +17,7 @@ BOOTSTRAP_ADDRS = 'forre.st vps.forre.st litecoin-p2pool.com 95.211.21.103 37.22
 ANNOUNCE_CHANNEL = '#p2pool-ltc'
 VERSION_CHECK = lambda v: None if 100400 <= v else 'Litecoin version too old. Upgrade to 0.10.4 or newer!'
 VERSION_WARNING = lambda v: None
+SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit'])
+MINIMUM_PROTOCOL_VERSION = 1600
+NEW_MINIMUM_PROTOCOL_VERSION = 1700
+SEGWIT_ACTIVATION_VERSION = 17

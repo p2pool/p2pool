@@ -26,7 +26,7 @@ class Test(unittest.TestCase):
         ))) < 2**256//2**30
     
     def test_tx_hash(self):
-        assert data.hash256(data.tx_type.pack(dict(
+        assert data.get_txid(dict(
             version=1,
             tx_ins=[dict(
                 previous_output=None,
@@ -38,7 +38,7 @@ class Test(unittest.TestCase):
                 script=data.pubkey_hash_to_script2(pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))),
             )],
             lock_time=0,
-        ))) == 0xb53802b2333e828d6532059f46ecf6b313a42d79f97925e457fbbfda45367e5c
+        )) == 0xb53802b2333e828d6532059f46ecf6b313a42d79f97925e457fbbfda45367e5c
     
     def test_address_to_pubkey_hash(self):
         assert data.address_to_pubkey_hash('1KUCp7YP5FP8ViRxhfszSUJCTAajK6viGy', networks.nets['bitcoin']) == pack.IntType(160).unpack('ca975b00a8c203b8692f5a18d92dc5c2d2ebc57b'.decode('hex'))

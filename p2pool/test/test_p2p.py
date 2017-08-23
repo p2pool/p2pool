@@ -58,7 +58,7 @@ class Test(unittest.TestCase):
                         )],
                         lock_time=i,
                     )
-                    new_mining_txs[bitcoin_data.hash256(bitcoin_data.tx_type.pack(huge_tx))] = huge_tx
+                    new_mining_txs[bitcoin_data.get_txid(huge_tx)] = huge_tx
                 self.mining_txs_var.set(new_mining_txs)
                 
                 self.sent_time = reactor.seconds()

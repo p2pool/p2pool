@@ -23,5 +23,7 @@ BOOTSTRAP_ADDRS = 'forre.st vps.forre.st portals94.ns01.us 54.227.25.14 119.1.96
 ANNOUNCE_CHANNEL = '#p2pool'
 VERSION_CHECK = lambda v: None if 100000 <= v else 'Bitcoin version too old. Upgrade to 0.11.2 or newer!' # not a bug. BIP65 support is ensured by SOFTFORKS_REQUIRED
 VERSION_WARNING = lambda v: None
-SOFTFORKS_REQUIRED = set(['bip65', 'csv'])
+SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit'])
 MINIMUM_PROTOCOL_VERSION = 1600
+NEW_MINIMUM_PROTOCOL_VERSION = 1700
+SEGWIT_ACTIVATION_VERSION = 17
