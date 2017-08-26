@@ -13,7 +13,7 @@ class Test(unittest.TestCase):
         try:
             h = 0x000000000000046acff93b0e76cd10490551bf871ce9ac9fad62e67a07ff1d1e
             block = yield deferral.retry()(defer.inlineCallbacks(lambda: defer.returnValue((yield (yield factory.getProtocol()).get_block(h)))))()
-            assert data.merkle_hash(map(data.hash256, map(data.tx_type.pack, block['txs']))) == block['header']['merkle_root']
+            assert data.merkle_hash(map(data.get_txid, block['txs'])) == block['header']['merkle_root']
             assert data.hash256(data.block_header_type.pack(block['header'])) == h
         finally:
             factory.stopTrying()

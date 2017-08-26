@@ -1,4 +1,4 @@
-from twisted.internet import defer, task
+from twisted.internet import defer
 from twisted.python import log
 
 import p2pool
@@ -29,16 +29,16 @@ class HeightTracker(object):
         self._watch2 = self._factory.new_block.watch(self._request)
         
         self._requested = set()
-        self._clear_task = task.LoopingCall(self._requested.clear)
+        self._clear_task = deferral.RobustLoopingCall(self._requested.clear)
         self._clear_task.start(60)
         
         self._last_notified_size = 0
         
         self.updated = variable.Event()
         
-        self._think_task = task.LoopingCall(self._think)
+        self._think_task = deferral.RobustLoopingCall(self._think)
         self._think_task.start(15)
-        self._think2_task = task.LoopingCall(self._think2)
+        self._think2_task = deferral.RobustLoopingCall(self._think2)
         self._think2_task.start(15)
     
     def _think(self):

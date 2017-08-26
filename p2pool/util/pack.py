@@ -38,12 +38,12 @@ class Type(object):
     def __ne__(self, other):
         return not (self == other)
     
-    def _unpack(self, data):
+    def _unpack(self, data, ignore_trailing=False):
         obj, (data2, pos) = self.read((data, 0))
         
         assert data2 is data
         
-        if pos != len(data):
+        if pos != len(data) and not ignore_trailing:
             raise LateEnd()
         
         return obj
@@ -59,23 +59,20 @@ class Type(object):
         return ''.join(res)
     
     
-    def unpack(self, data):
-        obj = self._unpack(data)
+    def unpack(self, data, ignore_trailing=False):
+        obj = self._unpack(data, ignore_trailing)
         
         if p2pool.DEBUG:
-            if self._pack(obj) != data:
+            packed = self._pack(obj)
+            good = data.startswith(packed) if ignore_trailing else data == packed
+            if not good:
                 raise AssertionError()
         
         return obj
     
     def pack(self, obj):
-        data = self._pack(obj)
-        
-        if p2pool.DEBUG:
-            if self._unpack(data) != obj:
-                raise AssertionError((self._unpack(data), obj))
-        
-        return data
+        # No check since obj can have more keys than our type
+        return self._pack(obj)
     
     def packed_size(self, obj):
         if hasattr(obj, '_packed_size') and obj._packed_size is not None:
@@ -294,7 +291,7 @@ class ComposedType(Type):
         return item, file
     
     def write(self, file, item):
-        assert set(item.keys()) == self.field_names, (set(item.keys()) - self.field_names, self.field_names - set(item.keys()))
+        assert set(item.keys()) >= self.field_names
         for key, type_ in self.fields:
             file = type_.write(file, item[key])
         return file

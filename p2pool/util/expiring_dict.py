@@ -3,7 +3,7 @@ from __future__ import division
 import time
 import weakref
 
-from twisted.internet import task
+from p2pool.util import deferral
 
 class Node(object):
     def __init__(self, contents, prev=None, next=None):
@@ -106,7 +106,7 @@ class ExpiringDict(object):
         self.d = dict() # key -> node, value
         
         self_ref = weakref.ref(self, lambda _: expire_loop.stop() if expire_loop.running else None)
-        self._expire_loop = expire_loop = task.LoopingCall(lambda: self_ref().expire())
+        self._expire_loop = expire_loop = deferral.RobustLoopingCall(lambda: self_ref().expire())
         expire_loop.start(1)
     
     def stop(self):

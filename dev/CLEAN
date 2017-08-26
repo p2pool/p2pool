@@ -1,1 +1,1 @@
-find p2pool/ -iname '*.py' | xargs ~/pycl.py 
+find p2pool/ -iname '*.py' | xargs pycl

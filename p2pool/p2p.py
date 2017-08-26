@@ -19,12 +19,14 @@ class PeerMisbehavingError(Exception):
 
 def fragment(f, **kwargs):
     try:
-        return f(**kwargs)
+        f(**kwargs)
     except p2protocol.TooLong:
         fragment(f, **dict((k, v[:len(v)//2]) for k, v in kwargs.iteritems()))
-        return fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
+        fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
+    VERSION = 1700
+    
     max_remembered_txs_size = 2500000
     
     def __init__(self, node, incoming):
@@ -36,8 +38,6 @@ class Protocol(p2protocol.Protocol):
         self.connected2 = False
     
     def connectionMade(self):
-        p2protocol.Protocol.connectionMade(self)
-        
         self.factory.proto_made_connection(self)
         
         self.connection_lost_event = variable.Event()
@@ -45,7 +45,7 @@ class Protocol(p2protocol.Protocol):
         self.addr = self.transport.getPeer().host, self.transport.getPeer().port
         
         self.send_version(
-            version=901,
+            version=self.VERSION,
             services=0,
             addr_to=dict(
                 services=0,
@@ -69,7 +69,7 @@ class Protocol(p2protocol.Protocol):
             max_id=2**256,
             func=lambda id, hashes, parents, stops: self.send_sharereq(id=id, hashes=hashes, parents=parents, stops=stops),
             timeout=15,
-            on_timeout=self.transport.loseConnection,
+            on_timeout=self.disconnect,
         )
         
         self.remote_tx_hashes = set() # view of peer's known_txs # not actually initially empty, but sending txs instead of tx hashes won't hurt
@@ -82,7 +82,7 @@ class Protocol(p2protocol.Protocol):
     def _connect_timeout(self):
         self.timeout_delayed = None
         print 'Handshake timed out, disconnecting from %s:%i' % self.addr
-        self.transport.loseConnection()
+        self.disconnect()
     
     def packetReceived(self, command, payload2):
         try:
@@ -94,17 +94,43 @@ class Protocol(p2protocol.Protocol):
             self.badPeerHappened()
     
     def badPeerHappened(self):
-        if p2pool.DEBUG:
-            print "Bad peer banned:", self.addr
-        self.transport.loseConnection()
+        print "Bad peer banned:", self.addr
+        self.disconnect()
         if self.transport.getPeer().host != '127.0.0.1': # never ban localhost
             self.node.bans[self.transport.getPeer().host] = time.time() + 60*60
     
     def _timeout(self):
         self.timeout_delayed = None
         print 'Connection timed out, disconnecting from %s:%i' % self.addr
-        self.transport.loseConnection()
+        self.disconnect()
     
+    def sendAdvertisement(self):
+        if self.node.serverfactory.listen_port is not None:
+            host=self.node.external_ip
+            port=self.node.serverfactory.listen_port.getHost().port
+            if host is not None:
+                if ':' in host:
+                    host, port_str = host.split(':')
+                    port = int(port_str)
+                if p2pool.DEBUG:
+                    print 'Advertising for incoming connections: %s:%i' % (host, port)
+                # Advertise given external IP address, just as if there were another peer behind us, with that address, who asked us to advertise it for them
+                self.send_addrs(addrs=[
+                    dict(
+                        address=dict(
+                            services=self.other_services,
+                            address=host,
+                            port=port,
+                        ),
+                        timestamp=int(time.time()),
+                    ),
+                ])
+            else:
+                if p2pool.DEBUG:
+                    print 'Advertising for incoming connections'
+                # Ask peer to advertise what it believes our IP address to be
+                self.send_addrme(port=port)
+
     message_version = pack.ComposedType([
         ('version', pack.IntType(32)),
         ('services', pack.IntType(64)),
@@ -118,7 +144,7 @@ class Protocol(p2protocol.Protocol):
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
         if self.other_version is not None:
             raise PeerMisbehavingError('more than one version message')
-        if version < 8:
+        if version < getattr(self.node.net, 'MINIMUM_PROTOCOL_VERSION', 1400):
             raise PeerMisbehavingError('peer too old')
         
         self.other_version = version
@@ -130,7 +156,7 @@ class Protocol(p2protocol.Protocol):
         if nonce in self.node.peers:
             if p2pool.DEBUG:
                 print 'Detected duplicate connection, disconnecting from %s:%i' % self.addr
-            self.transport.loseConnection()
+            self.disconnect()
             return
         
         self.nonce = nonce
@@ -152,15 +178,13 @@ class Protocol(p2protocol.Protocol):
             self.send_ping(),
         random.expovariate(1/100)][-1])
         
-        self._stop_thread2 = deferral.run_repeatedly(lambda: [
-            self.send_addrme(port=self.node.serverfactory.listen_port.getHost().port) if self.node.serverfactory.listen_port is not None else None,
-        random.expovariate(1/(100*len(self.node.peers) + 1))][-1])
+        if self.node.advertise_ip:
+            self._stop_thread2 = deferral.run_repeatedly(lambda: [
+                self.sendAdvertisement(),
+            random.expovariate(1/(100*len(self.node.peers) + 1))][-1])
         
         if best_share_hash is not None:
             self.node.handle_share_hashes([best_share_hash], self)
-        
-        if self.other_version < 8:
-            return
         
         def update_remote_view_of_my_known_txs(before, after):
             added = set(after) - set(before)
@@ -182,13 +206,13 @@ class Protocol(p2protocol.Protocol):
         def update_remote_view_of_my_mining_txs(before, after):
             added = set(after) - set(before)
             removed = set(before) - set(after)
+            if removed:
+                self.send_forget_tx(tx_hashes=list(removed))
+                self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(before[x]) for x in removed)
             if added:
                 self.remote_remembered_txs_size += sum(100 + bitcoin_data.tx_type.packed_size(after[x]) for x in added)
                 assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
                 fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
-            if removed:
-                self.send_forget_tx(tx_hashes=list(removed))
-                self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(before[x]) for x in removed)
         watch_id2 = self.node.mining_txs_var.transitioned.watch(update_remote_view_of_my_mining_txs)
         self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
         
@@ -257,37 +281,62 @@ class Protocol(p2protocol.Protocol):
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
     def handle_shares(self, shares):
-        self.node.handle_shares([p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] >= 9], self)
+        result = []
+        for wrappedshare in shares:
+            if wrappedshare['type'] < p2pool_data.Share.VERSION: continue
+            share = p2pool_data.load_share(wrappedshare, self.node.net, self.addr)
+            if wrappedshare['type'] >= 13:
+                txs = []
+                for tx_hash in share.share_info['new_transaction_hashes']:
+                    if tx_hash in self.node.known_txs_var.value:
+                        tx = self.node.known_txs_var.value[tx_hash]
+                    else:
+                        for cache in self.known_txs_cache.itervalues():
+                            if tx_hash in cache:
+                                tx = cache[tx_hash]
+                                print 'Transaction %064x rescued from peer latency cache!' % (tx_hash,)
+                                break
+                        else:
+                            print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
+                            self.disconnect()
+                            return
+                    txs.append(tx)
+            else:
+                txs = None
+            
+            result.append((share, txs))
+            
+        self.node.handle_shares(result, self)
     
     def sendShares(self, shares, tracker, known_txs, include_txs_with=[]):
-        if not shares:
-            return defer.succeed(None)
+        tx_hashes = set()
+        for share in shares:
+            if share.VERSION >= 13:
+                # send full transaction for every new_transaction_hash that peer does not know
+                for tx_hash in share.share_info['new_transaction_hashes']:
+                    assert tx_hash in known_txs, 'tried to broadcast share without knowing all its new transactions'
+                    if tx_hash not in self.remote_tx_hashes:
+                        tx_hashes.add(tx_hash)
+                continue
+            if share.hash in include_txs_with:
+                x = share.get_other_tx_hashes(tracker)
+                if x is not None:
+                    tx_hashes.update(x)
         
-        if self.other_version >= 8:
-            tx_hashes = set()
-            for share in shares:
-                if share.hash in include_txs_with:
-                    x = share.get_other_tx_hashes(tracker)
-                    if x is not None:
-                        tx_hashes.update(x)
-            
-            hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
-            
-            new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
-            if new_remote_remembered_txs_size > self.max_remembered_txs_size:
-                raise ValueError('shares have too many txs')
-            self.remote_remembered_txs_size = new_remote_remembered_txs_size
-            
-            fragment(self.send_remember_tx, tx_hashes=[x for x in hashes_to_send if x in self.remote_tx_hashes], txs=[known_txs[x] for x in hashes_to_send if x not in self.remote_tx_hashes])
+        hashes_to_send = [x for x in tx_hashes if x not in self.node.mining_txs_var.value and x in known_txs]
         
-        res = fragment(self.send_shares, shares=[share.as_share() for share in shares])
+        new_remote_remembered_txs_size = self.remote_remembered_txs_size + sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+        if new_remote_remembered_txs_size > self.max_remembered_txs_size:
+            raise ValueError('shares have too many txs')
+        self.remote_remembered_txs_size = new_remote_remembered_txs_size
         
-        if self.other_version >= 8:
-            res = self.send_forget_tx(tx_hashes=hashes_to_send)
-            
-            self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
+        fragment(self.send_remember_tx, tx_hashes=[x for x in hashes_to_send if x in self.remote_tx_hashes], txs=[known_txs[x] for x in hashes_to_send if x not in self.remote_tx_hashes])
         
-        return res
+        fragment(self.send_shares, shares=[share.as_share() for share in shares])
+        
+        self.send_forget_tx(tx_hashes=hashes_to_send)
+        
+        self.remote_remembered_txs_size -= sum(100 + bitcoin_data.tx_type.packed_size(known_txs[x]) for x in hashes_to_send)
     
     
     message_sharereq = pack.ComposedType([
@@ -308,11 +357,12 @@ class Protocol(p2protocol.Protocol):
         ('result', pack.EnumType(pack.VarIntType(), {0: 'good', 1: 'too long', 2: 'unk2', 3: 'unk3', 4: 'unk4', 5: 'unk5', 6: 'unk6'})),
         ('shares', pack.ListType(p2pool_data.share_type)),
     ])
+    class ShareReplyError(Exception): pass
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = [p2pool_data.load_share(share, self.node.net, self) for share in shares if share['type'] >= 9]
+            res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= p2pool_data.Share.VERSION]
         else:
-            res = failure.Failure("sharereply result: " + result)
+            res = failure.Failure(self.ShareReplyError(result))
         self.get_shares.got_response(id, res)
     
     
@@ -347,7 +397,7 @@ class Protocol(p2protocol.Protocol):
         for tx_hash in tx_hashes:
             if tx_hash in self.remembered_txs:
                 print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
-                self.transport.loseConnection()
+                self.disconnect()
                 return
             
             if tx_hash in self.node.known_txs_var.value:
@@ -360,7 +410,7 @@ class Protocol(p2protocol.Protocol):
                         break
                 else:
                     print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
-                    self.transport.loseConnection()
+                    self.disconnect()
                     return
             
             self.remembered_txs[tx_hash] = tx
@@ -371,7 +421,7 @@ class Protocol(p2protocol.Protocol):
             tx_hash = bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx))
             if tx_hash in self.remembered_txs:
                 print >>sys.stderr, 'Peer referenced transaction twice, disconnecting'
-                self.transport.loseConnection()
+                self.disconnect()
                 return
             
             if tx_hash in self.node.known_txs_var.value and not warned:
@@ -401,7 +451,8 @@ class Protocol(p2protocol.Protocol):
         if self.connected2:
             self.factory.proto_disconnected(self, reason)
             self._stop_thread()
-            self._stop_thread2()
+            if self.node.advertise_ip:
+                self._stop_thread2()
             self.connected2 = False
         self.factory.proto_lost_connection(self, reason)
         if p2pool.DEBUG:
@@ -558,7 +609,7 @@ class SingleClientFactory(protocol.ReconnectingClientFactory):
         self.node.lost_conn(proto, reason)
 
 class Node(object):
-    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({})):
+    def __init__(self, best_share_hash_func, port, net, addr_store={}, connect_addrs=set(), desired_outgoing_conns=10, max_outgoing_attempts=30, max_incoming_conns=50, preferred_storage=1000, known_txs_var=variable.Variable({}), mining_txs_var=variable.Variable({}), advertise_ip=True, external_ip=None):
         self.best_share_hash_func = best_share_hash_func
         self.port = port
         self.net = net
@@ -567,6 +618,8 @@ class Node(object):
         self.preferred_storage = preferred_storage
         self.known_txs_var = known_txs_var
         self.mining_txs_var = mining_txs_var
+        self.advertise_ip = advertise_ip
+        self.external_ip = external_ip
         
         self.traffic_happened = variable.Event()
         self.nonce = random.randrange(2**64)
@@ -617,8 +670,8 @@ class Node(object):
             raise ValueError('already have peer')
         self.peers[conn.nonce] = conn
         
-        print '%s connection to peer %s:%i established. p2pool version: %i %r' % ('Incoming' if conn.incoming else 'Outgoing', conn.addr[0], conn.addr[1], conn.other_version, conn.other_sub_version)
-    
+        print '%s peer %s:%i established. p2pool version: %i %r' % ('Incoming connection from' if conn.incoming else 'Outgoing connection to', conn.addr[0], conn.addr[1], conn.other_version, conn.other_sub_version)
+        
     def lost_conn(self, conn, reason):
         if conn.nonce not in self.peers:
             raise ValueError('''don't have peer''')
@@ -634,7 +687,8 @@ class Node(object):
             old_services, old_first_seen, old_last_seen = self.addr_store[host, port]
             self.addr_store[host, port] = services, old_first_seen, max(old_last_seen, timestamp)
         else:
-            self.addr_store[host, port] = services, timestamp, timestamp
+            if len(self.addr_store) < 10000:
+                self.addr_store[host, port] = services, timestamp, timestamp
     
     def handle_shares(self, shares, peer):
         print 'handle_shares', (shares, peer)

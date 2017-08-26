@@ -13,8 +13,25 @@ def check(bitcoind, net):
     if not (yield net.PARENT.RPC_CHECK(bitcoind)):
         print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
         raise deferral.RetrySilentlyException()
-    if not net.VERSION_CHECK((yield bitcoind.rpc_getinfo())['version']):
-        print >>sys.stderr, '    Bitcoin version too old! Upgrade to 0.6.4 or newer!'
+    
+    version_check_result = net.VERSION_CHECK((yield bitcoind.rpc_getinfo())['version'])
+    if version_check_result == True: version_check_result = None # deprecated
+    if version_check_result == False: version_check_result = 'Coin daemon too old! Upgrade!' # deprecated
+    if version_check_result is not None:
+        print >>sys.stderr, '    ' + version_check_result
+        raise deferral.RetrySilentlyException()
+    
+    try:
+        blockchaininfo = yield bitcoind.rpc_getblockchaininfo()
+        softforks_supported = set(item['id'] for item in blockchaininfo.get('softforks', []))
+        try:
+            softforks_supported |= set(item['id'] for item in blockchaininfo.get('bip9_softforks', []))
+        except TypeError: # https://github.com/bitcoin/bitcoin/pull/7863
+            softforks_supported |= set(item for item in blockchaininfo.get('bip9_softforks', []))
+    except jsonrpc.Error_for_code(-32601): # Method not found
+        softforks_supported = set()
+    if getattr(net, 'SOFTFORKS_REQUIRED', set()) - softforks_supported:
+        print 'Coin daemon too old! Upgrade!'
         raise deferral.RetrySilentlyException()
 
 @deferral.retry('Error getting work from bitcoind:', 3)
@@ -22,7 +39,7 @@ def check(bitcoind, net):
 def getwork(bitcoind, use_getblocktemplate=False):
     def go():
         if use_getblocktemplate:
-            return bitcoind.rpc_getblocktemplate(dict(mode='template'))
+            return bitcoind.rpc_getblocktemplate(dict(mode='template', rules=['segwit']))
         else:
             return bitcoind.rpc_getmemorypool()
     try:
@@ -38,6 +55,7 @@ def getwork(bitcoind, use_getblocktemplate=False):
         except jsonrpc.Error_for_code(-32601): # Method not found
             print >>sys.stderr, 'Error: Bitcoin version too old! Upgrade to v0.5 or newer!'
             raise deferral.RetrySilentlyException()
+    work['transactions'] = [x for x in work['transactions'] if x['txid'] == x['hash']] # don't mine segwit txs for now
     packed_transactions = [(x['data'] if isinstance(x, dict) else x).decode('hex') for x in work['transactions']]
     if 'height' not in work:
         work['height'] = (yield bitcoind.rpc_getblock(work['previousblockhash']))['height'] + 1
@@ -48,11 +66,13 @@ def getwork(bitcoind, use_getblocktemplate=False):
         previous_block=int(work['previousblockhash'], 16),
         transactions=map(bitcoin_data.tx_type.unpack, packed_transactions),
         transaction_hashes=map(bitcoin_data.hash256, packed_transactions),
+        transaction_fees=[x.get('fee', None) if isinstance(x, dict) else None for x in work['transactions']],
         subsidy=work['coinbasevalue'],
         time=work['time'] if 'time' in work else work['curtime'],
         bits=bitcoin_data.FloatingIntegerType().unpack(work['bits'].decode('hex')[::-1]) if isinstance(work['bits'], (str, unicode)) else bitcoin_data.FloatingInteger(work['bits']),
         coinbaseflags=work['coinbaseflags'].decode('hex') if 'coinbaseflags' in work else ''.join(x.decode('hex') for x in work['coinbaseaux'].itervalues()) if 'coinbaseaux' in work else '',
         height=work['height'],
+        rules=work.get('rules', []),
         last_update=time.time(),
         use_getblocktemplate=use_getblocktemplate,
         latency=end - start,
@@ -68,8 +88,13 @@ def submit_block_p2p(block, factory, net):
 @deferral.retry('Error submitting block: (will retry)', 10, 10)
 @defer.inlineCallbacks
 def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
+    segwit_rules = set(['!segwit', 'segwit'])
+    segwit_activated = len(segwit_rules - set(bitcoind_work.value['rules'])) < len(segwit_rules)
     if bitcoind_work.value['use_getblocktemplate']:
-        result = yield bitcoind.rpc_submitblock(bitcoin_data.block_type.pack(block).encode('hex'))
+        try:
+            result = yield bitcoind.rpc_submitblock((bitcoin_data.block_type if segwit_activated else bitcoin_data.stripped_block_type).pack(block).encode('hex'))
+        except jsonrpc.Error_for_code(-32601): # Method not found, for older litecoin versions
+            result = yield bitcoind.rpc_getblocktemplate(dict(mode='submit', data=bitcoin_data.block_type.pack(block).encode('hex')))
         success = result is None
     else:
         result = yield bitcoind.rpc_getmemorypool(bitcoin_data.block_type.pack(block).encode('hex'))
@@ -81,3 +106,12 @@ def submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net):
 def submit_block(block, ignore_failure, factory, bitcoind, bitcoind_work, net):
     submit_block_p2p(block, factory, net)
     submit_block_rpc(block, ignore_failure, bitcoind, bitcoind_work, net)
+
+@defer.inlineCallbacks
+def check_genesis_block(bitcoind, genesis_block_hash):
+    try:
+        yield bitcoind.rpc_getblock(genesis_block_hash)
+    except jsonrpc.Error_for_code(-5):
+        defer.returnValue(False)
+    else:
+        defer.returnValue(True)

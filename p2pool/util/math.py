@@ -72,17 +72,25 @@ add_dicts = add_dicts_ext()
 
 mult_dict = lambda c, x: dict((k, c*v) for k, v in x.iteritems())
 
-def format(x):
+def format(x, add_space=False):
     prefixes = 'kMGTPEZY'
     count = 0
     while x >= 100000 and count < len(prefixes) - 2:
         x = x//1000
         count += 1
     s = '' if count == 0 else prefixes[count - 1]
+    if add_space and s:
+        s = ' ' + s
     return '%i' % (x,) + s
 
 def format_dt(dt):
-    for value, name in [(60*60*24, 'days'), (60*60, 'hours'), (60, 'minutes'), (1, 'seconds')]:
+    for value, name in [
+        (365.2425*60*60*24, 'years'),
+        (60*60*24, 'days'),
+        (60*60, 'hours'),
+        (60, 'minutes'),
+        (1, 'seconds'),
+    ]:
         if dt > value:
             break
     return '%.01f %s' % (dt/value, name)
@@ -230,3 +238,8 @@ class RateMonitor(object):
             self.first_timestamp = t
         else:
             self.datums.append((t, datum))
+
+def merge_dicts(*dicts):
+    res = {}
+    for d in dicts: res.update(d)
+    return res

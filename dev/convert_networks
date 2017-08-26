@@ -1,0 +1,27 @@
+#!/bin/bash -xe
+
+mkdir -p p2pool/networks/
+cat > p2pool/networks/__init__.py << END
+import pkgutil
+
+nets = dict((name, __import__(name, globals(), fromlist="dummy"))
+    for module_loader, name, ispkg in pkgutil.iter_modules(__path__))
+for net_name, net in nets.iteritems():
+    net.NAME = net_name
+END
+python dev/convert_networks.py p2pool/networks.py p2pool/networks/ p2pool
+git add p2pool/networks/*.py
+git rm p2pool/networks.py
+
+mkdir -p p2pool/bitcoin/networks/
+cat > p2pool/bitcoin/networks/__init__.py << END
+import pkgutil
+
+nets = dict((name, __import__(name, globals(), fromlist="dummy"))
+    for module_loader, name, ispkg in pkgutil.iter_modules(__path__))
+for net_name, net in nets.iteritems():
+    net.NAME = net_name
+END
+python dev/convert_networks.py p2pool/bitcoin/networks.py p2pool/bitcoin/networks/ bitcoin
+git add p2pool/bitcoin/networks/*.py
+git rm p2pool/bitcoin/networks.py

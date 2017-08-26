@@ -1,0 +1,7 @@
+Release procedure:
+* Update network version
+* Tag+sign last commit
+* Upload Windows build
+* Make forum post
+* Update first post with links
+* Send email to mailing list if necessary
