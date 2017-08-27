@@ -78,8 +78,7 @@ In bash type this:
     cd litecoin_scrypt
     C:\Python27\python.exe setup.py build --compile=mingw32 install
 	
-If you run into an error with unrecognized command line option '-mno-cygwin', see this:
-http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o
+If you run into an error with unrecognized command line option '-mno-cygwin', see [this page](http://stackoverflow.com/questions/6034390/compiling-with-cython-and-mingw-produces-gcc-error-unrecognized-command-line-o).
 
 Running P2Pool:
 -------------------------
