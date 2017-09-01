@@ -13,6 +13,6 @@ MIN_TARGET = 0
 MAX_TARGET = 2**256//2**20 - 1
 PERSIST = False
 WORKER_PORT = 9133
-BOOTSTRAP_ADDRS = 'rav3n.dtdns.net p2p.zaplnc.pl'.split(' ')
+BOOTSTRAP_ADDRS = 'rav3n.dtdns.net'.split(' ')
 ANNOUNCE_CHANNEL = '#p2pool-alt'
 VERSION_CHECK = lambda v: True
