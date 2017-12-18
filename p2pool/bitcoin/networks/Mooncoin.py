@@ -12,9 +12,7 @@ P2P_PORT = 44664
 ADDRESS_VERSION = 3
 RPC_PORT = 44663
 RPC_CHECK = defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'Mooncoinaddress' in (yield bitcoind.rpc_help()) and
-            not (yield bitcoind.rpc_getinfo())['testnet']
-        ))
+            yield helper.check_genesis_block(bitcoind, 'bd687cbbac4842724d4b1dfd2e1a6ce35d765db05635b3ebd3810ba66ac5aee9')))
 SUBSIDY_FUNC = lambda height: 2000000*100000000
 POW_FUNC = lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data))
 BLOCK_PERIOD = 90 # s
