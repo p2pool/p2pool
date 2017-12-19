@@ -14,7 +14,7 @@ def check(bitcoind, net):
         print >>sys.stderr, "    Check failed! Make sure that you're connected to the right bitcoind with --bitcoind-rpc-port!"
         raise deferral.RetrySilentlyException()
     
-    version_check_result = net.VERSION_CHECK((yield bitcoind.rpc_getinfo())['version'])
+    version_check_result = net.VERSION_CHECK((yield bitcoind.rpc_getnetworkinfo())['version'])
     if version_check_result == True: version_check_result = None # deprecated
     if version_check_result == False: version_check_result = 'Coin daemon too old! Upgrade!' # deprecated
     if version_check_result is not None:

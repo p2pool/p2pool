@@ -688,9 +688,9 @@ def get_warnings(tracker, best_share, net, bitcoind_getinfo, bitcoind_work_value
             'An upgrade is likely necessary. Check http://p2pool.forre.st/ for more information.' % (
                 majority_desired_version, 100*desired_version_counts[majority_desired_version]/sum(desired_version_counts.itervalues())))
     
-    if bitcoind_getinfo['errors'] != '':
-        if 'This is a pre-release test build' not in bitcoind_getinfo['errors']:
-            res.append('(from bitcoind) %s' % (bitcoind_getinfo['errors'],))
+    if bitcoind_getinfo['warnings'] != '':
+        if 'This is a pre-release test build' not in bitcoind_getinfo['warnings']:
+            res.append('(from bitcoind) %s' % (bitcoind_getinfo['warnings'],))
     
     version_warning = getattr(net, 'VERSION_WARNING', lambda v: None)(bitcoind_getinfo['version'])
     if version_warning is not None:

@@ -13,7 +13,7 @@ ADDRESS_VERSION = 0
 RPC_PORT = 13332
 RPC_CHECK = defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             'terracoinaddress' in (yield bitcoind.rpc_help()) and
-            not (yield bitcoind.rpc_getinfo())['testnet']
+            (yield bitcoind.rpc_getblockchaininfo())['chain'] != 'test'
         ))
 SUBSIDY_FUNC = lambda height: 20*100000000 >> (height + 1)//1050000
 POW_FUNC = data.hash256
