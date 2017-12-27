@@ -18,7 +18,7 @@ SUBSIDY_FUNC = lambda height: 2000000*100000000
 POW_FUNC = lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data))
 BLOCK_PERIOD = 90 # s
 SYMBOL = 'MOON'
-CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'MoonCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Mooncoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.Mooncoin'), 'Mooncoin.conf')
+CONF_FILE_FUNC = lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'MoonCoin') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/mooncoin/') if platform.system() == 'Darwin' else os.path.expanduser('~/.mooncoin'), 'mooncoin.conf')
 BLOCK_EXPLORER_URL_PREFIX = 'http://moonchain.net/block/'
 ADDRESS_EXPLORER_URL_PREFIX = 'http://moonchain.net/address/'
 TX_EXPLORER_URL_PREFIX = 'http://moonchain.net/tx/'
