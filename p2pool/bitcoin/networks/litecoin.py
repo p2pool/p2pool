@@ -12,7 +12,7 @@ P2P_PORT = 9333
 ADDRESS_VERSION = 48
 RPC_PORT = 9332
 RPC_CHECK = defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
-            'litecoinaddress' in (yield bitcoind.rpc_help()) and
+            (yield helper.check_genesis_block(bitcoind, '12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2')) and
             (yield bitcoind.rpc_getblockchaininfo())['chain'] != 'test'
         ))
 SUBSIDY_FUNC = lambda height: 50*100000000 >> (height + 1)//840000
