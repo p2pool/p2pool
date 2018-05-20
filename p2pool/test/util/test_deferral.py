@@ -9,7 +9,7 @@ from p2pool.util import deferral
 class Test(unittest.TestCase):
     @defer.inlineCallbacks
     def test_sleep(self):
-        for i in xrange(10):
+        for i in range(10):
             length = random.expovariate(1/0.1)
             start = time.time()
             yield deferral.sleep(length)

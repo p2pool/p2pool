@@ -1,5 +1,3 @@
-from __future__ import nested_scopes
-
 """
 ################################################################################
 #
@@ -43,7 +41,7 @@ from __future__ import nested_scopes
 """
 
 ident = '$Id: NS.py 1468 2008-05-24 01:55:33Z warnes $'
-from version import __version__
+from .version import __version__
 
 ##############################################################################
 # Namespace Class
@@ -51,7 +49,7 @@ from version import __version__
 def invertDict(dict):
     d = {}
 
-    for k, v in dict.items():
+    for k, v in list(dict.items()):
         d[v] = k
 
     return d
@@ -98,7 +96,7 @@ class NS:
     STMAP_R     = invertDict(STMAP)
 
     def __init__(self):
-        raise Error, "Don't instantiate this"
+        raise Error("Don't instantiate this")
 
 
 

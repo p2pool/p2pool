@@ -14,14 +14,14 @@
 
 ident = "$Id$"
 
-import sys, types, httplib, urllib, socket, weakref
+import sys, types, http.client, urllib.request, urllib.parse, urllib.error, socket, weakref
 from os.path import isfile
 from string import join, strip, split
 from UserDict import UserDict
-from cStringIO import StringIO
-from TimeoutSocket import TimeoutSocket, TimeoutError
-from urlparse import urlparse
-from httplib import HTTPConnection, HTTPSConnection
+from io import StringIO
+from .TimeoutSocket import TimeoutSocket, TimeoutError
+from urllib.parse import urlparse
+from http.client import HTTPConnection, HTTPSConnection
 from exceptions import Exception
 try:
     from ZSI import _get_idstr
@@ -38,9 +38,9 @@ except:
 import xml.dom.minidom
 from xml.dom import Node
 
-import logging
-from c14n import Canonicalize
-from Namespaces import SCHEMA, SOAP, XMLNS, ZSI_SCHEMA_URI
+from . import logging
+from .c14n import Canonicalize
+from .Namespaces import SCHEMA, SOAP, XMLNS, ZSI_SCHEMA_URI
 
 
 try:
@@ -141,7 +141,7 @@ class TimeoutHTTPS(HTTPSConnection):
         sock.connect((self.host, self.port))
         realsock = getattr(sock.sock, '_sock', sock.sock)
         ssl = socket.ssl(realsock, self.key_file, self.cert_file)
-        self.sock = httplib.FakeSocket(sock, ssl)
+        self.sock = http.client.FakeSocket(sock, ssl)
 
 
 def urlopen(url, timeout=20, redirects=None):
@@ -150,7 +150,7 @@ def urlopen(url, timeout=20, redirects=None):
     scheme, host, path, params, query, frag = urlparse(url)
 
     if not scheme in ('http', 'https'):
-        return urllib.urlopen(url)
+        return urllib.request.urlopen(url)
     if params: path = '%s;%s' % (path, params)
     if query:  path = '%s?%s' % (path, query)
     if frag:   path = '%s#%s' % (path, frag)
@@ -163,7 +163,7 @@ def urlopen(url, timeout=20, redirects=None):
             import M2Crypto
         except ImportError:
             if not hasattr(socket, 'ssl'):
-                raise RuntimeError, 'no built-in SSL Support'
+                raise RuntimeError('no built-in SSL Support')
 
             conn = TimeoutHTTPS(host, None, timeout)
         else:
@@ -183,7 +183,7 @@ def urlopen(url, timeout=20, redirects=None):
         response = conn.getresponse()
         if response.status != 100:
             break
-        conn._HTTPConnection__state = httplib._CS_REQ_SENT
+        conn._HTTPConnection__state = http.client._CS_REQ_SENT
         conn._HTTPConnection__response = None
 
     status = response.status
@@ -193,7 +193,7 @@ def urlopen(url, timeout=20, redirects=None):
         location = response.msg.getheader('location')
         if location is not None:
             response.close()
-            if redirects is not None and redirects.has_key(location):
+            if redirects is not None and location in redirects:
                 raise RecursionError(
                     'Circular HTTP redirection detected.'
                     )
@@ -305,7 +305,7 @@ class DOM:
         NS_XSD_01 : NS_XSI_01,
     }
 
-    for key, value in _xsd_uri_mapping.items():
+    for key, value in list(_xsd_uri_mapping.items()):
         _xsd_uri_mapping[value] = key
 
 
@@ -428,7 +428,7 @@ class DOM:
                     return child
         if default is not join:
             return default
-        raise KeyError, name
+        raise KeyError(name)
 
     def getElementById(self, node, id, default=join):
         """Return the first child of node matching an id reference."""
@@ -440,7 +440,7 @@ class DOM:
                     return child
         if default is not join:
             return default
-        raise KeyError, name
+        raise KeyError(name)
 
     def getMappingById(self, document, depth=None, element=None,
                        mapping=None, level=1):
@@ -492,7 +492,7 @@ class DOM:
         if nsuri is None:
             result = node._attrs.get(name, None)
             if result is None:
-                for item in node._attrsNS.keys():
+                for item in list(node._attrsNS.keys()):
                     if item[1] == name:
                         result = node._attrsNS[item]
                         break
@@ -508,7 +508,7 @@ class DOM:
         """Return a Collection of all attributes 
         """
         attrs = {}
-        for k,v in node._attrs.items():
+        for k,v in list(node._attrs.items()):
             attrs[k] = v.value
         return attrs
 
@@ -643,7 +643,7 @@ class DOM:
 
         try:     
             result = self.loadDocument(file)
-        except Exception, ex:
+        except Exception as ex:
             file.close()
             raise ParseError(('Failed to load document %s' %url,) + ex.args)
         else:
@@ -679,39 +679,39 @@ class MessageInterface:
     def canonicalize(self):
         '''canonicalize the underlying DOM, and return as string.
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def createDocument(self, namespaceURI=SOAP.ENV, localName='Envelope'):
         '''create Document
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def createAppendElement(self, namespaceURI, localName):
         '''create and append element(namespaceURI,localName), and return
         the node.
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def findNamespaceURI(self, qualifiedName):
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def resolvePrefix(self, prefix):
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def setAttributeNS(self, namespaceURI, localName, value):
         '''set attribute (namespaceURI, localName)=value
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def setAttributeType(self, namespaceURI, localName):
         '''set attribute xsi:type=(namespaceURI, localName)
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
     def setNamespaceAttribute(self, namespaceURI, prefix):
         '''set namespace attribute xmlns:prefix=namespaceURI 
         '''
-        raise NotImplementedError, ''
+        raise NotImplementedError('')
 
 
 class ElementProxy(Base, MessageInterface):
@@ -756,7 +756,7 @@ class ElementProxy(Base, MessageInterface):
         Base.__init__(self)
         self._dom = DOM
         self.node = None
-        if type(message) in (types.StringType,types.UnicodeType):
+        if type(message) in (bytes,str):
             self.loadFromString(message)
         elif isinstance(message, ElementProxy):
             self.node = message._getNode()
@@ -777,7 +777,7 @@ class ElementProxy(Base, MessageInterface):
         else:
             context = XPath.Context.Context(self.node, processorNss=processorNss)
         nodes = expression.evaluate(context)
-        return map(lambda node: ElementProxy(self.sw,node), nodes)
+        return [ElementProxy(self.sw,node) for node in nodes]
 
     #############################################
     # Methods for checking/setting the
@@ -794,7 +794,7 @@ class ElementProxy(Base, MessageInterface):
         if localName and self.node:
             check = self._dom.isElement(self.node, localName, namespaceURI)
         if not check:
-            raise NamespaceError, 'unexpected node type %s, expecting %s' %(self.node, localName)
+            raise NamespaceError('unexpected node type %s, expecting %s' %(self.node, localName))
 
     def setNode(self, node=None):
         if node:
@@ -805,7 +805,7 @@ class ElementProxy(Base, MessageInterface):
         elif self.node:
             node = self._dom.getElement(self.node, self.name, self.namespaceURI, default=None)
             if not node:
-                raise NamespaceError, 'cant find element (%s,%s)' %(self.namespaceURI,self.name)
+                raise NamespaceError('cant find element (%s,%s)' %(self.namespaceURI,self.name))
             self.node = node
         else:
             #self.node = self._dom.create(self.node, self.name, self.namespaceURI, default=None)
@@ -835,7 +835,7 @@ class ElementProxy(Base, MessageInterface):
             prefix = 'ns%d' %self._indx
             try:
                 self._dom.findNamespaceURI(prefix, self._getNode())
-            except DOMException, ex:
+            except DOMException as ex:
                 break
         return prefix
 
@@ -849,19 +849,19 @@ class ElementProxy(Base, MessageInterface):
             if node and (node.nodeType == node.ELEMENT_NODE) and \
                 (nsuri == self._dom.findDefaultNS(node)):
                 return None
-        except DOMException, ex:
+        except DOMException as ex:
             pass
         if nsuri == XMLNS.XML:
             return self._xml_prefix
         if node.nodeType == Node.ELEMENT_NODE:
-            for attr in node.attributes.values():
+            for attr in list(node.attributes.values()):
                 if attr.namespaceURI == XMLNS.BASE \
                    and nsuri == attr.value:
                         return attr.localName
             else:
                 if node.parentNode:
                     return self._getPrefix(node.parentNode, nsuri)
-        raise NamespaceError, 'namespaceURI "%s" is not defined' %nsuri
+        raise NamespaceError('namespaceURI "%s" is not defined' %nsuri)
 
     def _appendChild(self, node):
         '''
@@ -869,7 +869,7 @@ class ElementProxy(Base, MessageInterface):
             node -- DOM Element Node
         '''
         if node is None:
-            raise TypeError, 'node is None'
+            raise TypeError('node is None')
         self.node.appendChild(node)
 
     def _insertBefore(self, newChild, refChild):
@@ -900,7 +900,7 @@ class ElementProxy(Base, MessageInterface):
     def getPrefix(self, namespaceURI):
         try:
             prefix = self._getPrefix(node=self.node, nsuri=namespaceURI)
-        except NamespaceError, ex:
+        except NamespaceError as ex:
             prefix = self._getUniquePrefix() 
             self.setNamespaceAttribute(prefix, namespaceURI)
         return prefix
@@ -942,13 +942,13 @@ class ElementProxy(Base, MessageInterface):
             self.node = self._dom.createDocument(None,None,None)
             return
         else:
-            raise KeyError, 'only support creation of document in %s' %self.reserved_ns[prefix]
+            raise KeyError('only support creation of document in %s' %self.reserved_ns[prefix])
 
         document = self._dom.createDocument(nsuri=namespaceURI, qname=qualifiedName, doctype=doctype)
         self.node = document.childNodes[0]
 
         #set up reserved namespace attributes
-        for prefix,nsuri in self.reserved_ns.items():
+        for prefix,nsuri in list(self.reserved_ns.items()):
             self._setAttributeNS(namespaceURI=self._xmlns_nsuri, 
                 qualifiedName='%s:%s' %(self._xmlns_prefix,prefix), 
                 value=nsuri)
@@ -991,7 +991,7 @@ class ElementProxy(Base, MessageInterface):
         if namespaceURI:
             try:
                 prefix = self.getPrefix(namespaceURI)
-            except KeyError, ex:
+            except KeyError as ex:
                 prefix = 'ns2'
                 self.setNamespaceAttribute(prefix, namespaceURI)
         qualifiedName = localName
@@ -1147,10 +1147,10 @@ class Collection(UserDict):
         self.data[key] = item
 
     def keys(self):
-        return map(lambda i: self._func(i), self.list)
+        return [self._func(i) for i in self.list]
 
     def items(self):
-        return map(lambda i: (self._func(i), i), self.list)
+        return [(self._func(i), i) for i in self.list]
 
     def values(self):
         return self.list
@@ -1168,7 +1168,7 @@ class CollectionNS(UserDict):
 
     def __getitem__(self, key):
         self.targetNamespace = self.parent().targetNamespace
-        if type(key) is types.IntType:
+        if type(key) is int:
             return self.list[key]
         elif self.__isSequence(key):
             nsuri,name = key
@@ -1179,21 +1179,21 @@ class CollectionNS(UserDict):
         item.parent = weakref.ref(self)
         self.list.append(item)
         targetNamespace = getattr(item, 'targetNamespace', self.parent().targetNamespace)
-        if not self.data.has_key(targetNamespace):
+        if targetNamespace not in self.data:
             self.data[targetNamespace] = {}
         self.data[targetNamespace][key] = item
 
     def __isSequence(self, key):
-        return (type(key) in (types.TupleType,types.ListType) and len(key) == 2)
+        return (type(key) in (tuple,list) and len(key) == 2)
 
     def keys(self):
         keys = []
-        for tns in self.data.keys():
-            keys.append(map(lambda i: (tns,self._func(i)), self.data[tns].values()))
+        for tns in list(self.data.keys()):
+            keys.append([(tns,self._func(i)) for i in list(self.data[tns].values())])
         return keys
 
     def items(self):
-        return map(lambda i: (self._func(i), i), self.list)
+        return [(self._func(i), i) for i in self.list]
 
     def values(self):
         return self.list
@@ -1247,7 +1247,7 @@ if 1:
             else:
                 node = self.buildDocument(None, localname)
 
-        for aname,value in attrs.items():
+        for aname,value in list(attrs.items()):
             a_uri, a_localname = aname
             if a_uri == xmlns_uri:
                 if a_localname == 'xmlns':
@@ -1303,7 +1303,7 @@ if 1:
         if node.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
             clone = newOwnerDocument.createElementNS(node.namespaceURI,
                                                      node.nodeName)
-            for attr in node.attributes.values():
+            for attr in list(node.attributes.values()):
                 clone.setAttributeNS(attr.namespaceURI, attr.nodeName, attr.value)
 
                 prefix, tag = xml.dom.minidom._nssplit(attr.nodeName)

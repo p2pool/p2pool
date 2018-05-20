@@ -22,7 +22,7 @@ class SkipList(object):
             skip_length, skip = self.skips[pos]
             
             # fill previous updates
-            for i in xrange(skip_length):
+            for i in range(skip_length):
                 if i in updates:
                     that_hash, delta = updates.pop(i)
                     x, y = self.skips[that_hash]
@@ -30,7 +30,7 @@ class SkipList(object):
                     y.append((pos, delta))
             
             # put desired skip nodes in updates
-            for i in xrange(len(skip), skip_length):
+            for i in range(len(skip), skip_length):
                 updates[i] = pos, None
             
             #if skip_length + 1 in updates:

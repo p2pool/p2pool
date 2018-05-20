@@ -10,12 +10,12 @@ class EncodeReplacerPipe(object):
         self.inner_file = inner_file
         self.softspace = 0
     def write(self, data):
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             try:
                 data = data.encode(self.inner_file.encoding, 'replace')
             except:
                 data = data.encode('ascii', 'replace')
-        self.inner_file.write(data)
+        self.inner_file.write(str(data))
     def flush(self):
         self.inner_file.flush()
 

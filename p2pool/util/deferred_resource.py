@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 from twisted.internet import defer
 from twisted.web import resource, server

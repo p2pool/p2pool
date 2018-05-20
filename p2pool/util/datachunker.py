@@ -32,7 +32,7 @@ class StringBuffer(object):
         return ''.join(data)
 
 def _DataChunker(receiver):
-    wants = receiver.next()
+    wants = next(receiver)
     buf = StringBuffer()
     
     while True:
@@ -46,5 +46,5 @@ def DataChunker(receiver):
     (receiver) in response to the receiver yielding the size of data to wait on
     '''
     x = _DataChunker(receiver)
-    x.next()
+    next(x)
     return x.send

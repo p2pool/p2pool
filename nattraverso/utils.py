@@ -17,7 +17,7 @@ def is_rfc1918_ip(ip):
     @type ip: a string "x.x.x.x"
     @return: True if it's a LAN address, False otherwise
     """
-    if isinstance(ip, basestring):
+    if isinstance(ip, str):
         ip = _ip_to_number(ip)
     
     for net, mask in _nets:
@@ -46,11 +46,11 @@ def _ip_to_number(ipstr):
     """
     net = [ int(digit) for digit in ipstr.split('.') ] + [ 0, 0, 0 ]
     net = net[:4]
-    return  ((((((0L+net[0])<<8) + net[1])<<8) + net[2])<<8) +net[3]
+    return  ((((((0+net[0])<<8) + net[1])<<8) + net[2])<<8) +net[3]
 
 # List of rfc1918 net/mask
 _rfc1918_networks = [('127', 8), ('192.168', 16), ('10', 8), ('172.16', 12)]
 # Machine readable form of the above
-_nets = [(_ip_to_number(net), (2L**32 -1)^(2L**(32-mask)-1))
+_nets = [(_ip_to_number(net), (2**32 -1)^(2**(32-mask)-1))
     for net, mask in _rfc1918_networks]
 

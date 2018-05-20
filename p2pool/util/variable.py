@@ -19,7 +19,7 @@ class Event(object):
         watch_id = self.watch(lambda *args: func(obj_ref(), *args))
         obj_ref = weakref.ref(obj, lambda _: self.unwatch(watch_id))
     def watch(self, func):
-        id = self.id_generator.next()
+        id = next(self.id_generator)
         self.observers[id] = func
         return id
     def unwatch(self, id):
@@ -37,7 +37,7 @@ class Event(object):
         
         once, self._once = self._once, None
         
-        for id, func in sorted(self.observers.iteritems()):
+        for id, func in sorted(self.observers.items()):
             try:
                 func(*event)
             except:

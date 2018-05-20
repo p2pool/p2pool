@@ -4,19 +4,19 @@ Delete when 1.0.0 is released!
 """
 
 ident = '$Id: SOAP.py 541 2004-01-31 04:20:06Z warnes $'
-from version import __version__
+from .version import __version__
 
-from Client      import *
-from Config      import *
-from Errors      import *
-from NS          import *
-from Parser      import *
-from SOAPBuilder import *
-from Server      import *
-from Types       import *
-from Utilities     import *
+from .Client      import *
+from .Config      import *
+from .Errors      import *
+from .NS          import *
+from .Parser      import *
+from .SOAPBuilder import *
+from .Server      import *
+from .Types       import *
+from .Utilities     import *
 import wstools
-import WSDL
+from . import WSDL
 
 from warnings import warn
 

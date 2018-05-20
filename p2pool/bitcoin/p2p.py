@@ -75,7 +75,7 @@ class Protocol(p2protocol.Protocol):
             elif inv['type'] == 'block':
                 self.factory.new_block.happened(inv['hash'])
             else:
-                print 'Unknown inv type', inv
+                print('Unknown inv type', inv)
     
     message_getdata = pack.ComposedType([
         ('requests', pack.ListType(pack.ComposedType([
@@ -155,7 +155,7 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_reject(self, message, ccode, reason, data):
         if p2pool.DEBUG:
-            print >>sys.stderr, 'Received reject message (%s): %s' % (message, reason)
+            print('Received reject message (%s): %s' % (message, reason), file=sys.stderr)
     
     def connectionLost(self, reason):
         if hasattr(self.factory, 'gotConnection'):
@@ -163,7 +163,7 @@ class Protocol(p2protocol.Protocol):
         if hasattr(self, 'pinger'):
             self.pinger.stop()
         if p2pool.DEBUG:
-            print >>sys.stderr, 'Bitcoin connection lost. Reason:', reason.getErrorMessage()
+            print('Bitcoin connection lost. Reason:', reason.getErrorMessage(), file=sys.stderr)
 
 class ClientFactory(protocol.ReconnectingClientFactory):
     protocol = Protocol

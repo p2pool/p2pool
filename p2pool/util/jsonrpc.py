@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import json
 import weakref
@@ -58,7 +58,7 @@ def _handle(data, provider, preargs=(), response_handler=None):
                 try:
                     req = json.loads(data)
                 except Exception:
-                    raise Error_for_code(-32700)(u'Parse error')
+                    raise Error_for_code(-32700)('Parse error')
                 
                 if 'result' in req or 'error' in req:
                     response_handler(req['id'], req['result'] if 'error' not in req or req['error'] is None else
@@ -67,20 +67,20 @@ def _handle(data, provider, preargs=(), response_handler=None):
                 
                 id_ = req.get('id', None)
                 method = req.get('method', None)
-                if not isinstance(method, basestring):
-                    raise Error_for_code(-32600)(u'Invalid Request')
+                if not isinstance(method, str):
+                    raise Error_for_code(-32600)('Invalid Request')
                 params = req.get('params', [])
                 if not isinstance(params, list):
-                    raise Error_for_code(-32600)(u'Invalid Request')
+                    raise Error_for_code(-32600)('Invalid Request')
                 
                 for service_name in method.split('.')[:-1]:
                     provider = getattr(provider, 'svc_' + service_name, None)
                     if provider is None:
-                        raise Error_for_code(-32601)(u'Service not found')
+                        raise Error_for_code(-32601)('Service not found')
                 
                 method_meth = getattr(provider, 'rpc_' + method.split('.')[-1], None)
                 if method_meth is None:
-                    raise Error_for_code(-32601)(u'Method not found')
+                    raise Error_for_code(-32601)('Method not found')
                 
                 result = yield method_meth(*list(preargs) + list(params))
                 error = None
@@ -88,8 +88,8 @@ def _handle(data, provider, preargs=(), response_handler=None):
                 raise
             except Exception:
                 log.err(None, 'Squelched JSON error:')
-                raise Error_for_code(-32099)(u'Unknown error')
-        except Error, e:
+                raise Error_for_code(-32099)('Unknown error')
+        except Error as e:
             result = None
             error = e._to_obj()
         
@@ -119,7 +119,7 @@ def _http_do(url, headers, timeout, method, params):
             }),
             timeout=timeout,
         )
-    except error.Error, e:
+    except error.Error as e:
         try:
             resp = json.loads(e.response)
         except:

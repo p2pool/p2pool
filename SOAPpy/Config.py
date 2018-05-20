@@ -34,12 +34,12 @@
 """
 
 ident = '$Id: Config.py 1298 2006-11-07 00:54:15Z sanxiyn $'
-from version import __version__
+from .version import __version__
 
 import socket
-from types import *
+from .types import *
 
-from NS import NS
+from .NS import NS
 
 ################################################################################
 # Configuration class
@@ -58,12 +58,11 @@ class SOAPConfig:
 
         if config:
             if not isinstance(config, SOAPConfig):
-                raise AttributeError, \
-                    "initializer must be SOAPConfig instance"
+                raise AttributeError("initializer must be SOAPConfig instance")
 
             s = config.__dict__
 
-            for k, v in s.items():
+            for k, v in list(s.items()):
                 if k[0] != '_':
                     d[k] = v
         else:
@@ -143,13 +142,13 @@ class SOAPConfig:
             if d['SSLclient'] or d['SSLserver']:
                 d['SSL'] = self.SSLconfig()
 
-        for k, v in kw.items():
+        for k, v in list(kw.items()):
             if k[0] != '_':
                 setattr(self, k, v)
 
     def __setattr__(self, name, value):
         if name in self.__readonly:
-            raise AttributeError, "readonly configuration setting"
+            raise AttributeError("readonly configuration setting")
 
         d = self.__dict__
 
@@ -162,19 +161,19 @@ class SOAPConfig:
                 base, uri = name, 0
 
             if type(value) == StringType:
-                if NS.NSMAP.has_key(value):
+                if value in NS.NSMAP:
                     n = (value, NS.NSMAP[value])
-                elif NS.NSMAP_R.has_key(value):
+                elif value in NS.NSMAP_R:
                     n = (NS.NSMAP_R[value], value)
                 else:
-                    raise AttributeError, "unknown namespace"
+                    raise AttributeError("unknown namespace")
             elif type(value) in (ListType, TupleType):
                 if uri:
                     n = (value[1], value[0])
                 else:
                     n = (value[0], value[1])
             else:
-                raise AttributeError, "unknown namespace type"
+                raise AttributeError("unknown namespace type")
 
             d[base], d[base + 'URI'] = n
 
@@ -187,8 +186,8 @@ class SOAPConfig:
         elif name == 'namespaceStyle':
             value = str(value)
 
-            if not NS.STMAP.has_key(value):
-                raise AttributeError, "unknown namespace style"
+            if value not in NS.STMAP:
+                raise AttributeError("unknown namespace style")
 
             d[name] = value
             n = d['typesNamespace'] = NS.STMAP[value][0]

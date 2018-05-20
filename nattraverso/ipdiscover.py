@@ -49,7 +49,7 @@ def get_local_ip():
         port.stopListening()
         
         if is_bogus_ip(localip):
-            raise RuntimeError, "Invalid IP address returned"
+            raise RuntimeError("Invalid IP address returned")
         else:
             defer.returnValue((is_rfc1918_ip(localip), localip))
     
@@ -128,7 +128,7 @@ def _discover_multicast():
         yield mcast.joinGroup('239.255.255.250', socket.INADDR_ANY)
         
         logging.debug("Sending multicast ping")
-        for i in xrange(3):
+        for i in range(3):
             p.transport.write(nonce, ('239.255.255.250', port))
         
         address, = yield p.address_received.get_deferred(5)

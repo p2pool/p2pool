@@ -56,12 +56,12 @@ except:
         BASE = "http://www.w3.org/2000/xmlns/"
         XML = "http://www.w3.org/XML/1998/namespace"
 try:
-    import cStringIO
+    import io
     StringIO = cStringIO
 except ImportError:
-    import StringIO
+    import io
 
-_attrs = lambda E: (E.attributes and E.attributes.values()) or []
+_attrs = lambda E: (E.attributes and list(E.attributes.values())) or []
 _children = lambda E: E.childNodes or []
 _IN_XML_NS = lambda n: n.name.startswith("xmlns")
 _inclusive = lambda n: n.unsuppressedPrefixes == None
@@ -69,7 +69,7 @@ _inclusive = lambda n: n.unsuppressedPrefixes == None
 
 # Does a document/PI has lesser/greater document order than the
 # first element?
-_LesserElement, _Element, _GreaterElement = range(3)
+_LesserElement, _Element, _GreaterElement = list(range(3))
 
 def _sorter(n1,n2):
     '''_sorter(n1,n2) -> int
@@ -174,7 +174,7 @@ class _implementation:
         elif node.nodeType == Node.DOCUMENT_TYPE_NODE:
             pass
         else:
-            raise TypeError, str(node)
+            raise TypeError(str(node))
 
 
     def _inherit_context(self, node):
@@ -184,7 +184,7 @@ class _implementation:
         canonicalization.'''
 
         # Collect the initial list of xml:foo attributes.
-        xmlattrs = filter(_IN_XML_NS, _attrs(node))
+        xmlattrs = list(filter(_IN_XML_NS, _attrs(node)))
 
         # Walk up and get all xml:XXX attributes we inherit.
         inherited, parent = [], node.parentNode
@@ -217,7 +217,7 @@ class _implementation:
             elif child.nodeType == Node.DOCUMENT_TYPE_NODE:
                 pass
             else:
-                raise TypeError, str(child)
+                raise TypeError(str(child))
     handlers[Node.DOCUMENT_NODE] = _do_document
 
 
@@ -344,11 +344,10 @@ class _implementation:
                 else:
                     prefix = 'xmlns'
                     
-                if not ns_rendered.has_key(prefix) and not ns_local.has_key(prefix):
-                    if not ns_unused_inherited.has_key(prefix):
-                        raise RuntimeError,\
-                            'For exclusive c14n, unable to map prefix "%s" in %s' %(
-                            prefix, node)
+                if prefix not in ns_rendered and prefix not in ns_local:
+                    if prefix not in ns_unused_inherited:
+                        raise RuntimeError('For exclusive c14n, unable to map prefix "%s" in %s' %(
+                            prefix, node))
                     
                     ns_local[prefix] = ns_unused_inherited[prefix]
                     del ns_unused_inherited[prefix]
@@ -358,7 +357,7 @@ class _implementation:
 
             # Create list of NS attributes to render.
             ns_to_render = []
-            for n,v in ns_local.items():
+            for n,v in list(ns_local.items()):
 
                 # If default namespace is XMLNS.BASE or empty,
                 # and if an ancestor was the same
@@ -376,7 +375,7 @@ class _implementation:
 
                 # If not previously rendered
                 # and it's inclusive  or utilized
-                if (n,v) not in ns_rendered.items():
+                if (n,v) not in list(ns_rendered.items()):
                     if inclusive or _utilized(n, node, other_attrs, self.unsuppressedPrefixes):
                         ns_to_render.append((n, v))
                     elif not inclusive:
@@ -392,9 +391,9 @@ class _implementation:
             # Else, add all local and ancestor xml attributes
             # Sort and render the attributes.
             if not inclusive or _in_subset(self.subset,node.parentNode):  #0426
-                other_attrs.extend(xml_attrs_local.values())
+                other_attrs.extend(list(xml_attrs_local.values()))
             else:
-                other_attrs.extend(xml_attrs.values())
+                other_attrs.extend(list(xml_attrs.values()))
             other_attrs.sort(_sorter)
             for a in other_attrs:
                 self._do_attr(a.nodeName, a.value)
@@ -426,8 +425,8 @@ def Canonicalize(node, output=None, **kw):
                 prefixes that should be inherited.
     '''
     if output:
-        apply(_implementation, (node, output.write), kw)
+        _implementation(*(node, output.write), **kw)
     else:
-        s = StringIO.StringIO()
-        apply(_implementation, (node, s.write), kw)
+        s = io.StringIO()
+        _implementation(*(node, s.write), **kw)
         return s.getvalue()

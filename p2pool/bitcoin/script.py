@@ -13,17 +13,17 @@ def protoPUSHDATA(size_len):
     return _
 
 opcodes = {}
-for i in xrange(256):
+for i in range(256):
     opcodes[i] = 'UNK_' + str(i), reads_nothing
 
 opcodes[0] = 'PUSH', lambda f: ('', f)
-for i in xrange(1, 76):
+for i in range(1, 76):
     opcodes[i] = 'PUSH', protoPUSH(i)
 opcodes[76] = 'PUSH', protoPUSHDATA(1)
 opcodes[77] = 'PUSH', protoPUSHDATA(2)
 opcodes[78] = 'PUSH', protoPUSHDATA(4)
 opcodes[79] = 'PUSH', lambda f: ('\x81', f)
-for i in xrange(81, 97):
+for i in range(81, 97):
     opcodes[i] = 'PUSH', lambda f, _i=i: (chr(_i - 80), f)
 
 opcodes[172] = 'CHECKSIG', reads_nothing
@@ -52,7 +52,7 @@ def get_sigop_count(script):
 def create_push_script(datums): # datums can be ints or strs
     res = []
     for datum in datums:
-        if isinstance(datum, (int, long)):
+        if isinstance(datum, int):
             if datum == -1 or 1 <= datum <= 16:
                 res.append(chr(datum + 80))
                 continue

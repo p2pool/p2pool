@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import unittest
 import hashlib
@@ -15,13 +15,13 @@ class Test(unittest.TestCase):
             #print
             assert sha256.sha256(test).hexdigest() == hashlib.sha256(test).hexdigest()
         def random_str(l):
-            return ''.join(chr(random.randrange(256)) for i in xrange(l))
-        for length in xrange(150):
+            return ''.join(chr(random.randrange(256)) for i in range(l))
+        for length in range(150):
             test = random_str(length)
             a = sha256.sha256(test).hexdigest()
             b = hashlib.sha256(test).hexdigest()
             assert a == b
-        for i in xrange(100):
+        for i in range(100):
             test = random_str(int(random.expovariate(1/100)))
             test2 = random_str(int(random.expovariate(1/100)))
             

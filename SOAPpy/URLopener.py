@@ -2,10 +2,10 @@
 authentication"""
 
 ident = '$Id: URLopener.py 541 2004-01-31 04:20:06Z warnes $'
-from version import __version__
+from .version import __version__
 
-from Config import Config
-from urllib import FancyURLopener
+from .Config import Config
+from urllib.request import FancyURLopener
 
 class URLopener(FancyURLopener):
 

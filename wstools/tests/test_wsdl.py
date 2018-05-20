@@ -6,7 +6,7 @@
 ###########################################################################
 
 import sys, unittest
-import ConfigParser
+import configparser
 import os
 from wstools.Utility import DOM
 from wstools.WSDLTools import WSDLReader
@@ -21,8 +21,8 @@ class WSDLToolsTestCase(unittest.TestCase):
         unittest.TestCase.__init__(self, methodName)
 
     def setUp(self):
-        self.path = nameGenerator.next()
-        print self.path
+        self.path = next(nameGenerator)
+        print(self.path)
         sys.stdout.flush()
 
     def __str__(self):
@@ -41,7 +41,7 @@ class WSDLToolsTestCase(unittest.TestCase):
         for node in DOM.getElements(definition, tag_name, nspname):
             name = DOM.getAttr(node, key)
             comp = component[name]
-            self.failUnlessEqual(eval('comp.%s' %key), name)
+            self.assertEqual(eval('comp.%s' %key), name)
 
     def checkXSDCollection(self, tag_name, component, node, key='name'):
         for cnode in DOM.getElements(node, tag_name):
@@ -56,7 +56,7 @@ class WSDLToolsTestCase(unittest.TestCase):
                 self.wsdl = WSDLReader().loadFromFile(self.path)
 
         except TimeoutError:
-            print "connection timed out"
+            print("connection timed out")
             sys.stdout.flush()
             return
         except:
@@ -94,9 +94,9 @@ class WSDLToolsTestCase(unittest.TestCase):
             raise
 
         try:
-            for key in self.wsdl.types.keys(): 
+            for key in list(self.wsdl.types.keys()): 
                 schema = self.wsdl.types[key]
-                self.failUnlessEqual(key, schema.getTargetNamespace())
+                self.assertEqual(key, schema.getTargetNamespace())
 
             definition = self.wsdl.document.documentElement
             version = DOM.WSDLUriToVersion(definition.namespaceURI)
@@ -114,8 +114,8 @@ class WSDLToolsTestCase(unittest.TestCase):
             raise
 
         if self.wsdl.extensions:
-            print 'No check for WSDLTools(%s) Extensions:' %(self.wsdl.name)
-            for ext in self.wsdl.extensions: print '\t', ext
+            print('No check for WSDLTools(%s) Extensions:' %(self.wsdl.name))
+            for ext in self.wsdl.extensions: print('\t', ext)
 
     def schemaAttributesDeclarations(self, schema, node):
         self.checkXSDCollection('attribute', schema.attr_decl, node)
@@ -132,13 +132,13 @@ class WSDLToolsTestCase(unittest.TestCase):
 
 
 def setUpOptions(section):
-    cp = ConfigParser.ConfigParser()
+    cp = configparser.ConfigParser()
     cp.read(cwd+'/config.txt')
     if not cp.sections():
-        print 'fatal error:  configuration file config.txt not present'
+        print('fatal error:  configuration file config.txt not present')
         sys.exit(0)
     if not cp.has_section(section):
-        print '%s section not present in configuration file, exiting' % section
+        print('%s section not present in configuration file, exiting' % section)
         sys.exit(0)
     return cp, len(cp.options(section))
 

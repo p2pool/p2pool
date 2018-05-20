@@ -48,7 +48,7 @@ class Test(unittest.TestCase):
                 yield deferral.sleep(.5)
                 
                 new_mining_txs = dict(self.mining_txs_var.value)
-                for i in xrange(3):
+                for i in range(3):
                     huge_tx = dict(
                         version=0,
                         tx_ins=[],

@@ -22,20 +22,28 @@ class DistanceSkipList(TrackerSkipList):
     def get_delta(self, element):
         return element, 1, self.previous(element)
     
-    def combine_deltas(self, (from_hash1, dist1, to_hash1), (from_hash2, dist2, to_hash2)):
+    def combine_deltas(self, xxx_todo_changeme, xxx_todo_changeme1):
+        (from_hash1, dist1, to_hash1) = xxx_todo_changeme
+        (from_hash2, dist2, to_hash2) = xxx_todo_changeme1
         if to_hash1 != from_hash2:
             raise AssertionError()
         return from_hash1, dist1 + dist2, to_hash2
     
-    def initial_solution(self, start, (n,)):
+    def initial_solution(self, start, xxx_todo_changeme2):
+        (n,) = xxx_todo_changeme2
         return 0, start
     
-    def apply_delta(self, (dist1, to_hash1), (from_hash2, dist2, to_hash2), (n,)):
+    def apply_delta(self, xxx_todo_changeme3, xxx_todo_changeme4, xxx_todo_changeme5):
+        (dist1, to_hash1) = xxx_todo_changeme3
+        (from_hash2, dist2, to_hash2) = xxx_todo_changeme4
+        (n,) = xxx_todo_changeme5
         if to_hash1 != from_hash2:
             raise AssertionError()
         return dist1 + dist2, to_hash2
     
-    def judge(self, (dist, hash), (n,)):
+    def judge(self, xxx_todo_changeme6, xxx_todo_changeme7):
+        (dist, hash) = xxx_todo_changeme6
+        (n,) = xxx_todo_changeme7
         if dist > n:
             return 1
         elif dist == n:
@@ -43,13 +51,15 @@ class DistanceSkipList(TrackerSkipList):
         else:
             return -1
     
-    def finalize(self, (dist, hash), (n,)):
+    def finalize(self, xxx_todo_changeme8, xxx_todo_changeme9):
+        (dist, hash) = xxx_todo_changeme8
+        (n,) = xxx_todo_changeme9
         assert dist == n
         return hash
 
 def get_attributedelta_type(attrs): # attrs: {name: func}
     class ProtoAttributeDelta(object):
-        __slots__ = ['head', 'tail'] + attrs.keys()
+        __slots__ = ['head', 'tail'] + list(attrs.keys())
         
         @classmethod
         def get_none(cls, element_id):
@@ -57,7 +67,7 @@ def get_attributedelta_type(attrs): # attrs: {name: func}
         
         @classmethod
         def from_element(cls, item):
-            return cls(item.hash, item.previous_hash, **dict((k, v(item)) for k, v in attrs.iteritems()))
+            return cls(item.hash, item.previous_hash, **dict((k, v(item)) for k, v in attrs.items()))
         
         @staticmethod
         def get_head(item):
@@ -69,7 +79,7 @@ def get_attributedelta_type(attrs): # attrs: {name: func}
         
         def __init__(self, head, tail, **kwargs):
             self.head, self.tail = head, tail
-            for k, v in kwargs.iteritems():
+            for k, v in kwargs.items():
                 setattr(self, k, v)
         
         def __add__(self, other):
@@ -185,7 +195,7 @@ class TrackerView(object):
     def _set_delta(self, item_hash, delta):
         other_item_hash = delta.tail
         if other_item_hash not in self._reverse_delta_refs:
-            ref = self._ref_generator.next()
+            ref = next(self._ref_generator)
             assert ref not in self._delta_refs
             self._delta_refs[ref] = self._delta_type.get_none(other_item_hash)
             self._reverse_delta_refs[other_item_hash] = ref
@@ -206,7 +216,7 @@ class TrackerView(object):
         self._reverse_deltas.setdefault(ref, set()).add(item_hash)
     
     def get_delta_to_last(self, item_hash):
-        assert isinstance(item_hash, (int, long, type(None)))
+        assert isinstance(item_hash, (int, type(None)))
         delta = self._delta_type.get_none(item_hash)
         updates = []
         while delta.tail in self._tracker.items:
@@ -248,7 +258,7 @@ class Tracker(object):
         return attr
     
     def add(self, item):
-        assert not isinstance(item, (int, long, type(None)))
+        assert not isinstance(item, (int, type(None)))
         delta = self._delta_type.from_element(item)
         
         if delta.head in self.items:
@@ -277,7 +287,7 @@ class Tracker(object):
         self.added.happened(item)
     
     def remove(self, item_hash):
-        assert isinstance(item_hash, (int, long, type(None)))
+        assert isinstance(item_hash, (int, type(None)))
         if item_hash not in self.items:
             raise KeyError()
         
@@ -331,7 +341,7 @@ class Tracker(object):
     
     def get_chain(self, start_hash, length):
         assert length <= self.get_height(start_hash)
-        for i in xrange(length):
+        for i in range(length):
             item = self.items[start_hash]
             yield item
             start_hash = self._delta_type.get_tail(item)

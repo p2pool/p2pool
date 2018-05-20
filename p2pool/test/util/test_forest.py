@@ -35,7 +35,7 @@ class DumbTracker(object):
         return dict((x, set(y for y in self.items if self.get_last(y) == x and y not in self.reverse)) for x in self.reverse if x not in self.items)
     
     def get_nth_parent_hash(self, item_hash, n):
-        for i in xrange(n):
+        for i in range(n):
             item_hash = self.items[item_hash].previous_hash
         return item_hash
     
@@ -57,7 +57,7 @@ class DumbTracker(object):
     def get_chain(self, start_hash, length):
         # same implementation :/
         assert length <= self.get_height(start_hash)
-        for i in xrange(length):
+        for i in range(length):
             yield self.items[start_hash]
             start_hash = self.items[start_hash].previous_hash
     
@@ -73,12 +73,12 @@ class DumbTracker(object):
 
 class FakeShare(object):
     def __init__(self, **kwargs):
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             setattr(self, k, v)
         self._attrs = kwargs
 
 def test_tracker(self):
-    t = DumbTracker(self.items.itervalues())
+    t = DumbTracker(iter(self.items.values()))
     
     assert self.items == t.items, (self.items, t.items)
     assert self.reverse == t.reverse, (self.reverse, t.reverse)
@@ -92,7 +92,7 @@ def test_tracker(self):
         a, b = self.get_height_and_last(start), t.get_height_and_last(start)
         assert a == b, (a, b)
         
-        other = random.choice(self.items.keys())
+        other = random.choice(list(self.items.keys()))
         assert self.is_child_of(start, other) == t.is_child_of(start, other)
         assert self.is_child_of(other, start) == t.is_child_of(other, start)
         
@@ -100,13 +100,13 @@ def test_tracker(self):
         assert list(self.get_chain(start, length)) == list(t.get_chain(start, length))
 
 def generate_tracker_simple(n):
-    t = forest.Tracker(math.shuffled(FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None) for i in xrange(n)))
+    t = forest.Tracker(math.shuffled(FakeShare(hash=i, previous_hash=i - 1 if i > 0 else None) for i in range(n)))
     test_tracker(t)
     return t
 
 def generate_tracker_random(n):
     items = []
-    for i in xrange(n):
+    for i in range(n):
         x = random.choice(items + [FakeShare(hash=None), FakeShare(hash=random.randrange(1000000, 2000000))]).hash
         items.append(FakeShare(hash=i, previous_hash=x))
     t = forest.Tracker(math.shuffled(items))
@@ -126,14 +126,14 @@ class Test(unittest.TestCase):
     def test_get_nth_parent_hash(self):
         t = generate_tracker_simple(200)
         
-        for i in xrange(1000):
+        for i in range(1000):
             a = random.randrange(200)
             b = random.randrange(a + 1)
             res = t.get_nth_parent_hash(a, b)
             assert res == a - b, (a, b, res)
     
     def test_tracker2(self):
-        for ii in xrange(20):
+        for ii in range(20):
             t = generate_tracker_random(random.randrange(100))
             #print "--start--"
             while t.items:
@@ -147,9 +147,9 @@ class Test(unittest.TestCase):
                 test_tracker(t)
     
     def test_tracker3(self):
-        for ii in xrange(10):
+        for ii in range(10):
             items = []
-            for i in xrange(random.randrange(100)):
+            for i in range(random.randrange(100)):
                 x = random.choice(items + [FakeShare(hash=None), FakeShare(hash=random.randrange(1000000, 2000000))]).hash
                 items.append(FakeShare(hash=i, previous_hash=x))
             
