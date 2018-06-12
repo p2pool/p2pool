@@ -227,21 +227,20 @@ class IntType(Type):
 class IPV6AddressType(Type):
     def read(self, file):
         data, file = read(file, 16)
-        if data[:12] == str(bytes.fromhex('00000000000000000000ffff')):
+        if data[:12] == bytes.fromhex('00000000000000000000ffff'):
             return '.'.join(str(ord(x)) for x in data[12:]), file
         return ':'.join(data[i*2:(i+1)*2].encode('hex') for i in range(8)), file
 
     def write(self, file, item):
         if ':' in item:
             tmp = ''.join(item.replace(':', ''))
-            data = str(bytes.fromhex(tmp))
+            data = bytes.fromhex(tmp)
         else:
             bits = list(map(int, item.split('.')))
             if len(bits) != 4:
                 raise ValueError('invalid address: %r' % (bits,))
-            data = str(bytes.fromhex('00000000000000000000ffff')) + ''.join(chr(x) for x in bits)
-        #assert len(data) == 16, len(data)
-        assert len(data) == 55, len(data)
+            data = bytes.fromhex('00000000000000000000ffff') + ''.join(chr(x) for x in bits).encode(encoding='utf-8')
+        assert len(data) == 16, len(data)
         return file, data
 
 _record_types = {}

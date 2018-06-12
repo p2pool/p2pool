@@ -91,11 +91,11 @@ class Protocol(protocol.Protocol):
         payload = type_.pack(payload2)
         if len(payload) > self._max_payload_length:
             raise TooLong('payload too long')
-        data = str(self._message_prefix + str(struct.pack('<12sI', command.encode(encoding='utf-8'), len(payload))) + str(hashlib.sha256(hashlib.sha256(payload.encode(encoding='utf-8')).digest()).digest()[:4]) + str(payload))
+        data = self._message_prefix + struct.pack('<12sI', command.encode(encoding='utf-8'), len(payload)) + hashlib.sha256(hashlib.sha256(payload.encode(encoding='utf-8')).digest()).digest()[:4] + payload.encode(encoding='utf-8')
         #data = "3c31327349"
         self.traffic_happened.happened('p2p/out', len(data))
         #print("WATCH THIS", type(data))
-        self.transport.write(data.encode('utf-8'))
+        self.transport.write(data)
 
     def __getattr__(self, attr):
         prefix = 'send_'
