@@ -7,10 +7,11 @@ from .. import data, helper
 from p2pool.util import pack
 
 
-P2P_PREFIX = '\xf9\xbe\xb4\xd9'
+#P2P_PREFIX = 'f9beb4d9'.decode('hex')
+P2P_PREFIX = str(bytes.fromhex('f9beb4d9'))
 P2P_PORT = 8333
 ADDRESS_VERSION = 0
-RPC_PORT = 8332
+RPC_PORT = 8334
 RPC_CHECK = defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
             (yield helper.check_genesis_block(bitcoind, '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')) and
             (yield bitcoind.rpc_getblockchaininfo())['chain'] != 'test'

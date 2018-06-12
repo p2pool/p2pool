@@ -6,8 +6,7 @@ from twisted.internet import defer
 from .. import data, helper
 from p2pool.util import pack
 
-
-P2P_PREFIX = '\x0b\x11\t\x07'
+P2P_PREFIX = str(bytes.fromhex('0b110907'))
 P2P_PORT = 18333
 ADDRESS_VERSION = 111
 RPC_PORT = 18332
