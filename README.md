@@ -22,6 +22,7 @@ Copy and paste the following commands into a bash shell in order to install p2po
 
 
 >wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo pypy
+
 >sudo rm setuptools-*.zip
 
 
