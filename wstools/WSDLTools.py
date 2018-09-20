@@ -10,10 +10,10 @@
 ident = "$Id$"
 
 import weakref
-from cStringIO import StringIO
-from Namespaces import OASIS, XMLNS, WSA, WSA_LIST, WSAW_LIST, WSRF_V1_2, WSRF
-from Utility import Collection, CollectionNS, DOM, ElementProxy, basejoin
-from XMLSchema import XMLSchema, SchemaReader, WSDLToolsAdapter
+from io import StringIO
+from .Namespaces import OASIS, XMLNS, WSA, WSA_LIST, WSAW_LIST, WSRF_V1_2, WSRF
+from .Utility import Collection, CollectionNS, DOM, ElementProxy, basejoin
+from .XMLSchema import XMLSchema, SchemaReader, WSDLToolsAdapter
 
 
 class WSDLReader:
@@ -82,7 +82,7 @@ class WSDL:
     version = '1.1'
 
     def addService(self, name, documentation='', targetNamespace=None):
-        if self.services.has_key(name):
+        if name in self.services:
             raise WSDLError(
                 'Duplicate service element: %s' % name
                 )
@@ -93,7 +93,7 @@ class WSDL:
         return item
 
     def addMessage(self, name, documentation='', targetNamespace=None):
-        if self.messages.has_key(name):
+        if name in self.messages:
             raise WSDLError(
                 'Duplicate message element: %s.' % name
                 )
@@ -104,7 +104,7 @@ class WSDL:
         return item
 
     def addPortType(self, name, documentation='', targetNamespace=None):
-        if self.portTypes.has_key(name):
+        if name in self.portTypes:
             raise WSDLError(
                 'Duplicate portType element: name'
                 )
@@ -115,7 +115,7 @@ class WSDL:
         return item
 
     def addBinding(self, name, type, documentation='', targetNamespace=None):
-        if self.bindings.has_key(name):
+        if name in self.bindings:
             raise WSDLError(
                 'Duplicate binding element: %s' % name
                 )
@@ -352,7 +352,7 @@ class WSDL:
                 parent.appendChild(child)
                 child.setAttribute('targetNamespace', namespace)
                 attrsNS = imported._attrsNS
-                for attrkey in attrsNS.keys():
+                for attrkey in list(attrsNS.keys()):
                     if attrkey[0] == DOM.NS_XMLNS:
                         attr = attrsNS[attrkey].cloneNode(1)
                         child.setAttributeNode(attr)
@@ -434,7 +434,7 @@ class Message(Element):
         self.parts = Collection(self)
 
     def addPart(self, name, type=None, element=None):
-        if self.parts.has_key(name):
+        if name in self.parts:
             raise WSDLError(
                 'Duplicate message part element: %s' % name
                 )
@@ -683,7 +683,7 @@ class Operation(Element):
         return wsdl.messages[self.faults[name].message]
 
     def addFault(self, message, name, documentation='', action=None):
-        if self.faults.has_key(name):
+        if name in self.faults:
             raise WSDLError(
                 'Duplicate fault element: %s' % name
                 )
@@ -747,7 +747,7 @@ class MessageRole(Element):
 
         ep = ElementProxy(None, node)
         epc = ep.createAppendElement(DOM.GetWSDLUri(wsdl.version), self.type)
-        if not isinstance(self.message, basestring) and len(self.message) == 2:
+        if not isinstance(self.message, str) and len(self.message) == 2:
             ns,name = self.message
             prefix = epc.getPrefix(ns)
             epc.setAttributeNS(None, 'message', '%s:%s' %(prefix,name))
@@ -1204,7 +1204,7 @@ class SoapBodyBinding:
                 )
         self.encodingStyle = encodingStyle
         self.namespace = namespace
-        if type(parts) in (type(''), type(u'')):
+        if type(parts) in (type(''), type('')):
             parts = parts.split()
         self.parts = parts
         self.use = use
@@ -1557,12 +1557,12 @@ def callInfoFromWSDL(port, name):
 
     addrbinding = port.getAddressBinding()
     if not isinstance(addrbinding, SoapAddressBinding):
-        raise ValueError, 'Unsupported binding type.'        
+        raise ValueError('Unsupported binding type.')        
     callinfo.location = addrbinding.location
 
     soapbinding = binding.findBinding(SoapBinding)
     if soapbinding is None:
-        raise ValueError, 'Missing soap:binding element.'
+        raise ValueError('Missing soap:binding element.')
     callinfo.transport = soapbinding.transport
     callinfo.style = soapbinding.style or 'document'
 
@@ -1579,7 +1579,7 @@ def callInfoFromWSDL(port, name):
 
         mime = msgrole.findBinding(MimeMultipartRelatedBinding)
         if mime is not None:
-            raise ValueError, 'Mime bindings are not supported.'
+            raise ValueError('Mime bindings are not supported.')
         else:
             for item in msgrole.findBindings(SoapHeaderBinding):
                 part = messages[item.message].parts[item.part]
@@ -1593,7 +1593,7 @@ def callInfoFromWSDL(port, name):
 
             body = msgrole.findBinding(SoapBodyBinding)
             if body is None:
-                raise ValueError, 'Missing soap:body binding.'
+                raise ValueError('Missing soap:body binding.')
             callinfo.encodingStyle = body.encodingStyle
             callinfo.namespace = body.namespace
             callinfo.use = body.use
@@ -1603,7 +1603,7 @@ def callInfoFromWSDL(port, name):
                 for name in body.parts:
                     parts.append(message.parts[name])
             else:
-                parts = message.parts.values()
+                parts = list(message.parts.values())
 
             for part in parts:
                 callinfo.addInParameter(
@@ -1622,16 +1622,16 @@ def callInfoFromWSDL(port, name):
                     operation.output.message)
             else:
                 message = wsdl.addMessage(operation.output.message)
-                print "Warning:", \
+                print("Warning:", \
                       "Recieved message not defined in the WSDL schema.", \
-                      "Adding it."
-                print "Message:", operation.output.message
+                      "Adding it.")
+                print("Message:", operation.output.message)
          
         msgrole = opbinding.output
 
         mime = msgrole.findBinding(MimeMultipartRelatedBinding)
         if mime is not None:
-            raise ValueError, 'Mime bindings are not supported.'
+            raise ValueError('Mime bindings are not supported.')
         else:
             for item in msgrole.findBindings(SoapHeaderBinding):
                 part = messages[item.message].parts[item.part]
@@ -1645,7 +1645,7 @@ def callInfoFromWSDL(port, name):
 
             body = msgrole.findBinding(SoapBodyBinding)
             if body is None:
-                raise ValueError, 'Missing soap:body binding.'
+                raise ValueError('Missing soap:body binding.')
             callinfo.encodingStyle = body.encodingStyle
             callinfo.namespace = body.namespace
             callinfo.use = body.use
@@ -1655,7 +1655,7 @@ def callInfoFromWSDL(port, name):
                 for name in body.parts:
                     parts.append(message.parts[name])
             else:
-                parts = message.parts.values()
+                parts = list(message.parts.values())
 
             if parts:
                 for part in parts:

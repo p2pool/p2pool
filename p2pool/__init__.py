@@ -40,7 +40,7 @@ def _get_version():
             return match.groups()[0]
         
         return 'unknown %s' % (dir_name.encode('hex'),)
-    except Exception, e:
+    except Exception as e:
         traceback.print_exc()
         return 'unknown %s' % (str(e).encode('hex'),)
 

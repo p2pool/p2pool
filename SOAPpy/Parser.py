@@ -1,8 +1,8 @@
 # SOAPpy modules
-from Config    import Config
-from Types     import *
-from NS        import NS
-from Utilities import *
+from .Config    import Config
+from .Types     import *
+from .NS        import NS
+from .Utilities import *
 
 import string
 import fpconst
@@ -13,7 +13,7 @@ try: from M2Crypto import SSL
 except: pass
 
 ident = '$Id: Parser.py 1497 2010-03-08 06:06:52Z pooryorick $'
-from version import __version__
+from .version import __version__
 
 
 ################################################################################
@@ -50,7 +50,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             self.contents.append(data)
             self.subattrs.append(attrs)
 
-            if self.namecounts.has_key(name):
+            if name in self.namecounts:
                 self.namecounts[name] += 1
             else:
                 self.namecounts[name] = 1
@@ -89,7 +89,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
         def toStr( name ):
             prefix = name[0]
             tag    = name[1]
-            if self._prem_r.has_key(prefix):
+            if prefix in self._prem_r:
                tag = self._prem_r[name[0]] + ':' + name[1]
             elif prefix:
                tag = prefix + ":" + tag
@@ -105,10 +105,10 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
         if self._next == "E":
             if name[1] != 'Envelope':
-                raise Error, "expected `SOAP-ENV:Envelope', " \
-                    "got `%s'" % toStr( name )
+                raise Error("expected `SOAP-ENV:Envelope', " \
+                    "got `%s'" % toStr( name ))
             if name[0] != NS.ENV:
-                raise faultType, ("%s:VersionMismatch" % NS.ENV_T,
+                raise faultType("%s:VersionMismatch" % NS.ENV_T,
                     "Don't understand version `%s' Envelope" % name[0])
             else:
                 self._next = "HorB"
@@ -116,18 +116,17 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             if name[0] == NS.ENV and name[1] in ("Header", "Body"):
                 self._next = None
             else:
-                raise Error, \
-                    "expected `SOAP-ENV:Header' or `SOAP-ENV:Body', " \
-                    "got `%s'" % toStr( name )
+                raise Error("expected `SOAP-ENV:Header' or `SOAP-ENV:Body', " \
+                    "got `%s'" % toStr( name ))
         elif self._next == "B":
             if name == (NS.ENV, "Body"):
                 self._next = None
             else:
-                raise Error, "expected `SOAP-ENV:Body', " \
-                      "got `%s'" % toStr( name )
+                raise Error("expected `SOAP-ENV:Body', " \
+                      "got `%s'" % toStr( name ))
         elif self._next == "":
-            raise Error, "expected nothing, " \
-                  "got `%s'" % toStr( name )
+            raise Error("expected nothing, " \
+                  "got `%s'" % toStr( name ))
                   
 
         if len(self._stack) == 2:
@@ -175,27 +174,27 @@ class SOAPParser(xml.sax.handler.ContentHandler):
         name = fromXMLname(name) # convert to SOAP 1.2 XML name encoding
 
         if self._next == "E":
-            raise Error, "didn't get SOAP-ENV:Envelope"
+            raise Error("didn't get SOAP-ENV:Envelope")
         if self._next in ("HorB", "B"):
-            raise Error, "didn't get SOAP-ENV:Body"
+            raise Error("didn't get SOAP-ENV:Body")
 
         cur = self.popFrame()
         attrs = cur.attrs
 
         idval = None
 
-        if attrs.has_key((None, 'id')):
+        if (None, 'id') in attrs:
             idval = attrs[(None, 'id')]
 
-            if self._ids.has_key(idval):
-                raise Error, "duplicate id `%s'" % idval
+            if idval in self._ids:
+                raise Error("duplicate id `%s'" % idval)
 
             del attrs[(None, 'id')]
 
         root = 1
 
         if len(self._stack) == 3:
-            if attrs.has_key((NS.ENC, 'root')):
+            if (NS.ENC, 'root') in attrs:
                 root = int(attrs[(NS.ENC, 'root')])
 
                 # Do some preliminary checks. First, if root="0" is present,
@@ -204,9 +203,9 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
                 if root == 0:
                     if idval == None:
-                        raise Error, "non-root element must have an id"
+                        raise Error("non-root element must have an id")
                 elif root != 1:
-                    raise Error, "SOAP-ENC:root must be `0' or `1'"
+                    raise Error("SOAP-ENC:root must be `0' or `1'")
 
                 del attrs[(NS.ENC, 'root')]
 
@@ -214,19 +213,19 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             href = attrs.get((None, 'href'))
             if href:
                 if href[0] != '#':
-                    raise Error, "Non-local hrefs are not yet suppported."
+                    raise Error("Non-local hrefs are not yet suppported.")
                 if self._data != None and \
                    string.join(self._data, "").strip() != '':
-                    raise Error, "hrefs can't have data"
+                    raise Error("hrefs can't have data")
 
                 href = href[1:]
 
-                if self._ids.has_key(href):
+                if href in self._ids:
                     data = self._ids[href]
                 else:
                     data = RefHolder(name, self._stack[-1])
 
-                    if self._refs.has_key(href):
+                    if href in self._refs:
                         self._refs[href].append(data)
                     else:
                         self._refs[href] = [data]
@@ -239,7 +238,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
             if attrs:
                 for i in NS.XSI_L:
-                    if attrs.has_key((i, 'type')):
+                    if (i, 'type') in attrs:
                         kind = attrs[(i, 'type')]
                         del attrs[(i, 'type')]
 
@@ -259,11 +258,11 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
             if attrs:
                 for i in (NS.XSI, NS.XSI2):
-                    if attrs.has_key((i, 'null')):
+                    if (i, 'null') in attrs:
                         null = attrs[(i, 'null')]
                         del attrs[(i, 'null')]
 
-                if attrs.has_key((NS.XSI3, 'nil')):
+                if (NS.XSI3, 'nil') in attrs:
                     null = attrs[(NS.XSI3, 'nil')]
                     del attrs[(NS.XSI3, 'nil')]
 
@@ -278,7 +277,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 # check for nil=1, but watch out for string values
                 try:                
                     null = int(null)
-                except ValueError, e:
+                except ValueError as e:
                     if not e[0].startswith("invalid literal for int()"):
                         raise e
                     null = 0
@@ -286,7 +285,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 if null:
                     if len(cur) or \
                         (self._data != None and string.join(self._data, "").strip() != ''):
-                        raise Error, "nils can't have data"
+                        raise Error("nils can't have data")
 
                     data = None
 
@@ -431,7 +430,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
         if idval != None:
             self._ids[idval] = data
 
-            if self._refs.has_key(idval):
+            if idval in self._refs:
                 for i in self._refs[idval]:
                     i.parent._placeItem(i.name, data, i.pos, i.subpos, attrs)
 
@@ -446,11 +445,9 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
     def endDocument(self):
         if len(self._refs) == 1:
-            raise Error, \
-                "unresolved reference " + self._refs.keys()[0]
+            raise Error("unresolved reference " + list(self._refs.keys())[0])
         elif len(self._refs) > 1:
-            raise Error, \
-                "unresolved references " + ', '.join(self._refs.keys())
+            raise Error("unresolved references " + ', '.join(list(self._refs.keys())))
 
     def startPrefixMapping(self, prefix, uri):
         self._prem[prefix] = uri
@@ -489,7 +486,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 else:
                     raise Exception
             except:
-                raise AttributeError, "invalid Array offset"
+                raise AttributeError("invalid Array offset")
         else:
             offset = 0
 
@@ -512,7 +509,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 return typedArrayType(None, name, (None, t), attrs, offset,
                     m.group('rank'), m.group('asize'), elemsname)
         except:
-            raise AttributeError, "invalid Array type `%s'" % kind
+            raise AttributeError("invalid Array type `%s'" % kind)
 
     # Conversion
 
@@ -683,7 +680,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                             s = float(s)
                         else:
                             try: s = int(s)
-                            except ValueError: s = long(s)
+                            except ValueError: s = int(s)
 
                         if i < fn: fn = i
 
@@ -715,7 +712,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                             try:
                                 s = int(s)
                             except ValueError:
-                                s = long(s)
+                                s = int(s)
 
                     r.append(s)
 
@@ -748,7 +745,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                         try:
                             s = int(s)
                         except ValueError:
-                            s = long(s)
+                            s = int(s)
 
                     if i < fn:
                         fn = i
@@ -781,14 +778,14 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             s = []
 
             for i in range(1, len(f)):
-                if d.has_key(f[i]):
+                if f[i] in d:
                     s.append(r[i - 1])
 
             if len(s) == 1:
                 return s[0]
             return tuple(s)
-        except Exception, e:
-            raise Error, "invalid %s value `%s' - %s" % (kind, value, e)
+        except Exception as e:
+            raise Error("invalid %s value `%s' - %s" % (kind, value, e))
 
     intlimits = \
     {
@@ -796,17 +793,17 @@ class SOAPParser(xml.sax.handler.ContentHandler):
         'non-positive-integer': (0, None, 0),
         'negativeInteger':      (0, None, -1),
         'negative-integer':     (0, None, -1),
-        'long':                 (1, -9223372036854775808L,
-                                    9223372036854775807L),
-        'int':                  (0, -2147483648L, 2147483647L),
+        'long':                 (1, -9223372036854775808,
+                                    9223372036854775807),
+        'int':                  (0, -2147483648, 2147483647),
         'short':                (0, -32768, 32767),
         'byte':                 (0, -128, 127),
         'nonNegativeInteger':   (0, 0, None),
         'non-negative-integer': (0, 0, None),
         'positiveInteger':      (0, 1, None),
         'positive-integer':     (0, 1, None),
-        'unsignedLong':         (1, 0, 18446744073709551615L),
-        'unsignedInt':          (0, 0, 4294967295L),
+        'unsignedLong':         (1, 0, 18446744073709551615),
+        'unsignedInt':          (0, 0, 4294967295),
         'unsignedShort':        (0, 0, 65535),
         'unsignedByte':         (0, 0, 255),
     }
@@ -832,12 +829,10 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 if elemtype=="ur-type":
                     return(d)
                 else:
-                    newarr = map( lambda(di):
-                                  self.convertToBasicTypes(d=di,
+                    newarr = [self.convertToBasicTypes(d=di,
                                                        t = ( NS.XSD, elemtype),
                                                        attrs=attrs,
-                                                       config=config),
-                                  d)
+                                                       config=config) for di in d]
                     return newarr
             else:
                 t = (NS.XSD, t[1])
@@ -872,26 +867,26 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 try:
                     d = int(d)
                     if len(attrs):
-                        d = long(d)
+                        d = int(d)
                 except:
-                    d = long(d)
+                    d = int(d)
                 return d
-            if self.intlimits.has_key (t[1]): # range-bounded integer types
+            if t[1] in self.intlimits: # range-bounded integer types
                 l = self.intlimits[t[1]]
                 try: d = int(d)
-                except: d = long(d)
+                except: d = int(d)
 
                 if l[1] != None and d < l[1]:
-                    raise UnderflowError, "%s too small" % d
+                    raise UnderflowError("%s too small" % d)
                 if l[2] != None and d > l[2]:
-                    raise OverflowError, "%s too large" % d
+                    raise OverflowError("%s too large" % d)
 
                 if l[0] or len(attrs):
-                    return long(d)
+                    return int(d)
                 return d
             if t[1] == "string":
                 if len(attrs):
-                    return unicode(dnn)
+                    return str(dnn)
                 try:
                     return str(dnn)
                 except:
@@ -902,7 +897,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                     return False
                 if d in ('1', 'true'):
                     return True
-                raise AttributeError, "invalid boolean value"
+                raise AttributeError("invalid boolean value")
             if t[1] in ('double','float'):
                 l = self.floatlimits[t[1]]
                 s = d.strip().lower()
@@ -920,23 +915,23 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 if config.strict_range:
                     if fpconst.isNaN(d):
                         if s[0:2] != 'nan':
-                            raise ValueError, "invalid %s: %s" % (t[1], s)
+                            raise ValueError("invalid %s: %s" % (t[1], s))
                     elif fpconst.isNegInf(d):
                         if s[0:3] != '-inf':
-                            raise UnderflowError, "%s too small: %s" % (t[1], s)
+                            raise UnderflowError("%s too small: %s" % (t[1], s))
                     elif fpconst.isPosInf(d):
                         if s[0:2] != 'inf' and s[0:3] != '+inf':
-                            raise OverflowError, "%s too large: %s" % (t[1], s)
+                            raise OverflowError("%s too large: %s" % (t[1], s))
                     elif d < 0 and d < l[1]:
-                            raise UnderflowError, "%s too small: %s" % (t[1], s)
+                            raise UnderflowError("%s too small: %s" % (t[1], s))
                     elif d > 0 and ( d < l[0] or d > l[2] ):
-                            raise OverflowError, "%s too large: %s" % (t[1], s)
+                            raise OverflowError("%s too large: %s" % (t[1], s))
                     elif d == 0:
                         if type(self.zerofloatre) == StringType:
                             self.zerofloatre = re.compile(self.zerofloatre)
     
                         if self.zerofloatre.search(s):
-                            raise UnderflowError, "invalid %s: %s" % (t[1], s)
+                            raise UnderflowError("invalid %s: %s" % (t[1], s))
                 return d
             
             if t[1] in ("dateTime", "date", "timeInstant", "time"):
@@ -961,7 +956,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 else:
                     return
             if t[1] == "anyURI":
-                return urllib.unquote(collapseWhiteSpace(d))
+                return urllib.parse.unquote(collapseWhiteSpace(d))
             if t[1] in ("normalizedString", "token"):
                 return collapseWhiteSpace(d)
         if t[0] == NS.ENC:
@@ -985,14 +980,14 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 except:
                     pass
 
-                raise Error, "unknown or missing binary encoding"
+                raise Error("unknown or missing binary encoding")
             if t[1] == "uri":
-                return urllib.unquote(collapseWhiteSpace(d))
+                return urllib.parse.unquote(collapseWhiteSpace(d))
             if t[1] == "recurringInstant":
                 return self.convertDateTime(d, t[1])
         if t[0] in (NS.XSD2, NS.ENC):
             if t[1] == "uriReference":
-                return urllib.unquote(collapseWhiteSpace(d))
+                return urllib.parse.unquote(collapseWhiteSpace(d))
             if t[1] == "timePeriod":
                 return self.convertDateTime(d, t[1])
             if t[1] in ("century", "year"):
@@ -1002,7 +997,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                 return self.convertDateTime(d, t[1])
         if t[0] == NS.XSD3:
             if t[1] == "anyURI":
-                return urllib.unquote(collapseWhiteSpace(d))
+                return urllib.parse.unquote(collapseWhiteSpace(d))
             if t[1] in ("gYearMonth", "gMonthDay"):
                 return self.convertDateTime(d, t[1])
             if t[1] == "gYear":
@@ -1026,7 +1021,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             if t[1] == "CDATA":
                 return collapseWhiteSpace(d)
 
-        raise UnknownTypeError, "unknown type `%s'" % (str(t[0]) + ':' + t[1])
+        raise UnknownTypeError("unknown type `%s'" % (str(t[0]) + ':' + t[1]))
 
 
 ################################################################################
@@ -1034,9 +1029,9 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 ################################################################################
 def _parseSOAP(xml_str, rules = None):
     try:
-        from cStringIO import StringIO
+        from io import StringIO
     except ImportError:
-        from StringIO import StringIO
+        from io import StringIO
 
     parser = xml.sax.make_parser()
     t = SOAPParser(rules = rules)
@@ -1054,7 +1049,7 @@ def _parseSOAP(xml_str, rules = None):
 
     try:
         parser.parse(inpsrc)
-    except xml.sax.SAXParseException, e:
+    except xml.sax.SAXParseException as e:
         parser._parser = None
         raise e
     
@@ -1077,9 +1072,9 @@ def parseSOAPRPC(xml_str, header = 0, body = 0, attrs = 0, rules = None):
     p = t.body[0]
 
     # Empty string, for RPC this translates into a void
-    if type(p) in (type(''), type(u'')) and p in ('', u''):
+    if type(p) in (type(''), type('')) and p in ('', ''):
         name = "Response"
-        for k in t.body.__dict__.keys():
+        for k in list(t.body.__dict__.keys()):
             if k[0] != "_":
                 name = k
         p = structType(name)

@@ -3,7 +3,7 @@
 # See LBNLCopyright for copyright notice!
 ###########################################################################
 import unittest
-import test_wsdl
+from . import test_wsdl
 import utils
 
 def makeTestSuite():

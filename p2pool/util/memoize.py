@@ -8,11 +8,11 @@ class LRUDict(object):
     def get(self, key, default=None):
         if key in self.inner:
             x, value = self.inner[key]
-            self.inner[key] = self.counter.next(), value
+            self.inner[key] = next(self.counter), value
             return value
         return default
     def __setitem__(self, key, value):
-        self.inner[key] = self.counter.next(), value
+        self.inner[key] = next(self.counter), value
         while len(self.inner) > self.n:
             self.inner.pop(min(self.inner, key=lambda k: self.inner[k][0]))
 

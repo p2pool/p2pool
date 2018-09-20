@@ -11,7 +11,7 @@ and port mappings are implemented here.
 """
 __revision__ = "$id"
 
-import socket, random, urlparse, logging
+import socket, random, urllib.parse, logging
 
 from twisted.internet import reactor, defer
 from twisted.web import client
@@ -492,7 +492,7 @@ class UPnPProtocol(DatagramProtocol, object):
             self._on_discovery_failed(UPnPError("upnp response showed no WANConnections"))
             return
         
-        control_url2 = urlparse.urljoin(urlbase, controlurl)
+        control_url2 = urllib.parse.urljoin(urlbase, controlurl)
         soap_proxy = SoapProxy(control_url2, upnpinfo.wanservice)
         self._on_discovery_succeeded(UPnPDevice(soap_proxy, upnpinfo.deviceinfos))
     

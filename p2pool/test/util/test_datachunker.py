@@ -4,11 +4,11 @@ import unittest
 from p2pool.util import datachunker
 
 def random_bytes(length):
-    return ''.join(chr(random.randrange(2**8)) for i in xrange(length))
+    return ''.join(chr(random.randrange(2**8)) for i in range(length))
 
 class Test(unittest.TestCase):
     def test_stringbuffer(self):
-        for i in xrange(100):
+        for i in range(100):
             sb = datachunker.StringBuffer()
             
             r = random_bytes(random.randrange(1000))

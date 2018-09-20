@@ -14,7 +14,7 @@ import sys
 #new line
 NL='\r\n'
 
-_width = len(repr(sys.maxint-1))
+_width = len(repr(sys.maxsize-1))
 _fmt = '%%0%dd' % _width
 
 class MIMEMessage:
@@ -37,7 +37,7 @@ class MIMEMessage:
         #maybe I can save some memory
         del alltext
         del msgparts
-        self._startCID =  "<" + (_fmt % random.randrange(sys.maxint)) + (_fmt % random.randrange(sys.maxint)) + ">"
+        self._startCID =  "<" + (_fmt % random.randrange(sys.maxsize)) + (_fmt % random.randrange(sys.maxsize)) + ">"
 
 
     def toString(self):
@@ -94,7 +94,7 @@ def _make_boundary(text=None):
     #some code taken from python stdlib
     # Craft a random boundary.  If text is given, ensure that the chosen
     # boundary doesn't appear in the text.
-    token = random.randrange(sys.maxint)
+    token = random.randrange(sys.maxsize)
     boundary = ('=' * 10) + (_fmt % token) + '=='
     if text is None:
         return boundary

@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import time
 import weakref
@@ -14,12 +14,12 @@ class Node(object):
         return node
     
     def insert_after(self, contents):
-        self.next.prev = self.next = node = Node(contents, self, self.next)
+        self.next.prev = self.__next__ = node = Node(contents, self, self.__next__)
         return node
     
     @staticmethod
     def connect(prev, next):
-        if prev.next is not None or next.prev is not None:
+        if prev.__next__ is not None or next.prev is not None:
             raise ValueError('node already connected')
         prev.next, next.prev = next, prev
     
@@ -27,9 +27,9 @@ class Node(object):
         self.contents = contents
     
     def delete(self):
-        if self.prev.next is None or self.next.prev is None:
+        if self.prev.__next__ is None or self.next.prev is None:
             raise ValueError('node not connected')
-        self.prev.next, self.next.prev = self.next, self.prev
+        self.prev.next, self.next.prev = self.__next__, self.prev
         self.next = self.prev = None
 
 
@@ -48,10 +48,10 @@ class LinkedList(object):
         return sum(1 for x in self)
     
     def __iter__(self):
-        cur = self.start.next
+        cur = self.start.__next__
         while cur is not self.end:
             cur2 = cur
-            cur = cur.next
+            cur = cur.__next__
             yield cur2 # in case cur is deleted, but items inserted after are ignored
     
     def __reversed__(self):
@@ -64,14 +64,14 @@ class LinkedList(object):
     def __getitem__(self, index):
         if index < 0:
             cur = self.end
-            for i in xrange(-index):
+            for i in range(-index):
                 cur = cur.prev
                 if cur is self.start:
                     raise IndexError('index out of range')
         else:
             cur = self.start
-            for i in xrange(index + 1):
-                cur = cur.next
+            for i in range(index + 1):
+                cur = cur.__next__
                 if cur is self.end:
                     raise IndexError('index out of range')
         return cur
@@ -83,7 +83,7 @@ class LinkedList(object):
         return self.end.insert_before(item)
     
     def popleft(self):
-        node = self.start.next
+        node = self.start.__next__
         if node is self.end:
             raise IndexError('popleft from empty')
         node.delete()
@@ -170,11 +170,11 @@ class ExpiringDict(object):
             return default_value
     
     def keys(self):
-        return self.d.keys()
+        return list(self.d.keys())
     
     def values(self):
-        return [value for node, value in self.d.itervalues()]
+        return [value for node, value in self.d.values()]
     
     def itervalues(self):
-        for node, value in self.d.itervalues():
+        for node, value in self.d.values():
             yield value

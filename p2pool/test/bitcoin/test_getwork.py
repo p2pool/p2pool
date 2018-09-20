@@ -33,7 +33,7 @@ class Test(unittest.TestCase):
             extra.pop('midstate', None)
             
             getwork_check = ba.getwork(**extra)
-            assert getwork_check == case or dict((k, v) for k, v in getwork_check.iteritems() if k != 'midstate') == case
+            assert getwork_check == case or dict((k, v) for k, v in getwork_check.items() if k != 'midstate') == case
         
         case2s = [
             getwork.BlockAttempt(

@@ -1,11 +1,10 @@
-from __future__ import division
-
 import hashlib
 import random
 import warnings
 
 import p2pool
 from p2pool.util import math, pack
+from functools import reduce
 
 def hash256(data):
     return pack.IntType(256).unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
@@ -19,25 +18,25 @@ class ChecksummedType(pack.Type):
     def __init__(self, inner, checksum_func=lambda data: hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]):
         self.inner = inner
         self.checksum_func = checksum_func
-    
+
     def read(self, file):
         obj, file = self.inner.read(file)
         data = self.inner.pack(obj)
-        
+
         calculated_checksum = self.checksum_func(data)
         checksum, file = pack.read(file, len(calculated_checksum))
         if checksum != calculated_checksum:
             raise ValueError('invalid checksum')
-        
+
         return obj, file
-    
+
     def write(self, file, item):
         data = self.inner.pack(item)
         return (file, data), self.checksum_func(data)
 
 class FloatingInteger(object):
     __slots__ = ['bits', '_target']
-    
+
     @classmethod
     def from_target_upper_bound(cls, target):
         n = math.natural_to_string(target)
@@ -46,42 +45,42 @@ class FloatingInteger(object):
         bits2 = (chr(len(n)) + (n + 3*chr(0))[:3])[::-1]
         bits = pack.IntType(32).unpack(bits2)
         return cls(bits)
-    
+
     def __init__(self, bits, target=None):
         self.bits = bits
         self._target = None
         if target is not None and self.target != target:
             raise ValueError('target does not match')
-    
+
     @property
     def target(self):
         res = self._target
         if res is None:
             res = self._target = math.shift_left(self.bits & 0x00ffffff, 8 * ((self.bits >> 24) - 3))
         return res
-    
+
     def __hash__(self):
         return hash(self.bits)
-    
+
     def __eq__(self, other):
         return self.bits == other.bits
-    
+
     def __ne__(self, other):
         return not (self == other)
-    
+
     def __cmp__(self, other):
         assert False
-    
+
     def __repr__(self):
         return 'FloatingInteger(bits=%s, target=%s)' % (hex(self.bits), hex(self.target))
 
 class FloatingIntegerType(pack.Type):
     _inner = pack.IntType(32)
-    
+
     def read(self, file):
         bits, file = self._inner.read(file)
         return FloatingInteger(bits), file
-    
+
     def write(self, file, item):
         return self._inner.write(file, item.bits)
 
@@ -142,17 +141,17 @@ class TransactionType(pack.Type):
         if marker == 0:
             next, file = self._wtx_type.read(file)
             witness = [None]*len(next['tx_ins'])
-            for i in xrange(len(next['tx_ins'])):
+            for i in range(len(next['tx_ins'])):
                 witness[i], file = self._witness_type.read(file)
             locktime, file = self._int_type.read(file)
             return dict(version=version, marker=marker, flag=next['flag'], tx_ins=next['tx_ins'], tx_outs=next['tx_outs'], witness=witness, lock_time=locktime), file
         else:
             tx_ins = [None]*marker
-            for i in xrange(marker):
+            for i in range(marker):
                 tx_ins[i], file = tx_in_type.read(file)
             next, file = self._ntx_type.read(file)
             return dict(version=version, tx_ins=tx_ins, tx_outs=next['tx_outs'], lock_time=next['lock_time']), file
-    
+
     def write(self, file, item):
         if is_segwit_tx(item):
             assert len(item['tx_ins']) == len(item['witness'])
@@ -210,7 +209,7 @@ aux_pow_coinbase_type = pack.ComposedType([
 ])
 
 def make_auxpow_tree(chain_ids):
-    for size in (2**i for i in xrange(31)):
+    for size in (2**i for i in range(31)):
         if size < len(chain_ids):
             continue
         res = {}
@@ -241,9 +240,9 @@ def merkle_hash(hashes):
 
 def calculate_merkle_link(hashes, index):
     # XXX optimize this
-    
+
     hash_list = [(lambda _h=h: _h, i == index, []) for i, h in enumerate(hashes)]
-    
+
     while len(hash_list) > 1:
         hash_list = [
             (
@@ -254,22 +253,22 @@ def calculate_merkle_link(hashes, index):
             for (left, left_f, left_l), (right, right_f, right_l) in
                 zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
         ]
-    
+
     res = [x['hash']() for x in hash_list[0][2]]
-    
+
     assert hash_list[0][1]
     if p2pool.DEBUG:
         new_hashes = [random.randrange(2**256) if x is None else x
             for x in hashes]
         assert check_merkle_link(new_hashes[index], dict(branch=res, index=index)) == merkle_hash(new_hashes)
     assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
-    
+
     return dict(branch=res, index=index)
 
 def check_merkle_link(tip_hash, link):
     if link['index'] >= 2**len(link['branch']):
         raise ValueError('index too large')
-    return reduce(lambda c, (i, h): hash256(merkle_record_type.pack(
+    return reduce(lambda c, i, h: hash256(merkle_record_type.pack(
         dict(left=h, right=c) if (link['index'] >> i) & 1 else
         dict(left=c, right=h)
     )), enumerate(link['branch']), tip_hash)
@@ -277,7 +276,7 @@ def check_merkle_link(tip_hash, link):
 # targets
 
 def target_to_average_attempts(target):
-    assert 0 <= target and isinstance(target, (int, long)), target
+    assert 0 <= target and isinstance(target, int), target
     if target >= 2**256: warnings.warn('target >= 2**256!')
     return 2**256//(target + 1)
 
@@ -286,7 +285,7 @@ def average_attempts_to_target(average_attempts):
     return min(int(2**256/average_attempts - 1 + 0.5), 2**256-1)
 
 def target_to_difficulty(target):
-    assert 0 <= target and isinstance(target, (int, long)), target
+    assert 0 <= target and isinstance(target, int), target
     if target >= 2**256: warnings.warn('target >= 2**256!')
     return (0xffff0000 * 2**(256-64) + 1)/(target + 1)
 
@@ -358,7 +357,7 @@ def script2_to_address(script2, net):
     else:
         if script2_test == script2:
             return pubkey_to_address(pubkey, net)
-    
+
     try:
         pubkey_hash = pack.IntType(160).unpack(script2[3:-2])
         script2_test2 = pubkey_hash_to_script2(pubkey_hash)
@@ -377,7 +376,7 @@ def script2_to_human(script2, net):
     else:
         if script2_test == script2:
             return 'Pubkey. Address: %s' % (pubkey_to_address(pubkey, net),)
-    
+
     try:
         pubkey_hash = pack.IntType(160).unpack(script2[3:-2])
         script2_test2 = pubkey_hash_to_script2(pubkey_hash)
@@ -386,5 +385,5 @@ def script2_to_human(script2, net):
     else:
         if script2_test2 == script2:
             return 'Address. Address: %s' % (pubkey_hash_to_address(pubkey_hash, net),)
-    
+
     return 'Unknown. Script: %s'  % (script2.encode('hex'),)

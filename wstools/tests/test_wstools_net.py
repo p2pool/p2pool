@@ -5,7 +5,7 @@
 # See LBNLCopyright for copyright notice!
 ###########################################################################
 import unittest
-import test_wsdl
+from . import test_wsdl
 
 def makeTestSuite():
     suite = unittest.TestSuite()

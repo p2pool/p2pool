@@ -54,7 +54,7 @@ class UPnPXml:
                 'manufacturer' : 'manufacturer'
             }
             device = doc.getElementsByTagName('device')[0]
-            for name, tag in attributes.iteritems():
+            for name, tag in attributes.items():
                 try:
                     self.deviceinfos[name] = device.getElementsByTagName(
                         tag)[0].firstChild.datas.encode('utf-8')

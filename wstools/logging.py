@@ -42,24 +42,24 @@ class BasicLogger(ILogger):
         if self.warnOn() is False: return
         if BasicLogger.last != self.msg:
             BasicLogger.last = self.msg
-            print >>self, "---- ", self.msg, " ----"
-        print >>self, "    %s  " %self.WARN,
-        print >>self, msg %args
+            print("---- ", self.msg, " ----", file=self)
+        print("    %s  " %self.WARN, end=' ', file=self)
+        print(msg %args, file=self)
     WARN = '[WARN]'
     def debug(self, msg, *args, **kw):
         if self.debugOn() is False: return
         if BasicLogger.last != self.msg:
             BasicLogger.last = self.msg
-            print >>self, "---- ", self.msg, " ----"
-        print >>self, "    %s  " %self.DEBUG,
-        print >>self, msg %args
+            print("---- ", self.msg, " ----", file=self)
+        print("    %s  " %self.DEBUG, end=' ', file=self)
+        print(msg %args, file=self)
     DEBUG = '[DEBUG]'
     def error(self, msg, *args, **kw):
         if BasicLogger.last != self.msg:
             BasicLogger.last = self.msg
-            print >>self, "---- ", self.msg, " ----"
-        print >>self, "    %s  " %self.ERROR,
-        print >>self, msg %args
+            print("---- ", self.msg, " ----", file=self)
+        print("    %s  " %self.ERROR, end=' ', file=self)
+        print(msg %args, file=self)
     ERROR = '[ERROR]'
 
     def write(self, *args):
@@ -140,12 +140,12 @@ class GLRecord(dict):
     def __str__(self):
         """
         """
-        from cStringIO import StringIO
+        from io import StringIO
         s = StringIO(); n = " "
         reserved = self.reserved; omitname = self.omitname; levels = self.levels
 
-        for k in ( list(filter(lambda i: self.has_key(i), reserved)) + 
-            list(filter(lambda i: i not in reserved, self.keys()))
+        for k in ( list([i for i in reserved if i in self]) + 
+            list([i for i in list(self.keys()) if i not in reserved])
         ):
             v = self[k]
             if k in omitname: 
@@ -178,8 +178,8 @@ class GLRecord(dict):
 
             return str.__new__(self, "%04d-%02d-%02dT%02d:%02d:%02d.%06d%s" %l)
 
-    format = { int:str, float:lambda x: "%lf" % x, long:str, str:lambda x:x,
-        unicode:str, GLDate:str, }
+    format = { int:str, float:lambda x: "%lf" % x, int:str, str:lambda x:x,
+        str:str, GLDate:str, }
 
 
 def gridLog(**kw):
@@ -205,8 +205,8 @@ def gridLog(**kw):
         scheme = url[:url.find('://')]
         send = GLRegistry[scheme]
         send( url, str(GLRecord(**kw)), )
-    except Exception, ex:
-        print >>sys.stderr, "*** gridLog failed -- %s" %(str(kw))
+    except Exception as ex:
+        print("*** gridLog failed -- %s" %(str(kw)), file=sys.stderr)
 
 
 def sendUDP(url, outputStr):
@@ -218,7 +218,7 @@ def sendUDP(url, outputStr):
     socket(AF_INET, SOCK_DGRAM).sendto( outputStr, (host,int(port)), )
 
 def writeToFile(url, outputStr):
-    print >> open(url.split('://')[1], 'a+'), outputStr
+    print(outputStr, file=open(url.split('://')[1], 'a+'))
 
 GLRegistry["gridlog-udp"] = sendUDP
 GLRegistry["file"] = writeToFile

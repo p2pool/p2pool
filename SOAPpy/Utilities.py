@@ -34,15 +34,15 @@
 """
 
 ident = '$Id: Utilities.py 1298 2006-11-07 00:54:15Z sanxiyn $'
-from version import __version__
+from .version import __version__
 
 import re
 import string
 import sys
-from types import *
+from .types import *
 
 # SOAPpy modules
-from Errors import *
+from .Errors import *
 
 ################################################################################
 # Utility infielders
@@ -84,8 +84,7 @@ def decodeHexString(data):
         try:
             c = conv[c]
         except KeyError:
-            raise ValueError, \
-                "invalid hex string character `%s'" % c
+            raise ValueError("invalid hex string character `%s'" % c)
 
         if low:
             bin += chr(high * 16 + c)
@@ -97,12 +96,11 @@ def decodeHexString(data):
         i += 1
 
     if low:
-        raise ValueError, "invalid hex string length"
+        raise ValueError("invalid hex string length")
 
     while i < len(data):
         if data[i] not in string.whitespace:
-            raise ValueError, \
-                "invalid hex string character `%s'" % c
+            raise ValueError("invalid hex string character `%s'" % c)
 
         i += 1
 
@@ -127,7 +125,7 @@ def cleanDate(d, first = 0):
     names = ('year', 'month', 'day', 'hours', 'minutes', 'seconds')
 
     if len(d) != 6:
-        raise ValueError, "date must have 6 elements"
+        raise ValueError("date must have 6 elements")
 
     for i in range(first, 6):
         s = d[i]
@@ -139,38 +137,38 @@ def cleanDate(d, first = 0):
                 except OverflowError:
                     if i > 0:
                         raise
-                    s = long(s)
+                    s = int(s)
 
                 if s != d[i]:
-                    raise ValueError, "%s must be integral" % names[i]
+                    raise ValueError("%s must be integral" % names[i])
 
                 d[i] = s
         elif type(s) == LongType:
             try: s = int(s)
             except: pass
         elif type(s) != IntType:
-            raise TypeError, "%s isn't a valid type" % names[i]
+            raise TypeError("%s isn't a valid type" % names[i])
 
         if i == first and s < 0:
             continue
 
         if ranges[i] != None and \
             (s < ranges[i][0] or ranges[i][1] < s):
-            raise ValueError, "%s out of range" % names[i]
+            raise ValueError("%s out of range" % names[i])
 
     if first < 6 and d[5] >= 61:
-        raise ValueError, "seconds out of range"
+        raise ValueError("seconds out of range")
 
     if first < 2:
         leap = first < 1 and leapMonth(d[0], d[1])
 
         if d[2] > months[d[1]] + leap:
-            raise ValueError, "day out of range"
+            raise ValueError("day out of range")
 
 def debugHeader(title):
     s = '*** ' + title + ' '
-    print s + ('*' * (72 - len(s)))
+    print(s + ('*' * (72 - len(s))))
 
 def debugFooter(title):
-    print '*' * 72
+    print('*' * 72)
     sys.stdout.flush()

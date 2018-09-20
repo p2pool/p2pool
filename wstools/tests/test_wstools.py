@@ -5,15 +5,15 @@
 # See LBNLCopyright for copyright notice!
 ###########################################################################
 
-import unittest, tarfile, os, ConfigParser
-import test_wsdl
+import unittest, tarfile, os, configparser
+from . import test_wsdl
 
 
 SECTION='files'
 CONFIG_FILE = 'config.txt'
 
 def extractFiles(section, option):
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
     archives = config.get(section, option)
     archives = eval(archives)

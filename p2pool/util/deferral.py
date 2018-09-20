@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import itertools
 import random
@@ -39,14 +39,14 @@ def retry(message='Error:', delay=3, max_retries=None, traceback=True):
             for i in itertools.count():
                 try:
                     result = yield func(*args, **kwargs)
-                except Exception, e:
+                except Exception as e:
                     if i == max_retries:
                         raise
                     if not isinstance(e, RetrySilentlyException):
                         if traceback:
                             log.err(None, message)
                         else:
-                            print >>sys.stderr, message, e
+                            print(message, e, file=sys.stderr)
                     yield sleep(delay)
                 else:
                     defer.returnValue(result)
@@ -189,10 +189,10 @@ class DeferredCacher(object):
                 self.waiting.pop(key).callback(None)
                 if fail.check(RetrySilentlyException):
                     return
-                print
-                print 'Error when requesting noncached value:'
+                print()
+                print('Error when requesting noncached value:')
                 fail.printTraceback()
-                print
+                print()
             self.func(key).addCallback(cb).addErrback(eb)
         if default is not self._nothing:
             return default

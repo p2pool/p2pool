@@ -3,14 +3,14 @@
 Rudimentary support."""
 
 ident = '$Id: WSDL.py 1467 2008-05-16 23:32:51Z warnes $'
-from version import __version__
+from .version import __version__
 
 import wstools
 import xml
-from Errors import Error
-from Client import SOAPProxy, SOAPAddress
-from Config import Config
-import urllib
+from .Errors import Error
+from .Client import SOAPProxy, SOAPAddress
+from .Config import Config
+import urllib.request, urllib.parse, urllib.error
 
 class Proxy:
     """WSDL Proxy.
@@ -41,14 +41,14 @@ class Proxy:
 
         # From Mark Pilgrim's "Dive Into Python" toolkit.py--open anything.
         if self.wsdl is None and hasattr(wsdlsource, "read"):
-            print 'stream:', wsdlsource
+            print('stream:', wsdlsource)
             try:
                 self.wsdl = reader.loadFromStream(wsdlsource)
-            except xml.parsers.expat.ExpatError, e:
-                newstream = urllib.URLopener(key_file=config.SSL.key_file, cert_file=config.SSL.cert_file).open(wsdlsource)
+            except xml.parsers.expat.ExpatError as e:
+                newstream = urllib.request.URLopener(key_file=config.SSL.key_file, cert_file=config.SSL.cert_file).open(wsdlsource)
                 buf = newstream.readlines()
-                raise Error, "Unable to parse WSDL file at %s: \n\t%s" % \
-                      (wsdlsource, "\t".join(buf))
+                raise Error("Unable to parse WSDL file at %s: \n\t%s" % \
+                      (wsdlsource, "\t".join(buf)))
                 
 
         # NOT TESTED (as of April 17, 2003)
@@ -63,25 +63,25 @@ class Proxy:
                 self.wsdl = reader.loadFromFile(wsdlsource)
                 #print 'file'
             except (IOError, OSError): pass
-            except xml.parsers.expat.ExpatError, e:
-                newstream = urllib.urlopen(wsdlsource)
+            except xml.parsers.expat.ExpatError as e:
+                newstream = urllib.request.urlopen(wsdlsource)
                 buf = newstream.readlines()
-                raise Error, "Unable to parse WSDL file at %s: \n\t%s" % \
-                      (wsdlsource, "\t".join(buf))
+                raise Error("Unable to parse WSDL file at %s: \n\t%s" % \
+                      (wsdlsource, "\t".join(buf)))
             
         if self.wsdl is None:
             try:
-                stream = urllib.URLopener(key_file=config.SSL.key_file, cert_file=config.SSL.cert_file).open(wsdlsource)
+                stream = urllib.request.URLopener(key_file=config.SSL.key_file, cert_file=config.SSL.cert_file).open(wsdlsource)
                 self.wsdl = reader.loadFromStream(stream, wsdlsource)
             except (IOError, OSError): pass
-            except xml.parsers.expat.ExpatError, e:
-                newstream = urllib.urlopen(wsdlsource)
+            except xml.parsers.expat.ExpatError as e:
+                newstream = urllib.request.urlopen(wsdlsource)
                 buf = newstream.readlines()
-                raise Error, "Unable to parse WSDL file at %s: \n\t%s" % \
-                      (wsdlsource, "\t".join(buf))
+                raise Error("Unable to parse WSDL file at %s: \n\t%s" % \
+                      (wsdlsource, "\t".join(buf)))
             
         if self.wsdl is None:
-            import StringIO
+            import io
             self.wsdl = reader.loadFromString(str(wsdlsource))
             #print 'string'
 
@@ -102,7 +102,7 @@ class Proxy:
 
     def __str__(self): 
         s = ''
-        for method in self.methods.values():
+        for method in list(self.methods.values()):
             s += str(method)
         return s
 
@@ -111,7 +111,7 @@ class Proxy:
 
         Raises AttributeError is method name is not found."""
 
-        if not self.methods.has_key(name): raise AttributeError, name
+        if name not in self.methods: raise AttributeError(name)
 
         callinfo = self.methods[name]
         self.soapproxy.proxy = SOAPAddress(callinfo.location)
@@ -120,18 +120,18 @@ class Proxy:
         return self.soapproxy.__getattr__(name)
 
     def show_methods(self):
-        for key in self.methods.keys():
+        for key in list(self.methods.keys()):
             method = self.methods[key]
-            print "Method Name:", key.ljust(15)
-            print
+            print("Method Name:", key.ljust(15))
+            print()
             inps = method.inparams
             for parm in range(len(inps)):
                 details = inps[parm]
-                print "   In #%d: %s  (%s)" % (parm, details.name, details.type)
-            print
+                print("   In #%d: %s  (%s)" % (parm, details.name, details.type))
+            print()
             outps = method.outparams
             for parm in range(len(outps)):
                 details = outps[parm]
-                print "   Out #%d: %s  (%s)" % (parm, details.name, details.type)
-            print
+                print("   Out #%d: %s  (%s)" % (parm, details.name, details.type))
+            print()
 
