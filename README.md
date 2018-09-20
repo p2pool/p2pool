@@ -152,4 +152,4 @@ To solo mine with p2pool or to start a new network for a new currency, set PERSI
     
 **License:**
 
-    <a href="https://github.com/p2pool/p2pool/blob/master/COPYING">Available Here</a>
+    https://github.com/p2pool/p2pool/blob/master/COPYING
