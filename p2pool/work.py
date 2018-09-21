@@ -168,7 +168,7 @@ class WorkerBridge(worker_interface.WorkerBridge):
         contents = re.split('([+/])', username)
         assert len(contents) % 2 == 1
         
-        user, contents2 = contents[0], contents[1:]
+        user, contents2 = contents[0].strip(), contents[1:]
         
         desired_pseudoshare_target = None
         desired_share_target = None
