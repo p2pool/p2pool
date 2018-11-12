@@ -284,14 +284,14 @@ class WorkerBridge(worker_interface.WorkerBridge):
                 else:
                     share_type = previous_share_type
         
+        local_addr_rates = self.get_local_addr_rates()
+        
         if desired_share_target is None:
             desired_share_target = 2**256-1
-            local_hash_rate = self._estimate_local_hash_rate()
-            if local_hash_rate is not None:
+            local_hash_rate = local_addr_rates.get(pubkey_hash, 0)
+            if local_hash_rate > 0.0:
                 desired_share_target = min(desired_share_target,
                     bitcoin_data.average_attempts_to_target(local_hash_rate * self.node.net.SHARE_PERIOD / 0.0167)) # limit to 1.67% of pool shares by modulating share difficulty
-            
-            local_addr_rates = self.get_local_addr_rates()
             lookbehind = 3600//self.node.net.SHARE_PERIOD
             block_subsidy = self.node.bitcoind_work.value['subsidy']
             if previous_share is not None and self.node.tracker.get_height(previous_share.hash) > lookbehind:
