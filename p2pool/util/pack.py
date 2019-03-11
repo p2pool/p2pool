@@ -275,6 +275,7 @@ def get_record(fields):
                 raise TypeError()
             def __ne__(self, other):
                 return not (self == other)
+        _Record.__name__ = '_Record=' + ','.join(fields)
         _record_types[fields] = _Record
     return _record_types[fields]
 
