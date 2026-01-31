@@ -6,7 +6,7 @@ Decentralized pool mining software for Dash, Litecoin, and Dogecoin cryptocurren
 
 **Status:** ✅ **PRODUCTION READY** - Mainnet merged mining operational
 
-Branch: `feature/scrypt-litecoin-dogecoin`
+Branch: `v36-Share-Format-Merged-Mining-Extension-Proposal`
 
 ### Key Features
 - ✅ Litecoin scrypt mining with Dogecoin AuxPoW merged mining
