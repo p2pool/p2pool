@@ -1,4 +1,4 @@
-# P2Pool-Dash
+# P2Pool
 
 Decentralized pool mining software for Dash, Litecoin, and Dogecoin cryptocurrencies.
 
