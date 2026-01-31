@@ -1,0 +1,41 @@
+# MM Adapter v2 - Mainnet Configuration
+# Litecoin + Dogecoin Merged Mining
+# Created: 2026-01-29
+
+# Adapter server settings (P2Pool connects here)
+server:
+  host: "0.0.0.0"
+  port: 44556
+  # Credentials P2Pool uses to connect to this adapter
+  rpc_user: "dogecoinrpc"
+  rpc_password: "dogecoinrpc_mainnet_2026"
+
+# Upstream daemon (Dogecoin Mainnet)
+upstream:
+  host: "192.168.86.27"
+  port: 22555  # Dogecoin mainnet RPC port
+  rpc_user: "dogecoinrpc"
+  rpc_password: "dogecoinrpc_mainnet_2026"
+  # Timeout for RPC calls (seconds)
+  timeout: 30
+
+# Chain configuration
+chain:
+  name: "dogecoin_mainnet"
+  chain_id: 98
+  address_version: 30  # Dogecoin mainnet = 0x1e = 30
+  # Network magic bytes (for validation)
+  network_magic: "c0c0c0c0"
+
+# Payout address for merged mining rewards (derived from DONATION_SCRIPT)
+payout:
+  address: "D88Vn6Dyct7DKfVCfR3syHkjyNx9gEyyiv"
+
+# Pool branding in OP_RETURN
+coinbase_text: "c2poolmerged"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "text"
+  file: null

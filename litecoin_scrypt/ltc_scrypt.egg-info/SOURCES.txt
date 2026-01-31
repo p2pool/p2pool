@@ -1,0 +1,8 @@
+scrypt.c
+scryptmodule_py3.c
+setup.py
+setup_py3.py
+ltc_scrypt.egg-info/PKG-INFO
+ltc_scrypt.egg-info/SOURCES.txt
+ltc_scrypt.egg-info/dependency_links.txt
+ltc_scrypt.egg-info/top_level.txt

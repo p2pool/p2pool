@@ -1,0 +1,38 @@
+# Merged Mining RPC Adapter Configuration
+
+# Adapter server settings (P2Pool connects here)
+server:
+  host: "0.0.0.0"
+  port: 44555
+  # Credentials P2Pool uses to connect to this adapter
+  rpc_user: "adapter"
+  rpc_password: "adapterpass"
+
+# Upstream daemon (Standard Dogecoin)
+upstream:
+  host: "192.168.86.27"
+  port: 22555  # Standard Dogecoin testnet RPC port
+  rpc_user: "dogecoinrpc"
+  rpc_password: "testpass"
+  # Timeout for RPC calls (seconds)
+  timeout: 30
+
+# Chain configuration
+chain:
+  name: "dogecoin_testnet"
+  chain_id: 98
+  # Network magic bytes (for validation)
+  # testnet: fcc1b7dc, mainnet: c0c0c0c0
+  network_magic: "fcc1b7dc"
+
+# Coinbase text for OP_RETURN in merged blocks (v2 only)
+# This identifies the pool in the blockchain
+# Can be overridden per-request via {"coinbase_text": "custom"} in getblocktemplate params
+# Default: "c2poolmerged"
+coinbase_text: "c2poolmerged"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"  # json or text
+  file: null  # Optional: path to log file

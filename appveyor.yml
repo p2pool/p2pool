@@ -1,0 +1,47 @@
+environment:
+  matrix:
+  - PYTHON: 'C:\Python27'
+    vc_platform: amd64_x86
+    platform: win32
+    pip_py2exe: http://sourceforge.net/projects/py2exe/files/latest/download?source=files
+  - PYTHON: 'C:\Python27-x64'
+    vc_platform: amd64
+    platform: win-amd64
+    pip_py2exe: http://sourceforge.net/projects/py2exe/files/latest/download?source=files
+
+matrix:
+  fast_finish: true
+
+clone_depth: 1
+
+init:
+- 'SET PATH=%PYTHON%;%PYTHON%\Scripts;%PATH%'
+- '"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" %vc_platform%'
+- python -c "import sys;print(sys.version)"
+
+install:
+- python -m pip install pip zope.interface twisted pypiwin32
+- 'echo "" >> %PYTHON%\Lib\site-packages\zope\__init__.py'
+- pip install %pip_py2exe%
+#- git submodule init
+#- git submodule update
+#- 'cd dash_hash && python setup.py install && cd ..'
+- pip install git+https://github.com/dashpay/dash_hash.git
+
+build: off
+
+before_test:
+- python run_p2pool.py --help
+
+after_test:
+- python setup.py py2exe
+#- python setup.py build --plat-name=%platform% bdist_wininst
+#- git clone --depth 1 -b develop https://github.com/pyinstaller/pyinstaller
+#- 'cd pyinstaller && python setup.py install && cd ..'
+#- 'pyinstaller -n p2pool_dash --debug --onefile -y -c -p p2pool -p p2pool\dash -p p2pool\dash\networks -p p2pool\networks -p dash_hash run_p2pool.py'
+
+artifacts:
+- path: dist\*
+
+cache:
+- '%LOCALAPPDATA%\pip\cache'

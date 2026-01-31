@@ -1,0 +1,3 @@
+Twisted>=12.2.0
+argparse>=1.2.1
+pyOpenSSL>=0.13

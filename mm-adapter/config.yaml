@@ -1,0 +1,35 @@
+# Merged Mining RPC Adapter Configuration - TEST SETUP
+
+# Adapter server settings (P2Pool connects here)
+server:
+  host: "0.0.0.0"
+  port: 44556  # Different port so we don't conflict with direct connection
+  # Credentials P2Pool uses to connect to this adapter
+  rpc_user: "dogecoinrpc"
+  rpc_password: "testpass"
+
+# Upstream daemon (Standard Dogecoin testnet4alpha)
+upstream:
+  host: "192.168.86.27"
+  port: 44555  # Dogecoin testnet4alpha RPC port
+  rpc_user: "dogecoinrpc"
+  rpc_password: "testpass"
+  # Timeout for RPC calls (seconds)
+  timeout: 30
+
+# Chain configuration
+chain:
+  name: "dogecoin_testnet4alpha"
+  chain_id: 98
+  # Network magic bytes (for validation)
+  network_magic: "fcc1b7dc"
+
+# Payout address for merged mining rewards
+payout:
+  address: "nb3u9mBf6d5s74Dn9jJXa7AbX5ZSVpTtBq"
+
+# Logging
+logging:
+  level: "DEBUG"  # Show all activity for testing
+  format: "text"  # Human readable for testing
+  file: null

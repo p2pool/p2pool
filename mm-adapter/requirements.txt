@@ -1,0 +1,4 @@
+# MM Adapter dependencies (Python 3.10+)
+aiohttp>=3.9.0
+pyyaml>=6.0
+structlog>=24.1.0

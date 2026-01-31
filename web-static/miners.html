@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Workers - P2Pool</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+    <script src="d3.v2.min.js"></script>
+    <style>
+        :root {
+            --primary: #008de4;
+            --primary-dark: #0066a9;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --dark: #1a1a2e;
+            --darker: #16162a;
+            --card-bg: #252540;
+            --text: #e0e0e0;
+            --text-muted: #8888a0;
+            --border: #3a3a5a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .logo .symbol {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .version {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--darker);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        nav a {
+            color: var(--text);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            background: var(--darker);
+        }
+        
+        nav a:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        nav a.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section-header h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .badge {
+            background: var(--primary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        /* Miner Cards */
+        .miners-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+        
+        .miner-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .miner-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+        
+        .miner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .miner-address {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--primary);
+            word-break: break-all;
+            flex: 1;
+        }
+        
+        .miner-address a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .miner-address a:hover {
+            text-decoration: underline;
+        }
+        
+        .miner-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .miner-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .miner-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .miner-stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .miner-stat-value.success {
+            color: var(--success);
+        }
+        
+        .miner-stat-value.warning {
+            color: var(--warning);
+        }
+        
+        .miner-stat-value.danger {
+            color: var(--danger);
+        }
+        
+        /* Workers Table */
+        .workers-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .workers-header {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .workers-table-container {
+            overflow-x: auto;
+            width: 100%;
+            margin: 0;
+        }
+        
+        table {
+            width: 100%;
+            min-width: 100%;
+            border-collapse: collapse;
+            background: var(--darker);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        thead {
+            background: var(--dark);
+        }
+        
+        th {
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        td {
+            padding: 12px 15px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover {
+            background: rgba(0, 141, 228, 0.1);
+        }
+        
+        .hash-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .hash-link:hover {
+            text-decoration: underline;
+        }
+        
+        .worker-name {
+            font-family: 'Courier New', monospace;
+            color: var(--text);
+        }
+        
+        .workers-table-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .workers-table-container::-webkit-scrollbar-track {
+            background: var(--darker);
+            border-radius: 3px;
+        }
+        
+        .workers-table-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        
+        .workers-table-container::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+        
+        .loading-spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--card-bg);
+            border-top: 1px solid var(--border);
+            padding: 20px 0;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .miners-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .miner-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            nav {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>⛏️ P2Pool Miners</h1>
+                    <span class="symbol symbol-small">DASH</span>
+                    <span class="version" id="version">...</span>
+                </div>
+                <nav>
+                    <a href="dashboard.html">Dashboard</a>
+                    <a href="graphs.html">Graphs</a>
+                    <a href="stratum.html">Stratum</a>
+                    <a href="miners.html" class="active">Miners</a>
+                    <a href="index.html">Classic</a>
+                    <a href="#" onclick="location.reload(); return false;">🔄 Refresh</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <!-- Overview Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Miners</h3>
+                <div class="stat-value" id="total_miners">0</div>
+                <div class="stat-label">Active addresses</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Hashrate</h3>
+                <div class="stat-value" id="total_hashrate">0 H/s</div>
+                <div class="stat-label">Combined mining power</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total DOA Rate</h3>
+                <div class="stat-value" id="total_doa">0%</div>
+                <div class="stat-label">Dead on arrival shares</div>
+            </div>
+            <div class="stat-card">
+                <h3>Average Share Time</h3>
+                <div class="stat-value" id="avg_share_time">0s</div>
+                <div class="stat-label">Mean time between shares</div>
+            </div>
+        </div>
+        
+        <!-- Workers List -->
+        <div class="section-header">
+            <h2>Active Workers <span class="badge" id="miners_count">0</span></h2>
+        </div>
+        
+        <div id="miners_loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div>Loading miners data...</div>
+        </div>
+        
+        <div id="miners_grid" class="miners-grid" style="display: none;">
+            <!-- Miner cards will be inserted here -->
+        </div>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>P2Pool <span id="footer_version">v1.1.1</span> - Decentralized Mining Pool</p>
+            <p><a href="https://github.com/frstrtr/p2pool-dash" target="_blank">GitHub</a></p>
+        </div>
+    </footer>
+    
+    <script>
+        function format_hashrate(h) {
+            if (h == null || !isFinite(h) || h < 0) return '0 H/s';
+            if (h < 1000) return d3.format('.2r')(h) + ' H/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' kH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' MH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' GH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' TH/s';
+            h = h / 1000;
+            return d3.format('.3r')(h) + ' PH/s';
+        }
+        
+        function format_dt(dt) {
+            if (!isFinite(dt)) return '∞';
+            if (dt < 0) return '?';
+            if (dt < 60) return d3.format('.1f')(dt) + 's';
+            dt = dt / 60;
+            if (dt < 60) return d3.format('.1f')(dt) + 'm';
+            dt = dt / 60;
+            if (dt < 24) return d3.format('.1f')(dt) + 'h';
+            dt = dt / 24;
+            return d3.format('.1f')(dt) + 'd';
+        }
+        
+        function values(o) { 
+            var res = []; 
+            for(var x in o) res.push(o[x]); 
+            return res; 
+        }
+        
+        var currency_info = {};
+        
+        // Load currency info
+        d3.json('../web/currency_info', function(info) {
+            currency_info = info || {};
+            d3.selectAll('.symbol-small').text((info && info.symbol) || 'DASH');
+        });
+        
+        // Load version
+        d3.json('../web/version', function(version) {
+            if (version) {
+                d3.select('#version').text(version);
+                d3.select('#footer_version').text('v' + version);
+            }
+        });
+        
+        // Load miners data (grouped by address)
+        function loadMiners() {
+            d3.json('../local_stats', function(local_stats) {
+                if (!local_stats) return;
+                
+                // Extract base address helper
+                function extractAddress(workerName) {
+                    return workerName.split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                }
+                
+                // Group workers by base address
+                var minerGroups = {};
+                for (var workerName in local_stats.miner_hash_rates) {
+                    var hashrate = local_stats.miner_hash_rates[workerName] || 0;
+                    var doa_hashrate = local_stats.miner_dead_hash_rates[workerName] || 0;
+                    var baseAddress = extractAddress(workerName);
+                    
+                    if (!minerGroups[baseAddress]) {
+                        minerGroups[baseAddress] = {
+                            address: baseAddress,
+                            workers: [],
+                            totalHashrate: 0,
+                            totalDoa: 0
+                        };
+                    }
+                    
+                    minerGroups[baseAddress].workers.push({
+                        name: workerName,
+                        hashrate: hashrate,
+                        doa_hashrate: doa_hashrate
+                    });
+                    minerGroups[baseAddress].totalHashrate += hashrate;
+                    minerGroups[baseAddress].totalDoa += doa_hashrate;
+                }
+                
+                // Convert to array and calculate aggregates
+                var miners = [];
+                for (var addr in minerGroups) {
+                    var group = minerGroups[addr];
+                    group.doa_percent = group.totalHashrate > 0 ? group.totalDoa / group.totalHashrate : 0;
+                    group.workers.sort(function(a, b) { return b.hashrate - a.hashrate; });
+                    miners.push(group);
+                }
+                
+                // Sort by total hashrate descending
+                miners.sort(function(a, b) { return b.totalHashrate - a.totalHashrate; });
+                
+                // Calculate totals
+                var total_hashrate = d3.sum(miners, function(m) { return m.totalHashrate; });
+                var total_doa_hashrate = d3.sum(miners, function(m) { return m.totalDoa; });
+                var total_doa_percent = total_hashrate > 0 ? total_doa_hashrate / total_hashrate : 0;
+                
+                // Update overview stats
+                d3.select('#total_miners').text(miners.length);
+                d3.select('#total_hashrate').text(format_hashrate(total_hashrate));
+                d3.select('#total_doa').text(d3.format('.2%')(total_doa_percent));
+                d3.select('#miners_count').text(miners.length);
+                
+                // Hide loading
+                d3.select('#miners_loading').style('display', 'none');
+                d3.select('#miners_grid').style('display', 'grid');
+                
+                // Fetch 24h hashrate data
+                d3.json('../web/graph_data/miner_hash_rates/last_day', function(graph_data) {
+                    d3.json('../current_payouts', function(payouts_data) {
+                        d3.json('../current_merged_payouts', function(merged_payouts_data) {
+                            var payouts = payouts_data || {};
+                            var merged_payouts = merged_payouts_data || {};
+                            
+                            // Calculate 24h average hashrates per worker
+                            var avg_24h = {};
+                            if (graph_data && graph_data.length > 0) {
+                                var worker_totals = {};
+                                var worker_counts = {};
+                                
+                                graph_data.forEach(function(point) {
+                                    if (point[1]) {
+                                        for (var workerName in point[1]) {
+                                            if (!worker_totals[workerName]) {
+                                                worker_totals[workerName] = 0;
+                                                worker_counts[workerName] = 0;
+                                            }
+                                            worker_totals[workerName] += point[1][workerName];
+                                            worker_counts[workerName]++;
+                                        }
+                                    }
+                                });
+                                
+                                for (var workerName in worker_totals) {
+                                    avg_24h[workerName] = worker_totals[workerName] / worker_counts[workerName];
+                                }
+                            }
+                            
+                            // Calculate average share time (using current hashrate)
+                            var avg_share_time = 0;
+                            if (miners.length > 0) {
+                                var total_time = d3.sum(miners, function(m) {
+                                    return m.totalHashrate > 0 ? 1 / m.totalHashrate : 0;
+                                });
+                                avg_share_time = total_time / miners.length * Math.pow(2, 32);
+                            }
+                            d3.select('#avg_share_time').text(format_dt(avg_share_time));
+                            
+                            // Render miner cards with workers
+                            renderMiners(miners, avg_24h, payouts, merged_payouts);
+                        });
+                    });
+                });
+            });
+        }
+        
+        function renderMiners(miners, avg_24h, payouts, merged_payouts) {
+            var container = d3.select('#miners_grid');
+            container.selectAll('*').remove();
+            
+            if (miners.length === 0) {
+                container.append('div')
+                    .attr('class', 'loading')
+                    .style('grid-column', '1 / -1')
+                    .text('No active miners');
+                return;
+            }
+            
+            miners.forEach(function(miner) {
+                var card = container.append('div').attr('class', 'miner-card');
+                
+                // Header with link to detail page
+                var header = card.append('div').attr('class', 'miner-header');
+                var addr_div = header.append('div').attr('class', 'miner-address');
+                
+                // Link to individual miner page
+                addr_div.append('a')
+                    .attr('href', 'miner.html?address=' + miner.address)
+                    .text(miner.address);
+                
+                // Add external blockchain explorer link
+                addr_div.append('a')
+                    .attr('href', currency_info.address_explorer_url_prefix + miner.address)
+                    .attr('target', '_blank')
+                    .attr('style', 'margin-left: 10px; font-size: 0.8rem;')
+                    .text('↗');
+                
+                // Worker count badge
+                if (miner.workers.length > 1) {
+                    addr_div.append('span')
+                        .attr('style', 'display: inline-block; margin-left: 10px; background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;')
+                        .text(miner.workers.length + ' workers');
+                }
+                
+                // Stats (aggregated)
+                var stats = card.append('div').attr('class', 'miner-stats');
+                
+                // Total Hashrate
+                var hr_stat = stats.append('div').attr('class', 'miner-stat');
+                hr_stat.append('div').attr('class', 'miner-stat-label').text('Total Hashrate');
+                hr_stat.append('div').attr('class', 'miner-stat-value success')
+                    .text(format_hashrate(miner.totalHashrate));
+                
+                // DOA Rate
+                var doa_stat = stats.append('div').attr('class', 'miner-stat');
+                doa_stat.append('div').attr('class', 'miner-stat-label').text('DOA Rate');
+                var doa_class = miner.doa_percent > 0.05 ? 'danger' : (miner.doa_percent > 0.02 ? 'warning' : 'success');
+                doa_stat.append('div').attr('class', 'miner-stat-value ' + doa_class)
+                    .text(d3.format('.2%')(miner.doa_percent));
+                
+                // 24h Average Hashrate (aggregated)
+                var avg_stat = stats.append('div').attr('class', 'miner-stat');
+                avg_stat.append('div').attr('class', 'miner-stat-label').text('24h Avg Hashrate');
+                var total_avg = 0;
+                miner.workers.forEach(function(w) {
+                    total_avg += avg_24h[w.name] || 0;
+                });
+                avg_stat.append('div').attr('class', 'miner-stat-value')
+                    .text(format_hashrate(total_avg));
+                
+                // Predicted Payout
+                var payout_stat = stats.append('div').attr('class', 'miner-stat');
+                payout_stat.append('div').attr('class', 'miner-stat-label').text('Predicted Payout');
+                var payout = payouts[miner.address] || 0;
+                payout_stat.append('div').attr('class', 'miner-stat-value')
+                    .html(d3.format('.4f')(payout) + ' <span class="symbol-small">' + (currency_info.symbol || 'LTC') + '</span>');
+                
+                // DOA Hashrate
+                var doa_hr_stat = stats.append('div').attr('class', 'miner-stat');
+                doa_hr_stat.append('div').attr('class', 'miner-stat-label').text('DOA Hashrate');
+                doa_hr_stat.append('div').attr('class', 'miner-stat-value')
+                    .text(format_hashrate(miner.totalDoa));
+                
+                // Merged Mining Payouts
+                if (merged_payouts[miner.address] && merged_payouts[miner.address].merged) {
+                    merged_payouts[miner.address].merged.forEach(function(mp) {
+                        var merged_stat = stats.append('div').attr('class', 'miner-stat');
+                        merged_stat.append('div').attr('class', 'miner-stat-label')
+                            .html('🔗 ' + mp.symbol + ' Payout');
+                        merged_stat.append('div').attr('class', 'miner-stat-value success')
+                            .html(d3.format(',.2f')(mp.amount) + ' <span style="font-size: 0.7rem;">' + mp.symbol + '</span>');
+                    });
+                }
+                
+                // Workers section (if multiple workers)
+                if (miner.workers.length > 1) {
+                    var workers_section = card.append('div').attr('class', 'workers-section');
+                    workers_section.append('div')
+                        .attr('class', 'workers-header')
+                        .html('👷 Workers (' + miner.workers.length + ')');
+                    
+                    var table_container = workers_section.append('div').attr('class', 'workers-table-container');
+                    var table = table_container.append('table');
+                    var thead = table.append('thead').append('tr');
+                    thead.append('th').text('Worker Name');
+                    thead.append('th').text('Hashrate');
+                    thead.append('th').text('DOA Rate');
+                    thead.append('th').text('24h Avg');
+                    
+                    var tbody = table.append('tbody');
+                    miner.workers.forEach(function(worker) {
+                        var row = tbody.append('tr');
+                        row.append('td')
+                            .attr('class', 'worker-name')
+                            .text(worker.name);
+                        row.append('td').text(format_hashrate(worker.hashrate));
+                        var worker_doa_percent = worker.hashrate > 0 ? worker.doa_hashrate / worker.hashrate : 0;
+                        row.append('td').text(d3.format('.2%')(worker_doa_percent));
+                        row.append('td').text(format_hashrate(avg_24h[worker.name] || 0));
+                    });
+                }
+            });
+        }
+        
+        // Load data on page load
+        loadMiners();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadMiners, 30000);
+    </script>
+</body>
+</html>

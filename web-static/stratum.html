@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2Pool - Stratum Statistics</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+    <script src="d3.v2.min.js"></script>
+    <style>
+        :root {
+            --primary: #008de4;
+            --primary-dark: #0066a9;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --dark: #1a1a2e;
+            --darker: #16162a;
+            --card-bg: #252540;
+            --text: #e0e0e0;
+            --text-muted: #8888a0;
+            --border: #3a3a5a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .logo .badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        nav a, nav button {
+            color: var(--text);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            background: var(--darker);
+            border: none;
+            cursor: pointer;
+        }
+        
+        nav a:hover, nav button:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        nav a.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        nav .refresh-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+        
+        nav .refresh-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        nav .refresh-btn.active {
+            background: var(--success);
+            border-color: var(--success);
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .stats-grid-4col {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .stat-value.primary { color: var(--primary); }
+        .stat-value.success { color: var(--success); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+        
+        .stat-unit {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* Section */
+        .section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            margin-bottom: 25px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .section-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .last-update {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            text-align: left;
+            padding: 12px 15px;
+            background: var(--darker);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        
+        th:first-child { border-radius: 8px 0 0 8px; }
+        th:last-child { border-radius: 0 8px 8px 0; }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .hash-rate {
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: var(--primary);
+        }
+        
+        .good { color: var(--success); }
+        .bad { color: var(--danger); }
+        
+        .status-enabled {
+            color: var(--success);
+            font-weight: 600;
+        }
+        
+        /* Health Info Box */
+        .health-info {
+            padding: 15px;
+            background: var(--darker);
+            border-radius: 8px;
+            line-height: 1.8;
+        }
+        
+        .health-info p {
+            margin: 0;
+        }
+        
+        /* Security Monitor Styles */
+        .security-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .security-card {
+            background: var(--darker);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .security-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .security-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .security-value.normal { color: var(--success); }
+        .security-value.elevated { color: var(--warning); }
+        .security-value.critical { color: var(--danger); }
+        
+        .security-unit {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+        
+        .threat-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .threat-normal { background: rgba(40, 167, 69, 0.2); color: var(--success); }
+        .threat-elevated { background: rgba(255, 193, 7, 0.2); color: var(--warning); }
+        .threat-warning { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .threat-critical { background: rgba(220, 53, 69, 0.3); color: var(--danger); animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .threat-info {
+            background: var(--darker);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .threat-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--warning);
+        }
+        
+        .threat-list {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--text);
+        }
+        
+        .threat-list li {
+            margin: 5px 0;
+        }
+        
+        .suspicious-workers {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .suspicious-workers .threat-title {
+            color: var(--danger);
+        }
+        
+        /* Ban Tabs */
+        .ban-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .ban-tab {
+            padding: 8px 16px;
+            background: var(--darker);
+            border: none;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .ban-tab:hover {
+            color: var(--text);
+        }
+        
+        .ban-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .ban-count {
+            background: var(--danger);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .no-bans, .no-data {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.success {
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success);
+        }
+        
+        .status-badge.warning {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+        
+        .status-badge.danger {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+        
+        .ban-tab-content table {
+            width: 100%;
+        }
+        
+        .time-remaining {
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: var(--warning);
+        }
+        
+        .ip-status-ok {
+            color: var(--success);
+        }
+        
+        .ip-status-warning {
+            color: var(--warning);
+        }
+        
+        .ip-status-danger {
+            color: var(--danger);
+        }
+        
+        /* Error Message */
+        #error-msg {
+            background: rgba(220, 53, 69, 0.15);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: none;
+            color: var(--danger);
+        }
+        
+        /* Two column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        @media (max-width: 900px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 20px;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 15px; }
+            .header-content { flex-direction: column; align-items: flex-start; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stats-grid-4col { grid-template-columns: repeat(2, 1fr); }
+            .stat-value { font-size: 1.4rem; }
+            nav { width: 100%; justify-content: flex-start; }
+            table { font-size: 0.8rem; }
+            th, td { padding: 8px 10px; }
+        }
+        
+        @media (max-width: 500px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .stats-grid-4col { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>P2Pool</h1>
+                    <span class="badge">Stratum Stats</span>
+                </div>
+                <nav>
+                    <a href="dashboard.html">Dashboard</a>
+                    <a href="graphs.html">Graphs</a>
+                    <a href="stratum.html" class="active">Stratum</a>
+                    <a href="miners.html">Miners</a>
+                    <a href="index.html">Classic</a>
+                    <button class="refresh-btn" onclick="manualRefresh()" title="Refresh data">🔄 Refresh</button>
+                    <button class="refresh-btn" id="auto-refresh-btn" onclick="toggleAutoRefresh()" title="Toggle auto-refresh">⏸ Auto: OFF</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container">
+        <div id="error-msg"></div>
+        
+        <!-- Pool Overview Stats - Row 1 -->
+        <div class="stats-grid-4col">
+            <div class="stat-card" title="Total TCP socket connections from all miners">
+                <h3>🔗 Active Connections</h3>
+                <div class="stat-value primary" id="connections">-</div>
+                <div class="stat-unit">TCP sockets</div>
+            </div>
+            <div class="stat-card" title="Unique worker names (miner identifiers)">
+                <h3>👷 Unique Workers</h3>
+                <div class="stat-value" id="workers">-</div>
+                <div class="stat-unit">miners</div>
+            </div>
+            <div class="stat-card" title="Connections per worker - Normal: 1-3, Warning: >3 may indicate connection issues">
+                <h3>📡 Conn/Worker Ratio</h3>
+                <div class="stat-value" id="conn_ratio">-</div>
+                <div class="stat-unit" id="conn_ratio_status">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>⏱️ Stratum Uptime</h3>
+                <div class="stat-value" id="uptime">-</div>
+            </div>
+        </div>
+        
+        <!-- Pool Overview Stats - Row 2 -->
+        <div class="stats-grid-4col">
+            <div class="stat-card">
+                <h3>✅ Total Accepted</h3>
+                <div class="stat-value success" id="total_accepted">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>❌ Total Rejected</h3>
+                <div class="stat-value" id="total_rejected">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>📊 Reject Rate</h3>
+                <div class="stat-value" id="reject_rate">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>⚡ Submission Rate</h3>
+                <div class="stat-value" id="submission_rate">-</div>
+                <div class="stat-unit">shares/sec</div>
+            </div>
+        </div>
+        
+        <!-- Share Statistics -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📊 Share Statistics (Last Hour)</h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>✅ Total Shares</h3>
+                    <div class="stat-value" id="shares_total">-</div>
+                    <div class="stat-unit">submitted</div>
+                </div>
+                <div class="stat-card">
+                    <h3>🟢 Valid Shares</h3>
+                    <div class="stat-value success" id="shares_valid">-</div>
+                    <div class="stat-unit">accepted</div>
+                </div>
+                <div class="stat-card">
+                    <h3>👻 Orphan Shares</h3>
+                    <div class="stat-value warning" id="shares_orphan">-</div>
+                    <div class="stat-sub">Rate: <span id="orphan_rate">-</span></div>
+                </div>
+                <div class="stat-card">
+                    <h3>💀 Dead/DOA Shares</h3>
+                    <div class="stat-value danger" id="shares_dead">-</div>
+                    <div class="stat-sub">Rate: <span id="doa_rate">-</span></div>
+                </div>
+                <div class="stat-card">
+                    <h3>⚠️ Total Stale</h3>
+                    <div class="stat-value" id="shares_stale">-</div>
+                    <div class="stat-sub">Rate: <span id="stale_rate">-</span></div>
+                </div>
+                <div class="stat-card">
+                    <h3>🎯 Efficiency</h3>
+                    <div class="stat-value primary" id="share_efficiency">-</div>
+                    <div class="stat-unit">valid/total</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Connection Health Info -->
+        <div class="section" id="conn-health-section" style="display: none;">
+            <div class="section-header">
+                <h2>ℹ️ Connection Health</h2>
+            </div>
+            <div class="health-info" id="conn-health-info"></div>
+        </div>
+        
+        <!-- Connected Workers -->
+        <div class="section">
+            <div class="section-header">
+                <h2>👷 Connected Workers</h2>
+                <span class="last-update" id="last-refresh">Loading...</span>
+            </div>
+            <table id="workers-table">
+                <thead>
+                    <tr>
+                        <th>Worker</th>
+                        <th>Hash Rate</th>
+                        <th>Shares</th>
+                        <th>Accepted</th>
+                        <th>Rejected</th>
+                        <th>Last Seen</th>
+                        <th>Connected</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        
+        <div class="two-col">
+            <!-- Stratum Extensions -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🔌 Protocol Extensions</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Extension</th>
+                            <th>BIP</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>version-rolling</td>
+                            <td>BIP320</td>
+                            <td class="status-enabled">✓ Enabled</td>
+                        </tr>
+                        <tr>
+                            <td>minimum-difficulty</td>
+                            <td>BIP310</td>
+                            <td class="status-enabled">✓ Enabled</td>
+                        </tr>
+                        <tr>
+                            <td>subscribe-extranonce</td>
+                            <td>NiceHash</td>
+                            <td class="status-enabled">✓ Enabled</td>
+                        </tr>
+                        <tr>
+                            <td>mining.suggest_difficulty</td>
+                            <td>Standard</td>
+                            <td class="status-enabled">✓ Enabled</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pool Safeguards -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🛡️ Pool Safeguards</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Safeguard</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Min Difficulty Floor</td>
+                            <td>0.001</td>
+                        </tr>
+                        <tr>
+                            <td>Max Difficulty Ceiling</td>
+                            <td>1,000,000</td>
+                        </tr>
+                        <tr>
+                            <td>Global Rate Limit</td>
+                            <td>1000 shares/sec</td>
+                        </tr>
+                        <tr>
+                            <td>Per-Connection Limit</td>
+                            <td>100 shares/sec</td>
+                        </tr>
+                        <tr>
+                            <td>Session Storage</td>
+                            <td>10,000 max, 1hr TTL</td>
+                        </tr>
+                        <tr>
+                            <td>Max Connections/IP</td>
+                            <td id="max_conn_per_ip">50</td>
+                        </tr>
+                        <tr>
+                            <td>Ban Duration</td>
+                            <td>1 hour</td>
+                        </tr>
+                        <tr>
+                            <td>Ban Threshold</td>
+                            <td>10 violations</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Security / DDoS Monitoring -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🔒 Security Monitor</h2>
+                <span id="threat-badge" class="threat-badge threat-normal">● Normal</span>
+            </div>
+            <div class="security-grid">
+                <div class="security-card">
+                    <div class="security-label">Submission Rate (10s)</div>
+                    <div class="security-value" id="rate_10s">-</div>
+                    <div class="security-unit">shares/sec</div>
+                </div>
+                <div class="security-card">
+                    <div class="security-label">Submission Rate (60s)</div>
+                    <div class="security-value" id="rate_60s">-</div>
+                    <div class="security-unit">shares/sec</div>
+                </div>
+                <div class="security-card">
+                    <div class="security-label">Burst Ratio</div>
+                    <div class="security-value" id="burst_ratio">-</div>
+                    <div class="security-unit" id="burst_status">10s/60s rate</div>
+                </div>
+                <div class="security-card">
+                    <div class="security-label">Rate Limit Usage</div>
+                    <div class="security-value" id="rate_limit_pct">-</div>
+                    <div class="security-unit">of max capacity</div>
+                </div>
+                <div class="security-card">
+                    <div class="security-label">Banned IPs</div>
+                    <div class="security-value" id="banned_ips">0</div>
+                    <div class="security-unit">active bans</div>
+                </div>
+                <div class="security-card">
+                    <div class="security-label">Banned Workers</div>
+                    <div class="security-value" id="banned_workers">0</div>
+                    <div class="security-unit">active bans</div>
+                </div>
+            </div>
+            <div class="threat-info" id="threat-info" style="display: none;">
+                <div class="threat-title" id="threat-title">⚠️ Warnings</div>
+                <ul class="threat-list" id="threat-list"></ul>
+            </div>
+            <div class="suspicious-workers" id="suspicious-section" style="display: none;">
+                <div class="threat-title">🚨 Suspicious Workers</div>
+                <table id="suspicious-table">
+                    <thead>
+                        <tr>
+                            <th>Worker</th>
+                            <th>Submission Rate</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Banned Nodes List -->
+        <div class="section" id="banned-section" style="display: none;">
+            <div class="section-header">
+                <h2>🚫 Banned Nodes</h2>
+                <span class="ban-count" id="ban-total-count">0 active</span>
+            </div>
+            <div class="ban-tabs">
+                <button class="ban-tab active" onclick="showBanTab('ips')">Banned IPs</button>
+                <button class="ban-tab" onclick="showBanTab('workers')">Banned Workers</button>
+            </div>
+            <div id="banned-ips-tab" class="ban-tab-content">
+                <table id="banned-ips-table">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Connections</th>
+                            <th>Ban Expires</th>
+                            <th>Time Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="no-bans" id="no-banned-ips">No banned IPs</div>
+            </div>
+            <div id="banned-workers-tab" class="ban-tab-content" style="display: none;">
+                <table id="banned-workers-table">
+                    <thead>
+                        <tr>
+                            <th>Worker Name</th>
+                            <th>Ban Expires</th>
+                            <th>Time Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="no-bans" id="no-banned-workers">No banned workers</div>
+            </div>
+        </div>
+        
+        <!-- Per-IP Connection Stats -->
+        <div class="section" id="ip-connections-section">
+            <div class="section-header">
+                <h2>📡 Connections by IP</h2>
+            </div>
+            <table id="ip-connections-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Active Connections</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <div class="no-data" id="no-ip-connections">No connections</div>
+        </div>
+    </main>
+    
+    <footer>
+        <p>P2Pool Stratum Server | <a href="https://github.com/frstrtr/p2pool-dash" target="_blank">GitHub</a></p>
+    </footer>
+    
+    <script>
+        function format_dt(dt) {
+            var pairs = [
+                [365.2425*60*60*24, 'years'],
+                [60*60*24, 'days'],
+                [60*60, 'hours'],
+                [60, 'minutes'],
+                [1, 'seconds'],
+            ];
+            for(var i in pairs) {
+                var value = pairs[i][0];
+                var name = pairs[i][1];
+                if(dt > value) break;
+            }
+            return d3.format('.1f')(dt/value) + ' ' + name;
+        }
+        
+        function format_hashrate(h) {
+            if (h >= 1e15) return d3.format('.2f')(h/1e15) + ' PH/s';
+            if (h >= 1e12) return d3.format('.2f')(h/1e12) + ' TH/s';
+            if (h >= 1e9) return d3.format('.2f')(h/1e9) + ' GH/s';
+            if (h >= 1e6) return d3.format('.2f')(h/1e6) + ' MH/s';
+            if (h >= 1e3) return d3.format('.2f')(h/1e3) + ' KH/s';
+            return d3.format('.0f')(h) + ' H/s';
+        }
+        
+        function format_time_ago(timestamp) {
+            if (!timestamp) return 'never';
+            var now = Date.now() / 1000;
+            var diff = now - timestamp;
+            if (diff < 60) return Math.floor(diff) + 's ago';
+            if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+            return Math.floor(diff/86400) + 'd ago';
+        }
+        
+        function update_stats() {
+            d3.json('../stratum_stats', function(data) {
+                if (!data) {
+                    d3.select('#error-msg').style('display', 'block')
+                        .text('Error: No data received from server');
+                    return;
+                }
+                if (data.error) {
+                    d3.select('#error-msg').style('display', 'block')
+                        .text('Server error: ' + data.error);
+                    return;
+                }
+                d3.select('#error-msg').style('display', 'none');
+                
+                var pool = data.pool || {};
+                var workers = data.workers || {};
+                
+                // Update pool stats
+                var connections = pool.connections || 0;
+                var workerCount = Object.keys(workers).length || pool.workers || 0;
+                
+                d3.select('#connections').text(connections);
+                d3.select('#workers').text(workerCount);
+                d3.select('#total_accepted').text(d3.format(',')(pool.total_accepted || 0));
+                d3.select('#total_rejected').text(d3.format(',')(pool.total_rejected || 0));
+                d3.select('#submission_rate').text(d3.format('.1f')(pool.submission_rate || 0));
+                d3.select('#uptime').text(format_dt(pool.uptime || 0));
+                
+                // Calculate and display connection/worker ratio with health status
+                var ratio = workerCount > 0 ? connections / workerCount : 0;
+                var ratioEl = d3.select('#conn_ratio');
+                var ratioStatusEl = d3.select('#conn_ratio_status');
+                var healthSection = d3.select('#conn-health-section');
+                var healthInfo = d3.select('#conn-health-info');
+                
+                ratioEl.text(d3.format('.1f')(ratio));
+                
+                if (workerCount === 0) {
+                    ratioEl.attr('class', 'stat-value');
+                    ratioStatusEl.text('no workers');
+                    healthSection.style('display', 'none');
+                } else if (ratio <= 1.5) {
+                    // 1 connection per worker - single connection miners
+                    ratioEl.attr('class', 'stat-value success');
+                    ratioStatusEl.text('✓ single-conn miners');
+                    healthSection.style('display', 'none');
+                } else if (ratio <= 3.0) {
+                    // 2-3 connections per worker - normal for most ASICs
+                    ratioEl.attr('class', 'stat-value success');
+                    ratioStatusEl.text('✓ normal (dual-conn)');
+                    healthSection.style('display', 'block');
+                    healthInfo.html('<p style="color: var(--success);">✓ <strong>Healthy:</strong> Each miner maintains ~' + d3.format('.0f')(ratio) + ' connections.</p>' +
+                        '<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">This is normal behavior. Many ASICs (like Bitmain D-series) maintain dual TCP connections for redundancy and faster job switching.</p>');
+                } else if (ratio <= 5.0) {
+                    // 4-5 connections per worker - slightly elevated
+                    ratioEl.attr('class', 'stat-value warning');
+                    ratioStatusEl.text('⚠ elevated');
+                    healthSection.style('display', 'block');
+                    healthInfo.html('<p style="color: var(--warning);">⚠ <strong>Elevated:</strong> ~' + d3.format('.1f')(ratio) + ' connections per worker.</p>' +
+                        '<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">This may indicate connection instability, frequent reconnects, or stale connections not being cleaned up. Check if miners are experiencing network issues.</p>');
+                } else {
+                    // >5 connections per worker - anomaly
+                    ratioEl.attr('class', 'stat-value danger');
+                    ratioStatusEl.text('⚠ anomaly detected');
+                    healthSection.style('display', 'block');
+                    healthInfo.html('<p style="color: var(--danger);">⚠ <strong>Anomaly:</strong> ' + d3.format('.1f')(ratio) + ' connections per worker is unusually high.</p>' +
+                        '<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">Possible causes:<br>' +
+                        '• Connection leaks (stale sockets not closing)<br>' +
+                        '• Miner firmware bugs creating duplicate connections<br>' +
+                        '• Network instability causing rapid reconnects<br>' +
+                        '• Possible connection flood attack<br><br>' +
+                        'Consider restarting miners or investigating network stability.</p>');
+                }
+                
+                // Calculate reject rate
+                var total = (pool.total_accepted || 0) + (pool.total_rejected || 0);
+                var reject_pct = total > 0 ? ((pool.total_rejected || 0) / total * 100) : 0;
+                var rejectEl = d3.select('#reject_rate');
+                rejectEl.text(d3.format('.2f')(reject_pct) + '%');
+                rejectEl.attr('class', reject_pct > 5 ? 'stat-value danger' : 'stat-value success');
+                
+                // Update workers table
+                var tbody = d3.select('#workers-table tbody');
+                tbody.selectAll('tr').remove();
+                
+                // Sort workers by hash rate (descending)
+                var workerList = [];
+                for (var name in workers) {
+                    workerList.push({name: name, stats: workers[name]});
+                }
+                workerList.sort(function(a, b) { return (b.stats.hash_rate || 0) - (a.stats.hash_rate || 0); });
+                
+                workerList.forEach(function(w) {
+                    var s = w.stats;
+                    var wr = (s.accepted || 0) + (s.rejected || 0);
+                    var wRejectPct = wr > 0 ? (s.rejected || 0) / wr * 100 : 0;
+                    
+                    var tr = tbody.append('tr');
+                    tr.append('td')
+                        .text(w.name.length > 25 ? w.name.substr(0, 12) + '...' + w.name.substr(-8) : w.name)
+                        .attr('title', w.name);
+                    tr.append('td').attr('class', 'hash-rate').text(format_hashrate(s.hash_rate || 0));
+                    tr.append('td').text(d3.format(',')(s.shares || 0));
+                    tr.append('td').attr('class', 'good').text(d3.format(',')(s.accepted || 0));
+                    tr.append('td').attr('class', wRejectPct > 5 ? 'bad' : '')
+                        .text(d3.format(',')(s.rejected || 0) + ' (' + d3.format('.1f')(wRejectPct) + '%)');
+                    tr.append('td').text(format_time_ago(s.last_seen));
+                    tr.append('td').text(s.first_seen ? format_dt(s.last_seen - s.first_seen) : '-');
+                });
+                
+                if (workerList.length === 0) {
+                    tbody.append('tr')
+                        .append('td').attr('colspan', '7')
+                        .style('text-align', 'center')
+                        .style('color', 'var(--text-muted)')
+                        .text('No workers connected');
+                }
+                
+                // Update IP Connections table
+                var ipConns = pool.ip_connections || {};
+                var ipWorkers = pool.ip_workers || {};  // Number of unique workers per IP
+                var thresholds = pool.threat_thresholds || {
+                    connection_worker_elevated: 4.0,
+                    connection_worker_warning: 6.0
+                };
+                var ipTbody = d3.select('#ip-connections-table tbody');
+                ipTbody.selectAll('tr').remove();
+                
+                var ipList = [];
+                for (var ip in ipConns) {
+                    var connCount = ipConns[ip];
+                    var workerCount = ipWorkers[ip] || 1;  // Default to 1 if not available
+                    var connPerWorker = connCount / workerCount;
+                    ipList.push({
+                        ip: ip, 
+                        count: connCount, 
+                        workers: workerCount,
+                        ratio: connPerWorker
+                    });
+                }
+                ipList.sort(function(a, b) { return b.count - a.count; });
+                
+                if (ipList.length > 0) {
+                    d3.select('#no-ip-connections').style('display', 'none');
+                    ipList.forEach(function(item) {
+                        var tr = ipTbody.append('tr');
+                        tr.append('td').text(item.ip);
+                        tr.append('td').text(item.count + ' (' + item.workers + ' workers)');
+                        
+                        // Status based on connection/worker ratio using network-configured thresholds
+                        // Normal: ~1 connection per worker (legitimate multi-rig miners)
+                        // Elevated: >threshold (configurable, default 4)
+                        // Warning: >warning threshold (configurable, default 6)
+                        var statusTd = tr.append('td');
+                        if (item.ratio > thresholds.connection_worker_warning) {
+                            statusTd.html('<span class="status-badge danger">⚠ High (' + item.ratio.toFixed(1) + ' conn/worker)</span>');
+                        } else if (item.ratio > thresholds.connection_worker_elevated) {
+                            statusTd.html('<span class="status-badge warning">Elevated (' + item.ratio.toFixed(1) + ' conn/worker)</span>');
+                        } else {
+                            statusTd.html('<span class="status-badge success">Normal (' + item.ratio.toFixed(1) + ' conn/worker)</span>');
+                        }
+                    });
+                } else {
+                    d3.select('#no-ip-connections').style('display', 'block');
+                }
+                
+                d3.select('#last-refresh').text('Last update: ' + new Date().toLocaleTimeString());
+            });
+            
+            // Fetch share statistics from local_stats
+            d3.json('../local_stats', function(localData) {
+                if (!localData) {
+                    console.log('Local stats not available');
+                    return;
+                }
+                
+                // Share counts from my_share_counts_in_last_hour
+                var shareCounts = localData.my_share_counts_in_last_hour || {};
+                var shares = localData.shares || {};
+                var staleProps = localData.my_stale_proportions_in_last_hour || {};
+                
+                var totalShares = shareCounts.shares || shares.total || 0;
+                var orphanShares = shareCounts.orphan_stale_shares || shares.orphan || 0;
+                var deadShares = shareCounts.doa_stale_shares || shares.dead || 0;
+                var staleShares = shareCounts.stale_shares || (orphanShares + deadShares);
+                var validShares = shareCounts.unstale_shares || (totalShares - staleShares);
+                
+                // Update displays
+                d3.select('#shares_total').text(d3.format(',')(totalShares));
+                
+                var validEl = d3.select('#shares_valid');
+                validEl.text(d3.format(',')(validShares));
+                validEl.attr('class', 'stat-value success');
+                
+                var orphanEl = d3.select('#shares_orphan');
+                orphanEl.text(d3.format(',')(orphanShares));
+                orphanEl.attr('class', orphanShares > 0 ? 'stat-value warning' : 'stat-value success');
+                
+                var deadEl = d3.select('#shares_dead');
+                deadEl.text(d3.format(',')(deadShares));
+                deadEl.attr('class', deadShares > 0 ? 'stat-value danger' : 'stat-value success');
+                
+                d3.select('#shares_stale').text(d3.format(',')(staleShares));
+                
+                // Calculate rates
+                var orphanRate = staleProps.orphan_stale || (totalShares > 0 ? orphanShares / totalShares : 0);
+                var deadRate = staleProps.dead_stale || (totalShares > 0 ? deadShares / totalShares : 0);
+                var staleRate = staleProps.stale || (totalShares > 0 ? staleShares / totalShares : 0);
+                
+                d3.select('#orphan_rate').text(d3.format('.2%')(orphanRate));
+                d3.select('#doa_rate').text(d3.format('.2%')(deadRate));
+                d3.select('#stale_rate').text(d3.format('.2%')(staleRate));
+                
+                // Efficiency
+                var efficiency = localData.efficiency || (totalShares > 0 ? validShares / totalShares : 1);
+                var effEl = d3.select('#share_efficiency');
+                effEl.text(d3.format('.2%')(efficiency > 1 ? 1 : efficiency));
+                effEl.attr('class', efficiency >= 0.95 ? 'stat-value success' : (efficiency >= 0.90 ? 'stat-value warning' : 'stat-value danger'));
+            });
+            
+            // Fetch security stats
+            d3.json('../stratum_security', function(secData) {
+                if (!secData || secData.error) {
+                    console.log('Security stats not available:', secData ? secData.error : 'no data');
+                    return;
+                }
+                
+                // Update rate displays
+                d3.select('#rate_10s').text(d3.format('.1f')(secData.rate_10s || 0));
+                d3.select('#rate_60s').text(d3.format('.1f')(secData.rate_60s || 0));
+                
+                // Burst ratio with color coding
+                var burstRatio = secData.burst_ratio || 0;
+                var burstEl = d3.select('#burst_ratio');
+                burstEl.text(d3.format('.1f')(burstRatio) + 'x');
+                
+                var burstStatus = d3.select('#burst_status');
+                if (burstRatio > 5) {
+                    burstEl.attr('class', 'security-value critical');
+                    burstStatus.text('⚠ spike detected!');
+                } else if (burstRatio > 3) {
+                    burstEl.attr('class', 'security-value elevated');
+                    burstStatus.text('elevated burst');
+                } else {
+                    burstEl.attr('class', 'security-value normal');
+                    burstStatus.text('normal variance');
+                }
+                
+                // Rate limit usage
+                var maxRate = secData.limits ? secData.limits.max_submissions_per_sec : 1000;
+                var ratePct = (secData.rate_10s / maxRate) * 100;
+                var rateEl = d3.select('#rate_limit_pct');
+                rateEl.text(d3.format('.1f')(ratePct) + '%');
+                
+                if (ratePct > 80) {
+                    rateEl.attr('class', 'security-value critical');
+                } else if (ratePct > 50) {
+                    rateEl.attr('class', 'security-value elevated');
+                } else {
+                    rateEl.attr('class', 'security-value normal');
+                }
+                
+                // Banned counts
+                var bannedIPs = secData.banned_ips_count || 0;
+                var bannedWorkers = secData.banned_workers_count || 0;
+                var bannedIPsEl = d3.select('#banned_ips');
+                var bannedWorkersEl = d3.select('#banned_workers');
+                
+                bannedIPsEl.text(bannedIPs);
+                bannedWorkersEl.text(bannedWorkers);
+                
+                if (bannedIPs > 0) {
+                    bannedIPsEl.attr('class', 'security-value elevated');
+                } else {
+                    bannedIPsEl.attr('class', 'security-value normal');
+                }
+                
+                if (bannedWorkers > 0) {
+                    bannedWorkersEl.attr('class', 'security-value elevated');
+                } else {
+                    bannedWorkersEl.attr('class', 'security-value normal');
+                }
+                
+                // Update limits display
+                if (secData.limits) {
+                    d3.select('#max_conn_per_ip').text(secData.limits.max_connections_per_ip || 50);
+                }
+                
+                // Threat level badge
+                var threatBadge = d3.select('#threat-badge');
+                var threatLevel = secData.threat_level || 0;
+                var threatLabels = ['● Normal', '● Elevated', '● Warning', '● CRITICAL'];
+                var threatClasses = ['threat-normal', 'threat-elevated', 'threat-warning', 'threat-critical'];
+                
+                threatBadge.text(threatLabels[threatLevel]);
+                threatBadge.attr('class', 'threat-badge ' + threatClasses[threatLevel]);
+                
+                // Threat reasons
+                var threatInfo = d3.select('#threat-info');
+                var threatList = d3.select('#threat-list');
+                var reasons = secData.threat_reasons || [];
+                
+                if (reasons.length > 0) {
+                    threatInfo.style('display', 'block');
+                    threatList.selectAll('li').remove();
+                    reasons.forEach(function(reason) {
+                        threatList.append('li').text(reason);
+                    });
+                    
+                    // Update title color based on threat level
+                    var titleColors = ['var(--success)', 'var(--warning)', '#ff9800', 'var(--danger)'];
+                    d3.select('#threat-title').style('color', titleColors[threatLevel]);
+                } else {
+                    threatInfo.style('display', 'none');
+                }
+                
+                // Suspicious workers
+                var suspiciousSection = d3.select('#suspicious-section');
+                var suspicious = secData.suspicious_workers || [];
+                
+                if (suspicious.length > 0) {
+                    suspiciousSection.style('display', 'block');
+                    var tbody = d3.select('#suspicious-table tbody');
+                    tbody.selectAll('tr').remove();
+                    
+                    suspicious.forEach(function(w) {
+                        var tr = tbody.append('tr');
+                        tr.append('td').text(w.name.length > 30 ? w.name.substr(0, 15) + '...' + w.name.substr(-10) : w.name)
+                            .attr('title', w.name);
+                        tr.append('td').attr('class', 'bad').text(d3.format('.1f')(w.rate) + ' shares/sec');
+                        tr.append('td').attr('class', 'bad').text('⚠ High Rate');
+                    });
+                } else {
+                    suspiciousSection.style('display', 'none');
+                }
+            });
+        }
+        
+        // Initial load
+        update_stats();
+        
+        // Manual refresh - auto-refresh disabled by default to reduce backend load
+        var autoRefreshInterval = null;
+        
+        function toggleAutoRefresh() {
+            var btn = document.getElementById('auto-refresh-btn');
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.textContent = '⏸ Auto: OFF';
+                btn.classList.remove('active');
+            } else {
+                autoRefreshInterval = setInterval(update_stats, 10000);
+                btn.textContent = '▶ Auto: ON (10s)';
+                btn.classList.add('active');
+            }
+        }
+        
+        function manualRefresh() {
+            update_stats();
+            loadBanData();
+        }
+        
+        // Load and display ban data
+        function loadBanData() {
+            d3.json('/ban_stats', function(error, data) {
+                if (error || !data) {
+                    console.log('Ban stats not available');
+                    return;
+                }
+                
+                // Update ban counts
+                d3.select('#banned-ips-count').text(data.banned_ips_count || 0);
+                d3.select('#banned-workers-count').text(data.banned_workers_count || 0);
+                
+                // Populate banned IPs table
+                var ipsTbody = d3.select('#banned-ips-table tbody');
+                ipsTbody.selectAll('tr').remove();
+                
+                var bannedIps = data.banned_ips || [];
+                if (bannedIps.length > 0) {
+                    bannedIps.forEach(function(ban) {
+                        var tr = ipsTbody.append('tr');
+                        tr.append('td').attr('class', 'mono').text(ban.ip);
+                        tr.append('td').text(formatTimestamp(ban.banned_at));
+                        tr.append('td').text(formatTimestamp(ban.expires_at));
+                        tr.append('td').text(formatDuration(ban.remaining_seconds));
+                        tr.append('td').text(ban.reason || 'Policy violation');
+                    });
+                } else {
+                    var tr = ipsTbody.append('tr');
+                    tr.append('td').attr('colspan', '5').attr('class', 'empty-msg').text('No banned IPs');
+                }
+                
+                // Populate banned workers table
+                var workersTbody = d3.select('#banned-workers-table tbody');
+                workersTbody.selectAll('tr').remove();
+                
+                var bannedWorkers = data.banned_workers || [];
+                if (bannedWorkers.length > 0) {
+                    bannedWorkers.forEach(function(ban) {
+                        var tr = workersTbody.append('tr');
+                        var workerName = ban.worker;
+                        if (workerName.length > 30) {
+                            workerName = workerName.substr(0, 15) + '...' + workerName.substr(-10);
+                        }
+                        tr.append('td').attr('class', 'mono').attr('title', ban.worker).text(workerName);
+                        tr.append('td').text(formatTimestamp(ban.banned_at));
+                        tr.append('td').text(formatTimestamp(ban.expires_at));
+                        tr.append('td').text(formatDuration(ban.remaining_seconds));
+                        tr.append('td').text(ban.reason || 'Policy violation');
+                    });
+                } else {
+                    var tr = workersTbody.append('tr');
+                    tr.append('td').attr('colspan', '5').attr('class', 'empty-msg').text('No banned workers');
+                }
+                
+                // Display violation tracking info
+                var violations = data.ip_violations || [];
+                if (violations.length > 0) {
+                    var violationsInfo = violations.slice(0, 5).map(function(v) {
+                        return v.ip + ': ' + v.violations + ' violations';
+                    }).join(', ');
+                    if (violations.length > 5) {
+                        violationsInfo += ' (+' + (violations.length - 5) + ' more)';
+                    }
+                    // Could add a violations section here if desired
+                }
+            });
+        }
+        
+        function formatTimestamp(ts) {
+            if (!ts) return '-';
+            var date = new Date(ts * 1000);
+            var now = new Date();
+            var diff = (now - date) / 1000;
+            
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400 && date.getDate() === now.getDate()) {
+                return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+            }
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        }
+        
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return 'Expired';
+            if (seconds < 60) return seconds + 's';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
+            var hours = Math.floor(seconds / 3600);
+            var mins = Math.floor((seconds % 3600) / 60);
+            return hours + 'h ' + mins + 'm';
+        }
+        
+        // Load ban data on page load
+        loadBanData();
+    </script>
+</body>
+</html>
