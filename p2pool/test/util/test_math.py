@@ -36,3 +36,22 @@ class Test(unittest.TestCase):
             for x in xrange(n + 1):
                 left, right = math.binomial_conf_interval(x, n)
                 assert 0 <= left <= x/n <= right <= 1, (left, right, x, n)
+
+    def test_convertbits(self):
+        self.assertListEqual([0], math.convertbits([0], 8, 16, True))
+        self.assertEqual(None, math.convertbits([0], 8, 16, False))
+        self.assertListEqual([0], math.convertbits([0, 0], 8, 16, False))
+        self.assertListEqual([0, 0], math.convertbits([0], 16, 8, False))
+        self.assertListEqual([255], math.convertbits([0, 255], 8, 16, False))
+        self.assertListEqual([65280], math.convertbits([255], 8, 16, True))
+        self.assertListEqual([65535], math.convertbits([255, 255], 8, 16, True))
+        self.assertListEqual([0, 255], math.convertbits([255], 16, 8, False))
+        self.assertListEqual([255, 0], math.convertbits([65280], 16, 8, False))
+        self.assertListEqual([255, 255], math.convertbits([65535], 16, 8, False))
+        self.assertListEqual([4, 11, 13, 2, 16], math.convertbits([34, 218, 40], 8, 5, True))
+        self.assertListEqual([34, 218, 40, 0], math.convertbits([4, 11, 13, 2, 16], 5, 8, True))
+        self.assertListEqual([34, 218, 40], math.convertbits([4, 11, 13, 2, 16], 5, 8, False))
+        self.assertListEqual([3, 82, 34, 218, 40], math.convertbits([0, 13, 9, 2, 5, 22, 17, 8], 5, 8, True))
+        self.assertListEqual([3, 82, 34, 218, 40], math.convertbits([0, 13, 9, 2, 5, 22, 17, 8], 5, 8, False))
+        self.assertListEqual([0, 13, 9, 2, 5, 22, 17, 8], math.convertbits([3, 82, 34, 218, 40], 8, 5, True))
+        self.assertListEqual([0, 13, 9, 2, 5, 22, 17, 8], math.convertbits([3, 82, 34, 218, 40], 8, 5, False))

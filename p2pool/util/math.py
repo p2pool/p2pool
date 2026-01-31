@@ -220,7 +220,7 @@ class RateMonitor(object):
         start_time = time.time() - self.max_lookback_time
         for i, (ts, datum) in enumerate(self.datums):
             if ts > start_time:
-                self.datums[:] = self.datums[i:]
+                del self.datums[:i]
                 return
     
     def get_datums_in_last(self, dt=None):
@@ -243,3 +243,25 @@ def merge_dicts(*dicts):
     res = {}
     for d in dicts: res.update(d)
     return res
+
+def convertbits(data, frombits, tobits, pad=True):
+    """General power-of-2 base conversion."""
+    acc = 0
+    bits = 0
+    ret = []
+    maxv = (1 << tobits) - 1
+    max_acc = (1 << (frombits + tobits - 1)) - 1
+    for value in data:
+        if value < 0 or (value >> frombits):
+            return None
+        acc = ((acc << frombits) | value) & max_acc
+        bits += frombits
+        while bits >= tobits:
+            bits -= tobits
+            ret.append((acc >> bits) & maxv)
+    if pad:
+        if bits:
+            ret.append((acc << (tobits - bits)) & maxv)
+    elif bits >= frombits or ((acc << (tobits - bits)) & maxv):
+        return None
+    return ret

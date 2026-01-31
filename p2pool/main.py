@@ -21,6 +21,7 @@ from nattraverso import portmapper, ipdiscover
 
 import bitcoin.p2p as bitcoin_p2p, bitcoin.data as bitcoin_data
 from bitcoin import stratum, worker_interface, helper
+from bitcoin.broadcaster import NetworkBroadcaster
 from util import fixargparse, jsonrpc, variable, deferral, math, logging, switchprotocol
 from . import networks, web, work
 import p2pool, p2pool.data as p2pool_data, p2pool.node as p2pool_node
@@ -64,12 +65,16 @@ class keypool():
 
     def paytotal(self):
         self.payouttotal = 0.0
+        print("pubkeys.keys: %s" % pubkeys.keys)
         for i in range(len(pubkeys.keys)):
-            self.payouttotal += node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)*1e-8
+            self.payouttotal += node.get_current_txouts().get(
+                    pubkeys.keys[i]['address'], 0) * 1e-8
         return self.payouttotal
 
     def getpaytotal(self):
         return self.payouttotal
+
+gnode = None # for debugging via rconsole/rfoo only
 
 @defer.inlineCallbacks
 def main(args, net, datadir_path, merged_urls, worker_endpoint):
@@ -99,8 +104,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         url = '%s://%s:%i/' % ('https' if args.bitcoind_rpc_ssl else 'http', args.bitcoind_address, args.bitcoind_rpc_port)
         print '''Testing bitcoind RPC connection to '%s' with username '%s'...''' % (url, args.bitcoind_rpc_username)
         bitcoind = jsonrpc.HTTPProxy(url, dict(Authorization='Basic ' + base64.b64encode(args.bitcoind_rpc_username + ':' + args.bitcoind_rpc_password)), timeout=30)
-        yield helper.check(bitcoind, net)
-        temp_work = yield helper.getwork(bitcoind)
+        yield helper.check(bitcoind, net, args)
+        temp_work = yield helper.getwork(bitcoind, net)
         
         bitcoind_getinfo_var = variable.Variable(None)
         @defer.inlineCallbacks
@@ -131,26 +136,28 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             
             if address is not None:
                 res = yield deferral.retry('Error validating cached address:', 5)(lambda: bitcoind.rpc_validateaddress(address))()
-                if not res['isvalid'] or not res['ismine']:
+                if not res['isvalid'] or (hasattr(res, 'ismine') and not res['ismine']):
                     print '    Cached address is either invalid or not controlled by local bitcoind!'
                     address = None
-            
+
             if address is None:
                 print '    Getting payout address from bitcoind...'
                 address = yield deferral.retry('Error getting payout address from bitcoind:', 5)(lambda: bitcoind.rpc_getaccountaddress('p2pool'))()
-            
+
             with open(address_path, 'wb') as f:
                 f.write(address)
-            
-            my_pubkey_hash = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
-            print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
-            print
-            pubkeys.addkey(my_pubkey_hash)
+
+            my_address = address
+            print('    ...success! Payout address: %s' % my_address)
+            print()
+
+            pubkeys.addkey({'address': my_address})
         elif args.address != 'dynamic':
-            my_pubkey_hash = args.pubkey_hash
-            print '    ...success! Payout address:', bitcoin_data.pubkey_hash_to_address(my_pubkey_hash, net.PARENT)
-            print
-            pubkeys.addkey(my_pubkey_hash)
+            my_address = args.address
+            print('    ...success! Payout address: %s' % my_address)
+            print()
+
+            pubkeys.addkey({'address': my_address})
         else:
             print '    Entering dynamic address mode.'
 
@@ -159,15 +166,14 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                 args.numaddresses = 2
             for i in range(args.numaddresses):
                 address = yield deferral.retry('Error getting a dynamic address from bitcoind:', 5)(lambda: bitcoind.rpc_getnewaddress('p2pool'))()
-                new_pubkey = bitcoin_data.address_to_pubkey_hash(address, net.PARENT)
-                pubkeys.addkey(new_pubkey)
+                pubkeys.addkey({'address': address})
 
             pubkeys.updatestamp(time.time())
 
-            my_pubkey_hash = pubkeys.keys[0]
+            my_address = pubkeys.keys[0]['address']
 
             for i in range(len(pubkeys.keys)):
-                print '    ...payout %d: %s' % (i, bitcoin_data.pubkey_hash_to_address(pubkeys.keys[i], net.PARENT),)
+                print('    ...payout %d: %s' % (i, pubkeys[i]['address']))
         
         print "Loading shares..."
         shares = {}
@@ -184,8 +190,61 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Initializing work...'
         
-        node = p2pool_node.Node(factory, bitcoind, shares.values(), known_verified, net)
+        global gnode
+        gnode = node = p2pool_node.Node(factory, bitcoind, shares.values(), known_verified, net)
         yield node.start()
+        
+        # Store external IP on node for web dashboard access
+        node.external_ip = args.p2pool_external_ip
+        
+        # Initialize block broadcaster for parallel propagation
+        broadcaster = None
+        if not args.disable_broadcaster:
+            print ''
+            print '=' * 70
+            print 'INITIALIZING MULTI-PEER BROADCASTER'
+            print '=' * 70
+            try:
+                broadcaster = NetworkBroadcaster(
+                    net=net.PARENT,
+                    coind=bitcoind,
+                    local_factory=factory,
+                    local_addr=(args.bitcoind_address, args.bitcoind_p2p_port),
+                    datadir_path=datadir_path,
+                    chain_name=net.PARENT.SYMBOL.lower()
+                )
+                
+                # Configure settings from CLI args
+                broadcaster.max_peers = args.broadcaster_max_peers
+                broadcaster.min_peers = args.broadcaster_min_peers
+                
+                # Start the broadcaster (bootstrap and begin peer management)
+                yield broadcaster.start()
+                
+                # Register with helper module for global access
+                helper.set_broadcaster(broadcaster)
+                
+                node.broadcaster = broadcaster
+                
+                print ''
+                print '*** BROADCASTER READY ***'
+                print '  Max peers: %d' % broadcaster.max_peers
+                print '  Min peers: %d' % broadcaster.min_peers
+                print '  Peer database: %d peers' % len(broadcaster.peer_db)
+                print '  Active connections: %d' % len(broadcaster.connections)
+                print '=' * 70
+                print ''
+            except Exception as e:
+                print '    ...block broadcaster failed to start (continuing without it): %s' % e
+                import traceback
+                traceback.print_exc()
+                broadcaster = None
+        else:
+            print ''
+            print 'Multi-peer broadcaster: DISABLED'
+            print '  Using local node only for block propagation'
+            print '  (Use without --disable-broadcaster to enable multi-peer broadcasting)'
+            print ''
         
         for share_hash in shares:
             if share_hash not in node.tracker.items:
@@ -208,6 +267,35 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             previous_share = shares[best_share.share_data['previous_share_hash']]
             counts = p2pool_data.get_desired_version_counts(node.tracker, node.tracker.get_nth_parent_hash(previous_share.hash, net.CHAIN_LENGTH*9//10), net.CHAIN_LENGTH//10)
             p2pool_data.update_min_protocol_version(counts, best_share)
+        
+        # Set up graceful shutdown handler
+        def sigterm_handler(signum, frame):
+            """Handle SIGTERM/SIGINT by stopping broadcaster before reactor stops"""
+            print ''
+            print 'Received shutdown signal, cleaning up...'
+            sys.stdout.flush()
+            
+            # Set stopping flag on p2p_node if it exists
+            if hasattr(node, 'p2p_node') and node.p2p_node:
+                node.p2p_node.stopping = True
+            
+            # Stop broadcaster if running
+            if broadcaster:
+                print 'Stopping broadcaster...'
+                sys.stdout.flush()
+                try:
+                    broadcaster.stop()
+                    print 'Broadcaster stopped'
+                    sys.stdout.flush()
+                except Exception as e:
+                    print 'Warning: Broadcaster shutdown error: %s' % str(e)
+                    sys.stdout.flush()
+            
+            # Now let reactor stop normally
+            reactor.callFromThread(reactor.stop)
+        
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGINT, sigterm_handler)
         
         print '    ...success!'
         print
@@ -285,7 +373,29 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
         
         print 'Listening for workers on %r port %i...' % (worker_endpoint[0], worker_endpoint[1])
         
-        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage, merged_urls, args.worker_fee, args, pubkeys, bitcoind)
+        # Convert address to pubkey_hash for WorkerBridge
+        my_pubkey_hash, _, _ = bitcoin_data.address_to_pubkey_hash(my_address, net.PARENT)
+        
+        # Log merged chain operator address configuration
+        if merged_urls:
+            print
+            print 'Merged mining configuration:'
+            if args.merged_operator_address:
+                print '    Using explicit merged chain operator address: %s' % args.merged_operator_address
+            else:
+                # Convert parent address to merged chain format for display
+                try:
+                    merged_operator_addr = bitcoin_data.pubkey_hash_to_address(
+                        my_pubkey_hash, net.PARENT.ADDRESS_VERSION, -1, net.PARENT)
+                    print '    Auto-converting parent address to merged chain format: %s' % merged_operator_addr
+                    print '    (You can override with --merged-operator-address <dogecoin_address>)'
+                except Exception as e:
+                    print '    Note: Could not preview merged chain address conversion: %s' % e
+            print
+        
+        wb = work.WorkerBridge(node, my_pubkey_hash, args.donation_percentage,
+                               merged_urls, args.worker_fee, args, pubkeys,
+                               bitcoind, args.share_rate)
         web_root = web.get_web_root(wb, datadir_path, bitcoind_getinfo_var, static_dir=args.web_static)
         caching_wb = worker_interface.CachingWorkerBridge(wb)
         worker_interface.WorkerInterface(caching_wb).attach_to(web_root, get_handler=lambda request: request.redirect('/static/'))
@@ -341,7 +451,15 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                             return
                         if share.pow_hash <= share.header['bits'].target and abs(share.timestamp - time.time()) < 10*60:
                             yield deferral.sleep(random.expovariate(1/60))
-                            message = '\x02%s BLOCK FOUND by %s! %s%064x' % (net.NAME.upper(), bitcoin_data.script2_to_address(share.new_script, net.PARENT), net.PARENT.BLOCK_EXPLORER_URL_PREFIX, share.header_hash)
+                            message = '\x02%s BLOCK FOUND by %s! %s%064x' % (
+                                    net.NAME.upper(),
+                                    bitcoin_data.script2_to_address(
+                                        share.new_script, net.ADDRESS_VERSION,
+                                        -1, net.PARENT) if
+                                            share.VERSION < 34 else
+                                                share.address,
+                                    net.PARENT.BLOCK_EXPLORER_URL_PREFIX,
+                                    share.header_hash)
                             if all('%x' % (share.header_hash,) not in old_message for old_message in self.recent_messages):
                                 self.say(self.channel, message)
                                 self._remember_message(message)
@@ -370,7 +488,7 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
             last_str = None
             last_time = 0
             while True:
-                yield deferral.sleep(3)
+                yield deferral.sleep(30)
                 try:
                     height = node.tracker.get_height(node.best_share_var.value)
                     this_str = 'P2Pool: %i shares in chain (%i verified/%i total) Peers: %i (%i incoming)' % (
@@ -399,7 +517,8 @@ def main(args, net, datadir_path, merged_urls, worker_endpoint):
                         paystr = ''
                         paytot = 0.0
                         for i in range(len(pubkeys.keys)):
-                            curtot = node.get_current_txouts().get(bitcoin_data.pubkey_hash_to_script2(pubkeys.keys[i]), 0)
+                            curtot = node.get_current_txouts().get(
+                                    pubkeys.keys[i]['address'], 0)
                             paytot += curtot*1e-8
                             paystr += "(%.4f)" % (curtot*1e-8,)
                         paystr += "=%.4f" % (paytot,)
@@ -453,6 +572,13 @@ def run():
     parser.add_argument('--debug',
         help='enable debugging mode',
         action='store_const', const=True, default=False, dest='debug')
+    parser.add_argument('--bench',
+        help='enable CPU performance profiling mode',
+        action='store_const', const=True, default=False, dest='bench')
+    parser.add_argument('--rconsole',
+        help='enable rconsole debugging mode (requires rfoo)',
+        action='store_const', const=True, default=False, dest='rconsole')
+
     parser.add_argument('-a', '--address',
         help='generate payouts to this address (default: <address requested from bitcoind>), or (dynamic)',
         type=str, action='store', default=None, dest='address')
@@ -474,9 +600,41 @@ def run():
     parser.add_argument('--merged',
         help='call getauxblock on this url to get work for merged mining (example: http://ncuser:ncpass@127.0.0.1:10332/)',
         type=str, action='append', default=[], dest='merged_urls')
+    parser.add_argument('--merged_addr',
+        help='call createauxblock/submitauxblock on this url to get work for merged mining and use payout address (example: payout%http://ncuser:ncpass@127.0.0.1:10332/)',
+        type=str, action='append', default=[], dest='merged_urls_addr')
+    parser.add_argument('--merged-operator-address',
+        help='node operator payout address for merged chain (e.g., Dogecoin address). If not provided, parent chain address will be converted to merged chain format',
+        type=str, action='store', default=None, dest='merged_operator_address')
+    
+    # Merged mining coin daemon interface (alternative to URL-based --merged)
+    merged_group = parser.add_argument_group('merged mining daemon interface',
+        'Alternative to --merged URL. Specify merged mining daemon connection parameters separately.')
+    merged_group.add_argument('--merged-coind-address', metavar='MERGED_COIND_ADDRESS',
+        help='connect to merged mining daemon at this address (e.g., Dogecoin node IP)',
+        type=str, action='store', default=None, dest='merged_coind_address')
+    merged_group.add_argument('--merged-coind-rpc-port', metavar='MERGED_COIND_RPC_PORT',
+        help='connect to merged mining daemon RPC at this port',
+        type=int, action='store', default=None, dest='merged_coind_rpc_port')
+    merged_group.add_argument('--merged-coind-p2p-port', metavar='MERGED_COIND_P2P_PORT',
+        help='connect to merged mining daemon P2P at this port (for fast block propagation)',
+        type=int, action='store', default=None, dest='merged_coind_p2p_port')
+    merged_group.add_argument('--merged-coind-rpc-user', metavar='MERGED_COIND_RPC_USER',
+        help='merged mining daemon RPC username',
+        type=str, action='store', default=None, dest='merged_coind_rpc_user')
+    merged_group.add_argument('--merged-coind-rpc-password', metavar='MERGED_COIND_RPC_PASSWORD',
+        help='merged mining daemon RPC password',
+        type=str, action='store', default=None, dest='merged_coind_rpc_password')
+    merged_group.add_argument('--merged-coind-rpc-ssl',
+        help='connect to merged mining daemon RPC using SSL',
+        action='store_true', default=False, dest='merged_coind_rpc_ssl')
+    
+    parser.add_argument('--coinbtext',
+        help='append this text to the coinbase',
+        type=str, action='append', default=[], dest='coinb_texts')
     parser.add_argument('--give-author', metavar='DONATION_PERCENTAGE',
-        help='donate this percentage of work towards the development of p2pool (default: 1.0)',
-        type=float, action='store', default=1.0, dest='donation_percentage')
+        help='donate this percentage of work towards the development of p2pool (default: 0.0)',
+        type=float, action='store', default=0.0, dest='donation_percentage')
     parser.add_argument('--iocp',
         help='use Windows IOCP API in order to avoid errors due to large number of sockets being open',
         action='store_true', default=False, dest='iocp')
@@ -510,6 +668,17 @@ def run():
         help='''don't advertise local IP address as being available for incoming connections. useful for running a dark node, along with multiple -n ADDR's and --outgoing-conns 0''',
         action='store_false', default=True, dest='advertise_ip')
     
+    broadcaster_group = parser.add_argument_group('multi-peer broadcaster')
+    broadcaster_group.add_argument('--disable-broadcaster',
+        help='''disable multi-peer block broadcasting (uses only local node for propagation)''',
+        action='store_true', default=False, dest='disable_broadcaster')
+    broadcaster_group.add_argument('--broadcaster-max-peers', metavar='MAX_PEERS',
+        help='maximum number of network peers to maintain connections to (default: 20)',
+        type=int, action='store', default=20, dest='broadcaster_max_peers')
+    broadcaster_group.add_argument('--broadcaster-min-peers', metavar='MIN_PEERS',
+        help='minimum number of peers required for healthy operation (default: 5)',
+        type=int, action='store', default=5, dest='broadcaster_min_peers')
+    
     worker_group = parser.add_argument_group('worker interface')
     worker_group.add_argument('-w', '--worker-port', metavar='PORT or ADDR:PORT',
         help='listen on PORT on interface with ADDR for RPC connections from miners (default: all interfaces, %s)' % ', '.join('%s:%i' % (name, net.WORKER_PORT) for name, net in sorted(realnets.items())),
@@ -517,26 +686,32 @@ def run():
     worker_group.add_argument('-f', '--fee', metavar='FEE_PERCENTAGE',
         help='''charge workers mining to their own bitcoin address (by setting their miner's username to a bitcoin address) this percentage fee to mine on your p2pool instance. Amount displayed at http://127.0.0.1:WORKER_PORT/fee (default: 0)''',
         type=float, action='store', default=0, dest='worker_fee')
+    worker_group.add_argument('-s', '--share-rate', metavar='SECONDS_PER_SHARE',
+        help='Auto-adjust mining difficulty on each connection to target this many seconds per pseudoshare (default: %3.0f)' % 3.,
+        type=float, action='store', default=3., dest='share_rate')
     
-    bitcoind_group = parser.add_argument_group('bitcoind interface')
-    bitcoind_group.add_argument('--bitcoind-config-path', metavar='BITCOIND_CONFIG_PATH',
-        help='custom configuration file path (when bitcoind -conf option used)',
+    bitcoind_group = parser.add_argument_group('coin daemon interface')
+    bitcoind_group.add_argument('--bitcoind-config-path', '--coind-config-path', metavar='COIND_CONFIG_PATH',
+        help='custom configuration file path (when coind -conf option used)',
         type=str, action='store', default=None, dest='bitcoind_config_path')
-    bitcoind_group.add_argument('--bitcoind-address', metavar='BITCOIND_ADDRESS',
-        help='connect to this address (default: 127.0.0.1)',
+    bitcoind_group.add_argument('--bitcoind-address', '--coind-address', metavar='COIND_ADDRESS',
+        help='connect to coin daemon at this address (default: 127.0.0.1)',
         type=str, action='store', default='127.0.0.1', dest='bitcoind_address')
-    bitcoind_group.add_argument('--bitcoind-rpc-port', metavar='BITCOIND_RPC_PORT',
-        help='''connect to JSON-RPC interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.RPC_PORT) for name, net in sorted(realnets.items())),
+    bitcoind_group.add_argument('--bitcoind-rpc-port', '--coind-rpc-port', metavar='COIND_RPC_PORT',
+        help='''connect to JSON-RPC interface at this port (default: %s <read from coin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.RPC_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_rpc_port')
-    bitcoind_group.add_argument('--bitcoind-rpc-ssl',
+    bitcoind_group.add_argument('--bitcoind-rpc-ssl', '--coind-rpc-ssl',
         help='connect to JSON-RPC interface using SSL',
         action='store_true', default=False, dest='bitcoind_rpc_ssl')
-    bitcoind_group.add_argument('--bitcoind-p2p-port', metavar='BITCOIND_P2P_PORT',
-        help='''connect to P2P interface at this port (default: %s <read from bitcoin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.P2P_PORT) for name, net in sorted(realnets.items())),
+    bitcoind_group.add_argument('--bitcoind-p2p-port', '--coind-p2p-port', metavar='COIND_P2P_PORT',
+        help='''connect to P2P interface at this port (default: %s <read from coin.conf if password not provided>)''' % ', '.join('%s:%i' % (name, net.PARENT.P2P_PORT) for name, net in sorted(realnets.items())),
         type=int, action='store', default=None, dest='bitcoind_p2p_port')
-    bitcoind_group.add_argument(metavar='BITCOIND_RPCUSERPASS',
-        help='bitcoind RPC interface username, then password, space-separated (only one being provided will cause the username to default to being empty, and none will cause P2Pool to read them from bitcoin.conf)',
+    bitcoind_group.add_argument(metavar='COIND_RPCUSERPASS',
+        help='coin daemon RPC interface username, then password, space-separated (only one being provided will cause the username to default to being empty, and none will cause P2Pool to read them from coin.conf)',
         type=str, action='store', default=[], nargs='*', dest='bitcoind_rpc_userpass')
+    bitcoind_group.add_argument('--allow-obsolete-bitcoind', '--allow-obsolete-coind',
+        help='allow the use of coin daemons that do not support all of the required softforks for this network',
+        action='store_const', const=True, default=False, dest='allow_obsolete_bitcoind')
     
     args = parser.parse_args()
     
@@ -545,6 +720,7 @@ def run():
         defer.setDebugging(True)
     else:
         p2pool.DEBUG = False
+    p2pool.BENCH = args.bench
     
     net_name = args.net_name + ('_testnet' if args.testnet else '')
     net = networks.nets[net_name]
@@ -614,19 +790,41 @@ def run():
     
     if args.address is not None and args.address != 'dynamic':
         try:
-            args.pubkey_hash = bitcoin_data.address_to_pubkey_hash(args.address, net.PARENT)
+            _ = bitcoin_data.address_to_pubkey_hash(args.address, net.PARENT)
+            args.pubkey_hash = True
         except Exception, e:
             parser.error('error parsing address: ' + repr(e))
     else:
         args.pubkey_hash = None
     
-    def separate_url(url):
+    def separate_url(url, addr=False):
+        paddr = None
+        if addr:
+            if '%' not in url:
+                parser.error('payoutaddress not specifed in merged url')
+            paddr, url = url.split('%')
+            print("Found payout %s for %s" % (paddr, url))
         s = urlparse.urlsplit(url)
         if '@' not in s.netloc:
             parser.error('merged url netloc must contain an "@"')
         userpass, new_netloc = s.netloc.rsplit('@', 1)
-        return urlparse.urlunsplit(s._replace(netloc=new_netloc)), userpass
+        return urlparse.urlunsplit(s._replace(netloc=new_netloc)), userpass, paddr
     merged_urls = map(separate_url, args.merged_urls)
+    merged_urls += [separate_url(x, addr=True) for x in args.merged_urls_addr]
+    
+    # Build merged URL from --merged-coind-* parameters if provided
+    if args.merged_coind_address is not None:
+        if args.merged_coind_rpc_port is None:
+            parser.error('--merged-coind-rpc-port is required when using --merged-coind-address')
+        if args.merged_coind_rpc_user is None or args.merged_coind_rpc_password is None:
+            parser.error('--merged-coind-rpc-user and --merged-coind-rpc-password are required when using --merged-coind-address')
+        
+        merged_scheme = 'https' if args.merged_coind_rpc_ssl else 'http'
+        merged_url = '%s://%s:%s/' % (merged_scheme, args.merged_coind_address, args.merged_coind_rpc_port)
+        merged_userpass = '%s:%s' % (args.merged_coind_rpc_user, args.merged_coind_rpc_password)
+        merged_paddr = args.merged_operator_address  # Can be None, will use parent address conversion
+        merged_urls.append((merged_url, merged_userpass, merged_paddr))
+        print 'Merged mining daemon: %s:%s (user: %s)' % (args.merged_coind_address, args.merged_coind_rpc_port, args.merged_coind_rpc_user)
     
     if args.logfile is None:
         args.logfile = os.path.join(datadir_path, 'log')
@@ -643,12 +841,104 @@ def run():
         signal.signal(signal.SIGUSR1, sigusr1)
     deferral.RobustLoopingCall(logfile.reopen).start(5)
     
+    # Check SSL support and log informational message
+    # SSL/TLS is optional in P2Pool and only needed for:
+    # 1. HTTPS RPC connections (--bitcoind-rpc-ssl flag) - rarely used, HTTP is standard
+    # 2. HTTPS block explorer links - just text URLs, no actual connections made
+    # 3. Twisted HTTP client redirect handling - fails gracefully if SSL unavailable
+    # 
+    # For Litecoin/Dogecoin merged mining, SSL is not required as:
+    # - Both daemons use HTTP RPC by default
+    # - P2Pool share chain uses custom binary protocol (not HTTP/HTTPS)
+    # - Merged mining data embedded in coinbase, no external connections
+    try:
+        from OpenSSL import SSL
+        print "SSL support: Available (OpenSSL library loaded)"
+    except ImportError:
+        print "SSL support: Not available (OpenSSL library not installed)"
+        print "  This is normal and does not affect P2Pool functionality."
+        print "  P2Pool will use HTTP for all RPC connections."
+        print "  If you need HTTPS RPC support in the future, install: pyopenssl and cryptography"
+    print
+    
+    class SSLErrorFilter(object):
+        """Filter out harmless SSL/OpenSSL import errors from Twisted HTTP client.
+        
+        Twisted's HTTP client tries to import OpenSSL when handling 301/302 redirects
+        to support HTTPS. On systems with incompatible OpenSSL versions (e.g., OpenSSL 3.x
+        without FIPS_mode symbol on PyPy), it logs ImportErrors but continues working
+        fine with HTTP. This filter suppresses these repetitive error messages.
+        
+        Known filtered errors:
+        - 'No module named OpenSSL' - OpenSSL not installed
+        - 'undefined symbol: FIPS_mode' - OpenSSL 3.x incompatibility with old pyopenssl
+        
+        Future maintainers: If you need HTTPS support, install compatible versions of
+        pyopenssl and cryptography packages for your Python/PyPy version.
+        """
+        _ssl_warning_shown = False
+        
+        @staticmethod
+        def is_ssl_error(eventDict):
+            """Check if this is a known harmless SSL error that should be suppressed."""
+            if not eventDict.get("isError"):
+                return False
+            if 'failure' not in eventDict:
+                return False
+            
+            tb = eventDict['failure'].getTraceback()
+            # Check for OpenSSL not installed
+            if 'from OpenSSL import SSL' in tb and 'ImportError' in tb:
+                return True
+            # Check for OpenSSL 3.x FIPS_mode incompatibility
+            if 'FIPS_mode' in tb or ('_openssl' in tb and 'undefined symbol' in tb):
+                return True
+            return False
+        
+        def emit(self, eventDict):
+            if self.is_ssl_error(eventDict):
+                if not SSLErrorFilter._ssl_warning_shown:
+                    SSLErrorFilter._ssl_warning_shown = True
+                    # Use direct file write to avoid duplication through logging pipes
+                    import datetime
+                    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    msg = '%s [SSL] OpenSSL 3.x/cryptography incompatibility detected - bug reporter disabled (does not affect mining)\n' % timestamp
+                    try:
+                        with open(os.path.join(datadir_path, 'log'), 'a') as f:
+                            f.write(msg)
+                    except:
+                        pass
+                # Return without processing - suppress the error completely
+                return
+            
+            # For non-SSL errors, do nothing - let the default observer handle them
+            # (We don't re-print here to avoid duplication)
+    
+    # Replace Twisted's default error observer with our filtered version
+    # First, stop the default observer from printing SSL errors
+    original_stderr_write = log.DefaultObserver.stderr.write
+    def filtered_stderr_write(data):
+        # Suppress SSL/OpenSSL traceback lines
+        if 'OpenSSL' in data or 'FIPS_mode' in data or '_openssl' in data:
+            return
+        if 'from cryptography' in data:
+            return
+        return original_stderr_write(data)
+    log.DefaultObserver.stderr.write = filtered_stderr_write
+    
+    # Install our SSL error filter as an observer
+    log.addObserver(SSLErrorFilter().emit)
+    
     class ErrorReporter(object):
         def __init__(self):
             self.last_sent = None
         
         def emit(self, eventDict):
             if not eventDict["isError"]:
+                return
+            
+            # Filter SSL/OpenSSL errors from bug reporter using shared method
+            if SSLErrorFilter.is_ssl_error(eventDict):
                 return
             
             if self.last_sent is not None and time.time() < self.last_sent + 5:
@@ -670,6 +960,9 @@ def run():
             ).addBoth(lambda x: None)
     if not args.no_bugreport:
         log.addObserver(ErrorReporter().emit)
-    
+    if args.rconsole:
+        from rfoo.utils import rconsole
+        rconsole.spawn_server()
+
     reactor.callWhenRunning(main, args, net, datadir_path, merged_urls, worker_endpoint)
     reactor.run()

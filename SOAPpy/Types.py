@@ -1,5 +1,3 @@
-from __future__ import nested_scopes
-
 """
 ################################################################################
 # Copyright (c) 2003, Pfizer
@@ -33,7 +31,9 @@ from __future__ import nested_scopes
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 ################################################################################
+
 """
+from __future__ import nested_scopes
 
 ident = '$Id: Types.py 1496 2010-03-04 23:46:17Z pooryorick $'
 from version import __version__
@@ -52,6 +52,10 @@ from Errors    import *
 from NS        import NS
 from Utilities import encodeHexString, cleanDate
 from Config    import Config
+
+NaN = float('NaN')
+PosInf = float('Inf')
+NegInf = -PosInf
 
 ###############################################################################
 # Utility functions
@@ -1561,6 +1565,16 @@ class arrayType(UserList.UserList, compoundType):
             a += [None] * (len(a) - curpos[0] + 1)
 
         a[curpos[0]] = value
+
+class mapType(arrayType):
+    _validURIs = ('http://xml.apache.org/xml-soap',)
+
+    def __init__(self, data = None, name = None, attrs = None,
+        offset = 0, rank = None, asize = 0, elemsname = None):
+        
+        arrayType.__init__(self, data, name, attrs, offset, rank, asize,
+            elemsname)
+        self._keyord=['key','value']
 
 class typedArrayType(arrayType):
     def __init__(self, data = None, name = None, typed = None, attrs = None,

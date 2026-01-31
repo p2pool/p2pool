@@ -1632,7 +1632,7 @@ class AttributeGroupDefinition(XMLSchemaComponent,\
         contents = self.getContents(node)
         content = []
 
-        for indx in range(len(contents)):
+        for indx in xrange(len(contents)):
             component = SplitQName(contents[indx].getTagName())[1]
             if (component == 'annotation') and (not indx):
                 self.annotation = Annotation(self)
@@ -2948,7 +2948,7 @@ class SimpleType(XMLSchemaComponent,\
             contents = self.getContents(node)
             content = []
 
-            for indx in range(len(contents)):
+            for indx in xrange(len(contents)):
                 component = SplitQName(contents[indx].getTagName())[1]
                 if (component == 'annotation') and (not indx):
                     self.annotation = Annotation(self)
@@ -2991,7 +2991,7 @@ class SimpleType(XMLSchemaComponent,\
             contents = self.getContents(node)
             content = []
 
-            for indx in range(len(contents)):
+            for indx in xrange(len(contents)):
                 component = SplitQName(contents[indx].getTagName())[1]
                 if (component == 'annotation') and (not indx):
                     self.annotation = Annotation(self)
@@ -3042,7 +3042,7 @@ class SimpleType(XMLSchemaComponent,\
             self.content = None
             self.setAttributes(node)
             contents = self.getContents(node)
-            for indx in range(len(contents)):
+            for indx in xrange(len(contents)):
                 component = SplitQName(contents[indx].getTagName())[1]
                 if (component == 'annotation') and (not indx):
                     self.annotation = Annotation(self)

@@ -46,13 +46,15 @@
                 d3.select('#efficiency').text(local_stats.efficiency != null ? d3.format('.4p')(local_stats.efficiency) : '???')
                 d3.select('#uptime').text(format_dt(local_stats.uptime));
                 d3.select('#block_value').text(local_stats.block_value);
+                d3.select('#block_value_payments').text(local_stats.block_value_payments || 0);
+                d3.select('#block_value_miner').text(local_stats.block_value_miner || local_stats.block_value);
                 
                 d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
                     .text(function(w){ return 'Warning: ' + w })
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
                 
                 var time_to_share = local_stats.attempts_to_share/local;
-                d3.select('#time_to_share').text(format_dt(time_to_share));
+                d3.select('#time_to_share').text(local > 0 ? format_dt(time_to_share) : 'Infinity years');
                 
                 d3.json('../global_stats', function(global_stats) {
                     d3.select('#pool_rate').text(d3.format('.3s')(global_stats.pool_hash_rate) + 'H/s');
@@ -62,7 +64,37 @@
                     var time_to_block = local_stats.attempts_to_block/global_stats.pool_hash_rate;
                     d3.select('#time_to_block').text(format_dt(time_to_block));
                     
-                    d3.select('#expected_payout_amount').text(d3.format('.3r')(local/global_stats.pool_hash_rate*local_stats.block_value*(1-local_stats.donation_proportion)));
+                    // Calculate expected payout for 24 hours of mining
+                    var block_value = local_stats.block_value_miner || local_stats.block_value || 0;
+                    var donation = local_stats.donation_proportion || 0;
+                    if (local > 0 && global_stats.pool_hash_rate > 0 && time_to_block > 0 && block_value > 0) {
+                        var blocks_in_24h = (24 * 3600) / time_to_block;
+                        var payout_per_block = (local/global_stats.pool_hash_rate) * block_value * (1 - donation);
+                        var expected_24h_payout = payout_per_block * blocks_in_24h;
+                        d3.select('#expected_payout_amount').text(d3.format('.3r')(expected_24h_payout));
+                    } else {
+                        d3.select('#expected_payout_amount').text('0');
+                    }
+                    
+                    // Fetch and display merged mining expected payout
+                    d3.json('../merged_stats', function(merged_stats) {
+                        if (merged_stats && merged_stats.block_value && merged_stats.symbol) {
+                            d3.select('#merged_block_value').text(d3.format('.2f')(merged_stats.block_value));
+                            d3.select('#merged_symbol').text(merged_stats.symbol);
+                            d3.select('#merged_symbol2').text(merged_stats.symbol);
+                            d3.select('#merged_info').style('display', 'block');
+                            
+                            // Calculate merged expected payout for 24 hours
+                            if (local > 0 && global_stats.pool_hash_rate > 0 && time_to_block > 0) {
+                                var blocks_in_24h = (24 * 3600) / time_to_block;
+                                var merged_payout_per_block = (local/global_stats.pool_hash_rate) * merged_stats.block_value * (1 - donation);
+                                var expected_merged_24h = merged_payout_per_block * blocks_in_24h;
+                                d3.select('#expected_merged_payout').text(d3.format('.2f')(expected_merged_24h));
+                            } else {
+                                d3.select('#expected_merged_payout').text('0');
+                            }
+                        }
+                    });
                 });
             });
             
@@ -73,39 +105,199 @@
             d3.json('../web/currency_info', function(currency_info) {
                 d3.selectAll('.symbol').text(currency_info.symbol);
                 
-                d3.json('../current_payouts', function(pays) {
+                // Use current_merged_payouts which includes derived merged addresses
+                d3.json('../current_merged_payouts', function(mergedPays) {
                     var totamount=0.0;
-
-                    d3.json('../payout_addr', function(addr) {
-                        d3.select('#payout_addr').text(addr).attr('href', currency_info.address_explorer_url_prefix + addr);
-                        d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
-                    });
-                    d3.json('../payout_addrs', function(addrs) {
-                        d3.select('#payout_addrs').text(addrs);
-
-                        for (var i in addrs) {
-                        	totamount = totamount + (addrs[i] in pays ? pays[addrs[i]] : 0);
-                        }
-	                d3.select('#payout_totamount').text(totamount);
-                    });
-
-                    var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
+                    var mergedTotal=0.0;
+                    var mergedSymbol='';
                     
-                    var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
-                    tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return currency_info.address_explorer_url_prefix + addr});
-                    tr.append('td').text(function(addr){return pays[addr]});
+                    // Calculate totals
+                    for (var addr in mergedPays) {
+                        totamount += mergedPays[addr].amount || 0;
+                        if (mergedPays[addr].merged) {
+                            mergedPays[addr].merged.forEach(function(m) {
+                                mergedTotal += m.amount || 0;
+                                if (!mergedSymbol) mergedSymbol = m.symbol;
+                            });
+                        }
+                    }
+                    d3.select('#payout_totamount').text(totamount.toFixed(8));
+
+                    var arr = []; for(var i in mergedPays) arr.push(i); 
+                    arr.sort(function(a, b){return (mergedPays[b].amount || 0) - (mergedPays[a].amount || 0)});
+                    
+                    // Render payouts table with merged chain sub-rows
+                    arr.forEach(function(addr) {
+                        var entry = mergedPays[addr];
+                        
+                        // Main row for parent chain
+                        var mainRow = d3.select('#payouts').append('tr');
+                        mainRow.append('td').append('a')
+                            .text(addr)
+                            .attr('href', currency_info.address_explorer_url_prefix + addr);
+                        mainRow.append('td').text((entry.amount || 0).toFixed(8));
+                        
+                        // Sub-rows for merged chain addresses
+                        if (entry.merged && entry.merged.length > 0) {
+                            entry.merged.forEach(function(merged) {
+                                var subRow = d3.select('#payouts').append('tr')
+                                    .style('background', 'rgba(111, 66, 193, 0.15)');
+                                
+                                var addrCell = subRow.append('td')
+                                    .style('padding-left', '20px');
+                                addrCell.append('span')
+                                    .style('color', '#6f42c1')
+                                    .style('font-weight', 'bold')
+                                    .text('↳ ' + merged.symbol + ': ');
+                                addrCell.append('a')
+                                    .style('color', '#6f42c1')
+                                    .text(merged.address)
+                                    .attr('href', getMergedExplorerUrl(merged.symbol, merged.address));
+                                
+                                subRow.append('td')
+                                    .style('color', '#6f42c1')
+                                    .text(d3.format('.2f')(merged.amount || 0));
+                            });
+                        }
+                    });
                     
                     var total_tr = d3.select('#payouts').append('tr');
                     total_tr.append('td').append('strong').text('Total');
-                    total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
+                    total_tr.append('td').text(totamount.toFixed(8));
+                    
+                    // Add merged total row if we have merged payouts
+                    if (mergedTotal > 0 && mergedSymbol) {
+                        var merged_total_tr = d3.select('#payouts').append('tr')
+                            .style('background', 'rgba(111, 66, 193, 0.2)');
+                        merged_total_tr.append('td').append('strong')
+                            .style('color', '#6f42c1')
+                            .text('Total Merged (' + mergedSymbol + ')');
+                        merged_total_tr.append('td')
+                            .style('color', '#6f42c1')
+                            .style('font-weight', 'bold')
+                            .text(d3.format('.2f')(mergedTotal));
+                    }
                 });
                 
+                function getMergedExplorerUrl(symbol, address) {
+                    var explorers = {
+                        'tDOGE': 'https://blockexplorer.one/dogecoin/testnet/address/',
+                        'DOGE': 'https://blockexplorer.one/dogecoin/mainnet/address/',
+                    };
+                    return (explorers[symbol] || '#') + address;
+                }
+                
                 d3.json('../recent_blocks', function(blocks) {
-                    var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
+                    // Limit to 10 most recent blocks
+                    var displayBlocks = blocks.slice(0, 10);
+                    var tr = d3.select('#blocks').selectAll().data(displayBlocks).enter().append('tr');
                     tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
                     tr.append('td').text(function(block){return block.number});
                     tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return currency_info.block_explorer_url_prefix + block.hash});
                     tr.append('td').append('a').text('→').attr('href', function(block){return 'share.html#' + block.share});
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (!block.luck) return '#888';
+                            if (block.luck >= 100) return '#28a745';
+                            if (block.luck >= 75) return '#ffc107';
+                            return '#dc3545';
+                        })
+                        .style('font-weight', 'bold')
+                        .attr('title', function(block){
+                            if (!block.time_to_find) return '';
+                            var msg = 'Found in ' + format_dt(block.time_to_find);
+                            if (block.expected_time) msg += ' (expected: ' + format_dt(block.expected_time) + ')';
+                            if (block.luck_method) msg += ' [' + block.luck_method + ']';
+                            return msg;
+                        })
+                        .text(function(block){
+                            if (!block.luck) return '-';
+                            return d3.format('.0f')(block.luck) + '%';
+                        });
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (block.status === 'confirmed') return '#28a745';
+                            if (block.status === 'orphaned') return '#dc3545';
+                            return '#ffc107';
+                        })
+                        .style('font-weight', 'bold')
+                        .text(function(block){
+                            if (block.status === 'confirmed') return '✓ Confirmed';
+                            if (block.status === 'orphaned') return '✗ Orphaned';
+                            return '⏳ Pending';
+                        });
+                });
+                
+                // Merged mining blocks
+                d3.json('../recent_merged_blocks', function(merged_blocks) {
+                    if (!merged_blocks || merged_blocks.length === 0) {
+                        d3.select('#merged_blocks_section').style('display', 'none');
+                        return;
+                    }
+                    d3.select('#merged_blocks_section').style('display', 'block');
+                    
+                    // Limit to 10 most recent merged blocks
+                    var displayBlocks = merged_blocks.slice(0, 10);
+                    
+                    // Block explorer URLs for different merged mining chains
+                    // Note: Use block hash (not pow_hash) for explorer links
+                    var merged_explorers = {
+                        98: {  // Dogecoin (chainid 98)
+                            testnet: 'https://blockexplorer.one/dogecoin/testnet/blockHash/',
+                            mainnet: 'https://blockexplorer.one/dogecoin/mainnet/blockHash/',
+                        },
+                        // Add more chain explorers here as needed
+                    };
+                    
+                    var tr = d3.select('#merged_blocks').selectAll().data(displayBlocks).enter().append('tr');
+                    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
+                    tr.append('td')
+                        .style('font-weight', 'bold')
+                        .style('color', '#6f42c1')
+                        .text(function(block){return block.symbol || block.network || 'AUX'});
+                    tr.append('td').text(function(block){return block.chainid || '-'});
+                    // Display pow_hash (unique per found block) with explorer link
+                    tr.append('td').append('a')
+                        .text(function(block){
+                            // Show pow_hash which is unique per found block
+                            var display_hash = block.pow_hash || '-';
+                            return display_hash.substring(0, 16) + '...';
+                        })
+                        .attr('href', function(block){
+                            var explorer_config = merged_explorers[block.chainid];
+                            if (explorer_config && block.pow_hash) {
+                                // Use testnet explorer for now (could detect from network name)
+                                var explorer = explorer_config.testnet;
+                                return explorer + block.pow_hash;
+                            }
+                            return '#';
+                        })
+                        .attr('target', '_blank')
+                        .attr('title', function(block){
+                            return 'POW Hash: ' + (block.pow_hash || 'N/A') + '\nTemplate Hash: ' + (block.hash || 'N/A');
+                        });
+                    tr.append('td').text(function(block){return block.miner || '-'});
+                    tr.append('td').text(function(block){return block.txs || '-'});
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (block.is_testnet) {
+                                // Testnet: show verification status
+                                if (block.verified === true) return '#28a745';  // Green for verified
+                                if (block.verified === false) return '#dc3545';  // Red for orphaned
+                                return '#ffc107';  // Yellow for pending verification
+                            }
+                            return '#17a2b8';  // Blue for mainnet (submitted)
+                        })
+                        .style('font-weight', 'bold')
+                        .text(function(block){
+                            if (block.is_testnet) {
+                                // Testnet: show verification status
+                                if (block.verified === true) return '✓ Verified';
+                                if (block.verified === false) return '✗ Orphaned';
+                                return '⏳ Verifying...';
+                            }
+                            return '↑ Submitted';  // Mainnet: just show submitted
+                        });
                 });
             });
             
@@ -123,19 +315,20 @@
             fill('../web/heads', '#heads');
             fill('../web/verified_tails', '#verified_tails');
             fill('../web/tails', '#tails');
-            fill('../web/my_share_hashes', '#my_share_hashes');
+            fill('../web/my_share_hashes50', '#my_share_hashes');
         </script>
     </head>
     <body>
         <h1>P2Pool <span class="symbol"></span></h1>
-        <p><a href="graphs.html">Graphs</a></p>
+        <p><a href="dashboard.html"><strong>🆕 New Dashboard</strong></a> | <a href="graphs.html">Graphs</a> | <a href="stratum.html">Stratum Stats</a></p>
         <p>Version: <span id="version"></span></p>
         <p>Pool rate: <span id="pool_rate"></span> (<span id="pool_stale"></span> DOA+orphan) Share difficulty: <span id="difficulty"></span></p>
         <p>Node uptime: <span id="uptime"></span> Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA) Expected time to share: <span id="time_to_share"></span></p>
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
-        <p>Payout if a block were found NOW: <span id="payout_totamount"></span> <span class="symbol"></span> to <a id="payout_addrs"></a>. Expected after mining for 24 hours:  <span id="expected_payout_amount"></span> <span class="symbol"></span> per block.</p>
-        <p>Current block value: <span id="block_value"></span> <span class="symbol"></span> Expected time to block: <span id="time_to_block"></span></p>
+        <p>Payout if a block were found NOW: <span id="payout_totamount"></span> <span class="symbol"></span> to <a id="payout_addrs"></a>. Expected payout after mining for 24 hours: <span id="expected_payout_amount"></span> <span class="symbol"></span></p>
+        <p id="merged_info" style="display:none; color:#6f42c1; font-weight:bold;">Merged mining block value: <span id="merged_block_value"></span> <span id="merged_symbol"></span>. Expected merged payout (24h): <span id="expected_merged_payout"></span> <span id="merged_symbol2"></span></p>
+        <p>Current block value: <span id="block_value"></span> <span class="symbol"></span>. Expected time to block: <span id="time_to_block"></span></p>
         <div id="warnings"></div>
         
         <h2>Share explorer</h2>
@@ -146,11 +339,19 @@
         <p>Tails: <span id="tails"></span></p>
         <p>My shares: <span id="my_share_hashes"></span></p>
         
-        <h2>Blocks found in last day:</h2>
+        <h2>Blocks found recently:</h2>
         <p>Note that blocks may have been orphaned from the P2Pool chain and so not be here.</p>
         <table border="1" id="blocks">
-            <tr><th>time</th><th>number</th><th>hash/explorer link</th><th>share</th></tr>
+            <tr><th>time</th><th>number</th><th>hash/explorer link</th><th>share</th><th>luck</th><th>status</th></tr>
         </table>
+        
+        <div id="merged_blocks_section" style="display:none;">
+            <h2>Merged Mining Blocks found recently:</h2>
+            <p>Blocks found on auxiliary chains via merged mining.</p>
+            <table border="1" id="merged_blocks">
+                <tr><th>time</th><th>network</th><th>chain id</th><th>block hash/explorer</th><th>miner</th><th>txs</th><th>status</th></tr>
+            </table>
+        </div>
         
         <h2>Payouts if a block were found NOW:</h2>
         <table border="1" id="payouts">

@@ -106,7 +106,7 @@ class ExpiringDict(object):
         self.d = dict() # key -> node, value
         
         self_ref = weakref.ref(self, lambda _: expire_loop.stop() if expire_loop.running else None)
-        self._expire_loop = expire_loop = deferral.RobustLoopingCall(lambda: self_ref().expire())
+        self._expire_loop = expire_loop = deferral.RobustLoopingCall(lambda: self_ref().expire() if isinstance(self_ref(),ExpiringDict) else None)
         expire_loop.start(1)
     
     def stop(self):

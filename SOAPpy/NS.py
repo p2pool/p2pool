@@ -1,5 +1,3 @@
-from __future__ import nested_scopes
-
 """
 ################################################################################
 #
@@ -40,7 +38,9 @@ from __future__ import nested_scopes
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 ################################################################################
+
 """
+from __future__ import nested_scopes
 
 ident = '$Id: NS.py 1468 2008-05-24 01:55:33Z warnes $'
 from version import __version__

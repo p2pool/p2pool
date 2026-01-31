@@ -1,15 +1,16 @@
 from p2pool.util import math, pack
+import cStringIO as StringIO
 
 def reads_nothing(f):
     return None, f
 def protoPUSH(length):
-    return lambda f: pack.read(f, length)
+    return lambda f: f.read(length)
 def protoPUSHDATA(size_len):
     def _(f):
-        length_str, f = pack.read(f, size_len)
+        length_str = f.read(size_len)
         length = math.string_to_natural(length_str[::-1].lstrip(chr(0)))
-        data, f = pack.read(f, length)
-        return data, f
+        data = f.read(length)
+        return data
     return _
 
 opcodes = {}
@@ -32,12 +33,12 @@ opcodes[174] = 'CHECKMULTISIG', reads_nothing
 opcodes[175] = 'CHECKMULTISIGVERIFY', reads_nothing
 
 def parse(script):
-    f = script, 0
-    while pack.size(f):
-        opcode_str, f = pack.read(f, 1)
+    f = StringIO.StringIO(script)
+    while pack.remaining(f):
+        opcode_str = f.read(1)
         opcode = ord(opcode_str)
         opcode_name, read_func = opcodes[opcode]
-        opcode_arg, f = read_func(f)
+        opcode_arg = read_func(f)
         yield opcode_name, opcode_arg
 
 def get_sigop_count(script):

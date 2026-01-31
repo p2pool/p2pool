@@ -55,6 +55,25 @@ class Protocol(protocol.Protocol):
             
             try:
                 self.packetReceived(command, type_.unpack(payload, self.ignore_trailing_payload))
+            except struct.error as e:
+                # TODO: Implement proper MWEB (MimbleWimble Extension Block) transaction parsing
+                # MWEB transactions on Litecoin use a different serialization format that
+                # our standard Bitcoin tx parser cannot decode. For now, we gracefully skip
+                # these messages rather than disconnecting from the peer.
+                # See: https://github.com/litecoin-project/lips/blob/master/lip-0002.mediawiki
+                # 
+                # Messages containing transactions that may have MWEB data:
+                # - 'tx': standalone transaction message
+                # - 'remember_tx': P2Pool protocol message with list of transactions
+                # - 'shares': P2Pool shares which reference transactions
+                if command in ('tx', 'remember_tx', 'shares'):
+                    # Always log MWEB skips for now (to diagnose orphan issues)
+                    print '[MWEB-SKIP] Skipping unparseable %s message (likely contains MWEB tx): %s' % (command, e,)
+                    continue  # Skip this message but stay connected
+                else:
+                    print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
+                    log.err(None, 'Error handling message: (see RECV line)')
+                    self.disconnect()
             except:
                 print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
                 log.err(None, 'Error handling message: (see RECV line)')

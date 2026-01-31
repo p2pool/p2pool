@@ -3,12 +3,29 @@ from __future__ import division
 import hashlib
 import random
 import warnings
+import binascii
 
 import p2pool
-from p2pool.util import math, pack
+from p2pool.util import math, pack, segwit_addr, cash_addr
+import struct
+
+mask = (1<<64) - 1
 
 def hash256(data):
     return pack.IntType(256).unpack(hashlib.sha256(hashlib.sha256(data).digest()).digest())
+
+def pack256(data):
+    if data is None:
+        data = 0
+    return struct.pack("<QQQQ", data & mask, data>>64 & mask, data>>128 & mask,
+                        data>>192 & mask)
+
+def unpack256(data):
+    raw = struct.unpack("<QQQQ", data)
+    return (raw[3]<<192) + (raw[2]<<128) + (raw[1]<<64) + raw[0]
+
+def hash256d(data):
+    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 def hash160(data):
     if data == '04ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664b'.decode('hex'):
@@ -21,19 +38,24 @@ class ChecksummedType(pack.Type):
         self.checksum_func = checksum_func
     
     def read(self, file):
-        obj, file = self.inner.read(file)
-        data = self.inner.pack(obj)
+        start = file.tell()
+        obj = self.inner.read(file)
+        end = file.tell()
+        file.seek(start)
+        data = file.read(end - start)
         
         calculated_checksum = self.checksum_func(data)
-        checksum, file = pack.read(file, len(calculated_checksum))
+        checksum = file.read(len(calculated_checksum))
         if checksum != calculated_checksum:
             raise ValueError('invalid checksum')
         
-        return obj, file
+        return obj
     
     def write(self, file, item):
         data = self.inner.pack(item)
-        return (file, data), self.checksum_func(data)
+        file.write(data)
+        file.write(self.checksum_func(data))
+        #return (file, data), self.checksum_func(data)
 
 class FloatingInteger(object):
     __slots__ = ['bits', '_target']
@@ -79,8 +101,8 @@ class FloatingIntegerType(pack.Type):
     _inner = pack.IntType(32)
     
     def read(self, file):
-        bits, file = self._inner.read(file)
-        return FloatingInteger(bits), file
+        bits = self._inner.read(file)
+        return FloatingInteger(bits)
     
     def write(self, file, item):
         return self._inner.write(file, item.bits)
@@ -115,6 +137,23 @@ tx_id_type = pack.ComposedType([
     ('lock_time', pack.IntType(32))
 ])
 
+def get_stripped_size(tx):
+    # TODO: For MWEB transactions, we store the raw size directly
+    # since we can't parse them to calculate size
+    if isinstance(tx, dict) and tx.get('_mweb'):
+        return tx['_raw_size']
+    if not 'stripped_size' in tx:
+        tx['stripped_size'] = tx_id_type.packed_size(tx)
+    return tx['stripped_size']
+def get_size(tx):
+    # TODO: For MWEB transactions, we store the raw size directly
+    # since we can't parse them to calculate size
+    if isinstance(tx, dict) and tx.get('_mweb'):
+        return tx['_raw_size']
+    if not 'size' in tx:
+        tx['size'] = tx_id_type.packed_size(tx)
+    return tx['size']
+
 class TransactionType(pack.Type):
     _int_type = pack.IntType(32)
     _varint_type = pack.VarIntType()
@@ -137,30 +176,37 @@ class TransactionType(pack.Type):
     ])
 
     def read(self, file):
-        version, file = self._int_type.read(file)
-        marker, file = self._varint_type.read(file)
+        version = self._int_type.read(file)
+        marker = self._varint_type.read(file)
         if marker == 0:
-            next, file = self._wtx_type.read(file)
+            next = self._wtx_type.read(file)
             witness = [None]*len(next['tx_ins'])
             for i in xrange(len(next['tx_ins'])):
-                witness[i], file = self._witness_type.read(file)
-            locktime, file = self._int_type.read(file)
-            return dict(version=version, marker=marker, flag=next['flag'], tx_ins=next['tx_ins'], tx_outs=next['tx_outs'], witness=witness, lock_time=locktime), file
+                witness[i] = self._witness_type.read(file)
+            locktime = self._int_type.read(file)
+            return dict(version=version, marker=marker, flag=next['flag'], tx_ins=next['tx_ins'], tx_outs=next['tx_outs'], witness=witness, lock_time=locktime)
         else:
             tx_ins = [None]*marker
             for i in xrange(marker):
-                tx_ins[i], file = tx_in_type.read(file)
-            next, file = self._ntx_type.read(file)
-            return dict(version=version, tx_ins=tx_ins, tx_outs=next['tx_outs'], lock_time=next['lock_time']), file
+                tx_ins[i] = tx_in_type.read(file)
+            next = self._ntx_type.read(file)
+            return dict(version=version, tx_ins=tx_ins, tx_outs=next['tx_outs'], lock_time=next['lock_time'])
     
     def write(self, file, item):
+        # TODO: Implement proper MWEB transaction serialization
+        # MWEB raw transactions are stored as dicts with '_mweb': True
+        # For now, write the raw bytes directly. This is used when sending
+        # transactions over P2P that we couldn't parse (MWEB format).
+        if isinstance(item, dict) and item.get('_mweb'):
+            file.write(item['_raw_tx'])
+            return
         if is_segwit_tx(item):
             assert len(item['tx_ins']) == len(item['witness'])
-            res = self._write_type.pack(item)
+            self._write_type.write(file, item)
             for w in item['witness']:
-                res += self._witness_type.pack(w)
-            res += self._int_type.pack(item['lock_time'])
-            return file, res
+                self._witness_type.write(file, w)
+            self._int_type.write(file, item['lock_time'])
+            return
         return tx_id_type.write(file, item)
 
 tx_type = TransactionType()
@@ -230,6 +276,46 @@ merkle_record_type = pack.ComposedType([
     ('right', pack.IntType(256)),
 ])
 
+class MerkleNode(object):
+    """Class for building a merkle tree."""
+
+    __slots__ = ('hash', 'parent', 'left', 'right')
+
+    def __init__(self, hash, left=None, right=None, parent=None):
+        if hash is None:
+            self.hash = '0'
+        else:
+            self.hash = hash
+        self.left = left
+        self.right = right
+        self.parent = parent
+
+    def get_sibling(self):
+        """Get the hash's sibling.
+
+        Args:
+            None
+
+        Returns:
+            The sibling MerkleNode of hash.
+        """
+        if not self.parent:
+            raise ValueError("There is no sibling of this node.")
+        if self == self.parent.left:
+            return self.parent.right
+        return self.parent.left
+
+    def __hash__(self):
+        return self.hash
+
+    def __str__(self, level=0):
+        ret = "%s%s\n" % ('\t'*level, self.hash)
+        if self.left:
+            ret += self.left.__str__(level=level+1)
+        if self.right:
+            ret += self.right.__str__(level=level+1)
+        return ret
+
 def merkle_hash(hashes):
     if not hashes:
         return 0
@@ -239,32 +325,45 @@ def merkle_hash(hashes):
             for left, right in zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])]
     return hash_list[0]
 
+def build_merkle_tree(nodes):
+    """Build a merkle tree from a list of hashes
+
+    Args:
+        nodes: A list of merkle nodes already part of the tree.
+
+    Returns:
+        The root merkle node.
+    """
+    if len(nodes) < 1:
+        raise ValueError("No nodes in list to build a merkle tree with.")
+    if len(nodes) == 1:
+        return nodes[0]
+    new_nodes = []
+    for i in range(0, len(nodes), 2):
+        try:
+            right = nodes[i+1]
+        except IndexError:
+            right = nodes[i]
+        new_node = MerkleNode(hash=hash256d(nodes[i].hash + right.hash),
+                              left=nodes[i], right=right)
+        nodes[i].parent = new_node
+        try:
+            nodes[i+1].parent = new_node
+        except IndexError:
+            pass
+        new_nodes.append(new_node)
+    return build_merkle_tree(new_nodes)
+
 def calculate_merkle_link(hashes, index):
-    # XXX optimize this
-    
-    hash_list = [(lambda _h=h: _h, i == index, []) for i, h in enumerate(hashes)]
-    
-    while len(hash_list) > 1:
-        hash_list = [
-            (
-                lambda _left=left, _right=right: hash256(merkle_record_type.pack(dict(left=_left(), right=_right()))),
-                left_f or right_f,
-                (left_l if left_f else right_l) + [dict(side=1, hash=right) if left_f else dict(side=0, hash=left)],
-            )
-            for (left, left_f, left_l), (right, right_f, right_l) in
-                zip(hash_list[::2], hash_list[1::2] + [hash_list[::2][-1]])
-        ]
-    
-    res = [x['hash']() for x in hash_list[0][2]]
-    
-    assert hash_list[0][1]
-    if p2pool.DEBUG:
-        new_hashes = [random.randrange(2**256) if x is None else x
-            for x in hashes]
-        assert check_merkle_link(new_hashes[index], dict(branch=res, index=index)) == merkle_hash(new_hashes)
-    assert index == sum(k*2**i for i, k in enumerate([1-x['side'] for x in hash_list[0][2]]))
-    
-    return dict(branch=res, index=index)
+    assert index < len(hashes)
+    merkle_nodes = [MerkleNode(pack256(x)) for x in hashes]
+    merkle_tree = build_merkle_tree(merkle_nodes)
+    merkle_branch = []
+    index_node = merkle_nodes[index]
+    while index_node.parent:
+        merkle_branch.append(unpack256(index_node.get_sibling().hash))
+        index_node = index_node.parent
+    return {'index': index, 'branch': merkle_branch}
 
 def check_merkle_link(tip_hash, link):
     if link['index'] >= 2**len(link['branch']):
@@ -312,17 +411,80 @@ human_address_type = ChecksummedType(pack.ComposedType([
     ('pubkey_hash', pack.IntType(160)),
 ]))
 
-def pubkey_hash_to_address(pubkey_hash, net):
-    return base58_encode(human_address_type.pack(dict(version=net.ADDRESS_VERSION, pubkey_hash=pubkey_hash)))
+def pubkey_hash_to_address(pubkey_hash, addr_ver, bech32_ver, net):
+    if addr_ver == -1:
+        if hasattr(net, 'padding_bugfix') and net.padding_bugfix:
+            thash = '{:040x}'.format(pubkey_hash)
+        else:
+            thash = '{:x}'.format(pubkey_hash)
+            if len(thash) % 2 == 1:
+                thash = '0%s' % thash
+        data = [int(x) for x in bytearray.fromhex(thash)]
+        if net.SYMBOL.lower() in ['bch', 'tbch', 'bsv', 'tbsv']:
+            return cash_addr.encode(net.HUMAN_READABLE_PART, bech32_ver, data)
+        else:
+            return segwit_addr.encode(net.HUMAN_READABLE_PART, bech32_ver, data)
+    return base58_encode(human_address_type.pack(dict(version=addr_ver, pubkey_hash=pubkey_hash)))
 
 def pubkey_to_address(pubkey, net):
-    return pubkey_hash_to_address(hash160(pubkey), net)
+    return pubkey_hash_to_address(hash160(pubkey), net.ADDRESS_VERSION, -1, net)
+
+class AddrError(Exception):
+    __slots__ = ()
+
+def address_to_script2(address, net):
+    res = address_to_pubkey_hash(address, net)
+    return pubkey_hash_to_script2(res[0], res[1], res[2], net)
 
 def address_to_pubkey_hash(address, net):
-    x = human_address_type.unpack(base58_decode(address))
-    if x['version'] != net.ADDRESS_VERSION:
-        raise ValueError('address not for this net!')
-    return x['pubkey_hash']
+    try:
+        return get_legacy_pubkey_hash(address, net)
+    except AddrError:
+        pass
+
+    if net.SYMBOL.lower() not in ['bch', 'tbch', 'bsv', 'tbsv']:
+        try:
+            return get_bech32_pubkey_hash(address, net)
+        except AddrError:
+            pass
+    else:
+        try:
+            return get_cashaddr_pubkey_hash(address, net)
+        except AddrError:
+            pass
+    raise ValueError('invalid addr')
+
+def get_legacy_pubkey_hash(address, net):
+    # P2PKH or P2SH address
+    try:
+        base_decode = base58_decode(address)
+        x = human_address_type.unpack(base_decode)
+    except Exception as e:
+        raise AddrError
+    else:
+        if x['version'] != net.ADDRESS_VERSION and x['version'] != net.ADDRESS_P2SH_VERSION:
+            raise ValueError('address not for this net!')
+        return x['pubkey_hash'], x['version'], -1
+
+def get_bech32_pubkey_hash(address, net):
+    try:
+        witver, witprog = segwit_addr.decode(net.HUMAN_READABLE_PART, address)
+        if witver is None or witprog is None:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    else:
+        return int(''.join('{:02x}'.format(x) for x in witprog), 16), -1, witver
+
+def get_cashaddr_pubkey_hash(address, net):
+    try:
+        ver, data = cash_addr.decode(net.HUMAN_READABLE_PART, address)
+        if ver is None or data is None:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    else:
+        return int(''.join('{:02x}'.format(x) for x in data), 16), -1, ver
 
 # transactions
 
@@ -340,33 +502,113 @@ def get_wtxid(tx, txid=None, txhash=None):
         return hash256(tx_id_type.pack(tx)) if txid is None else txid
 
 def get_txid(tx):
+    # Handle MWEB raw transactions stored as dict with _raw_tx key
+    if isinstance(tx, dict) and tx.get('_mweb'):
+        return hash256(tx['_raw_tx'])
     return hash256(tx_id_type.pack(tx))
 
 def pubkey_to_script2(pubkey):
     assert len(pubkey) <= 75
     return (chr(len(pubkey)) + pubkey) + '\xac'
 
-def pubkey_hash_to_script2(pubkey_hash):
+def pubkey_hash_to_script2(pubkey_hash, version, bech32_version, net):
+    if version == -1 and bech32_version >= 0:
+        if hasattr(net, 'padding_bugfix') and net.padding_bugfix:
+            decoded = '{:040x}'.format(pubkey_hash)
+        else:
+            decoded = '{:x}'.format(pubkey_hash)
+        ehash = binascii.unhexlify(decoded)
+        size = '{:x}'.format(len(decoded) // 2)
+        if len(size) % 2 == 1:
+            size = '0%s' % size
+        hsize = binascii.unhexlify(size)
+        if net.SYMBOL.lower() in ['bch', 'tbch', 'bsv', 'tbsv']:
+            # CashAddrs can be longer than 20 bytes
+            # TODO: Check the version and restrict the bytes.
+            if bech32_version == 0:
+                # P2KH
+                return '\x76\xa9%s%s\x88\xac' % (hsize, ehash)
+            elif bech32_version == 1:
+                # P2SH
+                return '\xa9%s%s\x87' % (hsize, ehash)
+            else:
+                raise NotImplementedError("Invalid cashaddr type %d" % bech32_version)
+        else:
+            return '\x00%s%s' % (hsize, ehash)
+    if version == net.ADDRESS_P2SH_VERSION:
+        return ('\xa9\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x87'
     return '\x76\xa9' + ('\x14' + pack.IntType(160).pack(pubkey_hash)) + '\x88\xac'
 
-def script2_to_address(script2, net):
+def script2_to_address(script2, addr_ver, bech32_ver, net):
+    try:
+        return script2_to_pubkey_address(script2, net)
+    except AddrError:
+        pass
+    for func in [script2_to_pubkey_hash_address, script2_to_bech32_address,
+                 script2_to_p2sh_address, script2_to_cashaddress]:
+        try:
+            return func(script2, addr_ver, bech32_ver, net)
+        except AddrError:
+            pass
+    raise ValueError("Invalid script2 hash %s" % binascii.hexlify(script2))
+
+def script2_to_pubkey_address(script2, net):
     try:
         pubkey = script2[1:-1]
-        script2_test = pubkey_to_script2(pubkey)
+        res = pubkey_to_script2(pubkey)
+        if res != script2:
+            raise ValueError
     except:
-        pass
-    else:
-        if script2_test == script2:
-            return pubkey_to_address(pubkey, net)
+        raise AddrError
+    return pubkey_to_address(pubkey, net)
     
+def script2_to_pubkey_hash_address(script2, addr_ver, bech32_ver, net):
+    # TODO: Check for BCH and BSV length, could be longer than 20 bytes
     try:
         pubkey_hash = pack.IntType(160).unpack(script2[3:-2])
-        script2_test2 = pubkey_hash_to_script2(pubkey_hash)
-    except:
-        pass
-    else:
-        if script2_test2 == script2:
-            return pubkey_hash_to_address(pubkey_hash, net)
+        res = pubkey_hash_to_script2(pubkey_hash, addr_ver, bech32_ver, net)
+        if res != script2:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    return pubkey_hash_to_address(pubkey_hash, addr_ver, bech32_ver, net)
+
+def script2_to_cashaddress(script2, addr_ver, ca_ver, net):
+    try:
+        if ca_ver == 0:
+            sub_hash = script2[3:-2]
+        elif ca_ver == 1:
+            sub_hash = script2[2:-1]
+        else:
+            raise ValueError
+        pubkey_hash = int(sub_hash.encode('hex'), 16)
+        res = pubkey_hash_to_script2(pubkey_hash, addr_ver, ca_ver, net)
+        if res != script2:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    return pubkey_hash_to_address(pubkey_hash, addr_ver, ca_ver, net)
+
+def script2_to_bech32_address(script2, addr_ver, bech32_ver, net):
+    try:
+        pubkey_hash = int(script2[2:].encode('hex'), 16)
+        res = pubkey_hash_to_script2(pubkey_hash, addr_ver, bech32_ver, net)
+        if res != script2:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    return pubkey_hash_to_address(pubkey_hash, addr_ver, bech32_ver, net)
+
+def script2_to_p2sh_address(script2, addr_ver, bech32_ver, net):
+    # TODO: Check for BCH and BSV length, could be longer than 20 bytes
+    try:
+        pubkey_hash = pack.IntType(160).unpack(script2[2:-1])
+        res = pubkey_hash_to_script2(pubkey_hash, addr_ver, bech32_ver, net)
+        if res != script2:
+            raise ValueError
+    except Exception as e:
+        raise AddrError
+    return pubkey_hash_to_address(pubkey_hash, addr_ver, bech32_ver, net)
 
 def script2_to_human(script2, net):
     try:
@@ -388,3 +630,6 @@ def script2_to_human(script2, net):
             return 'Address. Address: %s' % (pubkey_hash_to_address(pubkey_hash, net),)
     
     return 'Unknown. Script: %s'  % (script2.encode('hex'),)
+
+def is_segwit_script(script):
+    return script.startswith('\x00\x14') or script.startswith('\xa9\x14')

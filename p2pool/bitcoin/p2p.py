@@ -14,11 +14,14 @@ from p2pool.util import deferral, p2protocol, pack, variable
 
 class Protocol(p2protocol.Protocol):
     def __init__(self, net):
-        p2protocol.Protocol.__init__(self, net.P2P_PREFIX, 1000000, ignore_trailing_payload=True)
+        p2protocol.Protocol.__init__(self, net.P2P_PREFIX, 32000000, ignore_trailing_payload=True)
+        self.net = net
     
     def connectionMade(self):
+        # Use network-specific P2P version if available, otherwise default to 70002
+        p2p_version = getattr(self.net, 'P2P_VERSION', 70002)
         self.send_version(
-            version=70002,
+            version=p2p_version,
             services=1,
             time=int(time.time()),
             addr_to=dict(

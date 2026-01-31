@@ -152,7 +152,7 @@ def makeTestSuite(section='services_by_file'):
     cp, numTests = setUpOptions(section)
     nameGenerator = getOption(cp, section)
     suite = unittest.TestSuite()
-    for i in range(0, numTests):
+    for i in xrange(0, numTests):
         suite.addTest(unittest.makeSuite(WSDLToolsTestCase, 'test_'))
     return suite
 

@@ -1,16 +1,24 @@
 # SOAPpy modules
+import traceback
 from Config    import Config
 from Types     import *
 from NS        import NS
 from Utilities import *
 
 import string
-import fpconst
 import xml.sax
 from wstools.XMLname import fromXMLname
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 try: from M2Crypto import SSL
 except: pass
+
+from defusedxml import expatreader
+from defusedxml.common import DefusedXmlException
+
 
 ident = '$Id: Parser.py 1497 2010-03-08 06:06:52Z pooryorick $'
 from version import __version__
@@ -19,6 +27,11 @@ from version import __version__
 ################################################################################
 # SOAP Parser
 ################################################################################
+
+def make_parser(parser_list=[]):
+        return expatreader.create_parser()
+
+
 class RefHolder:
     def __init__(self, name, frame):
         self.name = name
@@ -94,7 +107,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             elif prefix:
                tag = prefix + ":" + tag
             return tag
-        
+
         # Workaround two sax bugs
         if name[0] == None and name[1][0] == ' ':
             name = (None, name[1][1:])
@@ -128,7 +141,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
         elif self._next == "":
             raise Error, "expected nothing, " \
                   "got `%s'" % toStr( name )
-                  
+
 
         if len(self._stack) == 2:
             rules = self._rules
@@ -276,7 +289,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                         null = 1
 
                 # check for nil=1, but watch out for string values
-                try:                
+                try:
                     null = int(null)
                 except ValueError, e:
                     if not e[0].startswith("invalid literal for int()"):
@@ -313,7 +326,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
             #print "cur.kind=", cur.kind
             #print "cur.rules=", cur.rules
             #print "\n"
-                        
+
 
             if cur.rules != None:
                 rule = cur.rules
@@ -375,7 +388,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 #                 print "ns:", ns
 #                 print "attrs:", attrs
 #                 print "kind:", kind
-                
+
 
                 if kind == None:
                     # If the current item's container is an array, it will
@@ -864,7 +877,7 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 #         print "   attrs=", attrs
 #         print "   t[0]=", t[0]
 #         print "   t[1]=", t[1]
-            
+
 #         print "   in?", t[0] in NS.EXSD_L
 
         if t[0] in NS.EXSD_L:
@@ -909,22 +922,22 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 
                 # Explicitly check for NaN and Infinities
                 if s == "nan":
-                    d = fpconst.NaN
+                    d = NaN
                 elif s[0:2]=="inf" or s[0:3]=="+inf":
-                    d = fpconst.PosInf
+                    d = PosInf
                 elif s[0:3] == "-inf":
-                    d = fpconst.NegInf
+                    d = NegInf
                 else :
                     d = float(s)
 
                 if config.strict_range:
-                    if fpconst.isNaN(d):
+                    if NaN == d:
                         if s[0:2] != 'nan':
                             raise ValueError, "invalid %s: %s" % (t[1], s)
-                    elif fpconst.isNegInf(d):
+                    elif NegInf == d:
                         if s[0:3] != '-inf':
                             raise UnderflowError, "%s too small: %s" % (t[1], s)
-                    elif fpconst.isPosInf(d):
+                    elif PosInf == d:
                         if s[0:2] != 'inf' and s[0:3] != '+inf':
                             raise OverflowError, "%s too large: %s" % (t[1], s)
                     elif d < 0 and d < l[1]:
@@ -934,11 +947,11 @@ class SOAPParser(xml.sax.handler.ContentHandler):
                     elif d == 0:
                         if type(self.zerofloatre) == StringType:
                             self.zerofloatre = re.compile(self.zerofloatre)
-    
+
                         if self.zerofloatre.search(s):
                             raise UnderflowError, "invalid %s: %s" % (t[1], s)
                 return d
-            
+
             if t[1] in ("dateTime", "date", "timeInstant", "time"):
                 return self.convertDateTime(d, t[1])
             if t[1] == "decimal":
@@ -1032,32 +1045,48 @@ class SOAPParser(xml.sax.handler.ContentHandler):
 ################################################################################
 # call to SOAPParser that keeps all of the info
 ################################################################################
-def _parseSOAP(xml_str, rules = None):
-    try:
-        from cStringIO import StringIO
-    except ImportError:
-        from StringIO import StringIO
+class EmptyEntityResolver(xml.sax.handler.EntityResolver):
+    def resolveEntity(self, publicId, systemId):
+        return StringIO("<?xml version='1.0' encoding='UTF-8'?>")
 
-    parser = xml.sax.make_parser()
-    t = SOAPParser(rules = rules)
-    parser.setContentHandler(t)
-    e = xml.sax.handler.ErrorHandler()
-    parser.setErrorHandler(e)
 
+def _parseSOAP(xml_str, rules = None, ignore_ext=None,
+               forbid_entities=False, forbid_external=True, forbid_dtd=False):
     inpsrc = xml.sax.xmlreader.InputSource()
     inpsrc.setByteStream(StringIO(xml_str))
+    if ignore_ext is None:
+        ignore_ext = False
+
+    parser = make_parser()
+    t = SOAPParser(rules=rules)
+    parser.setContentHandler(t)
+    errorHandler = xml.sax.handler.ErrorHandler()
+    parser.setErrorHandler(errorHandler)
+
+    if ignore_ext:
+        # disable by default  entity loading on posted content
+        forbid_dtd = True
+        forbid_entities = True
+        forbid_external = True
+    parser.forbid_dtd = forbid_dtd
+    parser.forbid_entities = forbid_entities
+    parser.forbid_external = forbid_external
+    parser.setEntityResolver(EmptyEntityResolver())
 
     # turn on namespace mangeling
-    parser.setFeature(xml.sax.handler.feature_namespaces,1)
-
-    parser.setFeature(xml.sax.handler.feature_external_ges, 0)
+    parser.setFeature(xml.sax.handler.feature_namespaces, 1)
 
     try:
         parser.parse(inpsrc)
+    except DefusedXmlException, e:
+        parser._parser = None
+        print traceback.format_exc()
+        raise e
     except xml.sax.SAXParseException, e:
         parser._parser = None
+        print traceback.format_exc()
         raise e
-    
+
     return t
 
 ################################################################################
@@ -1071,9 +1100,9 @@ def parseSOAP(xml_str, attrs = 0):
     return t.body
 
 
-def parseSOAPRPC(xml_str, header = 0, body = 0, attrs = 0, rules = None):
+def parseSOAPRPC(xml_str, header = 0, body = 0, attrs = 0, rules = None, ignore_ext=None):
 
-    t = _parseSOAP(xml_str, rules = rules)
+    t = _parseSOAP(xml_str, rules = rules, ignore_ext=ignore_ext)
     p = t.body[0]
 
     # Empty string, for RPC this translates into a void
@@ -1083,7 +1112,7 @@ def parseSOAPRPC(xml_str, header = 0, body = 0, attrs = 0, rules = None):
             if k[0] != "_":
                 name = k
         p = structType(name)
-        
+
     if header or body or attrs:
         ret = (p,)
         if header : ret += (t.header,)

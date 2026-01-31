@@ -87,27 +87,39 @@ class HeightTracker(object):
         if last != best_last:
             return -1000000000 # XXX hack
         return height - best_height
+    def get_height(self, block_hash):
+        # callers: highest height can change during yields!
+        height, last = self._tracker.get_height_and_last(block_hash)
+        return height
 
 @defer.inlineCallbacks
-def get_height_rel_highest_func(bitcoind, factory, best_block_func, net):
-    if '\ngetblock ' in (yield deferral.retry()(bitcoind.rpc_help)()):
+def get_height_funcs(coind, factory, best_block_func, net):
+    cached_heights = {}
+    if '\ngetblockheader ' in (yield deferral.retry()(coind.rpc_help)()):
         @deferral.DeferredCacher
         @defer.inlineCallbacks
         def height_cacher(block_hash):
-            try:
-                x = yield bitcoind.rpc_getblock('%x' % (block_hash,))
-            except jsonrpc.Error_for_code(-5): # Block not found
-                if not p2pool.DEBUG:
-                    raise deferral.RetrySilentlyException()
-                else:
-                    raise
-            defer.returnValue(x['blockcount'] if 'blockcount' in x else x['height'])
+            if not block_hash in cached_heights:
+                try:
+                    x = yield coind.rpc_getblockheader('%064x' % (block_hash,))
+                except jsonrpc.Error_for_code(-5): # Block not found
+                    if not p2pool.DEBUG:
+                        raise deferral.RetrySilentlyException()
+                    else:
+                        raise
+                cached_heights[block_hash] = x['blockcount'] if 'blockcount' in x else x['height']
+            defer.returnValue(cached_heights[block_hash])
         best_height_cached = variable.Variable((yield deferral.retry()(height_cacher)(best_block_func())))
         def get_height_rel_highest(block_hash):
             this_height = height_cacher.call_now(block_hash, 0)
             best_height = height_cacher.call_now(best_block_func(), 0)
             best_height_cached.set(max(best_height_cached.value, this_height, best_height))
             return this_height - best_height_cached.value
+        def get_height(block_hash):
+            this_height = height_cacher.call_now(block_hash, 0)
+            return this_height
     else:
         get_height_rel_highest = HeightTracker(best_block_func, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height_rel_highest
-    defer.returnValue(get_height_rel_highest)
+        get_height = HeightTracker(best_block_func, factory, 5*net.SHARE_PERIOD*net.CHAIN_LENGTH/net.PARENT.BLOCK_PERIOD).get_height
+    defer.returnValue((get_height_rel_highest, get_height))
+
