@@ -55,7 +55,7 @@ class Protocol(protocol.Protocol):
             
             try:
                 self.packetReceived(command, type_.unpack(payload, self.ignore_trailing_payload))
-            except struct.error as e:
+            except (struct.error, ValueError) as e:
                 # TODO: Implement proper MWEB (MimbleWimble Extension Block) transaction parsing
                 # MWEB transactions on Litecoin use a different serialization format that
                 # our standard Bitcoin tx parser cannot decode. For now, we gracefully skip
@@ -66,7 +66,8 @@ class Protocol(protocol.Protocol):
                 # - 'tx': standalone transaction message
                 # - 'remember_tx': P2Pool protocol message with list of transactions
                 # - 'shares': P2Pool shares which reference transactions
-                if command in ('tx', 'remember_tx', 'shares'):
+                # - 'sharereply': P2Pool sharereply which contains full share data with txs
+                if command in ('tx', 'remember_tx', 'shares', 'sharereply'):
                     # Always log MWEB skips for now (to diagnose orphan issues)
                     print '[MWEB-SKIP] Skipping unparseable %s message (likely contains MWEB tx): %s' % (command, e,)
                     continue  # Skip this message but stay connected

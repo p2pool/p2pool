@@ -99,9 +99,46 @@ def is_segwit_activated(version, net):
     segwit_activation_version = getattr(net, 'SEGWIT_ACTIVATION_VERSION', 0)
     return version >= segwit_activation_version and segwit_activation_version > 0
 
-# P2PKH donation script (modern format) - Dash address: XdgF55wEHBRWwbuBniNYH4GvvaoYMgL84u
-# Format: OP_DUP OP_HASH160 <20-byte pubkey_hash> OP_EQUALVERIFY OP_CHECKSIG
-DONATION_SCRIPT = '76a91420cb5c22b1e4d5947e5c112c7696b51ad9af3c6188ac'.decode('hex')
+# DONATION_SCRIPT: Original global P2Pool donation (P2PK format)
+# This MUST match global P2Pool exactly for share compatibility (used in gentx_before_refhash)
+# P2PK script: 0x41 <65-byte uncompressed pubkey> 0xac (OP_CHECKSIG)
+# Address: LeD2fnnDJYZuyt8zgDsZ2oBGmuVcxGKCLd (Litecoin mainnet)
+DONATION_SCRIPT = '4104ffd03de44a6e11b9917f3a29f9443283d9871c9d743ef30d5eddcd37094b64d1b3d8090496b53256786bf5c82932ec23c3b74d9f05a6f95a8b5529352656664bac'.decode('hex')
+
+# SECONDARY_DONATION_SCRIPT: Our project's donation (P2PKH format)
+# This is added as a regular payout BEFORE the original donation, preserving share compatibility
+# P2PKH script: 0x76 0xa9 0x14 <20-byte pubkey_hash> 0x88 0xac
+# Address: LU66WRMeuxt45vwGh9bWopRsBaZ8owBAb6 (Litecoin mainnet)
+SECONDARY_DONATION_SCRIPT = '76a91420cb5c22b1e4d5947e5c112c7696b51ad9af3c6188ac'.decode('hex')
+
+# Enable/disable secondary donation during transition period
+SECONDARY_DONATION_ENABLED = True
+
+def script_to_pubkey_hash(script):
+    """
+    Extract pubkey_hash from a script (supports both P2PK and P2PKH formats).
+    
+    P2PK format: <push_len> <pubkey> OP_CHECKSIG (0xac)
+      - Returns hash160(pubkey)
+    P2PKH format: OP_DUP (0x76) OP_HASH160 (0xa9) <push_len> <pubkey_hash> OP_EQUALVERIFY (0x88) OP_CHECKSIG (0xac)
+      - Returns pubkey_hash directly
+    
+    Returns: pubkey_hash as integer
+    """
+    if len(script) == 25 and script[0] == '\x76' and script[1] == '\xa9' and script[2] == '\x14':
+        # P2PKH script: 76 a9 14 <20-byte-hash> 88 ac
+        return int(script[3:23].encode('hex'), 16)
+    elif len(script) == 67 and script[0] == '\x41' and script[-1] == '\xac':
+        # P2PK script with uncompressed pubkey: 41 <65-byte-pubkey> ac
+        pubkey = script[1:-1]
+        return bitcoin_data.hash160(pubkey)
+    elif len(script) == 35 and script[0] == '\x21' and script[-1] == '\xac':
+        # P2PK script with compressed pubkey: 21 <33-byte-pubkey> ac
+        pubkey = script[1:-1]
+        return bitcoin_data.hash160(pubkey)
+    else:
+        raise ValueError('Unsupported script format (length=%d)' % len(script))
+
 def donation_script_to_address(net):
     try:
         return bitcoin_data.script2_to_address(
@@ -109,6 +146,20 @@ def donation_script_to_address(net):
     except ValueError:
         return bitcoin_data.script2_to_address(
                 DONATION_SCRIPT, net.PARENT.ADDRESS_P2SH_VERSION, -1, net.PARENT)
+
+def secondary_donation_script_to_address(net):
+    """Get address for secondary donation script (our project's donation)"""
+    if not SECONDARY_DONATION_ENABLED:
+        return None
+    try:
+        return bitcoin_data.script2_to_address(
+                SECONDARY_DONATION_SCRIPT, net.PARENT.ADDRESS_VERSION, -1, net.PARENT)
+    except ValueError:
+        try:
+            return bitcoin_data.script2_to_address(
+                    SECONDARY_DONATION_SCRIPT, net.PARENT.ADDRESS_P2SH_VERSION, -1, net.PARENT)
+        except ValueError:
+            return None
 
 class BaseShare(object):
     VERSION = 0
@@ -180,7 +231,6 @@ class BaseShare(object):
                 ('branch', pack.ListType(pack.IntType(256))),
                 ('index', pack.IntType(0)), # it will always be 0
             ])),
-            ('actual_header_merkle_root', pack.PossiblyNoneType(0, pack.IntType(256))),  # For merged mining - stores the actual mined merkle_root
         ])
         t['ref_type'] = pack.ComposedType([
             ('identifier', pack.FixedStrType(64//8)),
@@ -191,6 +241,9 @@ class BaseShare(object):
 
     @classmethod
     def generate_transaction(cls, tracker, share_data, block_target, desired_timestamp, desired_target, ref_merkle_link, desired_other_transaction_hashes_and_fees, net, known_txs=None, last_txout_nonce=0, base_subsidy=None, segwit_data=None):
+        # Secondary donation is now handled via "fake miner" mechanism in work.py
+        # The secondary donation address appears in weights dict as a regular miner payout
+        # This means all nodes (old and new) generate identical coinbases
         t0 = time.time()
         previous_share = tracker.items[share_data['previous_share_hash']] if share_data['previous_share_hash'] is not None else None
         
@@ -302,14 +355,21 @@ class BaseShare(object):
         else:
             this_address = share_data['address']
         donation_address = donation_script_to_address(net)
+        # Secondary donation now appears as a regular miner in weights dict (via "fake miner" in work.py)
         # 0.5% goes to block finder
         amounts[this_address] = amounts.get(this_address, 0) \
                                 + share_data['subsidy']//200
         # all that's left over is the donation weight and some extra
         # satoshis due to rounding
-        amounts[donation_address] = amounts.get(donation_address, 0) \
-                                    + share_data['subsidy'] \
-                                    - sum(amounts.itervalues())
+        total_donation = share_data['subsidy'] - sum(amounts.itervalues())
+        
+        # All donation goes to primary donation script (the one in gentx_before_refhash)
+        # Secondary donation is now handled via "fake miner" mechanism in work.py:
+        # - Secondary donation address appears in weights dict as a regular miner
+        # - This is compatible with old nodes - they see it as a normal miner payout
+        # - The split is done probabilistically at share creation time
+        amounts[donation_address] = amounts.get(donation_address, 0) + total_donation
+            
         if cls.VERSION < 34 and 'pubkey_hash' not in share_data:
             share_data['pubkey_hash'], _, _ = bitcoin_data.address_to_pubkey_hash(
                     this_address, net.PARENT)
@@ -372,9 +432,14 @@ class BaseShare(object):
         if segwit_activated:
             share_info['segwit_data'] = segwit_data
         
+        # Build payouts list - IMPORTANT: DONATION_SCRIPT must be LAST for gentx_before_refhash compatibility
+        # Secondary donation now appears as a regular miner payout in the weights dict
+        # (handled via "fake miner" mechanism in work.py)
         payouts = [dict(value=amounts[addr],
                         script=bitcoin_data.address_to_script2(addr, net.PARENT)
                         ) for addr in dests if amounts[addr] and addr != donation_address]
+        
+        # Primary donation MUST be last (for gentx_before_refhash compatibility with global p2pool)
         payouts.append({'script': DONATION_SCRIPT, 'value': amounts[donation_address]})
         
         # Debug: Uncomment to trace payout structure (confirmed working)
@@ -444,7 +509,6 @@ class BaseShare(object):
                 last_txout_nonce=last_txout_nonce,
                 hash_link=prefix_to_hash_link(bitcoin_data.tx_id_type.pack(gentx)[:-32-8-4], cls.gentx_before_refhash),
                 merkle_link=bitcoin_data.calculate_merkle_link([None] + other_transaction_hashes, 0),
-                actual_header_merkle_root=header['merkle_root'],  # Pass the actual mined merkle_root for merged mining
             ))
             assert share.header == header # checks merkle_root
             return share
@@ -538,12 +602,8 @@ class BaseShare(object):
             self.get_ref_hash(net, self.share_info, contents['ref_merkle_link']) + pack.IntType(64).pack(self.contents['last_txout_nonce']) + pack.IntType(32).pack(0),
             self.gentx_before_refhash,
         )
-        # For merged mining, use the actual mined merkle_root if provided (contains merged mining commitment)
-        # Otherwise reconstruct it from gentx_hash and merkle_link (normal p2pool operation)
-        if contents.get('actual_header_merkle_root') is not None:
-            merkle_root = contents['actual_header_merkle_root']
-        else:
-            merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.share_info['segwit_data']['txid_merkle_link'] if segwit_activated else self.merkle_link)
+        # Reconstruct merkle_root from gentx_hash and merkle_link
+        merkle_root = bitcoin_data.check_merkle_link(self.gentx_hash, self.share_info['segwit_data']['txid_merkle_link'] if segwit_activated else self.merkle_link)
         self.header = dict(self.min_header, merkle_root=merkle_root)
         
         # Debug: Uncomment to trace share creation (prints on every share)
@@ -621,8 +681,18 @@ class BaseShare(object):
             print "Performing maybe-unnecessary packing and hashing"
             known_txs = dict((bitcoin_data.hash256(bitcoin_data.tx_type.pack(tx)), tx) for tx in known_txs)
         
-        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(tracker, self.share_info['share_data'], self.header['bits'].target, self.share_info['timestamp'], self.share_info['bits'].target, self.contents['ref_merkle_link'], [(h, None) for h in other_tx_hashes], self.net,
-            known_txs=None, last_txout_nonce=self.contents['last_txout_nonce'], segwit_data=self.share_info.get('segwit_data', None))
+        # Generate the expected coinbase transaction
+        # With "fake miner" mechanism for secondary donation, all nodes generate identical coinbases
+        share_info, gentx, other_tx_hashes2, get_share = self.generate_transaction(
+            tracker, self.share_info['share_data'], self.header['bits'].target, 
+            self.share_info['timestamp'], self.share_info['bits'].target, 
+            self.contents['ref_merkle_link'], [(h, None) for h in other_tx_hashes], self.net,
+            known_txs=None, last_txout_nonce=self.contents['last_txout_nonce'], 
+            segwit_data=self.share_info.get('segwit_data', None))
+        
+        assert other_tx_hashes2 == other_tx_hashes
+        if bitcoin_data.get_txid(gentx) != self.gentx_hash:
+            raise ValueError('''gentx doesn't match hash_link''')
 
         if self.VERSION < 34:
             # check for excessive fees
@@ -652,13 +722,10 @@ class BaseShare(object):
             if self.naughty > 6:
                 self.naughty = 0
 
-        assert other_tx_hashes2 == other_tx_hashes
+        # share_info was already validated by generate_transaction matching gentx_hash
         if share_info != self.share_info:
             raise ValueError('share_info invalid')
-        if bitcoin_data.get_txid(gentx) != self.gentx_hash:
-            print bitcoin_data.get_txid(gentx), self.gentx_hash
-            print gentx
-            raise ValueError('''gentx doesn't match hash_link''')
+        
         if self.VERSION < 34:
             if bitcoin_data.calculate_merkle_link([None] + other_tx_hashes, 0) != self.merkle_link: # the other hash commitments are checked in the share_info assertion
                 raise ValueError('merkle_link and other_tx_hashes do not match')

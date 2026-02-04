@@ -15,6 +15,9 @@ from p2pool.bitcoin import script
 from p2pool.util import pack
 from p2pool import data as p2pool_data
 
+# Debug flag - set to True to enable verbose coinbase building output
+DEBUG_COINBASE = False
+
 # P2Pool author donation script (1% of merged mining blocks)
 # This is SEPARATE from the parent chain donation
 # P2PKH format - Dash address: XdgF55wEHBRWwbuBniNYH4GvvaoYMgL84u
@@ -89,12 +92,13 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
     worker_fee_amount = int(total_reward * worker_fee / 100) if worker_fee > 0 and node_operator_address else 0
     miners_reward = total_reward - donation_amount - worker_fee_amount
     
-    print >>sys.stderr, '[MERGED COINBASE] Total reward: %d satoshis' % total_reward
-    print >>sys.stderr, '[MERGED COINBASE] - Donation (%.1f%%): %d' % (donation_percentage, donation_amount)
-    print >>sys.stderr, '[MERGED COINBASE] - Node fee (%.1f%%): %d' % (worker_fee, worker_fee_amount)
-    print >>sys.stderr, '[MERGED COINBASE] - Miners (%.1f%%): %d' % (
-        100 - donation_percentage - worker_fee, miners_reward)
-    print >>sys.stderr, '[MERGED COINBASE] Building for %d shareholders' % len(shareholders)
+    if DEBUG_COINBASE:
+        print >>sys.stderr, '[MERGED COINBASE] Total reward: %d satoshis' % total_reward
+        print >>sys.stderr, '[MERGED COINBASE] - Donation (%.1f%%): %d' % (donation_percentage, donation_amount)
+        print >>sys.stderr, '[MERGED COINBASE] - Node fee (%.1f%%): %d' % (worker_fee, worker_fee_amount)
+        print >>sys.stderr, '[MERGED COINBASE] - Miners (%.1f%%): %d' % (
+            100 - donation_percentage - worker_fee, miners_reward)
+        print >>sys.stderr, '[MERGED COINBASE] Building for %d shareholders' % len(shareholders)
     
     # Build outputs for each shareholder (from miners_reward after fees)
     tx_outs = []
@@ -119,8 +123,9 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
                     'value': amount,
                     'script': script2,
                 })
-                print >>sys.stderr, '[MINER PAYOUT] %s: %d satoshis (%.1f%% of %.1f%%)' % (
-                    address[:20] + '...', amount, fraction * 100, 100 - donation_percentage - worker_fee)
+                if DEBUG_COINBASE:
+                    print >>sys.stderr, '[MINER PAYOUT] %s: %d satoshis (%.1f%% of %.1f%%)' % (
+                        address[:20] + '...', amount, fraction * 100, 100 - donation_percentage - worker_fee)
             except ValueError as e:
                 # Second try: address might be in parent chain format - convert it
                 if parent_net is not None:
@@ -138,8 +143,9 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
                             'value': amount,
                             'script': script2,
                         })
-                        print >>sys.stderr, '[MINER PAYOUT] %s -> %s: %d satoshis (%.1f%% of %.1f%%) [auto-converted from parent chain]' % (
-                            address[:15] + '...', converted_address[:15] + '...', amount, fraction * 100, 100 - donation_percentage - worker_fee)
+                        if DEBUG_COINBASE:
+                            print >>sys.stderr, '[MINER PAYOUT] %s -> %s: %d satoshis (%.1f%% of %.1f%%) [auto-converted from parent chain]' % (
+                                address[:15] + '...', converted_address[:15] + '...', amount, fraction * 100, 100 - donation_percentage - worker_fee)
                     except Exception as conv_e:
                         print >>sys.stderr, 'Warning: Failed to decode/convert address %s: %s (original: %s)' % (address, conv_e, e)
                 else:
@@ -154,8 +160,9 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
                 'value': worker_fee_amount,
                 'script': node_script,
             })
-            print >>sys.stderr, '[NODE FEE] %s: %d satoshis (%.1f%%)' % (
-                node_operator_address[:20] + '...', worker_fee_amount, worker_fee)
+            if DEBUG_COINBASE:
+                print >>sys.stderr, '[NODE FEE] %s: %d satoshis (%.1f%%)' % (
+                    node_operator_address[:20] + '...', worker_fee_amount, worker_fee)
         except ValueError as e:
             # Second try: address might be in parent chain format - convert it
             if parent_net is not None:
@@ -173,8 +180,9 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
                         'value': worker_fee_amount,
                         'script': node_script,
                     })
-                    print >>sys.stderr, '[NODE FEE] %s -> %s: %d satoshis (%.1f%%) [auto-converted from parent chain]' % (
-                        node_operator_address[:15] + '...', converted_address[:15] + '...', worker_fee_amount, worker_fee)
+                    if DEBUG_COINBASE:
+                        print >>sys.stderr, '[NODE FEE] %s -> %s: %d satoshis (%.1f%%) [auto-converted from parent chain]' % (
+                            node_operator_address[:15] + '...', converted_address[:15] + '...', worker_fee_amount, worker_fee)
                 except Exception as conv_e:
                     print >>sys.stderr, 'Warning: Failed to decode/convert node operator address %s: %s (original: %s)' % (
                         node_operator_address, conv_e, e)
@@ -192,7 +200,8 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
         'value': 0,
         'script': op_return_script,
     })
-    print >>sys.stderr, '[OP_RETURN] Added pool identifier to merged block: "%s"' % op_return_text
+    if DEBUG_COINBASE:
+        print >>sys.stderr, '[OP_RETURN] Added pool identifier to merged block: "%s"' % op_return_text
     
     # Add P2Pool author donation output (ALWAYS included as blockchain marker)
     # Even if donation_percentage=0, this output marks every block as P2Pool-mined
@@ -202,10 +211,11 @@ def build_merged_coinbase(template, shareholders, net, donation_percentage=1.0, 
         'script': DONATION_SCRIPT,
     })
     
-    print >>sys.stderr, '[DONATION] Added P2Pool marker/donation to merged block: %d satoshis (%.1f%%)' % (
-        donation_amount, donation_percentage)
-    print >>sys.stderr, '[MERGED COINBASE] Total outputs: %d (miners) + 1 (OP_RETURN) + 1 (donation marker) = %d' % (
-        len(tx_outs) - 2, len(tx_outs))
+    if DEBUG_COINBASE:
+        print >>sys.stderr, '[DONATION] Added P2Pool marker/donation to merged block: %d satoshis (%.1f%%)' % (
+            donation_amount, donation_percentage)
+        print >>sys.stderr, '[MERGED COINBASE] Total outputs: %d (miners) + 1 (OP_RETURN) + 1 (donation marker) = %d' % (
+            len(tx_outs) - 2, len(tx_outs))
     
     # If no valid outputs, create a single output to a default address
     # (This should never happen in normal operation)

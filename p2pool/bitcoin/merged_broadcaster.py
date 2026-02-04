@@ -132,6 +132,14 @@ class MergedMiningBroadcaster(object):
         self.base_backoff = 30  # Base backoff in seconds
         self.max_backoff = 3600  # Max backoff: 1 hour
         
+        # Protected node (local daemon) reconnection tracking
+        # This prevents FD leaks when daemon is not running
+        self.local_node_failures = 0  # Consecutive failures
+        self.local_node_last_attempt = 0  # Last attempt timestamp
+        self.local_node_backoff = 30  # Current backoff (grows exponentially)
+        self.local_node_max_backoff = 600  # Max 10 minutes between retries
+        self.daemon_healthy = None  # None=unknown, True=healthy, False=unhealthy
+        
         # Rate limiting for connection attempts
         self.max_concurrent_connections = 3  # Max pending connection attempts at once
         self.max_connections_per_cycle = 5  # Max new connections to attempt per maintenance cycle
@@ -530,10 +538,20 @@ class MergedMiningBroadcaster(object):
             print('MergedBroadcaster[%s]: Failed to connect to %s: %s' % (
                 self.chain_name, _safe_addr_str(addr), e), file=sys.stderr)
             
+            # Ensure proper cleanup of connector/factory to prevent FD leaks
             try:
                 connector.disconnect()
             except:
                 pass
+            
+            # Also try to stop the factory to release any pending deferreds
+            try:
+                factory.stopTrying()
+            except:
+                pass
+            
+            # Remove from pending
+            self.pending_connections.discard(addr)
             
             raise
     
@@ -702,19 +720,72 @@ class MergedMiningBroadcaster(object):
                             self.chain_name, _safe_addr_str(addr)))
                     del self.connections[addr]
         
-        # CRITICAL: Reconnect to our own node if disconnected
+        # CRITICAL: Reconnect to our own node if disconnected (with backoff)
         if self.local_p2p_addr and self.local_p2p_addr not in self.connections:
-            print('MergedBroadcaster[%s]: Reconnecting to our own node at %s...' % (
-                self.chain_name, _safe_addr_str(self.local_p2p_addr)))
-            try:
-                yield self._connect_to_peer(self.local_p2p_addr, protected=True)
-            except Exception as e:
-                print('MergedBroadcaster[%s]: Failed to reconnect to our own node: %s' % (
-                    self.chain_name, e), file=sys.stderr)
+            # Check if we should attempt reconnection (exponential backoff)
+            if current_time - self.local_node_last_attempt < self.local_node_backoff:
+                # Still in backoff period - skip this cycle
+                pass
+            else:
+                # Check daemon health via RPC before attempting P2P connection
+                # This prevents socket leaks when daemon is not running
+                daemon_ok = yield self._check_daemon_health()
+                
+                if daemon_ok:
+                    print('MergedBroadcaster[%s]: Reconnecting to our own node at %s...' % (
+                        self.chain_name, _safe_addr_str(self.local_p2p_addr)))
+                    self.local_node_last_attempt = current_time
+                    try:
+                        yield self._connect_to_peer(self.local_p2p_addr, protected=True)
+                        # Success! Reset backoff
+                        self.local_node_failures = 0
+                        self.local_node_backoff = 30
+                        self.daemon_healthy = True
+                    except Exception as e:
+                        self.local_node_failures += 1
+                        # Exponential backoff: double each failure, up to max
+                        self.local_node_backoff = min(
+                            self.local_node_backoff * 2,
+                            self.local_node_max_backoff
+                        )
+                        print('> MergedBroadcaster[%s]: Failed to reconnect to our own node: %s' % (
+                            self.chain_name, e), file=sys.stderr)
+                        print('> MergedBroadcaster[%s]: Next retry in %d seconds (failure #%d)' % (
+                            self.chain_name, self.local_node_backoff, self.local_node_failures))
+                else:
+                    # Daemon not healthy - apply backoff without attempting connection
+                    self.local_node_last_attempt = current_time
+                    if self.daemon_healthy is not False:
+                        # First time detecting unhealthy daemon
+                        print('> MergedBroadcaster[%s]: Daemon not responding - will retry in %d seconds' % (
+                            self.chain_name, self.local_node_backoff))
+                    self.daemon_healthy = False
+                    self.local_node_failures += 1
+                    self.local_node_backoff = min(
+                        self.local_node_backoff * 2,
+                        self.local_node_max_backoff
+                    )
         
         # Connect more peers if needed
         if len(self.connections) < self.min_peers:
             yield self._connect_to_peers()
+    
+    @defer.inlineCallbacks
+    def _check_daemon_health(self):
+        """Check if merged mining daemon is healthy via RPC
+        
+        This prevents socket leaks by checking RPC before attempting P2P.
+        Returns True if daemon responds, False otherwise.
+        """
+        try:
+            # Use a simple RPC call with short timeout
+            result = yield _with_timeout(
+                self.merged_proxy.rpc_getblockcount(),
+                timeout=5
+            )
+            defer.returnValue(True)
+        except Exception as e:
+            defer.returnValue(False)
     
     @defer.inlineCallbacks
     def _refresh_peers(self):
@@ -961,6 +1032,10 @@ class MergedMiningBroadcaster(object):
             issues.append('Not yet bootstrapped')
         if len(self.connections) == 0:
             issues.append('No active P2P connections')
+        if self.daemon_healthy is False:
+            issues.append('Merged mining daemon not responding')
+        if self.local_node_failures > 3:
+            issues.append('Multiple reconnection failures (%d)' % self.local_node_failures)
         
         healthy = len(issues) == 0 and len(self.connections) >= 1
         
@@ -969,6 +1044,9 @@ class MergedMiningBroadcaster(object):
             'active_connections': len(self.connections),
             'protected_connections': len([c for c in self.connections.values() if c.get('protected')]),
             'bootstrapped': self.bootstrapped,
+            'daemon_healthy': self.daemon_healthy,
+            'local_node_failures': self.local_node_failures,
+            'local_node_backoff': self.local_node_backoff,
             'issues': issues,
         }
     

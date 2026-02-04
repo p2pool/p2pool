@@ -2,6 +2,7 @@ from __future__ import division
 
 import math
 import random
+import struct
 import sys
 import time
 
@@ -334,7 +335,12 @@ class Protocol(p2protocol.Protocol):
         result = []
         for wrappedshare in shares:
             if wrappedshare['type'] < p2pool_data.Share.VERSION: continue
-            share = p2pool_data.load_share(wrappedshare, self.node.net, self.addr)
+            try:
+                share = p2pool_data.load_share(wrappedshare, self.node.net, self.addr)
+            except (ValueError, struct.error) as e:
+                # MWEB transactions can cause parsing errors - skip this share
+                print '[MWEB-SKIP] Skipping unparseable share in handle_shares (likely MWEB tx): %s' % (e,)
+                continue
             if 13 <= wrappedshare['type'] < 34:
                 txs = []
                 share_has_unknown_txs = False
@@ -445,7 +451,12 @@ class Protocol(p2protocol.Protocol):
     class ShareReplyError(Exception): pass
     def handle_sharereply(self, id, result, shares):
         if result == 'good':
-            res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= p2pool_data.Share.VERSION]
+            try:
+                res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= p2pool_data.Share.VERSION]
+            except (ValueError, struct.error) as e:
+                # MWEB transactions can cause parsing errors - skip these shares but don't disconnect
+                print '[MWEB-SKIP] Skipping sharereply with unparseable shares (likely MWEB tx): %s' % (e,)
+                res = []  # Return empty list - we'll get these shares from other peers
         else:
             res = failure.Failure(self.ShareReplyError(result))
         self.get_shares.got_response(id, res)

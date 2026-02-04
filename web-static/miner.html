@@ -703,8 +703,13 @@
                 const addrDiv = document.getElementById('miner_address');
                 addrDiv.innerHTML = '<a href="' + (currency_info.address_explorer_url_prefix || '') + stats.address + '" target="_blank">' + stats.address + '</a>';
                 
-                // Update current stats
-                document.getElementById('current_hashrate').textContent = format_hashrate(stats.hashrate);
+                // Update current stats - show ~ prefix if estimated from difficulty
+                var hashrateText = format_hashrate(stats.hashrate);
+                if (stats.estimated_hashrate) {
+                    hashrateText = '~' + hashrateText;
+                    document.getElementById('current_hashrate').title = 'Estimated from vardiff difficulty';
+                }
+                document.getElementById('current_hashrate').textContent = hashrateText;
                 
                 // DOA Rate - update multiple elements
                 const doaRate = stats.doa_rate * 100;

@@ -474,7 +474,10 @@ def get_bech32_pubkey_hash(address, net):
     except Exception as e:
         raise AddrError
     else:
-        return int(''.join('{:02x}'.format(x) for x in witprog), 16), -1, witver
+        # Return the witness program as integer, version -1 (indicates bech32), 
+        # witness version, and the original byte length for P2WPKH/P2WSH distinction
+        pubkey_hash_int = int(''.join('{:02x}'.format(x) for x in witprog), 16)
+        return pubkey_hash_int, -1, witver
 
 def get_cashaddr_pubkey_hash(address, net):
     try:

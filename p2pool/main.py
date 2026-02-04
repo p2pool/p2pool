@@ -594,6 +594,9 @@ def run():
     parser.add_argument('--logfile',
         help='''log to this file (default: data/<NET>/log)''',
         type=str, action='store', default=None, dest='logfile')
+    parser.add_argument('--no-console',
+        help='disable console output (use when running as daemon with output redirected to log)',
+        action='store_true', default=False, dest='no_console')
     parser.add_argument('--web-static',
         help='use an alternative web frontend in this directory (otherwise use the built-in frontend)',
         type=str, action='store', default=None, dest='web_static')
@@ -830,7 +833,12 @@ def run():
         args.logfile = os.path.join(datadir_path, 'log')
     
     logfile = logging.LogFile(args.logfile)
-    pipe = logging.TimestampingPipe(logging.TeePipe([logging.EncodeReplacerPipe(sys.stderr), logfile]))
+    # If --no-console is set (daemon mode), only write to logfile to avoid double logging
+    # when shell also redirects stdout/stderr to log file
+    if args.no_console:
+        pipe = logging.TimestampingPipe(logfile)
+    else:
+        pipe = logging.TimestampingPipe(logging.TeePipe([logging.EncodeReplacerPipe(sys.stderr), logfile]))
     sys.stdout = logging.AbortPipe(pipe)
     sys.stderr = log.DefaultObserver.stderr = logging.AbortPipe(logging.PrefixPipe(pipe, '> '))
     if hasattr(signal, "SIGUSR1"):

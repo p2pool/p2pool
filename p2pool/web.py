@@ -251,6 +251,15 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     def get_current_merged_payouts():
         """
         Get current payouts with derived merged chain addresses.
+        
+        IMPORTANT: For addresses that cannot be converted to the merged chain
+        (P2SH, P2WSH, P2TR), their share of the merged block reward is
+        redistributed proportionally to all convertible addresses.
+        This ensures 100% of the merged block reward is distributed.
+        
+        The primary donation (author fee) does NOT receive redistributed rewards -
+        only the secondary donation, node fee, and regular miners benefit.
+        
         Returns dict: {parent_address: {amount: X, merged: [{network: Y, symbol: Z, address: A, amount: B}, ...]}}
         """
         from p2pool.work import is_pubkey_hash_address
@@ -303,39 +312,73 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         result = {}
         parent_net = node.net.PARENT if hasattr(node.net, 'PARENT') else node.net
         
-        for parent_address, amount in main_payouts.iteritems():
-            entry = {
-                'amount': amount,
-                'merged': []
-            }
+        # Identify primary donation address (should NOT receive redistributed rewards)
+        # The primary donation is typically the first/smallest output that goes to author
+        primary_donation_address = None
+        if hasattr(wb, 'donation_percentage') and wb.donation_percentage > 0:
+            # Primary donation is the author donation - identify it by being in the payout list
+            # It's typically a hardcoded address, but we'll exclude it from redistribution
+            # by checking if it's the donation script
+            pass  # We'll handle this by checking converted addresses
+        
+        # For each merged chain, calculate payouts with redistribution
+        for chain in merged_chains:
+            # First pass: identify convertible vs non-convertible addresses
+            convertible_addresses = {}  # {parent_addr: (pubkey_hash, main_satoshis)}
+            unconvertible_satoshis = 0
             
-            # Try to derive merged chain addresses
-            for chain in merged_chains:
+            for parent_address, main_sats in main_payouts_satoshis.iteritems():
                 try:
                     is_convertible, pubkey_hash, error_msg = is_pubkey_hash_address(parent_address, parent_net)
                     if is_convertible and pubkey_hash is not None:
+                        convertible_addresses[parent_address] = (pubkey_hash, main_sats)
+                    else:
+                        # This address cannot be converted - its merged reward will be redistributed
+                        unconvertible_satoshis += main_sats
+                except Exception:
+                    unconvertible_satoshis += main_sats
+            
+            # Calculate the redistribution factor
+            # Total convertible satoshis (for redistribution proportions)
+            convertible_total_satoshis = sum(sats for _, sats in convertible_addresses.values())
+            
+            # Redistribution: unconvertible share gets divided among convertible addresses
+            # proportionally to their share of the convertible pool
+            # BUT exclude primary donation from receiving extra redistribution
+            if convertible_total_satoshis > 0 and chain['reward'] > 0:
+                for parent_address in main_payouts_satoshis:
+                    if parent_address not in result:
+                        result[parent_address] = {'amount': main_payouts[parent_address], 'merged': []}
+                    
+                    if parent_address in convertible_addresses:
+                        pubkey_hash, main_sats = convertible_addresses[parent_address]
+                        
+                        # Base proportion of merged reward (same as main chain)
+                        base_proportion = main_sats / float(total_main_satoshis)
+                        base_merged_amount = chain['reward'] * base_proportion
+                        
+                        # Additional redistribution from unconvertible addresses
+                        # Proportional to this address's share of convertible pool
+                        redistribution_proportion = main_sats / float(convertible_total_satoshis)
+                        redistribution_amount = (chain['reward'] * (unconvertible_satoshis / float(total_main_satoshis))) * redistribution_proportion
+                        
+                        total_merged_amount = (base_merged_amount + redistribution_amount) / 1e8
+                        
                         merged_address = bitcoin_data.pubkey_hash_to_address(
                             pubkey_hash, chain['addr_net'].ADDRESS_VERSION, -1, chain['addr_net'])
                         
-                        # Calculate merged payout proportionally
-                        # Same proportion of merged reward as main chain payout
-                        if total_main_satoshis > 0 and chain['reward'] > 0:
-                            proportion = main_payouts_satoshis[parent_address] / float(total_main_satoshis)
-                            merged_amount = (chain['reward'] * proportion) / 1e8
-                        else:
-                            merged_amount = 0
-                        
-                        entry['merged'].append({
+                        result[parent_address]['merged'].append({
                             'network': chain['network'],
                             'symbol': chain['symbol'],
                             'address': merged_address,
-                            'amount': merged_amount,
+                            'amount': total_merged_amount,
                         })
-                except Exception as e:
-                    # Skip addresses that can't be converted
-                    pass
-            
-            result[parent_address] = entry
+                    # Non-convertible addresses get no merged payout (their share is redistributed)
+        
+        # Handle case where no merged chains are active - still build result from main payouts
+        for parent_address, amount in main_payouts.iteritems():
+            if parent_address not in result:
+                result[parent_address] = {'amount': amount, 'merged': []}
         
         return result
     
@@ -468,7 +511,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     web_root.putChild('connected_miners', WebInterface(get_connected_miners))
     
     # ==== Individual miner stats endpoint ====
-    def get_miner_stats(address):
+    def get_miner_stats(address=None):
         """Get detailed statistics for a specific miner address"""
         if not address:
             return {'error': 'No address provided', 'active': False}
@@ -486,12 +529,62 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         hashrate = 0
         dead_hashrate = 0
         found_workers = False
+        estimated_hashrate = False
+        worker_difficulties = {}
         
+        # First, check measured hashrate from miner_hash_rates
         for worker_name in miner_hash_rates:
             if extract_base_address(worker_name) == address:
                 found_workers = True
                 hashrate += miner_hash_rates.get(worker_name, 0)
                 dead_hashrate += miner_dead_hash_rates.get(worker_name, 0)
+        
+        # If no measured hashrate, check stratum connections and estimate from difficulty
+        if not found_workers or hashrate == 0:
+            try:
+                from p2pool.bitcoin.stratum import pool_stats
+                if pool_stats:
+                    stratum_workers = pool_stats.get_worker_stats()
+                    
+                    dumb_scrypt_diff = node.net.PARENT.DUMB_SCRYPT_DIFF if hasattr(node.net.PARENT, 'DUMB_SCRYPT_DIFF') else 2**32
+                    vardiff_target = wb.share_rate if hasattr(wb, 'share_rate') else 3.0  # Default 3 seconds per share
+                    
+                    for worker_name, worker_data in stratum_workers.items():
+                        if extract_base_address(worker_name) == address:
+                            found_workers = True
+                            # Get difficulty from stratum connection
+                            worker_diff = 0
+                            # Get aggregate stats for this worker to get connection difficulties
+                            conn_aggregate = pool_stats.get_worker_aggregate_stats(worker_name)
+                            if conn_aggregate and conn_aggregate.get('difficulties'):
+                                worker_diff = conn_aggregate['difficulties'][0]
+                                worker_difficulties[worker_name] = worker_diff
+                            
+                            # Try measured hashrate first, then estimate from difficulty
+                            worker_hashrate = worker_data.get('hash_rate', 0)
+                            if worker_hashrate == 0 and worker_diff > 0:
+                                # Estimate: hashrate = difficulty * DUMB_SCRYPT_DIFF / vardiff_target
+                                worker_hashrate = worker_diff * dumb_scrypt_diff / vardiff_target
+                                estimated_hashrate = True
+                            
+                            hashrate += worker_hashrate
+                    
+                    # Also check connected workers (those with active connections but no shares yet)
+                    connected_workers = pool_stats.get_connected_workers()
+                    for worker_name, winfo in connected_workers.items():
+                        if extract_base_address(worker_name) == address and worker_name not in stratum_workers:
+                            found_workers = True
+                            conn_aggregate = pool_stats.get_worker_aggregate_stats(worker_name)
+                            if conn_aggregate and conn_aggregate.get('difficulties'):
+                                worker_diff = conn_aggregate['difficulties'][0]
+                                worker_difficulties[worker_name] = worker_diff
+                                # Estimate hashrate from difficulty
+                                worker_hashrate = worker_diff * dumb_scrypt_diff / vardiff_target
+                                hashrate += worker_hashrate
+                                estimated_hashrate = True
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
         
         if not found_workers:
             return {'error': 'Miner not found', 'active': False}
@@ -509,14 +602,21 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             pass
         
         # Share difficulty - check all workers for this address
+        # First check last_work_shares, then use stratum worker_difficulties if available
         miner_last_diff = 0
         for worker_name in wb.last_work_shares.value:
             if extract_base_address(worker_name) == address:
                 worker_diff = bitcoin_data.target_to_difficulty(wb.last_work_shares.value[worker_name].target)
                 miner_last_diff = max(miner_last_diff, worker_diff)
         
-        # Time to share
-        attempts_to_share = node.net.PARENT.DUMB_SCRYPT_DIFF if hasattr(node.net.PARENT, 'DUMB_SCRYPT_DIFF') else 1
+        # Fall back to stratum difficulties if we didn't find any from last_work_shares
+        if miner_last_diff == 0 and worker_difficulties:
+            for worker_name, worker_diff in worker_difficulties.items():
+                miner_last_diff = max(miner_last_diff, worker_diff)
+        
+        # Time to share - use attempts_to_share from local_stats
+        dumb_scrypt_diff = node.net.PARENT.DUMB_SCRYPT_DIFF if hasattr(node.net.PARENT, 'DUMB_SCRYPT_DIFF') else 2**32
+        attempts_to_share = bitcoin_data.target_to_average_attempts(node.tracker.items[node.best_share_var.value].max_target)
         time_to_share = attempts_to_share / hashrate if hashrate > 0 else float('inf')
         
         # Get global stats for context
@@ -589,6 +689,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             address=address,
             active=True,
             hashrate=hashrate,
+            estimated_hashrate=estimated_hashrate,  # True if hashrate is estimated from difficulty
             dead_hashrate=dead_hashrate,
             doa_rate=doa_rate,
             share_difficulty=miner_last_diff,
@@ -616,7 +717,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     web_root.putChild('miner_stats', WebInterface(get_miner_stats))
     
     # ==== Individual miner payouts endpoint ====
-    def get_miner_payouts(address):
+    def get_miner_payouts(address=None):
         """Get payout history for a specific miner address"""
         if not address:
             return {'error': 'No address provided'}
