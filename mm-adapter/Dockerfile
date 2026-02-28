@@ -11,7 +11,7 @@ COPY adapter.py .
 COPY config.example.yaml config.yaml
 
 # Expose the default port
-EXPOSE 44555
+EXPOSE 44556
 
 # Run the adapter
 CMD ["python", "adapter.py", "--config", "/app/config.yaml"]

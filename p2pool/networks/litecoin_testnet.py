@@ -11,7 +11,7 @@ PREFIX = 'ad9614f6466a39cf'.decode('hex')      # Message prefix for P2Pool proto
 
 P2P_PORT = 19338  # Port for P2Pool peer-to-peer communication (share propagation)
 MIN_TARGET = 0    # Minimum share target (hardest difficulty allowed)
-MAX_TARGET = 2**256//2**10 - 1  # ~10x easier than mainnet, allows mining with ~100 kH/s (difficulty ~0.0625 LTC = 4 Scrypt)
+MAX_TARGET = 2**256//20 - 1  # Match jtoomim canonical (2**256//20) for cross-version interop
 
 # PERSIST = False means this node can start its own new sharechain if no peers available.
 # When PERSIST=False:
@@ -26,11 +26,16 @@ MAX_TARGET = 2**256//2**10 - 1  # ~10x easier than mainnet, allows mining with ~
 PERSIST = False
 
 WORKER_PORT = 19327  # Stratum port for miners to connect (stratum+tcp://IP:19327)
-BOOTSTRAP_ADDRS = 'forre.st'.split(' ')  # Initial peers to try connecting to
+BOOTSTRAP_ADDRS = [
+    'NODE_C_IP',  # nodeC - canonical v35 test node
+    'PEER_IP',  # node33 - canonical v35 test node
+    'NODE_A_IP',  # nodeA - v36 experimental node
+]
 ANNOUNCE_CHANNEL = '#p2pool-alt'
 VERSION_CHECK = lambda v: True  # Accept any version (testnet is permissive)
 SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit', 'taproot', 'mweb'])
-MINIMUM_PROTOCOL_VERSION = 3301
+MINIMUM_PROTOCOL_VERSION = 3301  # Runtime ratchet in data.py raises this when share versions reach 95%
 SEGWIT_ACTIVATION_VERSION = 17
 BLOCK_MAX_SIZE = 1000000
 BLOCK_MAX_WEIGHT = 4000000
+IMMUTABLE_BLOCKS = True

@@ -15,11 +15,11 @@ def check_output(*popenargs, **kwargs):
 def _get_version():
     try:
         try:
-            return check_output(['git', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
+            return check_output(['git', 'describe', '--always', '--tags', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
         except:
             pass
         try:
-            return check_output(['git.cmd', 'describe', '--always', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
+            return check_output(['git.cmd', 'describe', '--always', '--tags', '--dirty'], cwd=os.path.dirname(os.path.abspath(sys.argv[0]))).strip()
         except:
             pass
         

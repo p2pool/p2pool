@@ -1,0 +1,231 @@
+# Dogecoin Testnet4 Patch - P2Pool Merged Mining
+#
+# This patch adds a new "testnet4alpha" network to Dogecoin Core with fixed
+# difficulty adjustment rules to work around the testnet block storm bug.
+#
+# BUG: The official testnet allows unlimited minimum difficulty blocks via
+# timestamp manipulation, causing ~3.3 blocks/second (180x faster than intended).
+# This makes merged mining testing impossible due to stale work submissions.
+#
+# See: DOGECOIN_TESTNET_BUG.md for full documentation
+# Official fix PR: https://github.com/dogecoin/dogecoin/pull/3967
+# Bug location: https://github.com/dogecoin/dogecoin/blob/master/src/dogecoin.cpp#L22-L39
+#
+# When Dogecoin Core releases official testnet4alpha, migrate to that instead.
+#
+diff --git a/src/chainparams.cpp b/src/chainparams.cpp
+--- a/src/chainparams.cpp
++++ b/src/chainparams.cpp
+@@ -316,6 +316,136 @@ class CTestNetParams : public CChainParams {
+ };
+ static CTestNetParams testNetParams;
+ 
++/**
++ * Testnet4 - Custom P2Pool merged mining testnet
++ * 
++ * Key features:
++ * - New genesis block (Jan 2026)
++ * - AuxPoW enabled from block 0
++ * - Digishield difficulty adjustment from block 0
++ * - Proper 60-second block time target
++ * - No seed nodes (isolated network)
++ * 
++ * CRITICAL FIX: fPowAllowMinDifficultyBlocks = false
++ * This prevents the block storm attack that plagues official testnet.
++ * See: https://github.com/dogecoin/dogecoin/pull/3967
++ */
++class CTestNet4Params : public CChainParams {
++public:
++    CTestNet4Params() {
++        strNetworkID = "testnet4alpha";
++
++        // Single consensus params - AuxPoW + Digishield from genesis
++        consensus.nHeightEffective = 0;
++        consensus.nSubsidyHalvingInterval = 100000;
++        consensus.nMajorityEnforceBlockUpgrade = 51;
++        consensus.nMajorityRejectBlockOutdated = 75;
++        consensus.nMajorityWindow = 100;
++        
++        // No BIP34/65/66 enforcement on this testnet (start fresh)
++        consensus.BIP34Height = 0;
++        consensus.BIP34Hash = uint256();
++        consensus.BIP65Height = 0;
++        consensus.BIP66Height = 0;
++        
++        // Difficulty settings - proper Digishield from start
++        consensus.powLimit = uint256S("0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
++        consensus.nPowTargetTimespan = 60; // Digishield: 1 minute
++        consensus.nPowTargetSpacing = 60;  // 1 minute blocks
++        consensus.fDigishieldDifficultyCalculation = true;
++        consensus.fSimplifiedRewards = true;
++        consensus.nCoinbaseMaturity = 30;  // Lower maturity for testing
++        consensus.fPowAllowMinDifficultyBlocks = false;  // NO min difficulty!
++        consensus.fPowAllowDigishieldMinDifficultyBlocks = false;  // NO min difficulty!
++        consensus.fPowNoRetargeting = false;  // Allow retargeting
++        
++        consensus.nRuleChangeActivationThreshold = 75; // 75%
++        consensus.nMinerConfirmationWindow = 100;
++        
++        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
++        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
++        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
++
++        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
++        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
++        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
++
++        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 1;
++        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = 0;
++        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = 0; // Disabled
++
++        consensus.nMinimumChainWork = uint256S("0x00");
++        consensus.defaultAssumeValid = uint256S("0x00");
++
++        // AuxPoW parameters - enabled from block 0
++        consensus.nAuxpowChainId = 0x0062; // 98 - Same as mainnet Dogecoin
++        consensus.fStrictChainId = false;  // Allow non-strict for testing
++        consensus.fAllowLegacyBlocks = false;  // AuxPoW only from start
++
++        // No consensus tree needed - single params
++        pConsensusRoot = &consensus;
++
++        // New message start bytes (unique to testnet4alpha)
++        pchMessageStart[0] = 0xfa;
++        pchMessageStart[1] = 0xce;
++        pchMessageStart[2] = 0xb0;
++        pchMessageStart[3] = 0x04;  // "04" for testnet4alpha
++        
++        nDefaultPort = 44558;  // Different from testnet (44556) and mainnet (22556)
++        nPruneAfterHeight = 1000;
++
++        // NEW GENESIS BLOCK - January 26, 2026
++        // nTime = 1737907200 (Jan 26, 2026 12:00:00 UTC)
++        // nNonce = needs to be mined
++        // nBits = 0x1e0ffff0 (starting difficulty)
++        // 
++        // To mine genesis: uncomment the genesis mining code below, run once,
++        // then update with the found nonce and hash
++        
++        genesis = CreateGenesisBlock(1737907200, 1, 0x1e0ffff0, 1, 88 * COIN);
++        
++        // GENESIS MINING - Uncomment to mine new genesis, then comment out
++        // LogPrintf("Mining testnet4alpha genesis block...\n");
++        // while (genesis.GetHash() > consensus.powLimit) {
++        //     genesis.nNonce++;
++        //     if (genesis.nNonce % 1000000 == 0)
++        //         LogPrintf("Trying nonce %u...\n", genesis.nNonce);
++        // }
++        // LogPrintf("Testnet4 genesis found! nNonce=%u hash=%s\n", genesis.nNonce, genesis.GetHash().ToString());
++        
++        consensus.hashGenesisBlock = genesis.GetHash();
++        
++        // Note: Will be updated after mining genesis
++        // assert(consensus.hashGenesisBlock == uint256S("0xTODO"));
++        assert(genesis.hashMerkleRoot == uint256S("0x5b2a3f53f605d62c53e62932dac6925e3d74afa5a4b459745c36d42d0ed26a69"));
++
++        // No DNS seeds - this is an isolated testnet
++        vSeeds.clear();
++
++        // Same address prefixes as testnet
++        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,113); // 0x71 - 'n' prefix
++        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196); // 0xc4
++        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,241); // 0xf1
++        base58Prefixes[EXT_PUBLIC_KEY] = boost::assign::list_of(0x04)(0x35)(0x87)(0xcf).convert_to_container<std::vector<unsigned char> >();
++        base58Prefixes[EXT_SECRET_KEY] = boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
++
++        // No fixed seeds
++        vFixedSeeds.clear();
++
++        fMiningRequiresPeers = false;  // Allow solo mining
++        fDefaultConsistencyChecks = false;
++        fRequireStandard = false;
++        fMineBlocksOnDemand = false;
++
++        checkpointData = (CCheckpointData) {
++            boost::assign::map_list_of
++            ( 0, consensus.hashGenesisBlock)
++        };
++
++        chainTxData = ChainTxData{
++            0,
++            0,
++            0
++        };
++    }
++};
++static CTestNet4Params testNet4Params;
++
+ /**
+  * Regression test
+  */
+@@ -418,6 +548,8 @@ CChainParams& Params(const std::string& chain)
+         return mainParams;
+     else if (chain == CBaseChainParams::TESTNET)
+         return testNetParams;
++    else if (chain == "testnet4alpha")
++        return testNet4Params;
+     else if (chain == CBaseChainParams::REGTEST)
+         return regTestParams;
+     else
+diff --git a/src/chainparamsbase.cpp b/src/chainparamsbase.cpp
+--- a/src/chainparamsbase.cpp
++++ b/src/chainparamsbase.cpp
+@@ -30,6 +30,15 @@ class CBaseTestNetParams : public CBaseChainParams
+     }
+ };
+ 
++class CBaseTestNet4Params : public CBaseChainParams
++{
++public:
++    CBaseTestNet4Params()
++    {
++        nRPCPort = 44559;  // Different from testnet (44555)
++    }
++};
++
+ /**
+  * Regression test
+  */
+@@ -41,10 +50,12 @@ class CBaseRegTestParams : public CBaseChainParams
+ };
+ 
+ static CBaseMainParams mainParams;
++static CBaseTestNet4Params testNet4Params;
+ static CBaseTestNetParams testNetParams;
+ static CBaseRegTestParams regTestParams;
+ 
+ const CBaseChainParams& BaseParams(const std::string& chain)
+ {
+     if (chain == CBaseChainParams::MAIN)
+@@ -52,6 +63,8 @@ const CBaseChainParams& BaseParams(const std::string& chain)
+         return mainParams;
+     else if (chain == CBaseChainParams::TESTNET)
+         return testNetParams;
++    else if (chain == "testnet4alpha")
++        return testNet4Params;
+     else if (chain == CBaseChainParams::REGTEST)
+         return regTestParams;
+     else
+diff --git a/src/init.cpp b/src/init.cpp
+--- a/src/init.cpp
++++ b/src/init.cpp
+@@ -458,6 +458,7 @@ std::string HelpMessage(HelpMessageMode mode)
+     strUsage += HelpMessageOpt("-maxtipage=<n>", strprintf("Maximum tip age in seconds to consider node in initial block download (default: %u)", DEFAULT_MAX_TIP_AGE));
+     }
+     strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
++    strUsage += HelpMessageOpt("-testnet4alpha", _("Use testnet4alpha (P2Pool merged mining testnet)"));
+     strUsage += HelpMessageOpt("-regtest", _("Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
+                                              "This is intended for regression testing tools and app development."));
+ 
+diff --git a/src/util.cpp b/src/util.cpp
+--- a/src/util.cpp
++++ b/src/util.cpp
+@@ -518,6 +518,8 @@ std::string GetChainName()
+     bool fTestNet = GetBoolArg("-testnet", false);
+     if (fTestNet && fRegTest)
+         throw std::runtime_error("Invalid combination of -regtest and -testnet.");
++    if (GetBoolArg("-testnet4alpha", false))
++        return "testnet4alpha";
+     if (fRegTest)
+         return CBaseChainParams::REGTEST;
+     if (fTestNet)

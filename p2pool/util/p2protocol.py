@@ -68,8 +68,19 @@ class Protocol(protocol.Protocol):
                 # - 'shares': P2Pool shares which reference transactions
                 # - 'sharereply': P2Pool sharereply which contains full share data with txs
                 if command in ('tx', 'remember_tx', 'shares', 'sharereply'):
-                    # Always log MWEB skips for now (to diagnose orphan issues)
-                    print '[MWEB-SKIP] Skipping unparseable %s message (likely contains MWEB tx): %s' % (command, e,)
+                    # Rate-limit MWEB skip logs: print summary every 100 skips
+                    if not hasattr(self, '_mweb_skip_count'):
+                        self._mweb_skip_count = 0
+                        self._mweb_skip_first_time = None
+                    self._mweb_skip_count += 1
+                    import time as _time
+                    now = _time.time()
+                    if self._mweb_skip_count == 1:
+                        self._mweb_skip_first_time = now
+                        print '[MWEB-SKIP] Skipping unparseable %s message (likely contains MWEB tx): %s' % (command, e,)
+                    elif self._mweb_skip_count % 100 == 0:
+                        elapsed = now - self._mweb_skip_first_time if self._mweb_skip_first_time else 0
+                        print '[MWEB-SKIP] Skipped %d unparseable messages in %.0fs (latest: %s)' % (self._mweb_skip_count, elapsed, command)
                     continue  # Skip this message but stay connected
                 else:
                     print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')

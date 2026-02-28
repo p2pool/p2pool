@@ -45,9 +45,26 @@ def _atomic_write(filename, data):
         os.remove(filename)
         os.rename(filename + '.new', filename)
 
-def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Event(), static_dir=None):
+def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Event(), static_dir=None,
+                 enable_miner_messages=False, transition_message=None, trusted_proxy=None):
     node = wb.node
     start_time = time.time()
+
+    _LOCALHOST_IPS = ('127.0.0.1', '::1', '::ffff:127.0.0.1')
+
+    def _get_real_client_ip(request):
+        """Get the real client IP, respecting X-Forwarded-For if behind a trusted proxy."""
+        peer_ip = request.getClientIP()
+        if trusted_proxy and peer_ip == trusted_proxy:
+            forwarded = request.getHeader('X-Forwarded-For')
+            if forwarded:
+                # X-Forwarded-For: client, proxy1, proxy2 — take the first (leftmost)
+                return forwarded.split(',')[0].strip()
+        return peer_ip
+
+    def _is_localhost(request):
+        """Check if the request originates from localhost."""
+        return _get_real_client_ip(request) in _LOCALHOST_IPS
     
     web_root = resource.Resource()
     
@@ -90,6 +107,578 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             for script, value in get_current_scaled_txouts(total, trunc).iteritems()
             if bitcoin_data.script2_to_address(script, node.net.PARENT) is not None
         ))
+    
+    def get_version_signaling():
+        """
+        Get version signaling statistics for version upgrade tracking.
+        
+        Three key metrics:
+        - share_types: Actual share class VERSION in chain (e.g. V17=Share, V35=PaddingBugfixShare, V36=MergedMiningShare)
+        - versions (desired_version): What each share votes FOR (signals next upgrade)
+        - successor signaling: Tracks the SUCCESSOR transition even during propagation phase
+        
+        The transition has multiple phases:
+        1. BUILDING_CHAIN: Chain hasn't reached CHAIN_LENGTH yet
+        2. PROPAGATING: Current type's shares are voting for SUCCESSOR but haven't reached sampling window
+        3. SIGNALING: SUCCESSOR votes appearing in sampling window (0-60%)
+        4. SIGNALING_STRONG: Strong signaling (60-95%)
+        5. ACTIVATING: Threshold reached (95%+), switchover imminent
+        """
+        if node.best_share_var.value is None:
+            return None
+        
+        chain_height = node.tracker.get_height(node.best_share_var.value)
+        if chain_height < 10:
+            return None
+        
+        chain_length = node.net.CHAIN_LENGTH
+        sampling_window_size = chain_length // 10  # 864 for litecoin
+        
+        # Get desired_version counts from the sampling window (or full chain if immature)
+        lookbehind = min(chain_height, chain_length // 10)
+        try:
+            previous_share = node.tracker.items[node.best_share_var.value]
+            counts = p2pool_data.get_desired_version_counts(
+                node.tracker,
+                node.tracker.get_nth_parent_hash(previous_share.hash, chain_length * 9 // 10) if chain_height >= chain_length else node.best_share_var.value,
+                lookbehind
+            )
+        except:
+            counts = {}
+        
+        total_weight = sum(counts.itervalues())
+        if total_weight == 0:
+            return None
+        
+        # Calculate percentages for desired_version voting
+        version_percentages = {}
+        for version, weight in counts.iteritems():
+            version_percentages[str(version)] = {
+                'weight': weight,
+                'percentage': (weight / total_weight) * 100
+            }
+        
+        # Single-pass scan of the active chain (up to CHAIN_LENGTH).
+        # Only consensus-relevant shares matter for voting/signaling stats.
+        # Shares beyond CHAIN_LENGTH are aged-out history and would dilute %.
+        # Collects: share type counts, desired_version votes, V36 propagation
+        # depth, and chain desired_version breakdown — all in one walk.
+        share_type_counts = {}       # VERSION -> count (active chain)
+        share_type_names = {
+            17: 'Share', 32: 'PreSegwitShare', 33: 'NewShare',
+            34: 'SegwitMiningShare', 35: 'PaddingBugfixShare', 36: 'MergedMiningShare'
+        }
+        overall_v36_votes = 0        # shares with desired_version >= 36
+        overall_v36_shares = 0       # shares with VERSION >= 36 (actual format)
+        overall_total = 0            # total shares scanned
+        full_chain_desired = {}      # desired_version -> count (active chain, unweighted)
+        propagation_target = chain_length  # 8640 for LTC — full chain length
+        v36_contiguous_from_tip = 0  # consecutive V36 votes from tip
+        deepest_v36_pos = 0          # deepest position where V36 vote exists
+        _contiguous = True
+        _scan_limit = min(chain_height, chain_length)  # cap at CHAIN_LENGTH
+        try:
+            _sh = node.best_share_var.value
+            _pos = 0
+            while _sh is not None and _pos < _scan_limit:
+                _s = node.tracker.items.get(_sh)
+                if _s is None:
+                    break
+                # Share type (VERSION)
+                share_type_counts[_s.VERSION] = share_type_counts.get(_s.VERSION, 0) + 1
+                # Desired version vote
+                _dv = getattr(_s, 'desired_version', _s.VERSION)
+                full_chain_desired[_dv] = full_chain_desired.get(_dv, 0) + 1
+                overall_total += 1
+                if _dv >= 36:
+                    overall_v36_votes += 1
+                    deepest_v36_pos = _pos + 1
+                    if _contiguous:
+                        v36_contiguous_from_tip = _pos + 1
+                elif _contiguous:
+                    _contiguous = False
+                if _s.VERSION >= 36:
+                    overall_v36_shares += 1
+                _sh = _s.previous_hash
+                _pos += 1
+        except:
+            pass
+        
+        overall_v36_vote_pct = (overall_v36_votes * 100.0 / overall_total) if overall_total > 0 else 0
+        overall_v36_share_pct = (overall_v36_shares * 100.0 / overall_total) if overall_total > 0 else 0
+        
+        total_shares = sum(share_type_counts.values()) if share_type_counts else 0
+        share_types = {}
+        for version, cnt in sorted(share_type_counts.items()):
+            name = share_type_names.get(version, 'V%d' % version)
+            share_types[str(version)] = {
+                'name': name,
+                'count': cnt,
+                'percentage': (cnt / total_shares * 100) if total_shares > 0 else 0
+            }
+        
+        # Full-chain desired_version percentages (unweighted, all shares)
+        full_chain_version_pcts = {}
+        for ver, cnt in full_chain_desired.items():
+            full_chain_version_pcts[str(ver)] = {
+                'count': cnt,
+                'percentage': (cnt * 100.0 / overall_total) if overall_total > 0 else 0
+            }
+        
+        # Current share type being produced (tip of chain)
+        current_share = node.tracker.items.get(node.best_share_var.value)
+        current_share_type = current_share.VERSION if current_share else None
+        current_share_name = share_type_names.get(current_share_type, 'V%d' % current_share_type) if current_share_type else 'Unknown'
+        
+        # Determine the SUCCESSOR version from the share class hierarchy
+        # This is the key: even when dominant vote == current type, if current type
+        # has a SUCCESSOR, we're in a transition toward that successor
+        successor_version = None
+        successor_name = None
+        if current_share is not None and hasattr(type(current_share), 'SUCCESSOR') and type(current_share).SUCCESSOR is not None:
+            successor_version = type(current_share).SUCCESSOR.VERSION
+            successor_name = share_type_names.get(successor_version, 'V%d' % successor_version)
+        
+        # Find the dominant desired version in sampling window
+        target_version = None
+        target_percentage = 0
+        for ver, weight in counts.iteritems():
+            pct = (weight / total_weight) * 100 if total_weight > 0 else 0
+            if pct > target_percentage:
+                target_version = ver
+                target_percentage = pct
+        target_version_name = share_type_names.get(target_version, 'V%d' % target_version) if target_version else 'Unknown'
+        
+        
+        # Determine transition state
+        # A transition is happening if:
+        # 1. Current type differs from dominant vote (classic detection), OR
+        # 2. Current type has a SUCCESSOR (we're producing shares that vote for successor)
+        classic_transition = current_share_type is not None and target_version is not None and current_share_type != target_version
+        successor_transition = successor_version is not None
+        is_transitioning = classic_transition or successor_transition
+        
+        # Hide transition widget when AutoRatchet is CONFIRMED — the
+        # V35->V36 transition is complete, all tasks done.
+        # But detect stale confirmed state: if chain is <50% V36, treat as voting
+        ratchet = getattr(wb, 'auto_ratchet', None)
+        ratchet_state = getattr(ratchet, 'state', '') if ratchet else ''
+        effective_ratchet_state = ratchet_state
+        if ratchet_state == 'confirmed' and chain_height > 0:
+            # Check if confirmed state is stale (chain mostly V35)
+            v36_share_count = sum(c for v, c in share_type_counts.iteritems() if v >= 36)
+            if total_shares > 0 and v36_share_count * 100 // total_shares < 50:
+                effective_ratchet_state = 'voting'  # stale confirmed, override
+        ratchet_confirmed = effective_ratchet_state == 'confirmed'
+        ratchet_active = effective_ratchet_state in ('voting', 'activated')
+        show_transition = (is_transitioning or ratchet_active) and not ratchet_confirmed
+        
+        # The effective target is the SUCCESSOR version when we're in successor transition
+        effective_target = successor_version if successor_transition else target_version
+        effective_target_name = share_type_names.get(effective_target, 'V%d' % effective_target) if effective_target else 'Unknown'
+        
+        # Chain maturity
+        chain_maturity = min(chain_height / float(chain_length), 1.0) if chain_length > 0 else 0
+        
+        # Calculate signaling for the EFFECTIVE TARGET in the sampling window
+        sampling_signaling = 0
+        sampling_counts = {}
+        if chain_height >= chain_length:
+            try:
+                sampling_start = node.tracker.get_nth_parent_hash(
+                    node.best_share_var.value, chain_length * 9 // 10)
+                sampling_counts = p2pool_data.get_desired_version_counts(
+                    node.tracker, sampling_start, sampling_window_size)
+                sampling_total = sum(sampling_counts.itervalues())
+                if sampling_total > 0 and effective_target is not None:
+                    sampling_signaling = (sampling_counts.get(effective_target, 0) / float(sampling_total)) * 100
+            except:
+                pass
+        
+        # Propagation: how far V36 votes have aged toward the sampling window
+        propagation_pct = min(deepest_v36_pos / float(propagation_target) * 100, 100) if propagation_target > 0 else 0
+        shares_to_window = max(0, propagation_target - deepest_v36_pos)
+        time_to_window_seconds = shares_to_window * node.net.SHARE_PERIOD
+        
+        # Legacy field for backward compat
+        current_type_count = share_type_counts.get(current_share_type, 0) if current_share_type else 0
+        
+        # Determine status and message
+        if not is_transitioning and not ratchet_active:
+            status = 'no_transition'
+            message = 'No version transition in progress'
+            transition_progress = 100
+        elif not is_transitioning and ratchet_active:
+            # Share type already switched to V36 but ratchet still needs confirmation
+            v36_format_count = sum(c for v, c in share_type_counts.iteritems() if v >= 36)
+            v36_format_pct = (v36_format_count * 100 // total_shares) if total_shares > 0 else 0
+            confirm_window = chain_length * 2
+            activated_height = getattr(ratchet, '_activated_height', None)
+            shares_since = max(0, chain_height - activated_height) if activated_height else 0
+            status = 'confirming'
+            message = 'V36 ACTIVATED — confirmation in progress: %d/%d shares (%d%% V36 format)' % (
+                shares_since, confirm_window, v36_format_pct)
+            transition_progress = min(shares_since * 100.0 / confirm_window, 100) if confirm_window > 0 else 0
+        elif chain_height < chain_length:
+            status = 'building_chain'
+            shares_remaining = chain_length - chain_height
+            message = 'Building chain: %d/%d shares (need %d more before upgrade checks activate)' % (
+                chain_height, chain_length, shares_remaining)
+            transition_progress = (chain_height / float(chain_length)) * 100
+        elif sampling_signaling >= 95:
+            status = 'activating'
+            message = 'V%d activation threshold reached! %.1f%% in sampling window — switchover imminent' % (
+                effective_target, sampling_signaling)
+            transition_progress = 100
+        elif sampling_signaling >= 60:
+            status = 'signaling_strong'
+            message = 'Strong V%d signaling — activation approaching (need 95%%)' % (
+                effective_target,)
+            transition_progress = sampling_signaling
+        elif sampling_signaling > 0:
+            status = 'signaling'
+            message = 'Network is signaling for V%d upgrade' % (
+                effective_target,)
+            transition_progress = sampling_signaling
+        elif overall_v36_votes > 0 and deepest_v36_pos < propagation_target:
+            # V36 votes exist in the chain but haven't reached the sampling window yet
+            status = 'propagating'
+            message = 'V%d votes propagating: %d votes (%.1f%% of chain), deepest at position %d/%d. Reach sampling window in ~%s' % (
+                effective_target, overall_v36_votes, overall_v36_vote_pct,
+                deepest_v36_pos, propagation_target, format_eta(time_to_window_seconds))
+            transition_progress = propagation_pct
+        elif overall_v36_votes > 0:
+            # V36 votes exist and have reached sampling window position but are 0% weighted
+            # (edge case: votes exist at the right position but weight rounds to 0)
+            status = 'signaling'
+            message = 'V%d votes appearing in sampling window. %d votes (%.1f%%) in chain overall' % (
+                effective_target, overall_v36_votes, overall_v36_vote_pct)
+            transition_progress = overall_v36_vote_pct
+        else:
+            # No V36 votes anywhere in the chain
+            status = 'waiting'
+            message = 'Waiting for miners to upgrade. No V%d votes in chain yet (0/%d shares). Miners need V36-capable software.' % (
+                effective_target, total_shares)
+            transition_progress = 0
+        
+        # AutoRatchet state for dashboard — report effective state
+        ratchet_info = None
+        if ratchet is not None:
+            ratchet_info = dict(
+                state=effective_ratchet_state,
+                persisted_state=getattr(ratchet, 'state', 'unknown'),
+                activated_at=getattr(ratchet, '_activated_at', None),
+                activated_height=getattr(ratchet, '_activated_height', None),
+                confirmed_at=getattr(ratchet, '_confirmed_at', None),
+            )
+        
+        return dict(
+            chain_height=chain_height,
+            chain_length_required=chain_length,
+            chain_ready=chain_height >= chain_length,
+            chain_maturity=round(chain_maturity * 100, 2),
+            lookbehind=lookbehind,
+            total_weight=total_weight,
+            sampling_window_size=sampling_window_size,
+            sampling_signaling=round(sampling_signaling, 2),
+            share_types=share_types,
+            current_share_type=current_share_type,
+            current_share_name=current_share_name,
+            # The effective target (SUCCESSOR version or dominant vote)
+            target_version=effective_target,
+            target_version_name=effective_target_name,
+            # When successor overrides the dominant vote, report the effective
+            # target's actual signaling % — not the dominant vote's %.
+            target_percentage=round(sampling_signaling if successor_transition else target_percentage, 2),
+            # Successor info
+            successor_version=successor_version,
+            successor_name=successor_name,
+            # Desired version voting breakdown (sampling window, weighted)
+            versions=version_percentages,
+            # Full-chain desired_version votes (unweighted, all tracked shares)
+            full_chain_versions=full_chain_version_pcts,
+            # Overall V36 stats (full chain, not just sampling window)
+            overall_v36_votes=overall_v36_votes,
+            overall_v36_vote_pct=round(overall_v36_vote_pct, 2),
+            overall_v36_shares=overall_v36_shares,
+            overall_v36_share_pct=round(overall_v36_share_pct, 2),
+            overall_total=overall_total,
+            # Propagation tracking (V36 votes aging toward sampling window)
+            propagation_pct=round(propagation_pct, 2),
+            propagation_target=propagation_target,
+            deepest_v36_position=deepest_v36_pos,
+            v36_contiguous_from_tip=v36_contiguous_from_tip,
+            current_type_count=current_type_count,
+            shares_to_window=shares_to_window,
+            time_to_window_seconds=round(time_to_window_seconds, 0),
+            # Transition state
+            show_transition=show_transition,
+            is_transitioning=is_transitioning,
+            transition_progress=round(transition_progress, 2),
+            thresholds=dict(accept=60, activate=95),
+            status=status,
+            message=message,
+            # Confirmation tracking (ACTIVATED state)
+            confirmation_window=chain_length * 2,
+            shares_since_activation=max(0, chain_height - (getattr(ratchet, '_activated_height', None) or chain_height)) if ratchet else 0,
+            # AutoRatchet state
+            auto_ratchet=ratchet_info,
+            # Transition message from share messaging system
+            transition_message=_get_transition_message(),
+            # Authority announcements (non-transition, always shown)
+            authority_announcements=_get_authority_announcements(),
+            # Address format warnings during transition
+            address_warnings=_get_address_warnings(
+                is_transitioning, ratchet_confirmed, effective_target),
+        )
+    
+    def _get_authority_announcements():
+        """Get authority announcements and alerts (non-transition messages).
+        
+        Returns a list of dicts with text, type, urgency, timestamp, etc.
+        These are always shown on the dashboard regardless of transition state.
+        Includes MSG_POOL_ANNOUNCE (0x03), MSG_EMERGENCY (0x10), and other
+        authority messages that are NOT MSG_TRANSITION_SIGNAL.
+        """
+        try:
+            store = getattr(node, '_message_store', None)
+            if store is None:
+                return []
+            from p2pool.share_messages import MSG_TRANSITION_SIGNAL
+            # Get all authority messages, exclude transition signals
+            msgs = store.get_messages(authority_only=True, limit=20)
+            msgs = [m for m in msgs if m.msg_type != MSG_TRANSITION_SIGNAL]
+            if not msgs:
+                return []
+            result = []
+            for msg in msgs[:10]:
+                entry = dict(
+                    type=msg.type_name,
+                    type_id=msg.msg_type,
+                    timestamp=msg.timestamp,
+                    age=int(msg.age),
+                    verified=msg.verified,
+                    authority=msg.is_protocol_authority,
+                )
+                # Text-based messages (POOL_ANNOUNCE, EMERGENCY)
+                if hasattr(msg, 'payload') and msg.payload:
+                    try:
+                        data = json.loads(msg.payload)
+                        entry['text'] = data.get('msg', data.get('text', ''))
+                        entry['urgency'] = data.get('urg', data.get('urgency', 'info'))
+                        entry['url'] = data.get('url', '')
+                    except (ValueError, TypeError):
+                        try:
+                            entry['text'] = msg.payload.decode('utf-8')
+                        except (UnicodeDecodeError, AttributeError):
+                            entry['text'] = ''
+                        entry['urgency'] = 'info'
+                result.append(entry)
+            return result
+        except Exception:
+            return []
+
+    def _get_address_warnings(is_transitioning, ratchet_confirmed, effective_target):
+        """Generate address format warnings for V36 merged mining.
+
+        These are node-generated (not authority-signed) informational
+        messages.  Always shown so miners can prepare their address
+        configuration BEFORE V36 activates — the multi-address stratum
+        format only takes effect after the transition switch.
+        """
+        warnings = []
+
+        parent_symbol = getattr(node.net.PARENT, 'SYMBOL', 'LTC') if hasattr(node.net, 'PARENT') else 'LTC'
+
+        # V35-phase limitation: shares can't carry explicit merged addresses
+        if not ratchet_confirmed and effective_target >= 36:
+            warnings.append(dict(
+                id='v35_addr_limitation',
+                urgency='recommended',
+                title='V35 Address Limitation (Current Phase)',
+                text=(
+                    'During V35 (current share format), shares cannot carry '
+                    'explicit merged mining addresses. Even if you configure '
+                    '%s,DOGE in stratum, PPLNS will use ONLY auto-converted '
+                    'DOGE addresses derived from your %s public key hash. '
+                    'Explicit address support activates after V36 transition.'
+                ) % (parent_symbol, parent_symbol),
+            ))
+
+        warnings.append(dict(
+            id='multiaddr_format',
+            urgency='recommended',
+            title='Multi-Address Mining Format',
+            text=(
+                'V36 introduces merged mining. To receive rewards on both '
+                'chains, configure your miner\'s stratum username as: '
+                '%s_ADDRESS,DOGE_ADDRESS.worker_name  '
+                'Example: Labc...xyz,D9ab...def.rig1'
+            ) % parent_symbol,
+        ))
+
+        # Auto-conversion warning
+        warnings.append(dict(
+            id='auto_convert',
+            urgency='info',
+            title='Address Auto-Conversion',
+            text=(
+                'If you only provide a %s address, a DOGE address will be '
+                'auto-derived from its public key hash. This derived address '
+                'may NOT match your actual DOGE wallet — you could lose '
+                'merged mining rewards. Always specify your own DOGE address '
+                'explicitly.'
+            ) % parent_symbol,
+        ))
+
+        # Invalid address redistribution warning
+        warnings.append(dict(
+            id='invalid_addr_redist',
+            urgency='info',
+            title='Invalid Address Redistribution',
+            text=(
+                'Miners with invalid or unparseable DOGE addresses will NOT '
+                'receive merged mining rewards. Their share of merged rewards '
+                'is redistributed probabilistically to other PPLNS miners '
+                'with valid addresses.'
+            ),
+        ))
+
+        return warnings
+
+    # Builtin transition blobs — loaded as fallback if file-based loading fails.
+    # Prefer shipping blobs in transition_messages/*.hex instead of embedding here.
+    # The ECDSA import fix (coincurve) ensures file-based loading now works reliably.
+    _BUILTIN_TRANSITION_BLOBS = [
+        # V35 -> V36 mainnet blob moved to transition_messages/transition_v35_v36_mainnet.hex
+    ]
+
+    _blobs_loaded = [False]
+
+    def _load_blob_dirs(store):
+        """Load transition/bootstrap blobs from all known directories.
+
+        Called once at store creation.  Blobs are deduplicated by
+        message hash, so calling again is safe but wasteful (re-reads
+        files, re-decrypts, re-verifies ECDSA just to be rejected by
+        the dedup set).  To pick up new blobs added after startup,
+        restart the node.
+        """
+        if _blobs_loaded[0]:
+            return
+        _blobs_loaded[0] = True
+
+        # 1. data/<net>/{bootstrap_messages,transition_messages,transitional_messages}/
+        if datadir_path:
+            for dirname in ('bootstrap_messages', 'transition_messages', 'transitional_messages'):
+                bdir = os.path.join(datadir_path, dirname)
+                if os.path.isdir(bdir):
+                    n = store.load_bootstrap_blobs(bdir)
+                    if n > 0:
+                        print('Messaging: loaded %d bootstrap message(s) from %s' % (n, bdir))
+
+        # 2. <repo>/transition_messages/ (shipped with the source code)
+        _script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        _module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _search_bases = list(dict.fromkeys([_script_dir, _module_dir]))
+        _found_shipped = False
+        for _base in _search_bases:
+            for _dname in ('transition_messages', 'transitional_messages'):
+                shipped_dir = os.path.join(_base, _dname)
+                if os.path.isdir(shipped_dir):
+                    n = store.load_bootstrap_blobs(shipped_dir)
+                    if n > 0:
+                        print('Messaging: loaded %d shipped message(s) from %s' % (n, shipped_dir))
+                        _found_shipped = True
+        if not _found_shipped:
+            print('Messaging: no shipped blobs found (searched %s)' % ', '.join(
+                os.path.join(b, d) for b in _search_bases for d in ('transition_messages', 'transitional_messages')))
+
+        # 3. --transition-message CLI blob
+        if transition_message:
+            blob_hex = transition_message
+            if os.path.isfile(blob_hex):
+                try:
+                    with open(blob_hex, 'r') as f:
+                        blob_hex = f.read().strip()
+                except Exception as e:
+                    print('Messaging: ERROR reading --transition-message file %s: %s' % (transition_message, e))
+            n = store.load_blob_hex(blob_hex)
+            if n > 0:
+                print('Messaging: loaded %d message(s) from --transition-message' % n)
+
+        # 4. Builtin hardcoded blobs (always available, no file path dependencies)
+        for blob_hex in _BUILTIN_TRANSITION_BLOBS:
+            try:
+                n = store.load_blob_hex(blob_hex)
+                if n > 0:
+                    print('Messaging: loaded %d builtin message(s)' % n)
+            except Exception:
+                pass
+
+    def _get_transition_message():
+        """Extract the latest TRANSITION_SIGNAL from the share messaging system.
+        
+        Returns dict with msg, url, urgency, from_ver, to_ver if found, else None.
+        Called on every version_signaling API request (cheap — message store is cached).
+        """
+        try:
+            store = getattr(node, '_message_store', None)
+            if store is None:
+                # Lazily create the message store (same as _get_message_store in msg API)
+                from p2pool.share_messages import ShareMessageStore, BanList
+                ban_path = os.path.join(datadir_path, 'banned_senders.json') if datadir_path else None
+                ban_list = BanList(persist_path=ban_path) if ban_path else BanList()
+                # max_age = sharechain PPLNS window duration (e.g. 8640 * 15 = 36h)
+                chain_window_secs = node.net.CHAIN_LENGTH * node.net.SHARE_PERIOD
+                store = ShareMessageStore(max_age=chain_window_secs, ban_list=ban_list)
+                node._message_store = store
+                if node.best_share_var.value is not None:
+                    try:
+                        chain_len = min(node.net.CHAIN_LENGTH,
+                                        node.tracker.get_height(node.best_share_var.value))
+                        store.rebuild_from_tracker(
+                            node.tracker, node.best_share_var.value, chain_len)
+                    except Exception:
+                        pass
+
+            # Load blob dirs once (idempotent — skips if already loaded).
+            _load_blob_dirs(store)
+
+            from p2pool.share_messages import MSG_TRANSITION_SIGNAL
+            signals = store.get_messages(
+                msg_type=MSG_TRANSITION_SIGNAL, authority_only=True, limit=5)
+            if not signals:
+                return None
+            # Return the most recent authority-signed transition signal
+            msg = signals[0]
+            try:
+                data = json.loads(msg.payload)
+            except (ValueError, TypeError):
+                return None
+            return dict(
+                msg=data.get('msg', ''),
+                url=data.get('url', ''),
+                urgency=data.get('urg', 'info'),
+                from_ver=data.get('from', ''),
+                to_ver=data.get('to', ''),
+                timestamp=msg.timestamp,
+                verified=msg.verified,
+                authority=msg.is_protocol_authority,
+            )
+        except Exception as e:
+            print('Messaging: _get_transition_message error: %s' % e)
+            return None
+
+    def format_eta(seconds):
+        """Format seconds into human-readable ETA."""
+        if seconds <= 0:
+            return 'now'
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        if hours > 0:
+            return '%dh %dm' % (hours, minutes)
+        return '%dm' % minutes
     
     def get_global_stats():
         # averaged over last hour
@@ -205,11 +794,13 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             attempts_to_block=bitcoin_data.target_to_average_attempts(node.bitcoind_work.value['bits'].target),
             attempts_to_merged_block=get_attempts_to_merged_block(wb),
             block_value=node.bitcoind_work.value['subsidy']*1e-8,
-            warnings=p2pool_data.get_warnings(node.tracker, node.best_share_var.value, node.net, bitcoind_getinfo_var.value, node.bitcoind_work.value),
+            warnings=p2pool_data.get_warnings(node.tracker, node.best_share_var.value, node.net, bitcoind_getinfo_var.value, node.bitcoind_work.value,
+                merged_work=wb.merged_work.value if hasattr(wb, 'merged_work') and wb.merged_work and hasattr(wb.merged_work, 'value') and wb.merged_work.value else None,
+                auto_ratchet=getattr(wb, 'auto_ratchet', None)),
             donation_proportion=wb.donation_percentage/100,
             version=p2pool.__version__,
             protocol_version=p2p.Protocol.VERSION,
-            fee=wb.worker_fee,
+            fee=getattr(wb, 'node_owner_fee', wb.worker_fee),
         )
     
     class WebInterface(deferred_resource.DeferredResource):
@@ -235,7 +826,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     web_root.putChild('user_stales', WebInterface(lambda:
         p2pool_data.get_user_stale_props(node.tracker, node.best_share_var.value,
             node.tracker.get_height(node.best_share_var.value), node.net.PARENT)))
-    web_root.putChild('fee', WebInterface(lambda: wb.worker_fee))
+    web_root.putChild('fee', WebInterface(lambda: getattr(wb, 'node_owner_fee', wb.worker_fee)))
     web_root.putChild('current_payouts', WebInterface(lambda: dict(
         (address, value/1e8) for address, value
             in node.get_current_txouts().iteritems())))
@@ -250,39 +841,34 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     
     def get_current_merged_payouts():
         """
-        Get current payouts with derived merged chain addresses.
+        Get current payouts with merged chain addresses from V36 PPLNS weights.
         
-        IMPORTANT: For addresses that cannot be converted to the merged chain
-        (P2SH, P2WSH, P2TR), their share of the merged block reward is
-        redistributed proportionally to all convertible addresses.
-        This ensures 100% of the merged block reward is distributed.
+        Uses get_v36_merged_weights() to compute the actual sharechain-derived
+        payout distribution. Two types of merged address keys:
+          - 'MERGED:<hex_script>': Explicit merged chain address from V36 share's
+            merged_addresses field. Decoded and displayed directly.
+          - Parent chain address string: Auto-converted from LTC to DOGE format.
+            P2SH/P2WSH/P2TR addresses cannot be converted — their weight is
+            redistributed proportionally to convertible/explicit addresses.
         
-        The primary donation (author fee) does NOT receive redistributed rewards -
-        only the secondary donation, node fee, and regular miners benefit.
-        
-        Returns dict: {parent_address: {amount: X, merged: [{network: Y, symbol: Z, address: A, amount: B}, ...]}}
+        Returns dict: {parent_address: {amount: X, merged: [{network, symbol, address, amount, source}, ...]}}
         """
         from p2pool.work import is_pubkey_hash_address
         
-        # Get main chain payouts (in satoshis for proportion calculation)
-        main_payouts_satoshis = dict((address, value) for address, value in node.get_current_txouts().iteritems())
-        main_payouts = dict((address, value/1e8) for address, value in main_payouts_satoshis.iteritems())
-        
-        # Calculate total main chain payout for proportion calculation
-        total_main_satoshis = sum(main_payouts_satoshis.values())
+        # Get main chain payouts for display
+        main_payouts = dict((address, value/1e8) for address, value
+                            in node.get_current_txouts().iteritems())
         
         # Check if we have merged work active
         merged_chains = []
         if hasattr(wb, 'merged_work') and wb.merged_work.value:
             for chainid, aux_work in wb.merged_work.value.iteritems():
-                # Get merged chain block reward - try coinbasevalue first, then template
                 merged_reward = aux_work.get('coinbasevalue', 0)
                 if merged_reward == 0:
                     template = aux_work.get('template')
                     if template and 'coinbasevalue' in template:
                         merged_reward = template['coinbasevalue']
                 
-                # Determine network name and symbol based on chainid
                 if chainid == 98:  # Dogecoin
                     merged_net_name = 'Dogecoin'
                     merged_net_symbol = 'DOGE'
@@ -308,77 +894,179 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                         'reward': merged_reward,
                     })
         
-        # Build result with merged addresses for each parent address
+        # Build result — start with main chain payouts
         result = {}
+        for parent_address, amount in main_payouts.iteritems():
+            result[parent_address] = {'amount': amount, 'merged': []}
+        
+        best = node.best_share_var.value
         parent_net = node.net.PARENT if hasattr(node.net, 'PARENT') else node.net
         
-        # Identify primary donation address (should NOT receive redistributed rewards)
-        # The primary donation is typically the first/smallest output that goes to author
-        primary_donation_address = None
-        if hasattr(wb, 'donation_percentage') and wb.donation_percentage > 0:
-            # Primary donation is the author donation - identify it by being in the payout list
-            # It's typically a hardcoded address, but we'll exclude it from redistribution
-            # by checking if it's the donation script
-            pass  # We'll handle this by checking converted addresses
-        
-        # For each merged chain, calculate payouts with redistribution
         for chain in merged_chains:
-            # First pass: identify convertible vs non-convertible addresses
-            convertible_addresses = {}  # {parent_addr: (pubkey_hash, main_satoshis)}
-            unconvertible_satoshis = 0
+            if best is None or chain['reward'] <= 0:
+                continue
             
-            for parent_address, main_sats in main_payouts_satoshis.iteritems():
+            # Get V36 PPLNS weights for this merged chain
+            try:
+                share_height = node.tracker.get_height(best)
+                parent_block_target = node.bitcoind_work.value['bits'].target
+                weights, total_weight, donation_weight = p2pool_data.get_v36_merged_weights(
+                    node.tracker,
+                    best,
+                    max(0, min(share_height, node.net.REAL_CHAIN_LENGTH)),
+                    65535 * node.net.SPREAD * bitcoin_data.target_to_average_attempts(parent_block_target),
+                    chain_id=chain['chainid'],
+                )
+            except Exception:
+                continue
+            
+            if total_weight <= 0:
+                continue
+            
+            # Build MERGED_script → parent_address mapping by walking shares.
+            # get_v36_merged_weights loses this association. We need it to nest
+            # explicit DOGE payouts under their parent LTC address in the result.
+            merged_key_to_parent = {}  # {'MERGED:<script_hex>': parent_address}
+            try:
+                chain_len = max(0, min(share_height, node.net.REAL_CHAIN_LENGTH))
+                for share in node.tracker.get_chain(best, chain_len):
+                    if share.VERSION >= 36:
+                        merged_addrs = getattr(share, 'merged_addresses', None)
+                        if merged_addrs is None and hasattr(share, 'share_info') and isinstance(share.share_info, dict):
+                            merged_addrs = share.share_info.get('merged_addresses', None)
+                        if merged_addrs:
+                            for entry in merged_addrs:
+                                if entry['chain_id'] == chain['chainid']:
+                                    mkey = 'MERGED:' + entry['script'].encode('hex')
+                                    if mkey not in merged_key_to_parent:
+                                        merged_key_to_parent[mkey] = share.address
+                                    break
+            except Exception:
+                pass
+            
+            # Resolve weight keys to merged chain addresses.
+            # Two key types from get_v36_merged_weights():
+            #   'MERGED:<hex_script>' = explicit merged chain script
+            #   parent_address_string = needs auto-conversion
+            resolved = {}       # {merged_address: weight}
+            key_to_parent = {}  # {merged_address: parent_address}
+            accepted_weight = 0
+            
+            for key, weight in weights.iteritems():
                 try:
-                    is_convertible, pubkey_hash, error_msg = is_pubkey_hash_address(parent_address, parent_net)
-                    if is_convertible and pubkey_hash is not None:
-                        convertible_addresses[parent_address] = (pubkey_hash, main_sats)
+                    if key.startswith('MERGED:'):
+                        # Explicit merged chain script from V36 share
+                        merged_script = key[7:].decode('hex')
+                        try:
+                            merged_address = bitcoin_data.script2_to_address(
+                                merged_script, chain['addr_net'].ADDRESS_VERSION, -1, chain['addr_net'])
+                        except Exception:
+                            merged_address = 'script:' + key[7:]  # Fallback for non-P2PKH scripts
+                        resolved[merged_address] = resolved.get(merged_address, 0) + weight
+                        # Use the share chain mapping to find the parent LTC address
+                        parent_addr = merged_key_to_parent.get(key, None)
+                        if parent_addr:
+                            key_to_parent[merged_address] = parent_addr
+                        accepted_weight += weight
                     else:
-                        # This address cannot be converted - its merged reward will be redistributed
-                        unconvertible_satoshis += main_sats
+                        # Parent chain address — try auto-conversion
+                        addr_result = is_pubkey_hash_address(key, parent_net)
+                        is_convertible = addr_result[0]
+                        pubkey_hash = addr_result[1]
+                        addr_type = addr_result[3] if len(addr_result) > 3 else 'p2pkh'
+                        if is_convertible and pubkey_hash is not None:
+                            if addr_type == 'p2sh':
+                                merged_address = bitcoin_data.pubkey_hash_to_address(
+                                    pubkey_hash, chain['addr_net'].ADDRESS_P2SH_VERSION, -1, chain['addr_net'])
+                            else:
+                                merged_address = bitcoin_data.pubkey_hash_to_address(
+                                    pubkey_hash, chain['addr_net'].ADDRESS_VERSION, -1, chain['addr_net'])
+                            resolved[merged_address] = resolved.get(merged_address, 0) + weight
+                            key_to_parent[merged_address] = key
+                            accepted_weight += weight
+                        # else: unconvertible — weight redistributed via smaller denominator
                 except Exception:
-                    unconvertible_satoshis += main_sats
+                    pass
             
-            # Calculate the redistribution factor
-            # Total convertible satoshis (for redistribution proportions)
-            convertible_total_satoshis = sum(sats for _, sats in convertible_addresses.values())
+            if accepted_weight <= 0:
+                continue
             
-            # Redistribution: unconvertible share gets divided among convertible addresses
-            # proportionally to their share of the convertible pool
-            # BUT exclude primary donation from receiving extra redistribution
-            if convertible_total_satoshis > 0 and chain['reward'] > 0:
-                for parent_address in main_payouts_satoshis:
-                    if parent_address not in result:
-                        result[parent_address] = {'amount': main_payouts[parent_address], 'merged': []}
-                    
-                    if parent_address in convertible_addresses:
-                        pubkey_hash, main_sats = convertible_addresses[parent_address]
-                        
-                        # Base proportion of merged reward (same as main chain)
-                        base_proportion = main_sats / float(total_main_satoshis)
-                        base_merged_amount = chain['reward'] * base_proportion
-                        
-                        # Additional redistribution from unconvertible addresses
-                        # Proportional to this address's share of convertible pool
-                        redistribution_proportion = main_sats / float(convertible_total_satoshis)
-                        redistribution_amount = (chain['reward'] * (unconvertible_satoshis / float(total_main_satoshis))) * redistribution_proportion
-                        
-                        total_merged_amount = (base_merged_amount + redistribution_amount) / 1e8
-                        
-                        merged_address = bitcoin_data.pubkey_hash_to_address(
-                            pubkey_hash, chain['addr_net'].ADDRESS_VERSION, -1, chain['addr_net'])
-                        
-                        result[parent_address]['merged'].append({
-                            'network': chain['network'],
-                            'symbol': chain['symbol'],
-                            'address': merged_address,
-                            'amount': total_merged_amount,
-                        })
-                    # Non-convertible addresses get no merged payout (their share is redistributed)
-        
-        # Handle case where no merged chains are active - still build result from main payouts
-        for parent_address, amount in main_payouts.iteritems():
-            if parent_address not in result:
-                result[parent_address] = {'amount': amount, 'merged': []}
+            # Distributable merged reward = total reward minus donation portion
+            # total_weight from get_v36_merged_weights() already includes donation_weight
+            # (convention: total_weight == sum(weights.values()) + donation_weight)
+            miner_weight = total_weight - donation_weight
+            miner_reward = chain['reward'] * float(miner_weight) / float(total_weight) if total_weight > 0 else chain['reward']
+            donation_reward = chain['reward'] - miner_reward
+            
+            # Enforce dust threshold to match actual coinbase builder (merged_mining.py)
+            dust_threshold = getattr(chain['addr_net'], 'DUST_THRESHOLD', int(1e8))
+            if donation_reward < dust_threshold and chain['reward'] > dust_threshold:
+                donation_reward = float(dust_threshold)
+                miner_reward = chain['reward'] - donation_reward
+            
+            # Assign merged payouts to parent addresses
+            for merged_address, weight in resolved.iteritems():
+                fraction = float(weight) / float(accepted_weight)
+                merged_amount = miner_reward * fraction / 1e8
+                
+                parent_addr = key_to_parent.get(merged_address, None)
+                source = 'auto-convert' if parent_addr and merged_address not in merged_key_to_parent.values() else 'explicit'
+                # Determine source: if merged_address came from a MERGED: key, it's explicit
+                has_explicit_key = any(merged_key_to_parent.get(k) == parent_addr 
+                                       for k in weights if k.startswith('MERGED:')) if parent_addr else False
+                if has_explicit_key:
+                    source = 'explicit'
+                elif parent_addr:
+                    source = 'auto-convert'
+                else:
+                    source = 'explicit'
+                
+                entry = {
+                    'network': chain['network'],
+                    'symbol': chain['symbol'],
+                    'address': merged_address,
+                    'amount': merged_amount,
+                    'source': source,
+                }
+                
+                if parent_addr and parent_addr in result:
+                    result[parent_addr]['merged'].append(entry)
+                elif merged_address not in result:
+                    result[merged_address] = {'amount': 0, 'merged': []}
+                    result[merged_address]['merged'].append(entry)
+                else:
+                    result[merged_address]['merged'].append(entry)
+            
+            # Add donation info — use precomputed DOGE P2SH address and nest
+            # under the LTC donation address that already exists in main payouts.
+            # All addresses are hardcoded constants to avoid per-request crypto
+            # (DDoS on web API must not starve the mining reactor loop).
+            if donation_reward > 0:
+                from p2pool import data as p2pool_data_mod
+                ltc_donation_addr = p2pool_data_mod.donation_script_to_address(node.net)
+                
+                # Precomputed DOGE P2SH addresses for COMBINED_DONATION_SCRIPT
+                if chain['chainid'] == 98:  # Dogecoin
+                    parent_symbol = getattr(node.net.PARENT, 'SYMBOL', '') if hasattr(node.net, 'PARENT') else ''
+                    is_testnet = parent_symbol.lower().startswith('t') or 'test' in parent_symbol.lower()
+                    doge_donation_addr = p2pool_data_mod.COMBINED_DONATION_DOGE_TESTNET if is_testnet else p2pool_data_mod.COMBINED_DONATION_DOGE_MAINNET
+                else:
+                    doge_donation_addr = '(donation)'
+                
+                donation_entry = {
+                    'network': chain['network'],
+                    'symbol': chain['symbol'],
+                    'address': doge_donation_addr,
+                    'amount': donation_reward / 1e8,
+                    'source': 'donation',
+                }
+                # Attach to the LTC donation address entry
+                if ltc_donation_addr and ltc_donation_addr in result:
+                    result[ltc_donation_addr]['merged'].append(donation_entry)
+                else:
+                    # Fallback: create the entry if main payouts didn't include it
+                    result.setdefault(ltc_donation_addr or '_donation', {'amount': 0, 'merged': []})
+                    result[ltc_donation_addr or '_donation']['merged'].append(donation_entry)
         
         return result
     
@@ -386,6 +1074,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     web_root.putChild('patron_sendmany', WebInterface(get_patron_sendmany, 'text/plain'))
     web_root.putChild('global_stats', WebInterface(get_global_stats))
     web_root.putChild('local_stats', WebInterface(get_local_stats))
+    web_root.putChild('version_signaling', WebInterface(get_version_signaling))
     web_root.putChild('peer_addresses', WebInterface(lambda: ' '.join('%s%s' % (peer.transport.getPeer().host, ':'+str(peer.transport.getPeer().port) if peer.transport.getPeer().port != node.net.P2P_PORT else '') for peer in node.p2p_node.peers.itervalues())))
     web_root.putChild('peer_txpool_sizes', WebInterface(lambda: dict(('%s:%i' % (peer.transport.getPeer().host, peer.transport.getPeer().port), peer.remembered_txs_size) for peer in node.p2p_node.peers.itervalues())))
     web_root.putChild('pings', WebInterface(defer.inlineCallbacks(lambda: defer.returnValue(
@@ -418,6 +1107,9 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 # Get aggregate connection stats
                 conn_aggregate = pool_stats.get_worker_aggregate_stats(worker_name)
                 
+                # Get merged addresses from connected workers if available
+                cw_info = connected_workers.get(worker_name, {})
+                
                 formatted_workers[worker_name] = {
                     'shares': wstats.get('shares', 0),
                     'accepted': wstats.get('accepted', 0),
@@ -430,6 +1122,8 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                     'active_connections': conn_aggregate.get('active_connections', 0) if conn_aggregate else 0,
                     'backup_connections': conn_aggregate.get('backup_connections', 0) if conn_aggregate else 0,
                     'connection_difficulties': conn_aggregate.get('difficulties', []) if conn_aggregate else [],
+                    'merged_addresses': cw_info.get('merged_addresses', {}),
+                    'merged_auto_converted': cw_info.get('merged_auto_converted', False),
                 }
             
             # Also include currently connected workers (even if no shares yet)
@@ -446,11 +1140,17 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                         'active_connections': 0,
                         'backup_connections': winfo.get('connections', 0),
                         'connection_difficulties': winfo.get('difficulties', []),
+                        'merged_addresses': winfo.get('merged_addresses', {}),
+                        'merged_auto_converted': winfo.get('merged_auto_converted', False),
                     }
                 else:
                     # Update connection info for existing workers
                     formatted_workers[worker_name]['connections'] = winfo.get('connections', 0)
                     formatted_workers[worker_name]['connection_difficulties'] = winfo.get('difficulties', [])
+                    # Add merged addresses if not already set
+                    if 'merged_addresses' not in formatted_workers[worker_name]:
+                        formatted_workers[worker_name]['merged_addresses'] = winfo.get('merged_addresses', {})
+                        formatted_workers[worker_name]['merged_auto_converted'] = winfo.get('merged_auto_converted', False)
             
             return {
                 'pool': stats,
@@ -634,12 +1334,14 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         # Get best difficulty for all workers of this address
         best_diff_all_time = 0
         best_diff_session = 0
+        best_diff_round = 0
         session_start = wb.session_start_time
         for worker_name in miner_hash_rates:
             if extract_base_address(worker_name) == address:
                 worker_best = wb.get_miner_best_difficulty(worker_name)
                 best_diff_all_time = max(best_diff_all_time, worker_best['all_time'])
                 best_diff_session = max(best_diff_session, worker_best['session'])
+                best_diff_round = max(best_diff_round, worker_best['round'])
         
         # Get hashrate periods for all workers of this address
         hashrate_periods = {'1m': {'hashrate': 0, 'dead_hashrate': 0},
@@ -700,9 +1402,11 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             # New fields for enhanced stats
             best_difficulty_all_time=best_diff_all_time,
             best_difficulty_session=best_diff_session,
+            best_difficulty_round=best_diff_round,
             best_diff_hashrate_all_time=best_diff_hashrate_all_time,
             best_diff_hashrate_session=best_diff_hashrate_session,
             session_start=session_start,
+            round_start=wb.node_best_difficulty['round_start'],
             hashrate_periods=hashrate_periods,
             network_difficulty=network_difficulty,
             chance_to_find_block=chance_to_find_block,
@@ -715,6 +1419,75 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         )
     
     web_root.putChild('miner_stats', WebInterface(get_miner_stats))
+    
+    # ==== Node-wide best share stats (BitAxe style) ====
+    def get_best_share():
+        """Return node-wide best share stats: all-time, session, and current round"""
+        nb = wb.node_best_difficulty
+        network_difficulty = bitcoin_data.target_to_difficulty(node.bitcoind_work.value['bits'].target)
+        
+        def pct_of_block(diff, net_diff):
+            return (diff / net_diff * 100) if net_diff > 0 and diff > 0 else 0
+        
+        result = dict(
+            network_difficulty=network_difficulty,
+            all_time=dict(
+                difficulty=nb['all_time'],
+                pct_of_block=pct_of_block(nb['all_time'], network_difficulty),
+                miner=nb['all_time_user'],
+                timestamp=nb['all_time_ts'],
+            ),
+            session=dict(
+                difficulty=nb['session'],
+                pct_of_block=pct_of_block(nb['session'], network_difficulty),
+                miner=nb['session_user'],
+                timestamp=nb['session_ts'],
+                started=wb.session_start_time,
+            ),
+            round=dict(
+                difficulty=nb['round'],
+                pct_of_block=pct_of_block(nb['round'], network_difficulty),
+                miner=nb['round_user'],
+                timestamp=nb['round_ts'],
+                started=nb['round_start'],
+            ),
+        )
+        
+        # Add merged chain (DOGE) best share stats
+        mb = wb.merged_best_difficulty
+        merged_difficulty = 0
+        merged_symbol = None
+        try:
+            for chainid, aux_work in wb.merged_work.value.iteritems():
+                merged_target = aux_work.get('target', 0)
+                if merged_target and merged_target > 0:
+                    merged_difficulty = bitcoin_data.target_to_difficulty(merged_target)
+                    merged_symbol = aux_work.get('merged_net_symbol', 'DOGE' if chainid == 98 else 'AUX')
+                    break
+        except Exception:
+            pass
+        
+        if merged_difficulty > 0 or mb['all_time'] > 0:
+            result['merged'] = dict(
+                network_difficulty=merged_difficulty,
+                symbol=merged_symbol or 'DOGE',
+                all_time=dict(
+                    difficulty=mb['all_time'],
+                    pct_of_block=pct_of_block(mb['all_time'], merged_difficulty),
+                    miner=mb['all_time_user'],
+                    timestamp=mb['all_time_ts'],
+                ),
+                round=dict(
+                    difficulty=mb['round'],
+                    pct_of_block=pct_of_block(mb['round'], merged_difficulty),
+                    miner=mb['round_user'],
+                    timestamp=mb['round_ts'],
+                    started=mb['round_start'],
+                ),
+            )
+        
+        return result
+    web_root.putChild('best_share', WebInterface(get_best_share))
     
     # ==== Individual miner payouts endpoint ====
     def get_miner_payouts(address=None):
@@ -730,14 +1503,250 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         except (ValueError, KeyError, IndexError):
             pass
         
+        # Find blocks found by this miner from block_history
+        miner_blocks = []
+        total_estimated_rewards = 0.0
+        confirmed_rewards = 0.0
+        maturing_rewards = 0.0
+        
+        try:
+            block_explorer_url = node.net.PARENT.BLOCK_EXPLORER_URL_PREFIX
+        except:
+            block_explorer_url = ''
+        
+        # Get current blockchain height for confirmation tracking
+        try:
+            current_height = node.bitcoind_work.value['height']
+        except:
+            current_height = 0
+        
+        # Fallback subsidy (current) for old blocks that don't have it stored
+        try:
+            current_subsidy = node.bitcoind_work.value['subsidy']
+        except:
+            current_subsidy = 0
+        
+        # Coinbase maturity (100 for LTC)
+        COINBASE_MATURITY = 100
+        
+        for b in block_history:
+            # Strip merged DOGE address (comma) and worker suffix for matching
+            block_miner = b.get('miner', '')
+            if block_miner:
+                block_miner = block_miner.split(',')[0].split('.')[0].split('+')[0].split('/')[0].split('_')[0]
+            if block_miner == address:
+                block_hash = b.get('hash', '')
+                block_height = b.get('number', 0)
+                
+                # Block reward (subsidy) in coins - fall back to current if missing
+                subsidy = b.get('subsidy', 0) or current_subsidy
+                block_reward = subsidy / 1e8 if subsidy > 0 else 0
+                
+                # Miner's estimated payout from this block (in coins)
+                # Fall back to current_payout proportion * block_reward if not stored
+                stored_payout = b.get('miner_payout', 0)
+                if stored_payout > 0:
+                    est_payout = stored_payout / 1e8
+                elif current_payout > 0 and block_reward > 0:
+                    # Estimate: miner's current share proportion * block reward
+                    est_payout = current_payout
+                else:
+                    est_payout = 0
+                
+                # Confirmation tracking
+                confirmations = max(0, current_height - block_height) if current_height > 0 and block_height > 0 else 0
+                is_mature = confirmations >= COINBASE_MATURITY
+                
+                if b.get('status') == 'confirmed' or b.get('verified'):
+                    if is_mature:
+                        status = 'confirmed'
+                    else:
+                        status = 'maturing'
+                else:
+                    status = 'pending'
+                
+                block_entry = {
+                    'timestamp': b.get('ts', 0),
+                    'block_height': block_height,
+                    'block_hash': block_hash,
+                    'block_reward': block_reward,
+                    'explorer_url': block_explorer_url + block_hash if block_explorer_url else '',
+                    'status': status,
+                    'estimated_payout': est_payout,
+                    'confirmations': confirmations,
+                    'confirmations_required': COINBASE_MATURITY,
+                }
+                miner_blocks.append(block_entry)
+                
+                # Accumulate reward totals
+                if est_payout > 0:
+                    total_estimated_rewards += est_payout
+                    if is_mature:
+                        confirmed_rewards += est_payout
+                    else:
+                        maturing_rewards += est_payout
+                
         return {
             'address': address,
             'current_payout': current_payout,
-            'blocks_found': 0,  # TODO: Track per-miner block history
-            'blocks': [],
+            'blocks_found': len(miner_blocks),
+            'total_estimated_rewards': total_estimated_rewards,
+            'confirmed_rewards': confirmed_rewards,
+            'maturing_rewards': maturing_rewards,
+            'blocks': miner_blocks[:10],  # Limit to 10 most recent
         }
     
     web_root.putChild('miner_payouts', WebInterface(get_miner_payouts))
+    
+    def get_merged_miner_payouts(address=None):
+        """Get merged mining payout history for a specific miner address"""
+        if not address:
+            return {'error': 'No address provided'}
+        
+        # Current merged payout from PPLNS distribution
+        current_merged_payout = 0
+        merged_payout_symbol = ''
+        try:
+            if hasattr(wb, 'merged_work') and wb.merged_work and hasattr(wb.merged_work, 'value') and wb.merged_work.value:
+                for chain_id, chain in wb.merged_work.value.iteritems():
+                    shareholders = chain.get('shareholders', {})
+                    template = chain.get('template', {})
+                    coinbasevalue = 0
+                    if template:
+                        coinbasevalue = template.get('coinbasevalue', 0)
+                    elif chain.get('coinbasevalue'):
+                        coinbasevalue = chain['coinbasevalue']
+                    
+                    don_pct = chain.get('donation_percentage', 1.0)
+                    node_owner_fee = chain.get('node_owner_fee', chain.get('worker_fee', 0))
+                    miners_reward = coinbasevalue - int(coinbasevalue * don_pct / 100) - (int(coinbasevalue * node_owner_fee / 100) if node_owner_fee > 0 else 0)
+                    
+                    merged_payout_symbol = chain.get('merged_net_symbol', 'DOGE' if chain_id == 98 else 'AUX')
+                    
+                    for sh_addr, val in shareholders.iteritems():
+                        frac = val[0] if isinstance(val, tuple) else val
+                        sh_base = sh_addr.split(',')[0].split('.')[0].split('_')[0].split('+')[0].split('/')[0]
+                        if sh_base == address:
+                            current_merged_payout = int(miners_reward * frac) / 1e8
+                            break
+        except Exception:
+            pass
+        
+        # Find merged blocks found by this miner
+        miner_merged_blocks = []
+        total_estimated_rewards = 0.0
+        confirmed_rewards = 0.0
+        maturing_rewards = 0.0
+        
+        # Coinbase maturity for DOGE testnet (240 blocks)
+        MERGED_COINBASE_MATURITY = 240
+        
+        # Get current merged chain height for confirmation tracking
+        merged_current_height = 0
+        try:
+            if hasattr(wb, 'merged_work') and wb.merged_work and hasattr(wb.merged_work, 'value') and wb.merged_work.value:
+                for chain_id, chain in wb.merged_work.value.iteritems():
+                    template = chain.get('template', {})
+                    if template:
+                        merged_current_height = template.get('height', 0)
+                        break
+        except Exception:
+            pass
+        
+        # Block explorer URLs for merged chains
+        merged_explorers = {
+            98: {'testnet': 'https://dogechain.info/block/',
+                 'mainnet': 'https://dogechain.info/block/'}
+        }
+        
+        for b in wb.recent_merged_blocks:
+            if b.get('verified') == False:
+                continue  # Skip orphaned blocks
+            
+            block_miner = b.get('miner', '')
+            block_miner_parent = b.get('miner_parent', '')
+            # Strip merged DOGE address (comma) and worker suffix for matching
+            if block_miner:
+                block_miner = block_miner.split(',')[0].split('.')[0].split('+')[0].split('/')[0].split('_')[0]
+            if block_miner_parent:
+                block_miner_parent = block_miner_parent.split(',')[0].split('.')[0].split('+')[0].split('/')[0].split('_')[0]
+            
+            if block_miner == address or block_miner_parent == address:
+                block_hash = b.get('hash', '')
+                block_height = b.get('height', 0)
+                sym = b.get('symbol', merged_payout_symbol or 'COIN')
+                chainid = b.get('chainid', 0)
+                coinbasevalue = b.get('coinbasevalue', 0)
+                block_reward = coinbasevalue / 1e8 if coinbasevalue > 0 else 0
+                
+                # Miner's estimated payout (in satoshis, stored at block-find time)
+                stored_payout = b.get('miner_payout', 0)
+                if stored_payout > 0:
+                    est_payout = stored_payout / 1e8
+                elif current_merged_payout > 0:
+                    # Fallback: use current PPLNS proportion
+                    est_payout = current_merged_payout
+                else:
+                    est_payout = block_reward  # Assume full reward if no PPLNS data
+                
+                # Confirmation tracking
+                confirmations = max(0, merged_current_height - block_height) if merged_current_height > 0 and block_height > 0 else 0
+                is_mature = confirmations >= MERGED_COINBASE_MATURITY
+                
+                if b.get('verified') == True:
+                    if is_mature:
+                        status = 'confirmed'
+                    else:
+                        status = 'maturing'
+                else:
+                    status = 'pending'
+                
+                # Explorer URL
+                is_testnet = b.get('is_testnet', True)
+                explorer = merged_explorers.get(chainid, {})
+                explorer_url = ''
+                if explorer:
+                    base_url = explorer.get('testnet' if is_testnet else 'mainnet', '')
+                    pow_hash = b.get('pow_hash', block_hash)
+                    explorer_url = base_url + pow_hash if base_url else ''
+                
+                block_entry = {
+                    'timestamp': b.get('ts', 0),
+                    'block_height': block_height,
+                    'block_hash': block_hash,
+                    'pow_hash': b.get('pow_hash', ''),
+                    'block_reward': block_reward,
+                    'explorer_url': explorer_url,
+                    'status': status,
+                    'estimated_payout': est_payout,
+                    'confirmations': confirmations,
+                    'confirmations_required': MERGED_COINBASE_MATURITY,
+                    'network': b.get('network', ''),
+                    'symbol': sym,
+                    'chainid': chainid,
+                }
+                miner_merged_blocks.append(block_entry)
+                
+                # Accumulate reward totals
+                if est_payout > 0:
+                    total_estimated_rewards += est_payout
+                    if status == 'confirmed':
+                        confirmed_rewards += est_payout
+                    elif status == 'maturing':
+                        maturing_rewards += est_payout
+        
+        return {
+            'address': address,
+            'current_payout': current_merged_payout,
+            'symbol': merged_payout_symbol,
+            'blocks_found': len(miner_merged_blocks),
+            'total_estimated_rewards': total_estimated_rewards,
+            'confirmed_rewards': confirmed_rewards,
+            'maturing_rewards': maturing_rewards,
+            'blocks': miner_merged_blocks[:10],  # Limit to 10 most recent
+        }
+    
+    web_root.putChild('merged_miner_payouts', WebInterface(get_merged_miner_payouts))
     
     # Block history storage - persisted to disk
     block_history = []
@@ -808,28 +1817,90 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 
                 # Skip if already in history
                 if block_hash in known_block_hashes:
-                    # Update verification status
+                    # Update verification status and fill in missing fields
+                    # (immediate-path blocks start with pending status and no share/miner data)
                     for b in block_history:
                         if b['hash'] == block_hash:
                             is_verified = s.hash in node.tracker.verified.items
                             b['verified'] = is_verified
                             b['status'] = 'confirmed' if is_verified else 'pending'
+                            # Fill in data that wasn't available at immediate-recording time
+                            if not b.get('share') or b['share'] == '':
+                                b['share'] = '%064x' % s.hash
+                            if not b.get('number') or b['number'] == 0:
+                                try:
+                                    b['number'] = p2pool_data.parse_bip0034(s.share_data['coinbase'])[0]
+                                except:
+                                    pass
+                            if not b.get('share_difficulty') or b['share_difficulty'] == 0:
+                                b['share_difficulty'] = bitcoin_data.target_to_difficulty(s.target)
+                            if not b.get('miner') or b['miner'] == '':
+                                try:
+                                    b['miner'] = bitcoin_data.script2_to_address(
+                                        s.new_script, node.net.PARENT.ADDRESS_VERSION, -1, node.net.PARENT)
+                                except Exception as e:
+                                    try:
+                                        b['miner'] = bitcoin_data.script2_to_address(
+                                            s.new_script, -1, 0, node.net.PARENT)  # bech32 v0
+                                    except Exception as e2:
+                                        try:
+                                            b['miner'] = bitcoin_data.script2_to_address(
+                                                s.new_script, node.net.PARENT.ADDRESS_P2SH_VERSION, -1, node.net.PARENT)  # P2SH
+                                        except Exception as e3:
+                                            print('Failed to extract miner address: %s / %s / %s' % (e, e2, e3))
+                            # Fill in subsidy and miner_payout if missing
+                            if not b.get('subsidy'):
+                                try:
+                                    b['subsidy'] = node.bitcoind_work.value['subsidy']
+                                except:
+                                    pass
+                            if not b.get('miner_payout') and b.get('miner'):
+                                try:
+                                    current_txouts = node.get_current_txouts()
+                                    miner_addr = b['miner'].split(',')[0].split('.')[0].split('_')[0]
+                                    b['miner_payout'] = current_txouts.get(miner_addr, 0)
+                                except:
+                                    pass
                             break
                     continue
                 
                 is_verified = s.hash in node.tracker.verified.items
+                # Extract miner address from share's payout script
+                miner_addr = ''
+                try:
+                    miner_addr = bitcoin_data.script2_to_address(
+                        s.new_script, node.net.PARENT.ADDRESS_VERSION, -1, node.net.PARENT)
+                except Exception:
+                    try:
+                        miner_addr = bitcoin_data.script2_to_address(
+                            s.new_script, -1, 0, node.net.PARENT)  # bech32 v0
+                    except Exception:
+                        try:
+                            miner_addr = bitcoin_data.script2_to_address(
+                                s.new_script, node.net.PARENT.ADDRESS_P2SH_VERSION, -1, node.net.PARENT)  # P2SH
+                        except Exception as e:
+                            print('Failed to extract miner from share %s: %s' % ('%064x' % s.hash, e))
                 block_info = {
                     'ts': s.timestamp,
                     'hash': block_hash,
                     'number': p2pool_data.parse_bip0034(s.share_data['coinbase'])[0],
                     'share': '%064x' % s.hash,
+                    'miner': miner_addr,
                     'network_difficulty': bitcoin_data.target_to_difficulty(s.header['bits'].target),
                     'share_difficulty': bitcoin_data.target_to_difficulty(s.target),
                     'actual_hash_difficulty': bitcoin_data.target_to_difficulty(s.pow_hash),
                     'verified': is_verified,
                     'status': 'confirmed' if is_verified else 'pending',
                     'pool_hashrate_at_find': pool_hashrate,
+                    'subsidy': node.bitcoind_work.value.get('subsidy', 0),
                 }
+                # Get miner's payout from current txouts
+                try:
+                    current_txouts = node.get_current_txouts()
+                    base_addr = miner_addr.split(',')[0].split('.')[0].split('_')[0]
+                    block_info['miner_payout'] = current_txouts.get(base_addr, 0)
+                except:
+                    block_info['miner_payout'] = 0
                 
                 # Calculate expected time based on difficulty and pool hashrate
                 if pool_hashrate > 0:
@@ -868,6 +1939,41 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 except:
                     pass  # Ignore if not yet defined during startup
             
+            # RPC fallback verification for blocks still pending after tracker scan.
+            # When p2pool restarts, shares may be evicted from the tracker but the
+            # blocks they produced are still valid on the parent chain.
+            # Fire-and-forget async verification for any stale pending blocks.
+            now = time.time()
+            for b in block_history:
+                if b.get('status') == 'pending' and (now - b.get('ts', 0)) > 30:
+                    def verify_via_rpc(block_rec):
+                        def on_result(block_data):
+                            if block_data and isinstance(block_data, dict):
+                                confs = block_data.get('confirmations', 0)
+                                block_height = block_data.get('height', 0)
+                                changed = False
+                                if confs > 0:
+                                    block_rec['verified'] = True
+                                    block_rec['status'] = 'confirmed'
+                                    if block_height > 0 and (not block_rec.get('number') or block_rec['number'] == 0):
+                                        block_rec['number'] = block_height
+                                    changed = True
+                                elif confs < 0:
+                                    block_rec['verified'] = False
+                                    block_rec['status'] = 'orphaned'
+                                    changed = True
+                                if changed:
+                                    save_block_history()
+                        def on_error(err):
+                            pass  # Block not found or RPC error - leave as pending
+                        try:
+                            d = node.bitcoind.rpc_getblock(block_rec['hash'])
+                            d.addCallback(on_result)
+                            d.addErrback(on_error)
+                        except:
+                            pass
+                    verify_via_rpc(b)
+            
             # Calculate pool average luck from all blocks with luck data
             total_luck = 0
             luck_count = 0
@@ -876,8 +1982,8 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                     total_luck += b['luck']
                     luck_count += 1
             
-            # Return a copy with pool_avg_luck added to first block
-            result = list(block_history)
+            # Return a copy with pool_avg_luck added
+            result = list(block_history)  # block_history is sorted newest-first
             if result and luck_count > 0:
                 result[0] = dict(result[0])
                 result[0]['pool_avg_luck'] = total_luck / luck_count
@@ -911,8 +2017,10 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             # Build full block info with luck data
             full_block_info = {
                 'ts': block_info['ts'],
-                'hash': block_info['hash'],
+                'hash': block_info['hash'],  # SHA256d hash (matches tracker's s.header_hash)
+                'pow_hash_hex': block_info.get('pow_hash_hex', ''),  # Scrypt/PoW hash for display
                 'number': block_info['number'],
+                'miner': block_info.get('miner', ''),  # Miner address who found the block
                 'share': '',  # Will be filled in when tracker catches up
                 'network_difficulty': block_info['network_difficulty'],
                 'share_difficulty': 0,  # Will be filled in when tracker catches up  
@@ -920,6 +2028,8 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 'verified': False,
                 'status': 'pending',
                 'pool_hashrate_at_find': pool_hashrate,
+                'subsidy': block_info.get('subsidy', 0),
+                'miner_payout': block_info.get('miner_payout', 0),
             }
             
             # Calculate expected time and luck
@@ -1057,19 +2167,20 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         try:
             if hasattr(wb, 'merged_work') and wb.merged_work and hasattr(wb.merged_work, 'value') and wb.merged_work.value:
                 for chain_id, chain in wb.merged_work.value.iteritems():
+                    # Determine symbol: check merged_net_symbol, symbol, or derive from chain_id
+                    if chain_id == 98:
+                        merged_symbol = chain.get('merged_net_symbol', 'DOGE')
+                    else:
+                        merged_symbol = chain.get('merged_net_symbol', chain.get('symbol', 'AUX'))
+                    
                     # Use coinbasevalue from createauxblock (includes subsidy + fees)
                     if 'coinbasevalue' in chain and chain['coinbasevalue'] > 0:
                         merged_block_value = chain['coinbasevalue'] / 1e8
-                        if chain_id == 98:  # Dogecoin
-                            merged_symbol = 'DOGE'
-                        else:
-                            merged_symbol = chain.get('symbol', 'AUX')
                         break
                     # Fallback: try template (getblocktemplate path)
                     elif 'template' in chain and chain['template']:
                         template = chain['template']
                         merged_block_value = template.get('coinbasevalue', 0) / 1e8
-                        merged_symbol = chain.get('symbol', 'AUX')
                         break
         except Exception as e:
             print "[MERGED STATS] Error getting merged work: %s" % e
@@ -1109,7 +2220,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             'pending_blocks': pending,
             'orphaned_blocks': orphaned,
             'networks': networks,
-            'recent': [b for b in blocks[-5:][::-1]],  # Last 5 blocks
+            'recent': [b for b in blocks[-10:][::-1]],  # Last 10 blocks
             'block_value': merged_block_value,
             'symbol': merged_symbol,
         }
@@ -1241,39 +2352,77 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
     web_root.putChild('network_difficulty', NetworkDifficultyResource())
     
     # Node info endpoint for miner configuration display
-    def get_node_info():
-        """Get node connection info for miners"""
+    # Cache external IP to avoid blocking the reactor with synchronous HTTP requests
+    _cached_external_ip = [None]  # mutable container for closure
+    
+    def _detect_local_ip():
+        """Get local network IP (non-blocking, no DNS)"""
         try:
-            # Use configured external IP if available, otherwise try to detect
-            external_ip = getattr(node, 'external_ip', None)
-            
-            if not external_ip:
-                # Try to get external IP from external service
-                try:
-                    import urllib2
-                    for url in ['https://api.ipify.org', 'https://icanhazip.com', 'https://ifconfig.me/ip']:
-                        try:
-                            req = urllib2.Request(url)
-                            req.add_header('User-Agent', 'p2pool')
-                            response = urllib2.urlopen(req, timeout=3)
-                            external_ip = response.read().strip()
-                            if external_ip and len(external_ip) < 50:
-                                break
-                        except:
-                            continue
-                except:
-                    pass
-            
-            # Fallback to local network IP
-            if not external_ip:
-                try:
-                    import socket
-                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    s.connect(("8.8.8.8", 80))
-                    external_ip = s.getsockname()[0]
-                    s.close()
-                except:
-                    external_ip = "127.0.0.1"
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+    
+    _external_ip_resolved = [False]  # True once we have a real external IP
+    
+    @defer.inlineCallbacks
+    def _resolve_external_ip():
+        """Resolve external IP asynchronously using Twisted, cache the result"""
+        if _external_ip_resolved[0]:
+            return
+        
+        # If --external-ip was provided, use it directly and skip auto-detection
+        configured_ip = getattr(node, 'external_ip', None)
+        if configured_ip:
+            ip = str(configured_ip)
+            if ':' in ip:
+                ip = ip.rsplit(':', 1)[0]
+            _cached_external_ip[0] = ip
+            _external_ip_resolved[0] = True
+            print 'Using configured external IP: %s' % ip
+            return
+        
+        # Set local IP as immediate fallback so dashboard never blocks
+        if _cached_external_ip[0] is None:
+            _cached_external_ip[0] = _detect_local_ip()
+        
+        # Try external services asynchronously (non-blocking)
+        # Use HTTP (not HTTPS) because PyPy 2.7's cryptography/OpenSSL binding
+        # is broken (undefined symbol: FIPS_mode) making TLS connections fail.
+        # For IP detection, HTTPS isn't security-critical — we're just reading
+        # our own public IP address, not transmitting secrets.
+        for url in ['http://api.ipify.org', 'http://icanhazip.com', 'http://ifconfig.me/ip', 'http://checkip.amazonaws.com']:
+            try:
+                from twisted.web.client import getPage
+                body = yield getPage(url.encode('ascii'), timeout=5, headers={b'User-Agent': b'p2pool'})
+                ip = body.strip()
+                if ip and len(ip) < 50 and ip != _detect_local_ip():
+                    _cached_external_ip[0] = ip
+                    _external_ip_resolved[0] = True
+                    print 'Detected external IP: %s' % ip
+                    break
+            except:
+                continue
+        
+        # If we still don't have external IP, retry in 30 seconds
+        if not _external_ip_resolved[0]:
+            print 'External IP detection failed, will retry in 30s (using %s for now)' % _cached_external_ip[0]
+            reactor.callLater(30, _resolve_external_ip)
+    
+    # Fire and forget — resolve in background, don't block startup
+    reactor.callLater(1, _resolve_external_ip)
+    
+    def get_node_info():
+        """Get node connection info for miners (non-blocking, uses cached IP)"""
+        try:
+            external_ip = getattr(node, 'external_ip', None) or _cached_external_ip[0] or _detect_local_ip()
+            # --external-ip accepts ADDR[:PORT], strip port if present
+            if external_ip and ':' in str(external_ip):
+                external_ip = str(external_ip).rsplit(':', 1)[0]
             
             return {
                 'external_ip': external_ip,
@@ -1447,7 +2596,7 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
             return None
         share = node.tracker.items[int(share_hash_str, 16)]
         
-        return dict(
+        result = dict(
             parent='%064x' % share.previous_hash if share.previous_hash else "None",
             far_parent='%064x' % share.share_info['far_share_hash'] if share.share_info['far_share_hash'] else "None",
             children=['%064x' % x for x in sorted(node.tracker.reverse.get(share.hash, set()), key=lambda sh: -len(node.tracker.reverse.get(sh, set())))], # sorted from most children to least children
@@ -1493,6 +2642,61 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                 other_transaction_hashes=['%064x' % x for x in share.get_other_tx_hashes(node.tracker)],
             ),
         )
+        
+        # Add V36 metadata if available
+        if share.VERSION >= 36:
+            v36_meta = {}
+            
+            # merged_addresses: per-chain payment scripts provided by miner via stratum
+            merged_addrs = getattr(share, 'merged_addresses', None)
+            if merged_addrs:
+                v36_meta['merged_addresses'] = []
+                for entry in merged_addrs:
+                    addr_info = {'chain_id': entry['chain_id'], 'script_hex': entry['script'].encode('hex')}
+                    # Try to resolve to human-readable address
+                    try:
+                        chain_id = entry['chain_id']
+                        if chain_id == 98:  # Dogecoin
+                            try:
+                                from p2pool.bitcoin.networks import dogecoin_testnet4alpha as dtn4a
+                                addr_info['address'] = bitcoin_data.script2_to_address(entry['script'], dtn4a.ADDRESS_VERSION, dtn4a)
+                            except Exception:
+                                try:
+                                    from p2pool.bitcoin.networks import dogecoin_testnet as dtn
+                                    addr_info['address'] = bitcoin_data.script2_to_address(entry['script'], dtn.ADDRESS_VERSION, dtn)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                    v36_meta['merged_addresses'].append(addr_info)
+            else:
+                v36_meta['merged_addresses'] = None  # auto-conversion fallback
+            
+            # merged_payout_hash: consensus commitment for PPLNS distribution
+            mph = share.share_info.get('merged_payout_hash', None)
+            v36_meta['merged_payout_hash'] = '%064x' % mph if mph else None
+            
+            # message_data: share messaging payload
+            msg_data = getattr(share, '_message_data', None)
+            if msg_data:
+                v36_meta['message_data_hex'] = msg_data.encode('hex')
+                v36_meta['message_data_size'] = len(msg_data)
+                # Try to parse message types
+                try:
+                    from p2pool.share_messages import unpack_share_messages
+                    parsed = unpack_share_messages(msg_data)
+                    v36_meta['messages'] = [{'type': m.msg_type, 'flags': m.flags} for m in parsed]
+                except Exception:
+                    v36_meta['messages'] = None
+            else:
+                v36_meta['message_data_hex'] = None
+                v36_meta['message_data_size'] = 0
+                v36_meta['messages'] = None
+            
+            result['v36_metadata'] = v36_meta
+        
+        result['version'] = share.VERSION
+        return result
 
     def get_share_address(share_hash_str):
         if int(share_hash_str, 16) not in node.tracker.items:
@@ -1507,6 +2711,96 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
 
     new_root.putChild('payout_address', WebInterface(lambda share_hash_str: get_share_address(share_hash_str)))
     new_root.putChild('share', WebInterface(lambda share_hash_str: get_share(share_hash_str)))
+    
+    def get_v36_status():
+        """Diagnostic endpoint for V36 share metadata, AutoRatchet state, and merged address tracking."""
+        status = {}
+        
+        # AutoRatchet state
+        ratchet = getattr(wb, 'auto_ratchet', None)
+        if ratchet:
+            status['auto_ratchet'] = {
+                'state': ratchet.state,
+                'activated_at': ratchet._activated_at,
+                'activated_height': ratchet._activated_height,
+                'confirmed_at': ratchet._confirmed_at,
+            }
+        else:
+            status['auto_ratchet'] = None
+        
+        # Share version stats from recent chain
+        best = node.best_share_var.value
+        if best is not None:
+            height = node.tracker.get_height(best)
+            sample = min(height, node.net.REAL_CHAIN_LENGTH)
+            v35_count = 0
+            v36_count = 0
+            v36_with_merged_addr = 0
+            v36_with_message = 0
+            v36_with_payout_hash = 0
+            
+            for share in node.tracker.get_chain(best, sample):
+                if share.VERSION >= 36:
+                    v36_count += 1
+                    if getattr(share, 'merged_addresses', None):
+                        v36_with_merged_addr += 1
+                    if getattr(share, '_message_data', None):
+                        v36_with_message += 1
+                    if share.share_info.get('merged_payout_hash', None):
+                        v36_with_payout_hash += 1
+                else:
+                    v35_count += 1
+            
+            status['share_chain'] = {
+                'height': height,
+                'sample_size': sample,
+                'v35_shares': v35_count,
+                'v36_shares': v36_count,
+                'v36_with_explicit_merged_addr': v36_with_merged_addr,
+                'v36_with_message_data': v36_with_message,
+                'v36_with_payout_hash': v36_with_payout_hash,
+                'v36_percentage': round(v36_count * 100.0 / sample, 2) if sample > 0 else 0,
+            }
+        else:
+            status['share_chain'] = None
+        
+        # Current merged mining info
+        current_merged = getattr(wb, '_current_merged_addresses', {})
+        if current_merged:
+            status['current_miner_merged_addresses'] = {
+                'dogecoin': current_merged.get('dogecoin', None),
+                'has_validated': current_merged.get('_validated') is not None,
+            }
+        else:
+            status['current_miner_merged_addresses'] = None
+        
+        # Merged PPLNS weights summary  
+        if best is not None and hasattr(wb, 'merged_work') and wb.merged_work.value:
+            for chain_id in wb.merged_work.value:
+                try:
+                    share_height = node.tracker.get_height(best)
+                    parent_block_target = node.bitcoind_work.value['bits'].target
+                    weights, total_weight, donation_weight = p2pool_data.get_v36_merged_weights(
+                        node.tracker, best,
+                        max(0, min(share_height, node.net.REAL_CHAIN_LENGTH)),
+                        65535 * node.net.SPREAD * bitcoin_data.target_to_average_attempts(parent_block_target),
+                        chain_id)
+                    explicit_count = sum(1 for k in weights if k.startswith('MERGED:'))
+                    fallback_count = sum(1 for k in weights if not k.startswith('MERGED:'))
+                    status['merged_pplns_chain_%d' % chain_id] = {
+                        'total_miners': len(weights),
+                        'explicit_merged_addr_miners': explicit_count,
+                        'auto_convert_miners': fallback_count,
+                        'total_weight': total_weight,
+                        'donation_weight': donation_weight,
+                    }
+                except Exception as e:
+                    status['merged_pplns_chain_%d' % chain_id] = {'error': str(e)}
+        
+        return status
+    
+    new_root.putChild('v36_status', WebInterface(get_v36_status))
+    web_root.putChild('v36_status', WebInterface(get_v36_status))
     new_root.putChild('heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.heads]))
     new_root.putChild('verified_heads', WebInterface(lambda: ['%064x' % x for x in node.tracker.verified.heads]))
     new_root.putChild('tails', WebInterface(lambda: ['%064x' % x for t in node.tracker.tails for x in node.tracker.reverse.get(t, set())]))
@@ -1617,8 +2911,14 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
                     add['address'], 0) * 1e-8
         hd.datastreams['current_payout'].add_datum(t, my_current_payouts)
         miner_hash_rates, miner_dead_hash_rates = wb.get_local_rates()
-        current_txouts_by_address = current_txouts
-        hd.datastreams['current_payouts'].add_datum(t, dict((user, current_txouts_by_address[user]*1e-8) for user in miner_hash_rates if user in current_txouts_by_address))
+        # Build payout dict keyed by base address (strip worker suffix)
+        # miner_hash_rates keys may have .worker suffix, current_txouts keys are base addresses
+        payouts_by_address = {}
+        for user in miner_hash_rates:
+            base_addr = user.split('.')[0].split('_')[0]
+            if base_addr in current_txouts:
+                payouts_by_address[base_addr] = current_txouts[base_addr] * 1e-8
+        hd.datastreams['current_payouts'].add_datum(t, payouts_by_address)
         
         # Track merged mining payouts per miner (DOGE)
         try:
@@ -1672,6 +2972,416 @@ def get_web_root(wb, datadir_path, bitcoind_getinfo_var, stop_event=variable.Eve
         return hd.datastreams[source].dataviews[view].get_data(time.time())
     
     new_root.putChild('graph_data', WebInterface(get_graph_data))
+    
+    # ====================================================================
+    # /msg/* — Share Messaging API
+    # ====================================================================
+    #
+    # Provides REST access to PoW-protected share messages.
+    # Messages live as long as their carrying share is in the sharechain.
+    # Authority messages (from COMBINED_DONATION_SCRIPT signers) persist longer.
+    # Node-local BanList filters messages from display (not from relay).
+    #
+    # GET  /msg/recent          — recent messages (all types)
+    # GET  /msg/chat            — miner-to-miner chat (verified)
+    # GET  /msg/announcements   — pool operator announcements
+    # GET  /msg/alerts          — emergency alerts
+    # GET  /msg/status          — node status reports
+    # GET  /msg/stats           — store statistics
+    # GET  /msg/bans            — current ban list
+    # POST /msg/ban             — add a ban (signing_id, address, keyword, type)
+    # POST /msg/unban           — remove a ban
+    # ====================================================================
+    
+    msg_root = resource.Resource()
+    web_root.putChild('msg', msg_root)
+    
+    def _get_message_store():
+        """Get or lazily create the ShareMessageStore on the node."""
+        store = getattr(node, '_message_store', None)
+        if store is None:
+            from p2pool.share_messages import ShareMessageStore, BanList
+            ban_path = os.path.join(datadir_path, 'banned_senders.json')
+            ban_list = BanList(persist_path=ban_path)
+            # max_age = sharechain PPLNS window duration (e.g. 8640 * 15 = 36h)
+            chain_window_secs = node.net.CHAIN_LENGTH * node.net.SHARE_PERIOD
+            store = ShareMessageStore(max_age=chain_window_secs, ban_list=ban_list)
+            node._message_store = store
+            # Rebuild from current sharechain
+            if node.best_share_var.value is not None:
+                try:
+                    chain_len = min(node.net.CHAIN_LENGTH,
+                                    node.tracker.get_height(node.best_share_var.value))
+                    rebuilt = store.rebuild_from_tracker(
+                        node.tracker, node.best_share_var.value, chain_len)
+                    if rebuilt > 0:
+                        print('Messaging: rebuilt %d messages from sharechain' % rebuilt)
+                except Exception:
+                    pass
+        # Always try to (re-)load blob dirs — debounced to every 5 min.
+        # This picks up blobs added after startup (e.g. via git pull).
+        _load_blob_dirs(store)
+        return store
+    
+    from p2pool.share_messages import MSG_EMERGENCY
+    
+    # GET /msg/config — display policy for dashboard
+    class MsgConfigResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            return json.dumps({
+                'enable_miner_messages': enable_miner_messages,
+                'authority_only': not enable_miner_messages,
+            })
+    
+    msg_root.putChild('config', MsgConfigResource())
+    
+    # GET /msg/recent?limit=20&since=<timestamp>
+    # Without --enable-miner-messages: returns only authority messages
+    class MsgRecentResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            try:
+                store = _get_message_store()
+                limit = int(request.args.get('limit', ['20'])[0])
+                since = request.args.get('since', [None])[0]
+                since = float(since) if since else None
+                msgs = store.get_messages(since=since, limit=min(limit, 200),
+                                          authority_only=not enable_miner_messages)
+                return json.dumps([m.to_dict() for m in msgs])
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('recent', MsgRecentResource())
+    
+    # GET /msg/chat?limit=50&verified=1
+    # Returns empty unless --enable-miner-messages is set
+    class MsgChatResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            if not enable_miner_messages:
+                return json.dumps([])
+            try:
+                store = _get_message_store()
+                limit = int(request.args.get('limit', ['50'])[0])
+                verified = request.args.get('verified', ['1'])[0] == '1'
+                if verified:
+                    msgs = store.get_chat(limit=min(limit, 200))
+                else:
+                    msgs = store.get_all_chat(limit=min(limit, 200))
+                return json.dumps([m.to_dict() for m in msgs])
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('chat', MsgChatResource())
+    
+    # GET /msg/announcements?limit=10
+    # Returns empty unless --enable-miner-messages is set
+    # (pool announcements are non-authority miner messages)
+    class MsgAnnouncementsResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            if not enable_miner_messages:
+                return json.dumps([])
+            try:
+                store = _get_message_store()
+                limit = int(request.args.get('limit', ['10'])[0])
+                msgs = store.get_announcements(limit=min(limit, 50))
+                return json.dumps([m.to_dict() for m in msgs])
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('announcements', MsgAnnouncementsResource())
+    
+    # GET /msg/alerts?limit=5
+    # Returns only authority alerts by default;
+    # all alerts when --enable-miner-messages is set
+    class MsgAlertsResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            try:
+                store = _get_message_store()
+                limit = int(request.args.get('limit', ['5'])[0])
+                msgs = store.get_messages(msg_type=MSG_EMERGENCY,
+                                          limit=min(limit, 20),
+                                          authority_only=not enable_miner_messages)
+                return json.dumps([m.to_dict() for m in msgs])
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('alerts', MsgAlertsResource())
+    
+    # GET /msg/status?limit=20
+    # Returns empty unless --enable-miner-messages is set
+    class MsgStatusResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            if not enable_miner_messages:
+                return json.dumps([])
+            try:
+                store = _get_message_store()
+                limit = int(request.args.get('limit', ['20'])[0])
+                msgs = store.get_node_statuses(limit=min(limit, 100))
+                return json.dumps([m.to_dict() for m in msgs])
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('status', MsgStatusResource())
+    
+    # GET /msg/stats
+    class MsgStatsResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            try:
+                store = _get_message_store()
+                return json.dumps(store.stats)
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('stats', MsgStatsResource())
+    
+    # GET /msg/bans
+    class MsgBansResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            try:
+                store = _get_message_store()
+                return json.dumps(store.ban_list.to_json())
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('bans', MsgBansResource())
+
+    # GET /msg/diag — blob loading diagnostics (helps operators debug
+    # why transition messages may not be showing)
+    class MsgDiagResource(resource.Resource):
+        def render_GET(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            # Security: only allow from localhost (exposes filesystem paths)
+            if not _is_localhost(request):
+                request.setResponseCode(403)
+                return json.dumps({'error': 'forbidden: localhost only'})
+            try:
+                store = _get_message_store()
+                # Directories that _load_blob_dirs scans
+                _script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+                _module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                _search_bases = list(dict.fromkeys([_script_dir, _module_dir]))
+
+                scanned_dirs = []
+                # data dir blobs
+                if datadir_path:
+                    for dirname in ('bootstrap_messages', 'transition_messages', 'transitional_messages'):
+                        d = os.path.join(datadir_path, dirname)
+                        exists = os.path.isdir(d)
+                        files = []
+                        if exists:
+                            for fn in sorted(os.listdir(d)):
+                                if fn.endswith('.hex') or fn.endswith('.blob'):
+                                    fp = os.path.join(d, fn)
+                                    try:
+                                        readable = os.access(fp, os.R_OK)
+                                        size = os.path.getsize(fp)
+                                    except Exception:
+                                        readable = False
+                                        size = -1
+                                    files.append({'name': fn, 'readable': readable, 'size': size})
+                        scanned_dirs.append({'path': d, 'exists': exists, 'files': files})
+
+                # shipped dirs
+                for _base in _search_bases:
+                    for _dname in ('transition_messages', 'transitional_messages'):
+                        d = os.path.join(_base, _dname)
+                        exists = os.path.isdir(d)
+                        files = []
+                        if exists:
+                            for fn in sorted(os.listdir(d)):
+                                if fn.endswith('.hex') or fn.endswith('.blob'):
+                                    fp = os.path.join(d, fn)
+                                    try:
+                                        readable = os.access(fp, os.R_OK)
+                                        size = os.path.getsize(fp)
+                                    except Exception:
+                                        readable = False
+                                        size = -1
+                                    files.append({'name': fn, 'readable': readable, 'size': size})
+                        scanned_dirs.append({'path': d, 'exists': exists, 'files': files})
+
+                # Store state
+                msg_count = len(store.messages) if hasattr(store, 'messages') else 0
+                transition_msgs = [m.to_dict() for m in store.messages
+                                   if hasattr(m, 'msg_type') and m.msg_type == 0x20]
+
+                return json.dumps({
+                    'blob_scan_count': _blob_scan_count[0],
+                    'last_blob_scan': _last_blob_scan[0],
+                    'seconds_since_scan': int(time.time() - _last_blob_scan[0]) if _last_blob_scan[0] else None,
+                    'cli_transition_message': transition_message or None,
+                    'scanned_dirs': scanned_dirs,
+                    'builtin_blobs': len(_BUILTIN_TRANSITION_BLOBS),
+                    'store_message_count': msg_count,
+                    'transition_signals': transition_msgs,
+                    'enable_miner_messages': enable_miner_messages,
+                })
+            except Exception as e:
+                import traceback
+                print('Messaging: /msg/diag error: %s' % traceback.format_exc())
+                return json.dumps({'error': 'internal error'})
+
+    msg_root.putChild('diag', MsgDiagResource())
+
+    # POST /msg/ban — add a ban
+    # Body: {"signing_id": "hex"} or {"address": "addr"} or
+    #       {"keyword": "word"} or {"type": 2}
+    class MsgBanResource(resource.Resource):
+        def render_POST(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            # Security: only allow from localhost
+            if not _is_localhost(request):
+                request.setResponseCode(403)
+                return json.dumps({'error': 'forbidden: localhost only'})
+            try:
+                store = _get_message_store()
+                content = request.content.read(65536)
+                if len(content) >= 65536:
+                    request.setResponseCode(413)
+                    return json.dumps({'error': 'request body too large'})
+                body = json.loads(content)
+                actions = []
+                if 'signing_id' in body:
+                    store.ban_list.ban_signing_id(body['signing_id'])
+                    actions.append('banned signing_id %s' % body['signing_id'])
+                if 'address' in body:
+                    store.ban_list.ban_address(body['address'])
+                    actions.append('banned address %s' % body['address'])
+                if 'keyword' in body:
+                    store.ban_list.ban_keyword(body['keyword'])
+                    actions.append('banned keyword "%s"' % body['keyword'])
+                if 'type' in body:
+                    store.ban_list.ban_type(int(body['type']))
+                    actions.append('banned type 0x%02x' % int(body['type']))
+                if not actions:
+                    return json.dumps({'error': 'no ban target specified'})
+                return json.dumps({'ok': True, 'actions': actions})
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('ban', MsgBanResource())
+    
+    # POST /msg/unban — remove a ban
+    # Body: same format as /msg/ban
+    class MsgUnbanResource(resource.Resource):
+        def render_POST(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            # Security: only allow from localhost
+            if not _is_localhost(request):
+                request.setResponseCode(403)
+                return json.dumps({'error': 'forbidden: localhost only'})
+            try:
+                store = _get_message_store()
+                content = request.content.read(65536)
+                if len(content) >= 65536:
+                    request.setResponseCode(413)
+                    return json.dumps({'error': 'request body too large'})
+                body = json.loads(content)
+                actions = []
+                if 'signing_id' in body:
+                    store.ban_list.unban_signing_id(body['signing_id'])
+                    actions.append('unbanned signing_id %s' % body['signing_id'])
+                if 'address' in body:
+                    store.ban_list.unban_address(body['address'])
+                    actions.append('unbanned address %s' % body['address'])
+                if 'keyword' in body:
+                    store.ban_list.unban_keyword(body['keyword'])
+                    actions.append('unbanned keyword "%s"' % body['keyword'])
+                if 'type' in body:
+                    store.ban_list.unban_type(int(body['type']))
+                    actions.append('unbanned type 0x%02x' % int(body['type']))
+                if not actions:
+                    return json.dumps({'error': 'no unban target specified'})
+                return json.dumps({'ok': True, 'actions': actions})
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('unban', MsgUnbanResource())
+    
+    # POST /msg/load_blob — load a transition/authority message blob at runtime
+    # Body: {"blob_hex": "<hex_string>"} or {"blob_file": "<path_to_hex_file>"}
+    # Restricted to localhost connections for security.
+    # This allows loading new transition signals for future transitions
+    # (e.g. V36→V37) without restarting the node.
+    class MsgLoadBlobResource(resource.Resource):
+        def render_POST(self, request):
+            request.setHeader('Content-Type', 'application/json')
+            request.setHeader('Access-Control-Allow-Origin', '*')
+            # Security: only allow from localhost
+            if not _is_localhost(request):
+                request.setResponseCode(403)
+                return json.dumps({'error': 'forbidden: localhost only'})
+            try:
+                store = _get_message_store()
+                content = request.content.read(65536)
+                if len(content) >= 65536:
+                    request.setResponseCode(413)
+                    return json.dumps({'error': 'request body too large'})
+                body = json.loads(content)
+                blob_hex = body.get('blob_hex', '')
+                blob_file = body.get('blob_file', '')
+                if blob_file:
+                    if not os.path.isfile(blob_file):
+                        return json.dumps({'error': 'blob_file not found: %s' % blob_file})
+                    with open(blob_file, 'r') as f:
+                        blob_hex = f.read().strip()
+                if not blob_hex:
+                    return json.dumps({'error': 'no blob_hex or blob_file provided'})
+                n = store.load_blob_hex(blob_hex)
+                if n > 0:
+                    print('Messaging: loaded %d message(s) from /msg/load_blob' % n)
+                return json.dumps({'ok': True, 'loaded': n})
+            except Exception as e:
+                return json.dumps({'error': str(e)})
+    
+    msg_root.putChild('load_blob', MsgLoadBlobResource())
+    
+    # ====================================================================
+    # Live share message ingestion
+    # ====================================================================
+    # When a V36+ share is verified and carries message_data, its
+    # already-validated _parsed_messages (from check()) are added to the
+    # message store immediately.  This means transition signals embedded
+    # in shares appear in the API/dashboard as soon as the share is
+    # accepted, rather than only on startup via rebuild_from_tracker().
+    def _on_verified_share(share_hash):
+        store = getattr(node, '_message_store', None)
+        if store is None:
+            return
+        try:
+            share = node.tracker.items[share_hash]
+            if not hasattr(share, '_parsed_messages') or not share._parsed_messages:
+                return
+            added = 0
+            for msg in share._parsed_messages:
+                msg.share_hash = share.hash
+                msg.sender_address = getattr(share, 'address', None)
+                if store._add_message(msg):
+                    added += 1
+            if added > 0:
+                print('Messaging: ingested %d message(s) from verified share %064x' % (added, share.hash))
+        except Exception:
+            pass  # Share might be gone from tracker
+    
+    node.tracker.verified.added.watch(_on_verified_share)
     
     if static_dir is None:
         static_dir = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'web-static')

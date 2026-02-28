@@ -1,4 +1,6 @@
-# Merged Mining RPC Adapter Configuration - TEST SETUP
+# Merged Mining RPC Adapter Configuration
+#
+# Run: python3 adapter.py --config config.yaml
 
 # Adapter server settings (P2Pool connects here)
 server:
@@ -6,14 +8,14 @@ server:
   port: 44556  # Different port so we don't conflict with direct connection
   # Credentials P2Pool uses to connect to this adapter
   rpc_user: "dogecoinrpc"
-  rpc_password: "testpass"
+  rpc_password: "YOUR_DOGE_RPC_PASSWORD"
 
 # Upstream daemon (Standard Dogecoin testnet4alpha)
 upstream:
-  host: "192.168.86.27"
+  host: "DOGE_DAEMON_IP"
   port: 44555  # Dogecoin testnet4alpha RPC port
   rpc_user: "dogecoinrpc"
-  rpc_password: "testpass"
+  rpc_password: "YOUR_DOGE_RPC_PASSWORD"
   # Timeout for RPC calls (seconds)
   timeout: 30
 
@@ -21,15 +23,18 @@ upstream:
 chain:
   name: "dogecoin_testnet4alpha"
   chain_id: 98
-  # Network magic bytes (for validation)
-  network_magic: "fcc1b7dc"
 
-# Payout address for merged mining rewards
-payout:
-  address: "nb3u9mBf6d5s74Dn9jJXa7AbX5ZSVpTtBq"
+# Coinbase text for OP_RETURN in merged blocks
+# This identifies the pool in the blockchain
+coinbase_text: "technocore"
 
 # Logging
 logging:
   level: "DEBUG"  # Show all activity for testing
   format: "text"  # Human readable for testing
-  file: null
+  file: "adapter.log"  # Log file path (null = stdout only, or use --log-file CLI flag)
+
+# Background template poller (adapter polls dogecoind independently)
+# P2Pool gets instant responses from cache instead of waiting for daemon
+polling:
+  interval: 1.0  # seconds between daemon polls (1s = fresh mempool)

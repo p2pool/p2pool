@@ -1,0 +1,30 @@
+# MM-Adapter config for Docker Compose deployment
+# Copy to config.docker.yaml and edit upstream credentials.
+#
+# The server section uses container-internal settings (P2Pool connects
+# via Docker networking on the "mm-adapter" hostname).
+# The upstream section must point to your Dogecoin Core daemon.
+
+server:
+  host: "0.0.0.0"
+  port: 44556
+  rpc_user: "dogecoinrpc"         # Must match P2Pool --merged-coind-rpc-user
+  rpc_password: "CHANGE_ME"       # Must match DOGE_RPC_PASSWORD in .env
+
+upstream:
+  host: "host.docker.internal"    # Docker host, or LAN IP of your Dogecoin node
+  port: 22555                      # Dogecoin mainnet RPC port
+  rpc_user: "dogecoinrpc"         # Must match dogecoin.conf rpcuser
+  rpc_password: "CHANGE_ME"       # Must match dogecoin.conf rpcpassword
+  timeout: 30
+
+chain:
+  name: "dogecoin_mainnet"
+  chain_id: 98
+
+coinbase_text: "p2pool-docker"
+
+logging:
+  level: "INFO"
+  format: "text"
+  file: null

@@ -1,0 +1,82 @@
+# MWEB Compatibility Fix for jtoomim/p2pool-ltc
+# 
+# This patch fixes the critical MWEB (MimbleWimble Extension Block) compatibility
+# issue that has broken p2pool-ltc on Litecoin mainnet since MWEB activation.
+#
+# Problem: The HogEx transaction (MWEB integration tx) fails to parse, causing
+# getwork() to fail silently, which leaves known_txs cache stale. This causes
+# ALL shares to be rejected with "Peer referenced unknown transaction".
+#
+# Apply with: patch -p1 < jtoomim_mweb_fix.patch
+#
+# Date: 2026-02-05
+# Author: P2Pool Merged Mining Team
+
+--- a/p2pool/bitcoin/helper.py
++++ b/p2pool/bitcoin/helper.py
+@@ -68,6 +68,7 @@ def getwork(bitcoind, net, use_getblocktemplate=True, txidcache={}, feecache={},
+     cachehits = 0
+     cachemisses = 0
+     knownhits = 0
+     knownmisses = 0
++    skipped_mweb = 0
+     for x in work['transactions']:
+         fee = x['fee']
+         x = x['data'] if isinstance(x, dict) else x
+@@ -85,7 +86,21 @@ def getwork(bitcoind, net, use_getblocktemplate=True, txidcache={}, feecache={},
+             knownmisses += 1
+             if not packed:
+                 packed = x.decode('hex')
+-            unpacked = bitcoin_data.tx_type.unpack(packed)
++            try:
++                unpacked = bitcoin_data.tx_type.unpack(packed)
++            except Exception as e:
++                # Transaction parsing failed - likely MWEB (MimbleWimble Extension Block)
++                # transaction on Litecoin. The HogEx transaction (last tx in block template)
++                # has a special format that our standard parser cannot decode.
++                #
++                # Store as raw bytes so the transaction exists in known_txs for share
++                # propagation. This allows P2P to work even if we can't fully parse the tx.
++                skipped_mweb += 1
++                if skipped_mweb == 1:
++                    print '[MWEB] Detected MWEB/HogEx transaction - storing as raw bytes'
++                unpacked = {'_raw_tx': packed, '_raw_size': len(packed), '_mweb': True}
+         unpacked_transactions.append(unpacked)
+         # The only place where we can get information on transaction fees is in GBT results
+         if not txid in feecache:
+
+--- a/p2pool/bitcoin/data.py
++++ b/p2pool/bitcoin/data.py
+@@ -195,6 +195,12 @@ class TransactionType(pack.Type):
+             return dict(version=version, tx_ins=tx_ins, tx_outs=next['tx_outs'], lock_time=next['lock_time'])
+     
+     def write(self, file, item):
++        # Handle MWEB raw transactions stored as dicts with '_mweb': True
++        # These are transactions we couldn't parse (HogEx format) but need to
++        # serialize for P2P propagation. Write the raw bytes directly.
++        if isinstance(item, dict) and item.get('_mweb'):
++            file.write(item['_raw_tx'])
++            return
+         if is_segwit_tx(item):
+             assert len(item['tx_ins']) == len(item['witness'])
+             self._write_type.write(file, item)
+
+--- a/p2pool/p2p.py
++++ b/p2pool/p2p.py
+@@ -474,9 +474,12 @@ class Protocol(p2protocol.Protocol):
+                         tx = cache[tx_hash]
+                         print 'Transaction %064x rescued from peer latency cache!' % (tx_hash,)
+                         break
+                 else:
+-                    print >>sys.stderr, 'Peer referenced unknown transaction %064x, disconnecting' % (tx_hash,)
+-                    self.disconnect()
+-                    return
++                    # Transaction not found - this can happen with mempool timing differences
++                    # or MWEB transactions that the peer has but we don't know about.
++                    # Don't disconnect, just skip this transaction.
++                    if p2pool.DEBUG:
++                        print >>sys.stderr, '[P2P] remember_tx: Unknown transaction %064x - skipping' % (tx_hash,)
++                    continue
+             
+             self.remembered_txs[tx_hash] = tx
+             self.remembered_txs_size += 100 + bitcoin_data.tx_type.packed_size(tx)

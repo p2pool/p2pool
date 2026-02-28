@@ -573,6 +573,7 @@ class NetworkBroadcaster(object):
         """Maintain connections to the best peers from our database
         
         Rate-limited and non-blocking connection management:
+        - Prunes dead/disconnected connections first
         - Limits concurrent pending connections
         - Uses exponential backoff for failed peers
         - Only attempts a few connections per cycle
@@ -582,6 +583,48 @@ class NetworkBroadcaster(object):
             return
         
         current_time = time.time()
+        
+        # CRITICAL: Prune dead connections FIRST, before capacity checks.
+        # Without this, self.connections accumulates zombies and thinks
+        # we're at capacity when we actually have zero live peers.
+        dead_addrs = []
+        for addr, conn in list(self.connections.items()):
+            if conn.get('protected'):
+                continue  # Never prune protected (local coind)
+            protocol = conn.get('protocol')
+            factory = conn.get('factory')
+            is_dead = False
+            # Check 1: protocol transport is gone or disconnected
+            if protocol and hasattr(protocol, 'transport'):
+                if not protocol.transport or not protocol.transport.connected:
+                    is_dead = True
+            # Check 2: factory reports no active connection
+            elif factory and hasattr(factory, 'conn') and factory.conn.value is None:
+                is_dead = True
+            # Check 3: no protocol stored (legacy entry)
+            elif protocol is None and factory:
+                if hasattr(factory, 'conn') and factory.conn.value is None:
+                    is_dead = True
+            if is_dead:
+                dead_addrs.append(addr)
+        
+        if dead_addrs:
+            for addr in dead_addrs:
+                conn = self.connections[addr]
+                # Stop factory from auto-reconnecting (ReconnectingClientFactory)
+                try:
+                    if conn.get('factory'):
+                        conn['factory'].stopTrying()
+                except:
+                    pass
+                try:
+                    if conn.get('connector'):
+                        conn['connector'].disconnect()
+                except:
+                    pass
+                del self.connections[addr]
+            print('Broadcaster[%s]: Pruned %d dead connections (%d remaining)' % (
+                self.chain_name, len(dead_addrs), len(self.connections))) if len(dead_addrs) > 0 else None
         
         # Verify local node connection and update its last_seen
         if self.local_addr not in self.connections:
@@ -683,14 +726,15 @@ class NetworkBroadcaster(object):
         # Sort by score (highest first)
         scored_peers.sort(reverse=True)
         
-        # Detailed peer selection logging
-        print('Broadcaster[%s]: Peer selection:' % self.chain_name)
-        print('  Database size: %d peers' % len(self.peer_db))
-        print('  Skipped - IPv6: %d, protected: %d, coind overlap: %d, connected: %d, pending: %d, backoff: %d, max attempts: %d' % (
-            skip_ipv6, skip_protected, skip_coind_overlap, skip_already_connected, skip_pending, skip_backoff, skip_max_attempts))
-        print('  Candidates scored: %d' % len(scored_peers))
-        print('  Current connections: %d' % len(self.connections))
-        print('  Discovery enabled: %s' % self.discovery_enabled)
+        # Detailed peer selection logging (throttled to once per 5 minutes)
+        import time as _time
+        _now = _time.time()
+        _last_sel = getattr(self, '_last_peer_sel_log', 0)
+        if _now - _last_sel >= 300:
+            self._last_peer_sel_log = _now
+            print('Broadcaster[%s]: Peer selection: db=%d scored=%d conn=%d disc=%s' % (
+                self.chain_name, len(self.peer_db), len(scored_peers),
+                len(self.connections), self.discovery_enabled))
         
         # Attempt connections to top peers (non-blocking)
         attempts_started = 0
@@ -711,9 +755,12 @@ class NetworkBroadcaster(object):
         """Connect to a peer"""
         host, port = addr
         
-        print('Broadcaster[%s]: Connecting to %s...' % (self.chain_name, _safe_addr_str(addr)))
+        # Connection attempt logging suppressed for release
         
         factory = bitcoin_p2p.ClientFactory(self.net)
+        # CRITICAL: Disable auto-reconnect. ReconnectingClientFactory will
+        # spawn infinite TCP sockets if left enabled, exhausting fd ulimit.
+        factory.stopTrying()
         connector = reactor.connectTCP(host, port, factory, timeout=10)
         
         self.stats['connection_stats']['total_attempts'] += 1
@@ -725,6 +772,7 @@ class NetworkBroadcaster(object):
             self.connections[addr] = {
                 'factory': factory,
                 'connector': connector,
+                'protocol': protocol,
                 'connected_at': time.time(),
                 'protected': False
             }
@@ -738,7 +786,7 @@ class NetworkBroadcaster(object):
                 self.peer_db[addr]['score'] += 10  # Bonus for successful connection
             
             self.stats['connection_stats']['successful_connections'] += 1
-            print('Broadcaster[%s]: Connected to %s' % (self.chain_name, _safe_addr_str(addr)))
+            # Connected log suppressed for release
             
             # Hook P2P messages for discovery and monitoring
             self._hook_protocol_messages(addr, protocol)
@@ -748,7 +796,7 @@ class NetworkBroadcaster(object):
                 try:
                     if hasattr(protocol, 'send_getaddr') and callable(protocol.send_getaddr):
                         protocol.send_getaddr()
-                        print('Broadcaster[%s]:   -> Sent getaddr request to %s' % (self.chain_name, _safe_addr_str(addr)))
+                        # getaddr log suppressed for release
                 except Exception as e:
                     print('Broadcaster[%s]: Error sending getaddr to %s: %s' % (
                         self.chain_name, _safe_addr_str(addr), e), file=sys.stderr)
@@ -761,6 +809,7 @@ class NetworkBroadcaster(object):
                 self.chain_name, _safe_addr_str(addr), e), file=sys.stderr)
             
             try:
+                factory.stopTrying()
                 connector.disconnect()
             except:
                 pass
@@ -817,6 +866,11 @@ class NetworkBroadcaster(object):
                 self.chain_name, _safe_addr_str(addr)), file=sys.stderr)
             return
         
+        try:
+            if conn.get('factory'):
+                conn['factory'].stopTrying()
+        except:
+            pass
         try:
             if conn.get('connector'):
                 conn['connector'].disconnect()
@@ -1049,7 +1103,11 @@ class NetworkBroadcaster(object):
             with open(tmp_path, 'wb') as f:
                 f.write(json.dumps(data, indent=2))
             
-            os.rename(tmp_path, db_path)
+            try:
+                os.rename(tmp_path, db_path)
+            except OSError:  # Windows can't overwrite with rename
+                os.remove(db_path)
+                os.rename(tmp_path, db_path)
             
         except Exception as e:
             print('Broadcaster[%s]: Error saving peer database: %s' % (

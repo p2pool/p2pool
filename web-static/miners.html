@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Active Workers - P2Pool</title>
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <script src="d3.v2.min.js"></script>
@@ -369,6 +372,34 @@
             background: var(--text-muted);
         }
         
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-confirmed {
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success);
+        }
+        
+        .status-pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+        
+        .status-maturing {
+            background: rgba(0, 141, 228, 0.2);
+            color: var(--primary);
+        }
+        
+        .status-orphaned {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+        
         /* Loading */
         .loading {
             text-align: center;
@@ -454,6 +485,9 @@
     </header>
     
     <div class="container">
+        <!-- Warnings -->
+        <div id="warnings"></div>
+
         <!-- Overview Stats -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -491,12 +525,72 @@
         <div id="miners_grid" class="miners-grid" style="display: none;">
             <!-- Miner cards will be inserted here -->
         </div>
+        
+        <!-- Recent Parent Chain Blocks -->
+        <div class="section-header">
+            <h2>⛏️ Blocks Found <span class="badge" id="blocks_count">0</span></h2>
+        </div>
+        <div class="chart-container" style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px;">
+            <div id="pool_blocks_loading" class="loading" style="padding: 20px;">
+                <div class="loading-spinner"></div>
+                <div>Loading blocks data...</div>
+            </div>
+            <div id="pool_blocks_container" style="display: none;">
+                <table id="pool_blocks_table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Block Height</th>
+                            <th>Block Hash</th>
+                            <th>Miner</th>
+                            <th>Luck</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pool_blocks_tbody">
+                    </tbody>
+                </table>
+                <div id="no_pool_blocks" style="display: none; text-align: center; padding: 20px; color: #8888a0;">
+                    No blocks found by the pool yet
+                </div>
+            </div>
+        </div>
+        
+        <!-- Merged Mining Blocks -->
+        <div class="section-header" id="merged_blocks_header">
+            <h2>🔗 Merged Mining Blocks <span class="badge" id="merged_blocks_count" style="background: #6f42c1;">0</span></h2>
+        </div>
+        <div class="chart-container" style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px;">
+            <div id="merged_blocks_loading" class="loading" style="padding: 20px;">
+                <div class="loading-spinner"></div>
+                <div>Loading merged blocks data...</div>
+            </div>
+            <div id="merged_blocks_container" style="display: none;">
+                <table id="merged_blocks_table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Network</th>
+                            <th>Block Height</th>
+                            <th>Block Hash</th>
+                            <th>Miner</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="merged_blocks_tbody">
+                    </tbody>
+                </table>
+                <div id="no_merged_blocks" style="display: none; text-align: center; padding: 20px; color: #8888a0;">
+                    No merged mining blocks found yet
+                </div>
+            </div>
+        </div>
     </div>
     
     <footer>
         <div class="container">
-            <p>P2Pool <span id="footer_version">v1.1.1</span> - Decentralized Mining Pool</p>
-            <p><a href="https://github.com/frstrtr/p2pool-dash" target="_blank">GitHub</a></p>
+            <p>P2Pool <span id="footer_version">-</span> - Decentralized Mining Pool</p>
+            <p><a href="https://github.com/frstrtr/p2pool-merged-v36" target="_blank">GitHub</a></p>
         </div>
     </footer>
     
@@ -565,13 +659,29 @@
             d3.json('../local_stats', function(local_stats) {
                 if (!local_stats) return;
                 
+                // Display warnings
+                d3.select('#warnings').selectAll('p').remove();
+                if (local_stats.warnings && local_stats.warnings.length > 0) {
+                    d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
+                        .text(function(w){ return '⚠️ Warning: ' + w })
+                        .attr('style', 'color:#dc3545;border:1px solid #dc3545;background:rgba(220,53,69,0.1);padding:10px;border-radius:5px;margin-bottom:8px;font-weight:bold;');
+                }
+                
                 var attempts_to_share = local_stats.attempts_to_share || 0;
                 
                 // Fetch stratum_stats to get ONLY real connected miners
                 d3.json('../stratum_stats', function(stratum_stats) {
                     // Extract base address helper
+                    // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
                     function extractAddress(workerName) {
-                        return workerName.split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                        return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                    }
+
+                    // Extract merged mining (DOGE) address from worker name
+                    function extractMergedAddress(workerName) {
+                        var parts = workerName.split(',');
+                        if (parts.length < 2) return null;
+                        return parts[1].split('.')[0].split('+')[0].split('/')[0];
                     }
                     
                     // Group workers by base address - use stratum_stats as source
@@ -581,6 +691,14 @@
                     for (var workerName in stratumWorkers) {
                         var workerData = stratumWorkers[workerName];
                         var baseAddress = extractAddress(workerName);
+                        var mergedAddr = extractMergedAddress(workerName);
+                        
+                        // If no explicit merged address in worker name, check API merged_addresses
+                        var mergedAutoConverted = false;
+                        if (!mergedAddr && workerData.merged_addresses) {
+                            mergedAddr = workerData.merged_addresses['dogecoin'] || null;
+                            mergedAutoConverted = workerData.merged_auto_converted || false;
+                        }
                         
                         // Get difficulty from connection_difficulties
                         var difficulty = 0;
@@ -604,6 +722,8 @@
                         if (!minerGroups[baseAddress]) {
                             minerGroups[baseAddress] = {
                                 address: baseAddress,
+                                mergedAddress: null,
+                                mergedAutoConverted: false,
                                 workers: [],
                                 totalHashrate: 0,
                                 totalDoa: 0,
@@ -611,6 +731,10 @@
                                 lastSeen: 0,
                                 totalConnections: 0
                             };
+                        }
+                        if (mergedAddr && !minerGroups[baseAddress].mergedAddress) {
+                            minerGroups[baseAddress].mergedAddress = mergedAddr;
+                            minerGroups[baseAddress].mergedAutoConverted = mergedAutoConverted;
                         }
                         
                         minerGroups[baseAddress].workers.push({
@@ -738,6 +862,29 @@
                     .attr('style', 'margin-left: 10px; font-size: 0.8rem;')
                     .text('↗');
                 
+                // Show merged mining (DOGE) address if present
+                if (miner.mergedAddress) {
+                    var mergedDiv = header.append('div')
+                        .attr('style', 'font-size: 0.8rem; color: #c3a634; margin-top: 4px; font-family: "Courier New", monospace;');
+                    mergedDiv.append('span').text('🐕 ');
+                    mergedDiv.append('a')
+                        .attr('href', 'https://dogechain.info/address/' + encodeURIComponent(miner.mergedAddress))
+                        .attr('target', '_blank')
+                        .attr('style', 'color: #c3a634; text-decoration: none;')
+                        .text(miner.mergedAddress);
+                    if (miner.mergedAutoConverted) {
+                        mergedDiv.append('span')
+                            .attr('style', 'color: #888; font-size: 0.65rem; margin-left: 4px;')
+                            .attr('title', 'Auto-converted from LTC address (same pubkey hash)')
+                            .text('(auto)');
+                    }
+                    mergedDiv.append('a')
+                        .attr('href', 'https://dogechain.info/address/' + encodeURIComponent(miner.mergedAddress))
+                        .attr('target', '_blank')
+                        .attr('style', 'margin-left: 5px; font-size: 0.7rem; color: #c3a634;')
+                        .text('↗');
+                }
+                
                 // Worker count badge
                 if (miner.workers.length > 1) {
                     addr_div.append('span')
@@ -860,9 +1007,216 @@
         
         // Load data on page load
         loadMiners();
+        loadPoolBlocks();
+        loadMergedBlocks();
         
         // Auto-refresh every 30 seconds
         setInterval(loadMiners, 30000);
+        setInterval(loadPoolBlocks, 60000);
+        setInterval(loadMergedBlocks, 60000);
+        
+        function loadPoolBlocks() {
+            d3.json('../recent_blocks', function(blocks) {
+                document.getElementById('pool_blocks_loading').style.display = 'none';
+                document.getElementById('pool_blocks_container').style.display = 'block';
+                
+                if (!blocks || blocks.length === 0) {
+                    document.getElementById('no_pool_blocks').style.display = 'block';
+                    document.getElementById('blocks_count').textContent = '0';
+                    return;
+                }
+                
+                // Show last 20 blocks
+                var displayBlocks = blocks.slice(0, 20);
+                document.getElementById('blocks_count').textContent = blocks.length;
+                
+                var tbody = document.getElementById('pool_blocks_tbody');
+                tbody.innerHTML = '';
+                
+                // Helper to extract base address
+                // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
+                function extractAddress(workerName) {
+                    if (!workerName) return '-';
+                    return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                }
+                
+                displayBlocks.forEach(function(block) {
+                    var tr = document.createElement('tr');
+                    
+                    // Time
+                    var tdTime = document.createElement('td');
+                    tdTime.textContent = new Date(block.ts * 1000).toLocaleString();
+                    tr.appendChild(tdTime);
+                    
+                    // Block Height
+                    var tdHeight = document.createElement('td');
+                    tdHeight.textContent = block.number || 'N/A';
+                    tr.appendChild(tdHeight);
+                    
+                    // Block Hash (link uses SHA256d hash for explorer, display shows PoW hash)
+                    var tdHash = document.createElement('td');
+                    var hashLink = document.createElement('a');
+                    hashLink.className = 'hash-link';
+                    hashLink.href = (currency_info.block_explorer_url_prefix || '#') + block.hash;
+                    hashLink.target = '_blank';
+                    hashLink.textContent = (block.pow_hash_hex || block.hash || '-').substring(0, 16) + '...';
+                    if (block.pow_hash_hex) hashLink.title = 'SHA256d: ' + block.hash + '\nPoW: ' + block.pow_hash_hex;
+                    tdHash.appendChild(hashLink);
+                    tr.appendChild(tdHash);
+                    
+                    // Miner
+                    var tdMiner = document.createElement('td');
+                    var minerAddr = extractAddress(block.miner || '');
+                    var minerLink = document.createElement('a');
+                    minerLink.href = 'miner.html?address=' + minerAddr;
+                    minerLink.style.color = 'var(--primary)';
+                    minerLink.style.textDecoration = 'none';
+                    minerLink.style.fontFamily = "'Courier New', monospace";
+                    minerLink.style.fontSize = '0.8rem';
+                    minerLink.textContent = minerAddr.substring(0, 12) + '...';
+                    minerLink.title = minerAddr;
+                    tdMiner.appendChild(minerLink);
+                    tr.appendChild(tdMiner);
+                    
+                    // Luck
+                    var tdLuck = document.createElement('td');
+                    if (block.luck) {
+                        tdLuck.textContent = d3.format('.0f')(block.luck) + '%';
+                        tdLuck.style.fontWeight = 'bold';
+                        if (block.luck >= 100) tdLuck.style.color = '#28a745';
+                        else if (block.luck >= 75) tdLuck.style.color = '#ffc107';
+                        else tdLuck.style.color = '#dc3545';
+                    } else {
+                        tdLuck.textContent = '-';
+                        tdLuck.style.color = '#888';
+                    }
+                    tr.appendChild(tdLuck);
+                    
+                    // Status
+                    var tdStatus = document.createElement('td');
+                    var badge = document.createElement('span');
+                    badge.className = 'status-badge';
+                    if (block.status === 'confirmed') {
+                        badge.className += ' status-confirmed';
+                        badge.textContent = '\u2713 Confirmed';
+                    } else if (block.status === 'orphaned') {
+                        badge.className += ' status-orphaned';
+                        badge.textContent = '\u2717 Orphaned';
+                    } else {
+                        badge.className += ' status-pending';
+                        badge.textContent = '\u23f3 Pending';
+                    }
+                    tdStatus.appendChild(badge);
+                    tr.appendChild(tdStatus);
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+        
+        function loadMergedBlocks() {
+            d3.json('../recent_merged_blocks', function(blocks) {
+                document.getElementById('merged_blocks_loading').style.display = 'none';
+                document.getElementById('merged_blocks_container').style.display = 'block';
+                
+                if (!blocks || blocks.length === 0) {
+                    document.getElementById('no_merged_blocks').style.display = 'block';
+                    document.getElementById('merged_blocks_count').textContent = '0';
+                    return;
+                }
+                
+                document.getElementById('merged_blocks_count').textContent = blocks.length;
+                
+                // Block explorer URLs
+                var merged_explorers = {
+                    98: { testnet: 'https://dogechain.info/block/', mainnet: 'https://dogechain.info/block/' }
+                };
+                
+                // Helper to extract base address
+                // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
+                function extractAddress(workerName) {
+                    if (!workerName) return '-';
+                    return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                }
+                
+                var tbody = document.getElementById('merged_blocks_tbody');
+                tbody.innerHTML = '';
+                
+                // Show last 20
+                var displayBlocks = blocks.slice(0, 20);
+                
+                displayBlocks.forEach(function(block) {
+                    var tr = document.createElement('tr');
+                    
+                    // Time
+                    var tdTime = document.createElement('td');
+                    tdTime.textContent = new Date(block.ts * 1000).toLocaleString();
+                    tr.appendChild(tdTime);
+                    
+                    // Network
+                    var tdNet = document.createElement('td');
+                    tdNet.style.fontWeight = 'bold';
+                    tdNet.style.color = '#6f42c1';
+                    tdNet.textContent = block.symbol || block.network || 'AUX';
+                    tr.appendChild(tdNet);
+                    
+                    // Block Height
+                    var tdHeight = document.createElement('td');
+                    tdHeight.textContent = block.height || 'N/A';
+                    tr.appendChild(tdHeight);
+                    
+                    // Block Hash
+                    var tdHash = document.createElement('td');
+                    var hashLink = document.createElement('a');
+                    hashLink.className = 'hash-link';
+                    var explorer = merged_explorers[block.chainid];
+                    if (explorer && block.pow_hash) {
+                        hashLink.href = (block.is_testnet ? explorer.testnet : explorer.mainnet) + block.pow_hash;
+                    } else {
+                        hashLink.href = '#';
+                    }
+                    hashLink.target = '_blank';
+                    hashLink.title = 'POW Hash: ' + (block.pow_hash || 'N/A');
+                    var hash = block.pow_hash || block.hash || '-';
+                    hashLink.textContent = hash.substring(0, 16) + '...';
+                    tdHash.appendChild(hashLink);
+                    tr.appendChild(tdHash);
+                    
+                    // Miner
+                    var tdMiner = document.createElement('td');
+                    var minerAddr = extractAddress(block.miner || block.miner_parent || '');
+                    var minerLink = document.createElement('a');
+                    minerLink.href = 'miner.html?address=' + minerAddr;
+                    minerLink.style.color = '#6f42c1';
+                    minerLink.style.textDecoration = 'none';
+                    minerLink.style.fontFamily = "'Courier New', monospace";
+                    minerLink.style.fontSize = '0.8rem';
+                    minerLink.textContent = minerAddr.substring(0, 12) + '...';
+                    minerLink.title = minerAddr;
+                    tdMiner.appendChild(minerLink);
+                    tr.appendChild(tdMiner);
+                    
+                    // Status
+                    var tdStatus = document.createElement('td');
+                    var badge = document.createElement('span');
+                    badge.className = 'status-badge';
+                    if (block.verified === true) {
+                        badge.className += ' status-confirmed';
+                        badge.textContent = '\u2713 Verified';
+                    } else if (block.verified === false) {
+                        badge.className += ' status-orphaned';
+                        badge.textContent = '\u2717 Orphaned';
+                    } else {
+                        badge.className += ' status-pending';
+                        badge.textContent = '\u23f3 Pending';
+                    }
+                    tdStatus.appendChild(badge);
+                    tr.appendChild(tdStatus);
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
     </script>
 </body>
 </html>

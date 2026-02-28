@@ -6,8 +6,8 @@
     <title>P2Pool Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <script src="d3.v2.min.js"></script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="highcharts.js"></script>
+    <script src="highcharts-exporting.js"></script>
     <style>
         :root {
             --primary: #008de4;
@@ -168,6 +168,187 @@
             font-size: 1.2rem;
         }
         
+        .warning-item.info-banner {
+            background: rgba(33, 150, 243, 0.15);
+            border-color: #2196F3;
+        }
+        .warning-item.info-banner::before {
+            content: "🔄";
+        }
+        .warning-item.transition-banner {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: #FFC107;
+        }
+        .warning-item.transition-banner::before {
+            content: "⏳";
+        }
+        .ratchet-state-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 6px;
+        }
+        .ratchet-voting { background: #FFC107; color: #000; }
+        .ratchet-activated { background: #2196F3; color: #fff; }
+        .ratchet-confirmed { background: #4CAF50; color: #fff; }
+
+        /* Share Messages — display deferred to BBS page (Phase 4)
+         * Messages are available via /msg/* REST API only.
+         * See: SHARE_MESSAGING_API.md
+         */
+        
+        /* Version Signaling */
+        .version-signaling {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+            animation: signaling-glow 3s ease-in-out infinite;
+        }
+        @keyframes signaling-glow {
+            0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.1); }
+            50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.3); }
+        }
+        .version-signaling .transition-status-msg {
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: 6px;
+            padding: 8px 14px;
+            margin-bottom: 12px;
+            font-size: 0.92em;
+            color: #f59e0b;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .signaling-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        
+        .signaling-icon {
+            font-size: 1.3rem;
+        }
+        
+        .signaling-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .signaling-badge {
+            margin-left: auto;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .signaling-badge.building_chain { background: #FFC107; color: #000; }
+        .signaling-badge.waiting { background: var(--text-muted); color: #fff; }
+        .signaling-badge.signaling { background: var(--primary); color: #fff; }
+        .signaling-badge.signaling_strong { background: var(--warning); color: #000; }
+        .signaling-badge.activating { background: var(--success); color: #fff; }
+        .signaling-badge.propagating { background: #2196F3; color: #fff; }
+        .signaling-badge.no_transition { background: #6f42c1; color: #fff; }
+        
+        .signaling-bar-container {
+            position: relative;
+            height: 24px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            overflow: visible;
+            margin-bottom: 10px;
+        }
+        
+        .signaling-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+            border-radius: 12px;
+            transition: width 0.5s ease;
+            position: relative;
+            min-width: 0;
+        }
+        
+        .bar-label {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        /* When bar is too narrow, show label outside on the right */
+        .bar-label-outside {
+            position: absolute;
+            left: calc(100% + 6px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        .signaling-threshold {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-left: 2px dashed rgba(255,255,255,0.5);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        
+        .signaling-threshold span {
+            position: absolute;
+            top: -18px;
+            left: -10px;
+        }
+        
+        .signaling-stats {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .signaling-message {
+            margin-left: 10px;
+            padding: 2px 8px;
+            background: rgba(111, 66, 193, 0.2);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .signaling-versions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 0.8rem;
+        }
+        
+        .version-tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .version-tag.target {
+            background: rgba(111, 66, 193, 0.3);
+            color: #b794f6;
+        }
+        
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -187,6 +368,16 @@
         .stat-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card.transitioning {
+            border-color: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+            animation: transition-pulse 3s ease-in-out infinite;
+        }
+        @keyframes transition-pulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.1); }
+            50% { box-shadow: 0 0 18px rgba(245, 158, 11, 0.25); }
         }
         
         .stat-card h3 {
@@ -377,6 +568,19 @@
         
         .table-scroll::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
+        }
+        
+        /* Fixed-height table panels — prevent layout shift on "Show more" */
+        .table-panel {
+            display: flex;
+            flex-direction: column;
+            height: 660px;   /* fixed height keeps all three columns aligned */
+            overflow: hidden; /* only inner .table-scroll scrolls, never the panel itself */
+        }
+        .table-panel .table-scroll {
+            flex: 1 1 0;
+            min-height: 0;   /* allow flex shrink below content size */
+            max-height: none; /* flex controls height, not the base 500px cap */
         }
         
         .amount {
@@ -986,7 +1190,7 @@
                 <div class="logo">
                     <h1>P2Pool</h1>
                     <span class="symbol" id="currency-symbol">DASH</span>
-                    <span class="version">v<span id="version">-</span></span>
+                    <span class="version"><span id="version">-</span></span>
                 </div>
                 <nav>
                     <a href="dashboard.html" class="active">Dashboard</a>
@@ -998,12 +1202,21 @@
                     <a href="javascript:toggleAutoRefresh()" id="auto-refresh-btn" class="refresh-btn" title="Toggle auto-refresh">⏸ Auto-Refresh: OFF</a>
                 </nav>
             </div>
-            <div class="miner-info" id="miner-info" style="display: none;">
-                <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 5px;">⛏️ Miner Configuration</div>
-                <div style="font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">
-                    <div><strong>Stratum URL:</strong> <span id="miner-url">-</span></div>
-                    <div style="margin-top: 3px;"><strong>Username:</strong> <span style="color: #ffc107;">YOUR_<span id="miner-coin-symbol">LTC</span>_ADDRESS</span></div>
-                    <div style="margin-top: 3px;"><strong>Password:</strong> <span style="color: #888;">anything</span></div>
+            <div style="display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap;">
+                <div class="miner-info" id="miner-info" style="flex: 1; min-width: 280px; margin-top: 0;">
+                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 5px;">⛏️ Miner Configuration</div>
+                    <div style="font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">
+                        <div><strong>Stratum URL:</strong> <span id="miner-url">detecting...</span></div>
+                        <div style="margin-top: 3px;"><strong>Username:</strong> <span style="color: #ffc107;">&lt;LTC_ADDR&gt;</span><span style="color: #888;">,</span><span style="color: #c3a634;">&lt;DOGE_ADDR&gt;</span><span style="color: #888;">.WORKER</span></div>
+                        <div style="margin-top: 3px;"><strong>Password:</strong> <span style="color: #888;">anything</span></div>
+                    </div>
+                </div>
+                <div class="miner-info" id="network-info" style="flex: 0 0 auto; min-width: 220px; margin-top: 0;">
+                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 5px;">🔗 Network</div>
+                    <div style="font-size: 0.85rem; font-family: monospace; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px;">
+                        <div><strong>Peers:</strong> <span id="peers_total">-</span> (Out: <span id="peers_out">-</span> | In: <span id="peers_in">-</span>)</div>
+                        <div style="margin-top: 3px;"><strong>Uptime:</strong> <span id="uptime">-</span></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1012,13 +1225,108 @@
     <main class="container">
         <div class="last-update" id="last-update">Last update: loading...</div>
         <div class="warnings" id="warnings"></div>
+        <div id="ratchet-banner" style="display: none; margin-bottom: 20px;"></div>
+        <!-- Share messages: API-only (/msg/*), no dashboard display -->
+        
+        <!-- Version Signaling Status -->
+        <div id="version-signaling" class="version-signaling" style="display: none;">
+            <div class="signaling-header">
+                <span class="signaling-icon">🔄</span>
+                <span class="signaling-title">Version Transition Status</span>
+                <span class="signaling-badge" id="signaling-status">-</span>
+            </div>
+            <div id="transition-status-msg" class="transition-status-msg" style="display: none;"></div>
+            <div class="signaling-content">
+                <!-- Chain maturity bar (shown when chain not ready) -->
+                <div id="chain-maturity-section" style="display: none;">
+                    <div style="color: #888; font-size: 0.85em; margin-bottom: 4px;">
+                        Chain Maturity: <span id="chain-maturity-text" style="color: #FFC107;">-</span>
+                    </div>
+                    <div class="signaling-bar-container">
+                        <div class="signaling-bar" id="chain-maturity-bar" style="width: 0%; background: linear-gradient(90deg, #FFC107, #FF9800);"><span class="bar-label" id="chain-maturity-bar-label"></span></div>
+                    </div>
+                </div>
+                <!-- Propagation bar (shares aging toward sampling window) -->
+                <div id="propagation-section" style="display: none; margin-bottom: 8px;">
+                    <div style="color: #888; font-size: 0.85em; margin-bottom: 4px;">
+                        Vote Propagation: <span id="propagation-text" style="color: #2196F3;">-</span>
+                    </div>
+                    <div class="signaling-bar-container">
+                        <div class="signaling-bar" id="propagation-bar" style="width: 0%; background: linear-gradient(90deg, #2196F3, #03A9F4);"><span class="bar-label" id="propagation-bar-label"></span></div>
+                    </div>
+                </div>
+                <!-- Signaling bar (sampling window) - shown during VOTING -->
+                <div id="signaling-bar-section">
+                    <div style="color: #888; font-size: 0.85em; margin-bottom: 4px;">
+                        Sampling Window Signaling: <span id="sampling-signaling-text" style="color: #4CAF50;">-</span>
+                    </div>
+                    <div class="signaling-bar-container" style="margin-top: 20px;">
+                        <div class="signaling-bar" id="signaling-bar" style="width: 0%"><span class="bar-label" id="signaling-bar-label"></span></div>
+                        <div class="signaling-threshold" style="left: 60%"><span>60%</span></div>
+                        <div class="signaling-threshold" style="left: 95%"><span>95%</span></div>
+                    </div>
+                </div>
+                <!-- V36 Chain Fill bar - shown during ACTIVATED while chain has mixed versions -->
+                <div id="confirmation-bar-section" style="display: none;">
+                    <div style="color: #888; font-size: 0.85em; margin-bottom: 4px;">
+                        V36 Chain Fill: <span id="confirmation-text" style="color: #2196F3;">-</span>
+                    </div>
+                    <div class="signaling-bar-container" style="margin-top: 20px;">
+                        <div class="signaling-bar" id="confirmation-bar" style="width: 0%; background: linear-gradient(90deg, #2196F3, #00BCD4);"><span class="bar-label" id="confirmation-bar-label"></span></div>
+                        <div class="signaling-threshold" style="left: 50%"><span>50%</span></div>
+                        <div class="signaling-threshold" style="left: 95%; border-color: #4CAF50;"><span style="color: #4CAF50;">95%</span></div>
+                    </div>
+                    <div style="color: #666; font-size: 0.78em; margin-top: 4px; font-style: italic;">
+                        V36 shares are replacing older V35 shares in the chain. Once 100% V36, the confirmation countdown begins.
+                    </div>
+                </div>
+                <!-- Confirmation countdown bar - shown when chain is 100% V36, counting X/800 -->
+                <div id="countdown-bar-section" style="display: none;">
+                    <div style="color: #888; font-size: 0.85em; margin-bottom: 4px;">
+                        Confirmation Countdown: <span id="countdown-text" style="color: #4CAF50;">-</span>
+                    </div>
+                    <div class="signaling-bar-container">
+                        <div class="signaling-bar" id="countdown-bar" style="width: 0%; background: linear-gradient(90deg, #4CAF50, #00E676);"><span class="bar-label" id="countdown-bar-label"></span></div>
+                    </div>
+                    <div style="color: #666; font-size: 0.78em; margin-top: 4px; font-style: italic;">
+                        All shares are V36 format. Counting 2× chain length (<span id="countdown-window-size">800</span> shares) of sustained ≥95% V36 — ensures the upgrade is irreversible before locking in.
+                    </div>
+                </div>
+                <!-- Transition message from share messaging system -->
+                <div id="transition-message-section" style="display: none; margin-top: 12px; padding: 10px 14px; border-radius: 6px; border-left: 4px solid #2196F3; background: rgba(33, 150, 243, 0.08);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span style="font-size: 1.1em;">📢</span>
+                        <span id="transition-msg-label" style="font-weight: 600; font-size: 0.9em; color: #2196F3;">Transition Signal</span>
+                        <span id="transition-msg-urgency" style="font-size: 0.75em; padding: 1px 8px; border-radius: 10px; background: rgba(33,150,243,0.2); color: #2196F3;">info</span>
+                    </div>
+                    <div id="transition-msg-text" style="color: #ddd; font-size: 0.88em; line-height: 1.4;"></div>
+                    <div id="transition-msg-url-row" style="margin-top: 6px; display: none;">
+                        <a id="transition-msg-url" href="#" target="_blank" rel="noopener" style="color: #4FC3F7; font-size: 0.85em; text-decoration: underline;">Get latest release →</a>
+                    </div>
+                </div>
+                <!-- Authority announcements (shown independent of transition state) -->
+                <div id="authority-announcements-section" style="display: none; margin-top: 12px;"></div>
+                <!-- Address format warnings (node-generated, always shown) -->
+                <div id="address-warnings-section" style="display: none; margin-top: 12px;"></div>
+                <div class="signaling-stats">
+                    <span class="signaling-message" id="signaling-message" style="font-size: 0.9em;"></span>
+                </div>
+                <div class="signaling-versions" id="signaling-versions"></div>
+                <div class="share-types-section" style="margin-top: 10px;">
+                    <span style="color: #888; font-size: 0.9em;">Current Share Type: </span>
+                    <span id="current-share-type" style="font-weight: bold; color: #4CAF50;">-</span>
+                    <span style="color: #888; font-size: 0.9em; margin-left: 15px;">Share Types in Chain: </span>
+                    <span id="share-types-breakdown" style="color: #fff;"></span>
+                </div>
+            </div>
+        </div>
         
         <!-- New Layout: 4 columns grid -->
         <div class="main-layout">
-            <!-- First Row: Pool Hash Rate, Local Hash Rate, Shares, Network -->
+            <!-- First Row: Pool Hash Rate, Local Hash Rate, Shares, Best Share -->
             <div class="left-column">
                 <div class="stat-card">
-                    <h3><span class="icon">🌐</span> Pool Hash Rate</h3>
+                    <h3><span class="icon">🌐</span> P2Pool Hash Rate</h3>
                     <div class="stat-value primary" id="pool_rate">-</div>
                     <div class="stat-sub">DOA+Orphan: <span id="pool_stale">-</span></div>
                     <div class="stat-detail">Share Difficulty: <span id="difficulty">-</span></div>
@@ -1036,18 +1344,18 @@
                         <div class="stat-detail">Expected Share: <span id="time_to_share">-</span></div>
                     </div>
                     
-                    <div class="stat-card">
+                    <div class="stat-card" id="shares_card">
                         <h3><span class="icon">📊</span> Shares</h3>
-                        <div class="stat-value" id="shares_total">-</div>
+                        <div class="stat-value" style="display: flex; align-items: baseline; justify-content: center; gap: 6px;"><span id="shares_total">-</span><span id="share_versions_line" style="font-size: 0.4em; font-weight: 400; opacity: 0.7;"></span></div>
                         <div class="stat-sub">Orphan: <span id="shares_orphan">-</span> | Dead: <span id="shares_dead">-</span></div>
                         <div class="stat-detail">Efficiency: <span id="efficiency">-</span></div>
                     </div>
                     
                     <div class="stat-card">
-                        <h3><span class="icon">🔗</span> Network</h3>
-                        <div class="stat-value" id="peers_total">-</div>
-                        <div class="stat-sub">Out: <span id="peers_out">-</span> | In: <span id="peers_in">-</span></div>
-                        <div class="stat-detail">Uptime: <span id="uptime">-</span></div>
+                        <h3><span class="icon">🎯</span> Best Share</h3>
+                        <div class="stat-value" style="display: flex; align-items: baseline; justify-content: center; gap: 4px;"><span id="best_share_round_pct_fancy" style="color: var(--primary);">-</span><span id="best_share_merged_round_part" style="display: none;"> / <span id="best_share_merged_pct_fancy" style="color: #c3a634;">-</span></span></div>
+                        <div class="stat-sub" style="font-size: 0.85em;"><span id="best_share_round_diff" style="color: var(--primary);">-</span> / <span id="best_share_net_diff" style="opacity: 0.55;">-</span><span id="best_share_merged_diff_part" style="display: none;"> &nbsp;·&nbsp; <span id="best_share_merged_round_diff" style="color: #c3a634;">-</span> / <span id="best_share_merged_net_diff" style="opacity: 0.55;">-</span></span></div>
+                        <div class="stat-detail">🏆 <span style="color: var(--primary);"><span id="best_share_alltime_pct_fancy">-</span></span><span id="best_share_merged_record_part" style="display: none;"> / <span style="color: #c3a634;"><span id="best_share_merged_alltime_pct_fancy">-</span></span></span></div>
                     </div>
                 </div>
                 
@@ -1063,7 +1371,7 @@
                 <div class="stat-card">
                     <h3><span class="icon">💎</span> Node Fee: <span id="node_fee_percent">-</span>%</h3>
                     <div class="stat-value success"><span id="payout_totamount">-</span> <small class="symbol-small" id="node_payout_symbol">-</small></div>
-                    <div class="stat-sub" id="node_merged_payout" style="color: #c3a634; font-size: 1.1em; margin-top: -4px; display: none;">+<span id="node_merged_amount">0</span> <span id="node_merged_symbol">DOGE</span></div>
+                    <div class="stat-sub" id="node_merged_payout" style="color: #c3a634; font-size: 1.1em; margin-top: -4px;">+<span id="node_merged_amount">0</span> <span id="node_merged_symbol">DOGE</span></div>
                     <div class="stat-detail">Per block found now</div>
                 </div>
                 
@@ -1153,6 +1461,7 @@
                                 <th title="Last pseudoshare received">Last Seen</th>
                                 <th title="Dead on Arrival rate">DOA Rate</th>
                                 <th title="Predicted payout if block found now">Predicted Payout</th>
+                                <th title="Predicted merged mining payout if block found now">Merged Payout</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -1164,12 +1473,11 @@
         
         <div class="two-col">
             <!-- Recent Blocks -->
-            <div class="table-container">
-                <div class="section-header" style="flex-wrap: wrap;">
+            <div class="table-container table-panel">
+                <div class="section-header" style="flex-wrap: wrap; flex-direction: column; align-items: flex-start; gap: 6px;">
                     <h2>🏆 Recent Blocks</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <span class="badge" id="blocks_count">0</span>
-                        <span class="badge" id="pool_luck_badge" style="background: var(--success);">Avg: -</span>
                         <span class="badge" id="luck_current_round" style="background: var(--primary);" title="Current round luck">Round: -</span>
                         <span class="badge" id="luck_seven_days" style="background: var(--primary);" title="7-day average luck">7d: -</span>
                         <span class="badge" id="luck_thirty_days" style="background: var(--primary);" title="30-day average luck">30d: -</span>
@@ -1197,8 +1505,8 @@
             </div>
             
             <!-- Merged Mining Blocks -->
-            <div class="table-container" id="merged_blocks_section" style="display: none;">
-                <div class="section-header" style="flex-wrap: wrap;">
+            <div class="table-container table-panel" id="merged_blocks_section" style="display: none;">
+                <div class="section-header" style="flex-wrap: wrap; flex-direction: column; align-items: flex-start; gap: 6px;">
                     <h2>⛏️ Merged Mining Blocks</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <span class="badge" id="merged_blocks_count" style="background: var(--primary);">0</span>
@@ -1225,11 +1533,13 @@
             </div>
             
             <!-- Payouts -->
-            <div class="table-container">
-                <div class="section-header">
+            <div class="table-container table-panel">
+                <div class="section-header" style="flex-wrap: wrap; flex-direction: column; align-items: flex-start; gap: 6px;">
                     <h2>💵 Current Payouts</h2>
-                    <span class="badge"><span id="payouts_total">0</span> <span class="symbol-small">DASH</span></span>
-                    <span class="badge" id="merged_payouts_badge" style="display: none; background: #6f42c1; margin-left: 8px;"><span id="merged_payouts_total">0</span> <span id="merged_payouts_symbol">AUX</span></span>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <span class="badge"><span id="payouts_total">0</span> <span class="symbol-small">DASH</span></span>
+                        <span class="badge" id="merged_payouts_badge" style="display: none; background: #6f42c1;"><span id="merged_payouts_total">0</span> <span id="merged_payouts_symbol">AUX</span></span>
+                    </div>
                 </div>
                 <div class="table-scroll">
                     <table id="payouts" class="data-table">
@@ -1250,7 +1560,7 @@
         <!-- Network Peers: Side-by-side layout -->
         <div class="two-col">
             <!-- P2Pool Nodes -->
-            <div class="table-container">
+            <div class="table-container table-panel">
                 <div class="section-header">
                     <h2>🌐 P2Pool Nodes</h2>
                     <div style="display: flex; gap: 10px; align-items: center;">
@@ -1290,7 +1600,7 @@
             </div>
             
             <!-- Litecoin Peers (Broadcaster) -->
-            <div class="table-container">
+            <div class="table-container table-panel">
                 <div class="section-header">
                     <h2>📡 Litecoin Peers</h2>
                     <div style="display: flex; gap: 10px; align-items: center;">
@@ -1384,7 +1694,7 @@
     </main>
     
     <footer>
-        <p>P2Pool <span id="footer_version">-</span> | <a href="https://github.com/frstrtr/p2pool-dash" target="_blank">GitHub</a></p>
+        <p>P2Pool <span id="footer_version">-</span> | <a href="https://github.com/frstrtr/p2pool-merged-v36" target="_blank">GitHub</a></p>
     </footer>
     
     <script>
@@ -1412,6 +1722,33 @@
             if (h >= 1e6) return d3.format('.2f')(h/1e6) + ' MH/s';
             if (h >= 1e3) return d3.format('.2f')(h/1e3) + ' KH/s';
             return d3.format('.0f')(h) + ' H/s';
+        }
+        
+        function format_difficulty(d) {
+            if (d == null || !isFinite(d) || d <= 0) return '0';
+            if (d < 1000) return d3.format('.2f')(d);
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' K';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' M';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' G';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' T';
+            d = d / 1000;
+            return d3.format('.2f')(d) + ' P';
+        }
+
+        // Format percentage with big integer + small decimal parts
+        // Format percentage with big bold integer + smaller decimal
+        function format_pct_fancy(pct) {
+            if (pct == null || !isFinite(pct)) return '-';
+            var full = d3.format('.4f')(pct);
+            var dot = full.indexOf('.');
+            var intPart = full.substring(0, dot);
+            var decPart = full.substring(dot) + '%';
+            return '<span style="font-size:1.3em;font-weight:800;line-height:1">' + intPart + '</span>' +
+                   '<span style="font-size:0.55em;font-weight:400;opacity:0.85">' + decPart + '</span>';
         }
         
         function format_time_short(timestamp) {
@@ -1452,7 +1789,15 @@
             // Parse worker names and extract base addresses
             // Supported formats: address.worker, address_worker, address+diff, address/diff
             function extractAddress(workerName) {
-                return workerName.split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
+                return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+            }
+            
+            // Extract merged mining (DOGE) address from worker name
+            function extractMergedAddress(workerName) {
+                var parts = workerName.split(',');
+                if (parts.length < 2) return null;
+                return parts[1].split('.')[0].split('+')[0].split('/')[0];
             }
             
             // Estimate hashrate from difficulty: hashrate = difficulty * DUMB_SCRYPT_DIFF / target_seconds
@@ -1471,6 +1816,14 @@
                 for (var workerName in stratumWorkers) {
                     var workerData = stratumWorkers[workerName];
                     var baseAddress = extractAddress(workerName);
+                    var mergedAddr = extractMergedAddress(workerName);
+                    
+                    // If no explicit merged address in worker name, check API merged_addresses
+                    var mergedAutoConverted = false;
+                    if (!mergedAddr && workerData.merged_addresses) {
+                        mergedAddr = workerData.merged_addresses['dogecoin'] || null;
+                        mergedAutoConverted = workerData.merged_auto_converted || false;
+                    }
                     
                     // Get difficulty from connection_difficulties array (use first/current difficulty)
                     var difficulty = 0;
@@ -1495,6 +1848,8 @@
                     if (!minerGroups[baseAddress]) {
                         minerGroups[baseAddress] = {
                             address: baseAddress,
+                            mergedAddress: null,
+                            mergedAutoConverted: false,
                             workers: [],
                             totalHashrate: 0,
                             totalEstimatedHashrate: 0,
@@ -1504,6 +1859,10 @@
                             lastSeen: 0,
                             hasEstimatedHashrate: false
                         };
+                    }
+                    if (mergedAddr && !minerGroups[baseAddress].mergedAddress) {
+                        minerGroups[baseAddress].mergedAddress = mergedAddr;
+                        minerGroups[baseAddress].mergedAutoConverted = mergedAutoConverted;
                     }
                     
                     minerGroups[baseAddress].workers.push({
@@ -1560,20 +1919,22 @@
                 
                 if (display.length === 0) {
                     d3.select('#active_miners tbody').append('tr').append('td')
-                        .attr('colspan', '7')
+                        .attr('colspan', '8')
                         .attr('style', 'text-align: center; color: #888;')
                         .text('No miners currently connected via stratum');
                     return;
                 }
                 
-                // Fetch payout data
+                // Fetch payout data (both main chain and merged)
                 d3.json('../current_payouts', function(payouts_data) {
+                d3.json('../current_merged_payouts', function(merged_payouts_data) {
                 var payouts = {};
                 if (payouts_data) {
                     for (var addr in payouts_data) {
                         payouts[addr] = payouts_data[addr];
                     }
                 }
+                var mergedPayouts = merged_payouts_data || {};
                 
                 var tbody = d3.select('#active_miners tbody');
                 
@@ -1606,6 +1967,23 @@
                         .attr('href', 'miner.html?address=' + miner.address)
                         .attr('onclick', 'event.stopPropagation()')
                         .text(miner.address);
+                    if (miner.mergedAddress) {
+                        var mergedDiv = addressCell.append('div')
+                            .attr('style', 'font-size: 0.7rem; color: #c3a634; margin-top: 2px; margin-left: 20px;');
+                        mergedDiv.append('span').text('🐕 ');
+                        mergedDiv.append('a')
+                            .attr('href', 'https://dogechain.info/address/' + encodeURIComponent(miner.mergedAddress))
+                            .attr('target', '_blank')
+                            .attr('onclick', 'event.stopPropagation()')
+                            .attr('style', 'color: #c3a634; text-decoration: none;')
+                            .text(miner.mergedAddress);
+                        if (miner.mergedAutoConverted) {
+                            mergedDiv.append('span')
+                                .attr('style', 'color: #888; font-size: 0.6rem; margin-left: 4px;')
+                                .attr('title', 'Auto-converted from LTC address (same pubkey hash)')
+                                .text('(auto)');
+                        }
+                    }
                     if (miner.workers.length > 1) {
                         addressCell.append('span')
                             .attr('class', 'worker-count-badge')
@@ -1658,9 +2036,22 @@
                     // DOA Rate
                     minerRow.append('td').text(d3.format('.2%')(miner.doa_percent));
                     
-                    // Payout
+                    // Payout with symbol
                     var payout = payouts[miner.address] || 0;
-                    minerRow.append('td').text(d3.format('.4f')(payout));
+                    var payoutSymbol = (currency_info && currency_info.symbol) || 'LTC';
+                    minerRow.append('td').text(d3.format('.4f')(payout) + ' ' + payoutSymbol);
+                    
+                    // Merged payout
+                    var mergedEntry = mergedPayouts[miner.address];
+                    var mergedPayoutCell = minerRow.append('td');
+                    if (mergedEntry && mergedEntry.merged && mergedEntry.merged.length > 0) {
+                        var mp = mergedEntry.merged[0];
+                        mergedPayoutCell
+                            .style('color', '#c3a634')
+                            .text(d3.format(',.2f')(mp.amount) + ' ' + (mp.symbol || 'DOGE'));
+                    } else {
+                        mergedPayoutCell.style('color', '#666').text('-');
+                    }
                     
                     // Create worker rows (initially hidden)
                     miner.workers.forEach(function(worker, widx) {
@@ -1713,7 +2104,9 @@
                         var doaPercent = worker.hashrate > 0 ? worker.doa_hashrate / worker.hashrate : 0;
                         workerRow.append('td').text(d3.format('.2%')(doaPercent));
                         workerRow.append('td').text('-');
+                        workerRow.append('td').text('-');
                     });
+                });
                 });
                 });
             });
@@ -1744,19 +2137,17 @@
         d3.json('../web/version', function(version) {
             if (version) {
                 d3.select('#version').text(version);
-                d3.select('#footer_version').text('v' + version);
+                d3.select('#footer_version').text(version);
             }
         });
         
-        // Load node info for miner configuration
+        // Load node info for miner configuration (non-blocking, server responds instantly)
         d3.json('../node_info', function(nodeInfo) {
             if (nodeInfo && nodeInfo.external_ip) {
                 var minerUrl = 'stratum+tcp://' + nodeInfo.external_ip + ':' + nodeInfo.worker_port;
                 document.getElementById('miner-url').textContent = minerUrl;
-                document.getElementById('miner-info').style.display = 'block';
-                if (nodeInfo.symbol) {
-                    document.getElementById('miner-coin-symbol').textContent = nodeInfo.symbol;
-                }
+            } else {
+                document.getElementById('miner-url').textContent = 'unavailable';
             }
         });
         
@@ -1771,7 +2162,7 @@
                 var local = d3.sum(values(local_stats.miner_hash_rates));
                 var local_dead = d3.sum(values(local_stats.miner_dead_hash_rates));
                 d3.select('#local_rate').text(format_hashrate(local));
-                d3.select('#local_doa').text(d3.format('.2p')(local_dead/local));
+                d3.select('#local_doa').text(local > 0 ? d3.format('.2p')(local_dead/local) : '0%');
                 
                 d3.select('#shares_total').text(local_stats.shares.total);
                 d3.select('#shares_orphan').text(local_stats.shares.orphan);
@@ -1791,12 +2182,516 @@
                 var warnings = d3.select('#warnings').selectAll('.warning-item')
                     .data(local_stats.warnings || []);
                 warnings.enter().append('div')
-                    .attr('class', 'warning-item')
+                    .attr('class', function(w) {
+                        if (w.indexOf('V36 TRANSITION:') === 0) return 'warning-item transition-banner';
+                        return 'warning-item';
+                    })
                     .text(function(w) { return w; });
                 warnings.exit().remove();
+
+                // Share messages: available via /msg/* API only (no dashboard display)
                 
-                var time_to_share = local_stats.attempts_to_share / local;
-                d3.select('#time_to_share').text(isFinite(time_to_share) ? format_dt(time_to_share) : '∞');
+                // Version Signaling Status - Universal transition display
+                d3.json('../version_signaling', function(vs) {
+                    // Share version + desired version counts in Shares card
+                    if (vs) {
+                        var html = '';
+                        var isTransitioning = vs.show_transition;
+                        // Share format counts with color coding
+                        if (vs.share_types) {
+                            Object.keys(vs.share_types).sort().forEach(function(v) {
+                                var st = vs.share_types[v];
+                                var color = (parseInt(v) >= (vs.target_version || 36)) ? '#22c55e' : '#94a3b8';
+                                if (html) html += ' ';
+                                html += '<span style="color:' + color + '">V' + v + ':' + st.count + '</span>';
+                            });
+                        }
+                        // Separator + desired version counts
+                        if (vs.full_chain_versions) {
+                            html += ' <span style="opacity:0.5">|</span> want ';
+                            var first = true;
+                            Object.keys(vs.full_chain_versions).sort().forEach(function(v) {
+                                var dv = vs.full_chain_versions[v];
+                                var color = (parseInt(v) >= (vs.target_version || 36)) ? '#22c55e' : '#94a3b8';
+                                if (!first) html += ' ';
+                                html += '<span style="color:' + color + '">V' + v + ':' + dv.count + '</span>';
+                                first = false;
+                            });
+                        }
+                        d3.select('#share_versions_line').html(html || '');
+                        // Apply transitioning visual to Shares card
+                        d3.select('#shares_card').classed('transitioning', !!isTransitioning);
+                    }
+                    if (!vs) {
+                        d3.select('#version-signaling').style('display', 'none');
+                        return;
+                    }
+                    if (!vs.show_transition) {
+                        d3.select('#version-signaling').style('display', 'none');
+                        return;
+                    }
+                    
+                    d3.select('#version-signaling').style('display', 'block');
+                    
+                    // Update title
+                    d3.select('.signaling-title').text('V' + vs.current_share_type + ' \u2192 V' + vs.target_version + ' Transition');
+                    
+                    // Transition status message
+                    var statusMsg = '';
+                    var statusIcon = '\u26A1';
+                    if (vs.status === 'building_chain') {
+                        statusMsg = 'Building share chain\u2026 Collecting shares before transition signaling can begin.';
+                        statusIcon = '\u23F3';
+                    } else if (vs.status === 'waiting') {
+                        statusMsg = 'Waiting for enough shares to start version signaling.';
+                        statusIcon = '\u23F3';
+                    } else if (vs.status === 'signaling') {
+                        statusMsg = 'Network is signaling for V' + vs.target_version + ' upgrade.';
+                        statusIcon = '\uD83D\uDCE1';
+                    } else if (vs.status === 'signaling_strong') {
+                        statusMsg = 'Strong signaling for V' + vs.target_version + ' upgrade \u2014 activation approaching.';
+                        statusIcon = '\uD83D\uDD25';
+                    } else if (vs.status === 'activating') {
+                        statusMsg = 'V' + vs.target_version + ' activation threshold reached! Confirming upgrade\u2026';
+                        statusIcon = '\u2705';
+                    } else if (vs.status === 'propagating') {
+                        statusMsg = 'V' + vs.target_version + ' shares propagating through the network.';
+                        statusIcon = '\uD83C\uDF10';
+                    }
+                    if (statusMsg) {
+                        d3.select('#transition-status-msg').style('display', 'flex').html(statusIcon + ' ' + statusMsg);
+                    } else {
+                        d3.select('#transition-status-msg').style('display', 'none');
+                    }
+                    
+                    // Update status badge (including propagating)
+                    var badge = d3.select('#signaling-status');
+                    var statusLabel = vs.status.toUpperCase().replace(/_/g, ' ');
+                    badge.text(statusLabel);
+                    badge.attr('class', 'signaling-badge ' + vs.status);
+                    
+                    // Chain maturity section
+                    if (!vs.chain_ready) {
+                        d3.select('#chain-maturity-section').style('display', 'block');
+                        d3.select('#chain-maturity-bar').style('width', vs.chain_maturity + '%');
+                        d3.select('#chain-maturity-bar-label').text(d3.format('.1f')(vs.chain_maturity) + '%');
+                        d3.select('#chain-maturity-text').text(
+                            vs.chain_height + ' / ' + vs.chain_length_required + 
+                            ' (' + d3.format('.1f')(vs.chain_maturity) + '%) \u2014 need ' + 
+                            (vs.chain_length_required - vs.chain_height) + ' more shares');
+                    } else {
+                        d3.select('#chain-maturity-section').style('display', 'none');
+                    }
+                    
+                    // Propagation section — shows V36 votes aging toward sampling window
+                    if (vs.status === 'propagating') {
+                        d3.select('#propagation-section').style('display', 'block');
+                        d3.select('#propagation-bar').style('width', vs.propagation_pct + '%');
+                        d3.select('#propagation-bar-label').text(d3.format('.1f')(vs.overall_v36_vote_pct) + '% V36');
+                        var etaMin = Math.round(vs.time_to_window_seconds / 60);
+                        var etaH = Math.floor(etaMin / 60);
+                        var etaM = etaMin % 60;
+                        var etaStr = etaH > 0 ? etaH + 'h ' + etaM + 'm' : etaM + 'm';
+                        d3.select('#propagation-text').text(
+                            'V' + vs.target_version + ' votes: ' + vs.overall_v36_votes + '/' + vs.overall_total +
+                            ' (' + d3.format('.1f')(vs.overall_v36_vote_pct) + '% of full chain). ' +
+                            'Deepest at position ' + vs.deepest_v36_position + '/' + vs.chain_length +
+                            ' \u2014 reach sampling window in ~' + etaStr);
+                    } else {
+                        d3.select('#propagation-section').style('display', 'none');
+                    }
+                    
+                    // Switch between signaling bar and confirmation bar based on state
+                    var isConfirming = vs.auto_ratchet && vs.auto_ratchet.state === 'activated';
+                    
+                    if (isConfirming) {
+                        // ACTIVATED state — compute chain fill stats
+                        var v36FormatPct = 0, v36Cnt = 0, totalCnt = 0;
+                        if (vs.share_types) {
+                            for (var v in vs.share_types) {
+                                totalCnt += vs.share_types[v].count;
+                                if (parseInt(v) >= 36) v36Cnt += vs.share_types[v].count;
+                            }
+                            v36FormatPct = totalCnt > 0 ? (v36Cnt * 100 / totalCnt) : 0;
+                        }
+                        var confirmWindow = vs.confirmation_window || (vs.chain_length_required * 2);
+                        var sharesSince = vs.shares_since_activation || 0;
+                        var chainFull = (totalCnt > 0 && v36Cnt >= totalCnt);
+                        
+                        d3.select('#signaling-bar-section').style('display', 'none');
+                        
+                        if (chainFull) {
+                            // Phase 3: Chain is 100% V36 — show confirmation countdown (X/800)
+                            d3.select('#confirmation-bar-section').style('display', 'none');
+                            d3.select('#countdown-bar-section').style('display', 'block');
+                            var countdownPct = confirmWindow > 0 ? Math.min(100, sharesSince * 100 / confirmWindow) : 0;
+                            d3.select('#countdown-bar').style('width', countdownPct + '%');
+                            d3.select('#countdown-bar-label').text(d3.format('.1f')(countdownPct) + '%');
+                            // ETA calculation
+                            var sharesRemaining = Math.max(0, confirmWindow - sharesSince);
+                            var etaSec = sharesRemaining * 10; // ~10 sec per share
+                            var etaMin = Math.round(etaSec / 60);
+                            var etaH = Math.floor(etaMin / 60);
+                            var etaM = etaMin % 60;
+                            var etaStr = etaH > 0 ? etaH + 'h ' + etaM + 'm' : etaM + 'm';
+                            d3.select('#countdown-text').text(
+                                sharesSince + '/' + confirmWindow + ' shares elapsed' +
+                                (sharesRemaining > 0 ? ' \u2014 ~' + etaStr + ' remaining' : ' \u2014 CONFIRMING'));
+                            d3.select('#countdown-window-size').text(confirmWindow);
+                        } else {
+                            // Phase 2: Chain has mixed V35+V36 — show chain fill bar
+                            d3.select('#confirmation-bar-section').style('display', 'block');
+                            d3.select('#countdown-bar-section').style('display', 'none');
+                            var fillPct = Math.min(100, v36FormatPct);
+                            d3.select('#confirmation-bar').style('width', fillPct + '%');
+                            d3.select('#confirmation-bar-label').text(d3.format('.1f')(v36FormatPct) + '% V36');
+                            if (v36FormatPct >= 95) {
+                                d3.select('#confirmation-bar').style('background', 'linear-gradient(90deg, #4CAF50, #00E676)');
+                            } else {
+                                d3.select('#confirmation-bar').style('background', 'linear-gradient(90deg, #2196F3, #00BCD4)');
+                            }
+                            d3.select('#confirmation-text').text(
+                                d3.format('.1f')(v36FormatPct) + '% V36 format in chain (' + 
+                                v36Cnt + '/' + totalCnt + ' shares). ' +
+                                'Confirmation: ' + sharesSince + '/' + confirmWindow + ' shares elapsed.');
+                        }
+                    } else {
+                        // VOTING/other: show sampling window signaling bar
+                        d3.select('#signaling-bar-section').style('display', 'block');
+                        d3.select('#confirmation-bar-section').style('display', 'none');
+                        d3.select('#countdown-bar-section').style('display', 'none');
+                        
+                        var sigPct = vs.sampling_signaling;
+                        // Use full-chain V36 percentage for the bar width (more representative)
+                        var barPct = vs.overall_v36_vote_pct > sigPct ? vs.overall_v36_vote_pct : sigPct;
+                        d3.select('#signaling-bar').style('width', Math.min(100, barPct) + '%');
+                        var sigLabel = d3.format('.1f')(barPct) + '%';
+                        if (vs.overall_v36_vote_pct > sigPct + 0.1) {
+                            sigLabel = d3.format('.1f')(vs.overall_v36_vote_pct) + '% chain / ' + d3.format('.1f')(sigPct) + '% window';
+                        }
+                        var sigLabelEl = d3.select('#signaling-bar-label');
+                        if (barPct >= 15) {
+                            sigLabelEl.attr('class', 'bar-label').text(sigLabel);
+                        } else {
+                            sigLabelEl.attr('class', 'bar-label-outside').text(sigLabel);
+                        }
+                        if (vs.chain_ready) {
+                            var samplingText;
+                            if (vs.overall_v36_vote_pct > sigPct + 0.1) {
+                                // Full chain has more V36 votes than sampling window shows
+                                samplingText = d3.format('.1f')(vs.overall_v36_vote_pct) + '% V' + vs.target_version +
+                                    ' desired in full chain (' + vs.overall_v36_votes + '/' + vs.overall_total + ' shares). ' +
+                                    'Sampling window: ' + d3.format('.1f')(sigPct) + '% of ' + vs.sampling_window_size +
+                                    ' shares \u2014 need 95% to activate';
+                            } else {
+                                samplingText = d3.format('.1f')(sigPct) + '% of sampling window (' + 
+                                    vs.sampling_window_size + ' shares) voting for V' + vs.target_version +
+                                    ' \u2014 need 95% to activate';
+                            }
+                            d3.select('#sampling-signaling-text').text(samplingText);
+                        } else {
+                            d3.select('#sampling-signaling-text').text(
+                                d3.format('.1f')(vs.overall_v36_vote_pct || vs.target_percentage) + '% overall signaling for V' + vs.target_version +
+                                ' (sampling window activates at ' + vs.chain_length_required + ' shares)');
+                        }
+                    }
+                    
+                    // Update message
+                    d3.select('#signaling-message').text(vs.message);
+                    
+                    // Update transition message from share messaging system
+                    var tmsg = vs.transition_message;
+                    if (tmsg && tmsg.msg) {
+                        d3.select('#transition-message-section').style('display', 'block');
+                        d3.select('#transition-msg-text').text(tmsg.msg);
+                        // Label shows version range
+                        var label = 'Transition Signal';
+                        if (tmsg.from_ver && tmsg.to_ver) {
+                            label = 'V' + tmsg.from_ver + ' → V' + tmsg.to_ver + ' Transition Signal';
+                        }
+                        d3.select('#transition-msg-label').text(label);
+                        // Urgency badge
+                        var urg = tmsg.urgency || 'info';
+                        var urgColors = {
+                            'info': { bg: 'rgba(33,150,243,0.2)', fg: '#2196F3', border: '#2196F3' },
+                            'recommended': { bg: 'rgba(255,152,0,0.2)', fg: '#FF9800', border: '#FF9800' },
+                            'required': { bg: 'rgba(244,67,54,0.2)', fg: '#F44336', border: '#F44336' }
+                        };
+                        var uc = urgColors[urg] || urgColors['info'];
+                        d3.select('#transition-msg-urgency')
+                            .text(urg.toUpperCase())
+                            .style('background', uc.bg)
+                            .style('color', uc.fg);
+                        d3.select('#transition-message-section')
+                            .style('border-left-color', uc.border);
+                        d3.select('#transition-msg-label').style('color', uc.fg);
+                        // URL link
+                        if (tmsg.url) {
+                            d3.select('#transition-msg-url-row').style('display', 'block');
+                            d3.select('#transition-msg-url').attr('href', tmsg.url).text(tmsg.url + ' →');
+                        } else {
+                            d3.select('#transition-msg-url-row').style('display', 'none');
+                        }
+                    } else {
+                        d3.select('#transition-message-section').style('display', 'none');
+                    }
+                    
+                    // Update authority announcements (shown independent of transition)
+                    var announcements = vs.authority_announcements || [];
+                    var announcementsDiv = d3.select('#authority-announcements-section');
+                    announcementsDiv.selectAll('*').remove();
+                    if (announcements.length > 0) {
+                        announcementsDiv.style('display', 'block');
+                        var urgStyles = {
+                            'info': { bg: 'rgba(33, 150, 243, 0.08)', border: '#2196F3', fg: '#2196F3', icon: '\uD83D\uDCE2' },
+                            'recommended': { bg: 'rgba(255, 152, 0, 0.08)', border: '#FF9800', fg: '#FF9800', icon: '\u26A0\uFE0F' },
+                            'required': { bg: 'rgba(244, 67, 54, 0.08)', border: '#F44336', fg: '#F44336', icon: '\uD83D\uDEA8' },
+                            'alert': { bg: 'rgba(244, 67, 54, 0.08)', border: '#F44336', fg: '#F44336', icon: '\uD83D\uDEA8' }
+                        };
+                        announcements.forEach(function(ann) {
+                            if (!ann.text) return;
+                            var urg = ann.urgency || 'info';
+                            var style = urgStyles[urg] || urgStyles['info'];
+                            if (ann.type_id === 16) { style = urgStyles['alert']; urg = 'alert'; } // MSG_EMERGENCY=0x10
+                            var card = announcementsDiv.append('div')
+                                .style('padding', '10px 14px')
+                                .style('border-radius', '6px')
+                                .style('border-left', '4px solid ' + style.border)
+                                .style('background', style.bg)
+                                .style('margin-bottom', '8px');
+                            var header = card.append('div')
+                                .style('display', 'flex').style('align-items', 'center')
+                                .style('gap', '8px').style('margin-bottom', '4px');
+                            header.append('span').style('font-size', '1.1em').text(style.icon);
+                            var typeLabel = ann.type || 'Announcement';
+                            header.append('span')
+                                .style('font-weight', '600').style('font-size', '0.9em')
+                                .style('color', style.fg).text(typeLabel);
+                            header.append('span')
+                                .style('font-size', '0.75em').style('padding', '1px 8px')
+                                .style('border-radius', '10px')
+                                .style('background', style.bg).style('color', style.fg)
+                                .text(urg.toUpperCase());
+                            if (ann.age != null) {
+                                var ageText = ann.age < 3600 ? Math.floor(ann.age/60) + 'm ago' :
+                                              ann.age < 86400 ? Math.floor(ann.age/3600) + 'h ago' :
+                                              Math.floor(ann.age/86400) + 'd ago';
+                                header.append('span')
+                                    .style('font-size', '0.72em').style('color', '#888')
+                                    .style('margin-left', 'auto').text(ageText);
+                            }
+                            card.append('div')
+                                .style('color', '#ddd').style('font-size', '0.88em')
+                                .style('line-height', '1.4').text(ann.text);
+                            if (ann.url) {
+                                card.append('div').style('margin-top', '6px')
+                                    .append('a').attr('href', ann.url)
+                                    .attr('target', '_blank').attr('rel', 'noopener')
+                                    .style('color', '#4FC3F7').style('font-size', '0.85em')
+                                    .style('text-decoration', 'underline')
+                                    .text(ann.url + ' \u2192');
+                            }
+                        });
+                    } else {
+                        announcementsDiv.style('display', 'none');
+                    }
+                    
+                    // Update address format warnings (node-generated)
+                    var addrWarnings = vs.address_warnings || [];
+                    var addrDiv = d3.select('#address-warnings-section');
+                    addrDiv.selectAll('*').remove();
+                    if (addrWarnings.length > 0) {
+                        addrDiv.style('display', 'block');
+                        var awUrgStyles = {
+                            'info': { bg: 'rgba(33, 150, 243, 0.06)', border: '#2196F3', fg: '#90CAF9', icon: '\u2139\uFE0F' },
+                            'recommended': { bg: 'rgba(255, 152, 0, 0.06)', border: '#FF9800', fg: '#FFE0B2', icon: '\u26A0\uFE0F' },
+                            'required': { bg: 'rgba(244, 67, 54, 0.06)', border: '#F44336', fg: '#FFCDD2', icon: '\uD83D\uDEA8' }
+                        };
+                        // Collapsible header
+                        var headerDiv = addrDiv.append('div')
+                            .style('display', 'flex').style('align-items', 'center')
+                            .style('gap', '8px').style('cursor', 'pointer')
+                            .style('padding', '6px 0').style('user-select', 'none');
+                        headerDiv.append('span').style('font-size', '1em').text('\uD83D\uDCCB');
+                        headerDiv.append('span')
+                            .style('font-weight', '600').style('font-size', '0.88em')
+                            .style('color', '#FF9800')
+                            .text('Address Format Guide (' + addrWarnings.length + ')');
+                        var toggleIcon = headerDiv.append('span')
+                            .style('font-size', '0.8em').style('color', '#888')
+                            .style('margin-left', 'auto').text('\u25B6');
+                        var cardsContainer = addrDiv.append('div')
+                            .style('display', 'none').style('margin-top', '6px');
+                        headerDiv.on('click', function() {
+                            var visible = cardsContainer.style('display') !== 'none';
+                            cardsContainer.style('display', visible ? 'none' : 'block');
+                            toggleIcon.text(visible ? '\u25B6' : '\u25BC');
+                        });
+                        addrWarnings.forEach(function(w) {
+                            var urg = w.urgency || 'info';
+                            var style = awUrgStyles[urg] || awUrgStyles['info'];
+                            var card = cardsContainer.append('div')
+                                .style('padding', '8px 12px')
+                                .style('border-radius', '6px')
+                                .style('border-left', '3px solid ' + style.border)
+                                .style('background', style.bg)
+                                .style('margin-bottom', '6px');
+                            var hdr = card.append('div')
+                                .style('display', 'flex').style('align-items', 'center')
+                                .style('gap', '6px').style('margin-bottom', '3px');
+                            hdr.append('span').style('font-size', '0.95em').text(style.icon);
+                            hdr.append('span')
+                                .style('font-weight', '600').style('font-size', '0.85em')
+                                .style('color', style.fg).text(w.title || '');
+                            card.append('div')
+                                .style('color', '#bbb').style('font-size', '0.82em')
+                                .style('line-height', '1.45').text(w.text || '');
+                        });
+                    } else {
+                        addrDiv.style('display', 'none');
+                    }
+                    
+                    // Update version breakdown — show FULL CHAIN desired_version votes
+                    var versionsDiv = d3.select('#signaling-versions');
+                    versionsDiv.selectAll('.version-tag').remove();
+                    // Use full_chain_versions (entire tracked chain) as primary display
+                    var fcv = vs.full_chain_versions || vs.versions;
+                    if (fcv) {
+                        for (var ver in fcv) {
+                            var verData = fcv[ver];
+                            var isTarget = (parseInt(ver) === vs.target_version);
+                            var label;
+                            if (isTarget) {
+                                label = 'V' + ver + ' desired: ' + (verData.count || 0) + '/' + vs.overall_total +
+                                    ' (' + d3.format('.1f')(verData.percentage) + '%) — target';
+                            } else {
+                                label = 'V' + ver + ' desired: ' + (verData.count || 0) + '/' + vs.overall_total +
+                                    ' (' + d3.format('.1f')(verData.percentage) + '%)';
+                            }
+                            versionsDiv.append('span')
+                                .attr('class', 'version-tag' + (isTarget ? ' target' : ''))
+                                .text(label);
+                        }
+                    }
+                    // Sampling window tag (secondary — shows what the activation check sees)
+                    if (vs.chain_ready && vs.versions) {
+                        var swLabel = 'Sampling window (' + vs.sampling_window_size + '): ';
+                        var swParts = [];
+                        for (var ver in vs.versions) {
+                            swParts.push('V' + ver + ' ' + d3.format('.1f')(vs.versions[ver].percentage) + '%');
+                        }
+                        swLabel += swParts.join(', ');
+                        versionsDiv.append('span')
+                            .attr('class', 'version-tag')
+                            .style('background', 'rgba(255,255,255,0.05)')
+                            .style('border-color', '#666')
+                            .style('color', '#aaa')
+                            .style('font-size', '0.85em')
+                            .text(swLabel);
+                    }
+                    // Overall V36 adoption summary (prominent green badge)
+                    if (vs.overall_v36_votes != null) {
+                        var overallLabel = 'V' + vs.target_version + ' adoption: ' + 
+                            vs.overall_v36_votes + '/' + vs.overall_total + ' votes (' + 
+                            d3.format('.1f')(vs.overall_v36_vote_pct) + '% of full chain)';
+                        if (vs.overall_v36_shares > 0) {
+                            overallLabel += ', ' + vs.overall_v36_shares + ' V36 format shares';
+                        }
+                        versionsDiv.append('span')
+                            .attr('class', 'version-tag target')
+                            .style('background', 'rgba(76, 175, 80, 0.2)')
+                            .style('border-color', '#4CAF50')
+                            .style('color', '#81C784')
+                            .text(overallLabel);
+                    }
+                    
+                    // Update current share type
+                    if (vs.current_share_name) {
+                        d3.select('#current-share-type').text(vs.current_share_name + ' (V' + vs.current_share_type + ')');
+                    }
+                    
+                    // Update share types breakdown
+                    var shareTypesSpan = d3.select('#share-types-breakdown');
+                    shareTypesSpan.text('');
+                    if (vs.share_types) {
+                        var parts = [];
+                        for (var ver in vs.share_types) {
+                            var typeData = vs.share_types[ver];
+                            parts.push('V' + ver + ': ' + d3.format('.1f')(typeData.percentage) + '% (' + typeData.count + ')');
+                        }
+                        shareTypesSpan.text(parts.join(' | '));
+                    }
+                    
+                    // AutoRatchet chain-state banner
+                    var ratchetDiv = d3.select('#ratchet-banner');
+                    if (vs.auto_ratchet && vs.auto_ratchet.state !== 'confirmed') {
+                        var r = vs.auto_ratchet;
+                        // Use desired_version voting (vs.versions), not share format (vs.share_types)
+                        var v36VotePct = 0;
+                        if (vs.versions && vs.versions['36']) {
+                            v36VotePct = Math.round(vs.versions['36'].percentage * 10) / 10;
+                        }
+                        var v35VotePct = Math.round((100 - v36VotePct) * 10) / 10;
+                        // Share format counts (for ACTIVATED state)
+                        var v36FormatCount = 0, totalShares = 0;
+                        if (vs.share_types) {
+                            for (var v in vs.share_types) {
+                                totalShares += vs.share_types[v].count;
+                                if (parseInt(v) >= 36) v36FormatCount += vs.share_types[v].count;
+                            }
+                        }
+                        var bannerClass = 'warning-item';
+                        var bannerText = '';
+                        var badgeClass = 'ratchet-state-badge';
+                        
+                        if (r.state === 'voting') {
+                            bannerClass += ' transition-banner';
+                            badgeClass += ' ratchet-voting';
+                            if (!vs.chain_ready) {
+                                bannerText = 'V36 Transition: VOTING — Building chain ' + 
+                                    vs.chain_height + '/' + vs.chain_length_required + 
+                                    ' shares. Need full ' + vs.chain_length_required + 
+                                    '-share window before activation can begin.';
+                            } else {
+                                if (vs.overall_v36_votes != null && vs.overall_v36_votes > 0) {
+                                    bannerText = 'V36 Transition: VOTING — ' +
+                                        d3.format('.1f')(vs.overall_v36_vote_pct) + '% voting V36 in full chain (' +
+                                        vs.overall_v36_votes + '/' + vs.overall_total + ' shares). ' +
+                                        'Sampling window: ' + d3.format('.1f')(vs.sampling_signaling) + '% of ' +
+                                        vs.sampling_window_size + ' shares. Need 95% in sampling window to activate.';
+                                } else {
+                                    bannerText = 'V36 Transition: VOTING — ' + d3.format('.1f')(vs.sampling_signaling) + 
+                                        '% voting V36 in sampling window (' + vs.sampling_window_size + 
+                                        ' shares). Need 95% to activate. (no V36 votes yet — miners need to upgrade)';
+                                }
+                            }
+                        } else if (r.state === 'activated') {
+                            bannerClass += ' info-banner';
+                            badgeClass += ' ratchet-activated';
+                            var v36FormatPct = totalShares > 0 ? Math.round(v36FormatCount * 100 / totalShares) : 0;
+                            var confirmWindow = vs.confirmation_window || (vs.chain_length_required * 2);
+                            var sharesSince = vs.shares_since_activation || 0;
+                            bannerText = 'V36 Transition: ACTIVATED — Now producing V36 shares. ' +
+                                v36FormatPct + '% V36 format in chain. ' +
+                                'Confirmation: ' + sharesSince + '/' + confirmWindow + ' shares elapsed.';
+                        }
+                        
+                        if (bannerText) {
+                            ratchetDiv.style('display', 'block');
+                            ratchetDiv.html('');
+                            var item = ratchetDiv.append('div').attr('class', bannerClass);
+                            item.append('span').text(bannerText);
+                            item.append('span').attr('class', badgeClass).text(r.state.toUpperCase());
+                        } else {
+                            ratchetDiv.style('display', 'none');
+                        }
+                    } else {
+                        ratchetDiv.style('display', 'none');
+                    }
+                });
+                
+                var time_to_share = local > 0 ? local_stats.attempts_to_share / local : Infinity;
+                d3.select('#time_to_share').text(local > 0 && isFinite(time_to_share) ? format_dt(time_to_share) : '-');
                 
                 d3.json('../global_stats', function(global_stats) {
                     if (!global_stats) return;
@@ -1831,6 +2726,29 @@
                             d3.select('#time_to_merged_block').text('N/A');
                         }
                     });
+                    
+                    // Fetch best share stats (BitAxe style)
+                    d3.json('../best_share', function(bs) {
+                        if (!bs) return;
+                        // Current round — fancy percentage as hero value
+                        d3.select('#best_share_round_pct_fancy').html(format_pct_fancy(bs.round.pct_of_block));
+                        // Share diff vs network diff subtitle
+                        d3.select('#best_share_round_diff').text(format_difficulty(bs.round.difficulty));
+                        d3.select('#best_share_net_diff').text(format_difficulty(bs.network_difficulty));
+                        // All-time record — percentage only (no redundant difficulty)
+                        d3.select('#best_share_alltime_pct_fancy').html(format_pct_fancy(bs.all_time.pct_of_block));
+                        // Merged chain (DOGE) stats - inline
+                        if (bs.merged) {
+                            d3.select('#best_share_merged_round_part').style('display', 'inline');
+                            d3.select('#best_share_merged_pct_fancy').html(format_pct_fancy(bs.merged.round.pct_of_block));
+                            d3.select('#best_share_merged_record_part').style('display', 'inline');
+                            d3.select('#best_share_merged_alltime_pct_fancy').html(format_pct_fancy(bs.merged.all_time.pct_of_block));
+                            // Merged diff subtitle
+                            d3.select('#best_share_merged_diff_part').style('display', 'inline');
+                            d3.select('#best_share_merged_round_diff').text(format_difficulty(bs.merged.round.difficulty));
+                            d3.select('#best_share_merged_net_diff').text(format_difficulty(bs.merged.network_difficulty));
+                        }
+                    });
                 });
             });
         }
@@ -1852,23 +2770,10 @@
                 
                 d3.select('#blocks_count').text(blocks.length);
                 
-                // Update pool average luck badge
-                if (blocks[0] && blocks[0].pool_avg_luck) {
-                    var avgLuck = blocks[0].pool_avg_luck;
-                    var luckBadge = d3.select('#pool_luck_badge');
-                    luckBadge.text('Avg Luck: ' + d3.format('.0f')(avgLuck) + '%');
-                    if (avgLuck >= 100) {
-                        luckBadge.style('background', 'var(--success)');
-                    } else if (avgLuck >= 75) {
-                        luckBadge.style('background', 'var(--warning)');
-                    } else {
-                        luckBadge.style('background', 'var(--danger)');
-                    }
-                }
-                
-                // Store all blocks and current display count
-                window.allBlocks = blocks;
-                window.blocksDisplayCount = Math.min(5, blocks.length);
+                // Store only 10 most recent blocks for table display
+                // (graph chart fetches recent_blocks separately and gets full history)
+                window.allBlocks = blocks.slice(0, 10);
+                window.blocksDisplayCount = Math.min(10, window.allBlocks.length);
                 
                 // Function to render blocks
                 function renderBlocks() {
@@ -2000,9 +2905,10 @@
                     
                     // Update show more button
                     var showMoreBtn = d3.select('#blocks_show_more');
-                    if (window.blocksDisplayCount < window.allBlocks.length) {
+                    var blocksRemaining = window.allBlocks.length - window.blocksDisplayCount;
+                    if (blocksRemaining > 0) {
                         showMoreBtn.style('display', 'block')
-                            .text('Show 5 more... (' + (window.allBlocks.length - window.blocksDisplayCount) + ' remaining)');
+                            .text('Show ' + Math.min(10, blocksRemaining) + ' more... (' + blocksRemaining + ' remaining)');
                     } else {
                         showMoreBtn.style('display', 'none');
                     }
@@ -2013,7 +2919,9 @@
                 
                 // Show more button handler
                 d3.select('#blocks_show_more').on('click', function() {
-                    window.blocksDisplayCount = Math.min(window.blocksDisplayCount + 5, window.allBlocks.length);
+                    var remaining = window.allBlocks.length - window.blocksDisplayCount;
+                    var step = (remaining <= 10) ? remaining : 10;
+                    window.blocksDisplayCount = Math.min(window.blocksDisplayCount + step, window.allBlocks.length);
                     renderBlocks();
                 });
             });
@@ -2028,8 +2936,8 @@
                     return;
                 }
                 
-                // Show the section
-                d3.select('#merged_blocks_section').style('display', 'block');
+                // Show the section (use 'flex' to preserve table-panel layout)
+                d3.select('#merged_blocks_section').style('display', 'flex');
                 d3.select('#merged_blocks_count').text(blocks.length);
                 
                 // Update chain name badge
@@ -2040,15 +2948,15 @@
                 // Clear existing rows
                 d3.select('#merged_blocks tbody').selectAll('tr').remove();
                 
-                // Store all blocks and current display count
-                window.allMergedBlocks = blocks;
-                window.mergedBlocksDisplayCount = Math.min(5, blocks.length);
+                // Store only 10 most recent merged blocks for table display
+                window.allMergedBlocks = blocks.slice(0, 10);
+                window.mergedBlocksDisplayCount = Math.min(10, window.allMergedBlocks.length);
                 
                 // Block explorer URLs for different merged mining chains
                 var merged_explorers = {
                     98: {  // Dogecoin (chainid 98)
-                        testnet: 'https://blockexplorer.one/dogecoin/testnet/blockHash/',
-                        mainnet: 'https://blockexplorer.one/dogecoin/mainnet/blockHash/',
+                        testnet: 'https://dogechain.info/block/',
+                        mainnet: 'https://dogechain.info/block/',
                     },
                 };
                 
@@ -2110,9 +3018,10 @@
                     
                     // Update show more button
                     var showMoreBtn = d3.select('#merged_blocks_show_more');
-                    if (window.mergedBlocksDisplayCount < window.allMergedBlocks.length) {
+                    var mergedRemaining = window.allMergedBlocks.length - window.mergedBlocksDisplayCount;
+                    if (mergedRemaining > 0) {
                         showMoreBtn.style('display', 'block')
-                            .text('Show 5 more... (' + (window.allMergedBlocks.length - window.mergedBlocksDisplayCount) + ' remaining)');
+                            .text('Show ' + Math.min(10, mergedRemaining) + ' more... (' + mergedRemaining + ' remaining)');
                     } else {
                         showMoreBtn.style('display', 'none');
                     }
@@ -2123,7 +3032,9 @@
                 
                 // Show more button handler
                 d3.select('#merged_blocks_show_more').on('click', function() {
-                    window.mergedBlocksDisplayCount = Math.min(window.mergedBlocksDisplayCount + 5, window.allMergedBlocks.length);
+                    var remaining = window.allMergedBlocks.length - window.mergedBlocksDisplayCount;
+                    var step = (remaining <= 10) ? remaining : 10;
+                    window.mergedBlocksDisplayCount = Math.min(window.mergedBlocksDisplayCount + step, window.allMergedBlocks.length);
                     renderMergedBlocks();
                 });
             });
@@ -2175,7 +3086,7 @@
 
         // Payouts state for show more functionality
         window.payoutsData = null;
-        window.payoutsDisplayCount = 10;
+        window.payoutsDisplayCount = 5;
         window.payoutsMergedSymbol = null;
         
         function renderPayoutsWithShowMore() {
@@ -2238,10 +3149,11 @@
             });
             
             // Show "Show more" button if there are more payouts
-            if (window.payoutsDisplayCount < window.payoutsData.sortedAddrs.length) {
+            var payoutsRemaining = window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount;
+            if (payoutsRemaining > 0) {
                 d3.select('#payouts_show_more')
                     .style('display', 'block')
-                    .text('Show 5 more (' + (window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount) + ' remaining)');
+                    .text('Show ' + Math.min(10, payoutsRemaining) + ' more (' + payoutsRemaining + ' remaining)');
             } else {
                 d3.select('#payouts_show_more').style('display', 'none');
             }
@@ -2314,10 +3226,9 @@
                     }
                     d3.select('#payout_totamount').text(d3.format('.4f')(totamount));
                     
-                    // Show merged payout if any
-                    if (totMergedAmount > 0 && window.payoutsMergedSymbol) {
-                        d3.select('#node_merged_payout').style('display', 'inline');
-                        d3.select('#node_merged_amount').text(d3.format(',.0f')(totMergedAmount));
+                    // Show merged payout (always show when merged mining is active)
+                    if (window.payoutsMergedSymbol) {
+                        d3.select('#node_merged_amount').text(d3.format(',.2f')(totMergedAmount));
                         d3.select('#node_merged_symbol').text(window.payoutsMergedSymbol);
                     }
                 });
@@ -2327,8 +3238,10 @@
                 
                 // Set up show more button click handler
                 d3.select('#payouts_show_more').on('click', function() {
+                    var rem = window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount;
+                    var step = (rem <= 10) ? rem : 10;
                     window.payoutsDisplayCount = Math.min(
-                        window.payoutsDisplayCount + 5,
+                        window.payoutsDisplayCount + step,
                         window.payoutsData.sortedAddrs.length
                     );
                     renderPayoutsWithShowMore();
@@ -2339,8 +3252,8 @@
         function getMergedExplorerUrl(symbol, address) {
             // Block explorers for merged mining chains
             var explorers = {
-                'tDOGE': 'https://blockexplorer.one/dogecoin/testnet/address/',
-                'DOGE': 'https://blockexplorer.one/dogecoin/mainnet/address/',
+                'tDOGE': 'https://dogechain.info/address/',
+                'DOGE': 'https://dogechain.info/address/',
             };
             var prefix = explorers[symbol] || '#';
             return prefix + address;
@@ -2363,8 +3276,10 @@
             
             // Set up show more button for simple payouts
             d3.select('#payouts_show_more').on('click', function() {
+                var rem = window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount;
+                var step = (rem <= 10) ? rem : 10;
                 window.payoutsDisplayCount = Math.min(
-                    window.payoutsDisplayCount + 5,
+                    window.payoutsDisplayCount + step,
                     window.payoutsData.sortedAddrs.length
                 );
                 renderSimplePayoutsWithShowMore();
@@ -2396,10 +3311,11 @@
             });
             
             // Show "Show more" button if there are more payouts
-            if (window.payoutsDisplayCount < window.payoutsData.sortedAddrs.length) {
+            var simpleRemaining = window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount;
+            if (simpleRemaining > 0) {
                 d3.select('#payouts_show_more')
                     .style('display', 'block')
-                    .text('Show 5 more (' + (window.payoutsData.sortedAddrs.length - window.payoutsDisplayCount) + ' remaining)');
+                    .text('Show ' + Math.min(10, simpleRemaining) + ' more (' + simpleRemaining + ' remaining)');
             } else {
                 d3.select('#payouts_show_more').style('display', 'none');
             }
@@ -2439,6 +3355,7 @@
                     });
                 tr.append('td').text(function(p) { return p.version || '-'; });
                 tr.append('td')
+                    .style('white-space', 'nowrap')
                     .html(function(p) { 
                         return p.incoming ? 
                             '<span style="color: var(--success)">⬇ Incoming</span>' : 
@@ -2541,7 +3458,7 @@
                 // Store peers globally for pagination
                 window.allBroadcasterPeers = peers;
                 if (!window.broadcastPeersDisplayCount) {
-                    window.broadcastPeersDisplayCount = Math.min(5, peers.length);
+                    window.broadcastPeersDisplayCount = Math.min(10, peers.length);
                 }
                 
                 function renderBroadcasterPeers() {
@@ -2590,10 +3507,11 @@
                     });
                     
                     // Show "Show more" button if there are more peers
-                    if (window.broadcastPeersDisplayCount < window.allBroadcasterPeers.length) {
+                    var bcRemaining = window.allBroadcasterPeers.length - window.broadcastPeersDisplayCount;
+                    if (bcRemaining > 0) {
                         d3.select('#broadcaster_peers_show_more')
                             .style('display', 'block')
-                            .text('Show 5 more... (' + (window.allBroadcasterPeers.length - window.broadcastPeersDisplayCount) + ' remaining)');
+                            .text('Show ' + Math.min(10, bcRemaining) + ' more... (' + bcRemaining + ' remaining)');
                     } else {
                         d3.select('#broadcaster_peers_show_more').style('display', 'none');
                     }
@@ -2603,8 +3521,10 @@
                 
                 // Set up show more button
                 d3.select('#broadcaster_peers_show_more').on('click', function() {
+                    var bcRem = window.allBroadcasterPeers.length - window.broadcastPeersDisplayCount;
+                    var bcStep = (bcRem <= 10) ? bcRem : 10;
                     window.broadcastPeersDisplayCount = Math.min(
-                        window.broadcastPeersDisplayCount + 5,
+                        window.broadcastPeersDisplayCount + bcStep,
                         window.allBroadcasterPeers.length
                     );
                     renderBroadcasterPeers();
@@ -3439,7 +4359,7 @@
             
             // Display current worker count and unique miner count
             var currentWorkerCount = minerCount.length > 0 ? minerCount[minerCount.length - 1][1] : 0;
-            currentWorkerCount = (currentWorkerCount === null || currentWorkerCount === undefined) ? 0 : currentWorkerCount;
+            currentWorkerCount = (currentWorkerCount === null || currentWorkerCount === undefined) ? 0 : Math.round(currentWorkerCount);
             var uniqueMiners = [];
             if (uniqueMinerCountData && uniqueMinerCountData.length > 0) {
                 for (var i = 0; i < uniqueMinerCountData.length; i++) {
@@ -3451,7 +4371,7 @@
                 }
             }
             var currentUniqueMinerCount = uniqueMiners.length > 0 ? uniqueMiners[uniqueMiners.length - 1][1] : 0;
-            currentUniqueMinerCount = (currentUniqueMinerCount === null || currentUniqueMinerCount === undefined) ? 0 : currentUniqueMinerCount;
+            currentUniqueMinerCount = (currentUniqueMinerCount === null || currentUniqueMinerCount === undefined) ? 0 : Math.round(currentUniqueMinerCount);
             document.getElementById('graph-miners').textContent = currentWorkerCount + '/' + currentUniqueMinerCount;
             
             if (avgLuck !== null) {
@@ -4074,9 +4994,9 @@
             
             // Display current worker count and unique miner count in fullscreen
             var fsWorkerCount = minerCount.length > 0 ? minerCount[minerCount.length - 1][1] : 0;
-            fsWorkerCount = (fsWorkerCount === null || fsWorkerCount === undefined) ? 0 : fsWorkerCount;
+            fsWorkerCount = (fsWorkerCount === null || fsWorkerCount === undefined) ? 0 : Math.round(fsWorkerCount);
             var fsUniqueMinerCount = uniqueMinerCount.length > 0 ? uniqueMinerCount[uniqueMinerCount.length - 1][1] : 0;
-            fsUniqueMinerCount = (fsUniqueMinerCount === null || fsUniqueMinerCount === undefined) ? 0 : fsUniqueMinerCount;
+            fsUniqueMinerCount = (fsUniqueMinerCount === null || fsUniqueMinerCount === undefined) ? 0 : Math.round(fsUniqueMinerCount);
             document.getElementById('fs-graph-miners').textContent = fsWorkerCount + '/' + fsUniqueMinerCount;
             
             if (fsAvgLuck !== null) {

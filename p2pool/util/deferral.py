@@ -3,6 +3,7 @@ from __future__ import division
 import itertools
 import random
 import sys
+import time as _time
 
 from twisted.internet import defer, reactor
 from twisted.python import failure, log
@@ -25,6 +26,18 @@ def run_repeatedly(f, *args, **kwargs):
 class RetrySilentlyException(Exception):
     pass
 
+# Known transient/config errors that don't need full tracebacks
+# Maps substring pattern -> short human message
+_KNOWN_ERROR_PATTERNS = [
+    ('initial sync and waiting for blocks', 'daemon is still syncing, will retry...'),
+    ('downloading blocks', 'daemon is downloading blocks, will retry...'),
+    ('401 Unauthorized', 'RPC authentication failed (401) - check credentials'),
+    ('Connection refused', 'connection refused - is the daemon running?'),
+    ('Connection was refused', 'connection refused - is the daemon running?'),
+]
+_known_error_log_times = {}  # pattern -> last log timestamp
+_KNOWN_ERROR_LOG_INTERVAL = 300  # log known errors at most every 5 minutes
+
 def retry(message='Error:', delay=3, max_retries=None, traceback=True):
     '''
     @retry('Error getting block:', 1)
@@ -43,7 +56,20 @@ def retry(message='Error:', delay=3, max_retries=None, traceback=True):
                     if i == max_retries:
                         raise
                     if not isinstance(e, RetrySilentlyException):
-                        if traceback:
+                        error_str = str(e)
+                        known_match = None
+                        for pattern, short_msg in _KNOWN_ERROR_PATTERNS:
+                            if pattern in error_str:
+                                known_match = (pattern, short_msg)
+                                break
+                        if known_match is not None:
+                            pattern, short_msg = known_match
+                            now = _time.time()
+                            last = _known_error_log_times.get(pattern, 0)
+                            if now - last >= _KNOWN_ERROR_LOG_INTERVAL:
+                                _known_error_log_times[pattern] = now
+                                print >>sys.stderr, '%s %s' % (message, short_msg)
+                        elif traceback:
                             log.err(None, message)
                         else:
                             print >>sys.stderr, message, e
@@ -88,12 +114,13 @@ class GenericDeferrer(object):
     Converts query with identifier/got response interface to deferred interface
     '''
     
-    def __init__(self, max_id, func, timeout=5, on_timeout=lambda: None):
+    def __init__(self, max_id, func, timeout=5, on_timeout=lambda: None, null_id=False):
         self.max_id = max_id
         self.func = func
         self.timeout = timeout
         self.on_timeout = on_timeout
         self.map = {}
+        self.null_id = null_id
     
     def __call__(self, *args, **kwargs):
         while True:
@@ -113,7 +140,10 @@ class GenericDeferrer(object):
             self.on_timeout()
         timer = reactor.callLater(self.timeout, timeout)
         self.map[id] = df, timer
-        self.func(id, *args, **kwargs)
+        if self.null_id:
+            self.func(None, *args, **kwargs)
+        else:
+            self.func(id, *args, **kwargs)
         return df
     
     def got_response(self, id, resp):

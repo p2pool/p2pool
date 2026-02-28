@@ -2,7 +2,7 @@ import random
 import sys
 import time
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, error, reactor
 from twisted.python import log
 
 from p2pool import data as p2pool_data, p2p
@@ -60,6 +60,8 @@ class P2PNode(p2p.Node):
                 parents=0,
                 stops=[],
             )
+        except (defer.TimeoutError, error.ConnectionLost, error.ConnectionDone, error.ConnectError):
+            pass
         except:
             log.err(None, 'in handle_share_hashes:')
             peer.badPeerHappened(30)
@@ -125,6 +127,9 @@ class P2PNode(p2p.Node):
                 except defer.TimeoutError:
                     print 'Share request timed out!'
                     continue
+                except (error.ConnectionLost, error.ConnectionDone, error.ConnectError):
+                    print 'Lost connection to %s:%i during share download' % peer.addr
+                    continue
                 except:
                     log.err(None, 'in download_shares:')
                     peer.badPeerHappened(30)
@@ -174,9 +179,6 @@ class Node(object):
         self.mining2_txs_var = variable.Variable({}) # hash -> tx
         self.best_share_var = variable.Variable(None)
         self.desired_var = variable.Variable(None)
-        self.txidcache = {}
-        self.feecache = {}
-        self.feefifo = []
         self.punish = False
 
         self.tracker = p2pool_data.OkayTracker(self.net)
@@ -216,7 +218,7 @@ class Node(object):
             while stop_signal.times == 0:
                 flag = self.factory.new_block.get_deferred()
                 try:
-                    self.bitcoind_work.set((yield helper.getwork(self.bitcoind, self.net, self.bitcoind_work.value['use_getblocktemplate'], self.txidcache, self.feecache, self.feefifo, self.known_txs_var.value)))
+                    self.bitcoind_work.set((yield helper.getwork(self.bitcoind, self.net, self.bitcoind_work.value['use_getblocktemplate'])))
                     self.check_and_purge_txs()
                 except:
                     log.err()
@@ -329,7 +331,7 @@ class Node(object):
     
     def set_best_share(self):
         oldpunish = self.punish
-        best, desired, decorated_heads, bad_peer_addresses, self.punish= self.tracker.think(self.get_height_rel_highest, self.get_height, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value, self.feecache)
+        best, desired, decorated_heads, bad_peer_addresses, self.punish= self.tracker.think(self.get_height_rel_highest, self.get_height, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)
         if self.punish and not oldpunish and best == self.best_share_var.value: # need to reissue work with lower difficulty
             self.best_share_var.changed.happened(best) # triggers wb.new_work_event to reissue work
 
@@ -351,7 +353,7 @@ class Node(object):
         return p2pool_data.get_expected_payouts(self.tracker, self.best_share_var.value, self.bitcoind_work.value['bits'].target, self.bitcoind_work.value['subsidy'], self.net)
     
     def clean_tracker(self):
-        best, desired, decorated_heads, bad_peer_addresses, self.punish = self.tracker.think(self.get_height_rel_highest, self.get_height, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value, self.feecache)
+        best, desired, decorated_heads, bad_peer_addresses, self.punish = self.tracker.think(self.get_height_rel_highest, self.get_height, self.bitcoind_work.value['previous_block'], self.bitcoind_work.value['bits'], self.known_txs_var.value)
         
         # eat away at heads
         if decorated_heads:

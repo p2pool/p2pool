@@ -98,7 +98,6 @@ def _handle(data, provider, preargs=(), response_handler=None):
             error = e._to_obj()
         
         defer.returnValue(json.dumps(dict(
-            jsonrpc='2.0',
             id=id_,
             result=result,
             error=error,
@@ -116,7 +115,6 @@ def _http_do(url, headers, timeout, method, params):
             method='POST',
             headers=dict(headers, **{'Content-Type': 'application/json'}),
             postdata=json.dumps({
-                'jsonrpc': '2.0',
                 'method': method,
                 'params': params,
                 'id': id_,
@@ -172,12 +170,11 @@ class LineBasedPeer(basic.LineOnlyReceiver):
     
     def __init__(self):
         #basic.LineOnlyReceiver.__init__(self)
-        self._matcher = deferral.GenericDeferrer(max_id=2**30, func=lambda id, method, params: self.sendLine(json.dumps({
-            'jsonrpc': '2.0',
+        self._matcher = deferral.GenericDeferrer(max_id=2**30, func=lambda id_, method, params: self.sendLine(json.dumps({
+            'id': id_,
             'method': method,
             'params': params,
-            'id': id,
-        })))
+        })), null_id=True)
         self.other = Proxy(self._matcher)
     
     def lineReceived(self, line):

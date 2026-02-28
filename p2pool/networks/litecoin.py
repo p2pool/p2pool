@@ -16,16 +16,16 @@ MIN_TARGET = 0
 # This sets the MINIMUM share difficulty. Vardiff auto-adjusts UP from here.
 #
 # Formula: stratum_diff = (0xffff0000 * 2**192 / target) * 65536
-#   2**256//2**20 = diff 16  -> 5.3 sec/share at 13 GH/s (too fast, floods)
-#   2**256//2**21 = diff 32  -> 10.6 sec/share at 13 GH/s (good balance)
+#   2**256//2**20 = diff 16  -> 5.3 sec/share at 13 GH/s (jtoomim default)
+#   2**256//2**21 = diff 32  -> 10.6 sec/share at 13 GH/s
 #   2**256//2**22 = diff 64  -> 21.1 sec/share at 13 GH/s
 #   2**256//2**24 = diff 256 -> 84.6 sec/share at 13 GH/s (too slow for small pools)
 #
 # If floor is too easy: share flooding -> network can't propagate -> orphans
 # If floor is too hard: small miners wait too long -> vardiff stuck at floor
 #
-# Current: diff 32, optimal for ~10-50 GH/s pools. Larger pools auto-adjust higher.
-MAX_TARGET = 2**256//2**21 - 1
+# NOTE: MUST match jtoomim/p2pool for V35 compatibility!
+MAX_TARGET = 2**256//2**20 - 1
 # PERSIST: Sharechain persistence and peer sync mode
 # ===================================================
 # Controls whether node participates in sharechain sync with network:
@@ -45,29 +45,28 @@ MAX_TARGET = 2**256//2**21 - 1
 PERSIST = True
 WORKER_PORT = 9327
 BOOTSTRAP_ADDRS = [
-        # Active nodes discovered 2025 (protocol 3502)
-        'ml.toom.im',           # jtoomim's node - healthy, 1.5% orphan rate
-        '31.25.241.224',        # peer from ml.toom.im
-        '20.106.76.227',        # peer from ml.toom.im
-        '83.221.211.116',       # peer from ml.toom.im
-        # Legacy nodes (may be offline)
-        'crypto.office-on-the.net',
-        'ltc.p2pool.leblancnet.us',
-        '51.148.43.34',
-        '68.131.29.131',
-        '87.102.46.100',
-        '89.237.60.231',
-        '95.79.35.133',
-        '96.255.61.32',
-        '174.56.93.93',
-        '178.238.236.130',
-        '194.190.93.235',
+        # Active p2pool nodes (verified 2026-02-26 via peer_addresses API)
+        'ml.toom.im',           # jtoomim's node (protocol 3502)
+        'usa.p2p-spb.xyz',      # p2p-spb pool node (protocol 3502)
+        # V36 nodes (protocol 3503)
+        '102.160.209.121',      # technocore node29 (v36)
+        '5.188.104.245',        # V36 peer
+        # Live peers seen by ml.toom.im and usa.p2p-spb.xyz
+        '20.127.82.115',        # Azure peer
+        '31.25.241.224',        # EU peer
+        '20.113.157.65',        # Azure peer
+        '20.106.76.227',        # Azure peer
+        '15.218.180.55',        # AWS peer
+        '173.79.139.224',       # US peer
+        '174.60.78.162',        # US peer
 ]
 ANNOUNCE_CHANNEL = '#p2pool-ltc'
 VERSION_CHECK = lambda v: None if 100400 <= v else 'Litecoin version too old. Upgrade to 0.10.4 or newer!'
 VERSION_WARNING = lambda v: None
 SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit', 'taproot', 'mweb'])
-MINIMUM_PROTOCOL_VERSION = 3301
+MINIMUM_PROTOCOL_VERSION = 3301  # Runtime ratchet in data.py raises this when share versions reach 95%
 SEGWIT_ACTIVATION_VERSION = 17
 BLOCK_MAX_SIZE = 1000000
 BLOCK_MAX_WEIGHT = 4000000
+# Some networks have block inclusion/order rules that p2pool doesn't understand (e.g. Litecoin's MWEB)
+IMMUTABLE_BLOCKS = True

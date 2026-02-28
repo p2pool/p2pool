@@ -53,6 +53,168 @@
                     .text(function(w){ return 'Warning: ' + w })
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
                 
+                // Version Signaling Status - Universal transition display
+                d3.json('../version_signaling', function(vs) {
+                    if (!vs || !vs.show_transition) {
+                        d3.select('#version-signaling').style('display', 'none');
+                        return;
+                    }
+                    d3.select('#version-signaling').style('display', 'block');
+                    d3.select('#version-transition-title').text(
+                        'V' + vs.current_share_type + ' \u2192 V' + vs.target_version + ' Transition');
+                    var statusBadge = d3.select('#version-signaling-status');
+                    statusBadge.text(vs.status.toUpperCase().replace(/_/g, ' '));
+                    var badgeColors = {
+                        'building_chain': '#FFC107', 'waiting': '#888',
+                        'propagating': '#2196F3', 'signaling': '#6f42c1',
+                        'signaling_strong': '#FF9800', 'activating': '#28a745',
+                        'no_transition': '#6f42c1'
+                    };
+                    statusBadge.style('background', badgeColors[vs.status] || '#888')
+                        .style('color', (vs.status === 'building_chain') ? '#000' : '#fff');
+                    if (!vs.chain_ready) {
+                        d3.select('#index-chain-maturity').style('display', 'block');
+                        d3.select('#index-chain-bar').style('width', vs.chain_maturity + '%');
+                        d3.select('#index-chain-bar-label').text(d3.format('.1f')(vs.chain_maturity) + '%');
+                        d3.select('#index-chain-progress-text').text(
+                            vs.chain_height + ' / ' + vs.chain_length_required + 
+                            ' (' + d3.format('.1f')(vs.chain_maturity) + '%) \u2014 need ' +
+                            (vs.chain_length_required - vs.chain_height) + ' more');
+                    } else {
+                        d3.select('#index-chain-maturity').style('display', 'none');
+                    }
+                    if (vs.status === 'propagating') {
+                        d3.select('#index-propagation').style('display', 'block');
+                        d3.select('#index-propagation-bar').style('width', vs.propagation_pct + '%');
+                        d3.select('#index-propagation-bar-label').text(d3.format('.1f')(vs.overall_v36_vote_pct) + '% V36');
+                        var etaMin = Math.round(vs.time_to_window_seconds / 60);
+                        var etaH = Math.floor(etaMin / 60); var etaM = etaMin % 60;
+                        var etaStr = etaH > 0 ? etaH + 'h ' + etaM + 'm' : etaM + 'm';
+                        d3.select('#index-propagation-text').text(
+                            'V' + vs.target_version + ' votes: ' + vs.overall_v36_votes + '/' + vs.overall_total +
+                            ' (' + d3.format('.1f')(vs.overall_v36_vote_pct) + '% of full chain). ' +
+                            'Reach sampling window in ~' + etaStr);
+                    } else {
+                        d3.select('#index-propagation').style('display', 'none');
+                    }
+                    var sigPct = vs.sampling_signaling;
+                    var barPct = vs.overall_v36_vote_pct > sigPct ? vs.overall_v36_vote_pct : sigPct;
+                    d3.select('#version-signaling-bar').style('width', Math.min(100, barPct) + '%');
+                    var idxSigLabel = barPct >= 15 ? d3.format('.1f')(barPct) + '%' : '';
+                    if (vs.overall_v36_vote_pct > sigPct + 0.1 && barPct >= 20) {
+                        idxSigLabel = d3.format('.1f')(vs.overall_v36_vote_pct) + '% chain / ' + d3.format('.1f')(sigPct) + '% window';
+                    }
+                    d3.select('#index-signaling-bar-label').text(idxSigLabel);
+                    if (barPct < 15) {
+                        d3.select('#index-signaling-bar-label')
+                            .style('right', 'auto').style('left', 'calc(100% + 6px)')
+                            .style('color', '#555').style('text-shadow', 'none')
+                            .text(d3.format('.1f')(barPct) + '%');
+                    } else {
+                        d3.select('#index-signaling-bar-label')
+                            .style('left', null).style('right', '6px')
+                            .style('color', '#fff').style('text-shadow', '0 1px 2px rgba(0,0,0,0.5)');
+                    }
+                    var samplingStr;
+                    if (vs.chain_ready) {
+                        if (vs.overall_v36_vote_pct > sigPct + 0.1) {
+                            samplingStr = d3.format('.1f')(vs.overall_v36_vote_pct) + '% V' + vs.target_version +
+                                ' desired in full chain (' + vs.overall_v36_votes + '/' + vs.overall_total + '). ' +
+                                'Sampling: ' + d3.format('.1f')(sigPct) + '% of ' + vs.sampling_window_size +
+                                ' (need 95%)';
+                        } else {
+                            samplingStr = d3.format('.1f')(sigPct) + '% of ' + vs.sampling_window_size + 
+                                ' shares voting V' + vs.target_version + ' (need 95%)';
+                        }
+                    } else {
+                        samplingStr = d3.format('.1f')(vs.overall_v36_vote_pct || vs.target_percentage) + '% overall (activates at ' +
+                            vs.chain_length_required + ' shares)';
+                    }
+                    d3.select('#index-sampling-text').text(samplingStr);
+                    d3.select('#index-status-message').text(vs.message);
+                    d3.select('#index-current-type').text(
+                        vs.current_share_name + ' (V' + vs.current_share_type + ')');
+                    if (vs.share_types) {
+                        var parts = [];
+                        for (var ver in vs.share_types) {
+                            var t = vs.share_types[ver];
+                            parts.push('V' + ver + ' format: ' + d3.format('.1f')(t.percentage) + '% (' + t.count + ')');
+                        }
+                        // Full-chain desired_version vote counts
+                        var fcv = vs.full_chain_versions;
+                        if (fcv) {
+                            var voteParts = [];
+                            for (var ver in fcv) {
+                                voteParts.push('V' + ver + ' desired: ' + fcv[ver].count + ' (' +
+                                    d3.format('.1f')(fcv[ver].percentage) + '%)');
+                            }
+                            parts.push(voteParts.join(', '));
+                        }
+                        d3.select('#index-chain-types').text(parts.join(' | '));
+                    }
+                    // Transition message from share messaging system
+                    var tmsg = vs.transition_message;
+                    if (tmsg && tmsg.msg) {
+                        d3.select('#index-transition-msg').style('display', 'block');
+                        d3.select('#index-tmsg-text').text(tmsg.msg);
+                        var label = 'Transition Signal';
+                        if (tmsg.from_ver && tmsg.to_ver) {
+                            label = 'V' + tmsg.from_ver + ' → V' + tmsg.to_ver + ' Transition Signal';
+                        }
+                        d3.select('#index-tmsg-label').text(label);
+                        var urg = tmsg.urgency || 'info';
+                        var urgColors = { 'info': '#2196F3', 'recommended': '#FF9800', 'required': '#F44336' };
+                        var urgBorder = urgColors[urg] || '#2196F3';
+                        d3.select('#index-transition-msg').style('border-left-color', urgBorder);
+                        d3.select('#index-tmsg-label').style('color', urgBorder);
+                        d3.select('#index-tmsg-urgency').text(urg.toUpperCase()).style('color', urgBorder);
+                        if (tmsg.url) {
+                            d3.select('#index-tmsg-url-row').style('display', 'block');
+                            d3.select('#index-tmsg-url').attr('href', tmsg.url).text(tmsg.url);
+                        } else {
+                            d3.select('#index-tmsg-url-row').style('display', 'none');
+                        }
+                    } else {
+                        d3.select('#index-transition-msg').style('display', 'none');
+                    }
+                    // Authority announcements (shown independent of transition)
+                    var announcements = vs.authority_announcements || [];
+                    var annDiv = d3.select('#index-announcements');
+                    annDiv.selectAll('*').remove();
+                    if (announcements.length > 0) {
+                        var urgStyles = {
+                            'info': { bg: '#e8f4fd', border: '#2196F3', fg: '#1976D2' },
+                            'recommended': { bg: '#fff3e0', border: '#FF9800', fg: '#E65100' },
+                            'required': { bg: '#ffebee', border: '#F44336', fg: '#C62828' },
+                            'alert': { bg: '#ffebee', border: '#F44336', fg: '#C62828' }
+                        };
+                        announcements.forEach(function(ann) {
+                            if (!ann.text) return;
+                            var urg = ann.urgency || 'info';
+                            var style = urgStyles[urg] || urgStyles['info'];
+                            if (ann.type_id === 16) { style = urgStyles['alert']; urg = 'alert'; }
+                            var card = annDiv.append('div')
+                                .style('padding', '8px 12px').style('border-left', '3px solid ' + style.border)
+                                .style('background', style.bg).style('border-radius', '3px').style('margin-bottom', '6px');
+                            var hdr = card.append('div').style('display', 'flex').style('align-items', 'center').style('gap', '6px');
+                            hdr.append('strong').style('font-size', '0.9em').style('color', style.fg).text(ann.type || 'Announcement');
+                            hdr.append('span').style('font-size', '0.75em').style('font-weight', 'bold').style('color', style.fg).text(urg.toUpperCase());
+                            if (ann.age != null) {
+                                var ageText = ann.age < 3600 ? Math.floor(ann.age/60) + 'm ago' :
+                                              ann.age < 86400 ? Math.floor(ann.age/3600) + 'h ago' :
+                                              Math.floor(ann.age/86400) + 'd ago';
+                                hdr.append('span').style('font-size', '0.72em').style('color', '#888').style('margin-left', 'auto').text(ageText);
+                            }
+                            card.append('div').style('font-size', '0.85em').style('color', '#333').style('margin-top', '4px').text(ann.text);
+                            if (ann.url) {
+                                card.append('div').style('margin-top', '4px')
+                                    .append('a').attr('href', ann.url).attr('target', '_blank').attr('rel', 'noopener')
+                                    .style('font-size', '0.8em').style('color', '#1976D2').text(ann.url);
+                            }
+                        });
+                    }
+                });
+                
                 var time_to_share = local_stats.attempts_to_share/local;
                 d3.select('#time_to_share').text(local > 0 ? format_dt(time_to_share) : 'Infinity years');
                 
@@ -181,8 +343,8 @@
                 
                 function getMergedExplorerUrl(symbol, address) {
                     var explorers = {
-                        'tDOGE': 'https://blockexplorer.one/dogecoin/testnet/address/',
-                        'DOGE': 'https://blockexplorer.one/dogecoin/mainnet/address/',
+                        'tDOGE': 'https://dogechain.info/address/',
+                        'DOGE': 'https://dogechain.info/address/',
                     };
                     return (explorers[symbol] || '#') + address;
                 }
@@ -243,8 +405,8 @@
                     // Note: Use block hash (not pow_hash) for explorer links
                     var merged_explorers = {
                         98: {  // Dogecoin (chainid 98)
-                            testnet: 'https://blockexplorer.one/dogecoin/testnet/blockHash/',
-                            mainnet: 'https://blockexplorer.one/dogecoin/mainnet/blockHash/',
+                            testnet: 'https://dogechain.info/block/',
+                            mainnet: 'https://dogechain.info/block/',
                         },
                         // Add more chain explorers here as needed
                     };
@@ -331,7 +493,52 @@
         <p>Current block value: <span id="block_value"></span> <span class="symbol"></span>. Expected time to block: <span id="time_to_block"></span></p>
         <div id="warnings"></div>
         
-        <h2>Share explorer</h2>
+        <!-- Version Signaling Status -->
+        <div id="version-signaling" style="display:none; background:#f0e6ff; border:2px solid #6f42c1; border-radius:5px; padding:10px; margin:10px 0;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span style="font-size:1.2em;">🔄</span>
+                <strong id="version-transition-title">Version Transition</strong>
+                <span id="version-signaling-status" style="padding:2px 8px; border-radius:3px; font-size:0.8em; font-weight:bold;">-</span>
+            </div>
+            <div id="index-chain-maturity" style="display:none; margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;">Chain Maturity: <span id="index-chain-progress-text">-</span></div>
+                <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:hidden; position:relative;">
+                    <div id="index-chain-bar" style="height:100%; background:linear-gradient(90deg, #FFC107, #FF9800); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-chain-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+                </div>
+            </div>
+            <div id="index-propagation" style="display:none; margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;"><span id="index-propagation-text">-</span></div>
+                <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:visible; position:relative;">
+                    <div id="index-propagation-bar" style="height:100%; background:linear-gradient(90deg, #2196F3, #03A9F4); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-propagation-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+                </div>
+            </div>
+            <div style="margin-top:8px; font-size:0.85em; color:#555;">Sampling Window: <span id="index-sampling-text">-</span></div>
+            <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:visible; position:relative;">
+                <div id="version-signaling-bar" style="height:100%; background:linear-gradient(90deg, #6f42c1, #28a745); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-signaling-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+            </div>
+            <div style="margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;" id="index-status-message"></div>
+                <div style="font-size:0.8em; color:#888; margin-top:4px;">
+                    Current: <span id="index-current-type">-</span>
+                    &nbsp;|&nbsp; Chain: <span id="index-chain-types">-</span>
+                </div>
+            </div>
+            <!-- Transition Message -->
+            <div id="index-transition-msg" style="display:none; margin-top:8px; padding:8px 12px; border-left:3px solid #2196F3; background:#e8f4fd; border-radius:3px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <strong id="index-tmsg-label" style="font-size:0.9em; color:#2196F3;">Transition Signal</strong>
+                    <span id="index-tmsg-urgency" style="font-size:0.75em; font-weight:bold; color:#2196F3;">INFO</span>
+                </div>
+                <div id="index-tmsg-text" style="font-size:0.85em; color:#333; margin-top:4px;"></div>
+                <div id="index-tmsg-url-row" style="display:none; margin-top:4px;">
+                    <a id="index-tmsg-url" href="#" target="_blank" rel="noopener" style="font-size:0.8em; color:#1976D2;">Get latest release</a>
+                </div>
+            </div>
+            <!-- Authority Announcements -->
+            <div id="index-announcements" style="margin-top:8px;"></div>
+        </div>
+        
+<h2>Share explorer</h2>
         <p>Best share: <span id="best_share"></span></p>
         <p>Verified heads: <span id="verified_heads"></span></p>
         <p>Heads: <span id="heads"></span></p>

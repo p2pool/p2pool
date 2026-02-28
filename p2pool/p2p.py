@@ -19,10 +19,10 @@ class PeerMisbehavingError(Exception):
 
 
 def get_tx_packed_size(tx):
-    """Get the packed size of a transaction, handling both normal and MWEB raw transactions."""
-    if isinstance(tx, dict) and tx.get('_mweb'):
-        # MWEB transaction stored as raw bytes
-        return tx['_raw_size']
+    """Get the packed size of a transaction, handling both normal and GBT raw hex transactions."""
+    if isinstance(tx, dict) and 'data' in tx:
+        # GBT transaction stored as hex dict
+        return len(tx['data']) // 2
     return bitcoin_data.tx_type.packed_size(tx)
 
 
@@ -34,7 +34,10 @@ def fragment(f, **kwargs):
         fragment(f, **dict((k, v[len(v)//2:]) for k, v in kwargs.iteritems()))
 
 class Protocol(p2protocol.Protocol):
-    VERSION = 3502  # Updated to match active Litecoin p2pool network (ml.toom.im)
+    # Testing phase: 3503 = compatible with jtoomim peers (3502) while signaling
+    # our fork.  When V36 testing is complete, set this to 3600 (or auto-derive
+    # from max(share.MINIMUM_PROTOCOL_VERSION)).
+    VERSION = 3503
     
     max_remembered_txs_size = 25000000
     
@@ -160,13 +163,23 @@ class Protocol(p2protocol.Protocol):
         ('best_share_hash', pack.PossiblyNoneType(0, pack.IntType(256))),
     ])
     def handle_version(self, version, services, addr_to, addr_from, nonce, sub_version, mode, best_share_hash):
-        print "Peer %s:%s says protocol version is %s, client version %s" % (addr_from['address'], addr_from['port'], version, sub_version)
+        # Throttle peer version logging: only log each unique peer IP once per 5 minutes
+        import time as _time
+        _peer_key = addr_from['address']
+        _now = _time.time()
+        if not hasattr(self.node, '_peer_version_log_times'):
+            self.node._peer_version_log_times = {}
+        _last = self.node._peer_version_log_times.get(_peer_key, 0)
+        if _now - _last >= 300:
+            self.node._peer_version_log_times[_peer_key] = _now
+            print "Peer %s:%s says protocol version is %s, client version %s" % (addr_from['address'], addr_from['port'], version, sub_version)
         if self.other_version is not None:
             # This can happen during simultaneous connection attempts - just disconnect, don't ban
             print 'Peer %s:%i sent duplicate version message, disconnecting (will not ban)' % self.addr
             self.disconnect()
             return
-        if version < getattr(self.node.net, 'MINIMUM_PROTOCOL_VERSION', 1400):
+        min_ver = getattr(self.node.net, 'MINIMUM_PROTOCOL_VERSION', 1400)
+        if version < min_ver:
             raise PeerMisbehavingError('peer too old')
         
         self.other_version = version
@@ -258,7 +271,8 @@ class Protocol(p2protocol.Protocol):
                 self.remote_remembered_txs_size -= sum(100 + get_tx_packed_size(before[x]) for x in removed)
             if added:
                 self.remote_remembered_txs_size += sum(100 + get_tx_packed_size(after[x]) for x in added)
-                assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
+                if self.remote_remembered_txs_size > self.max_remembered_txs_size:
+                    raise ValueError('remote_remembered_txs_size %d exceeds max %d' % (self.remote_remembered_txs_size, self.max_remembered_txs_size))
                 fragment(self.send_remember_tx, tx_hashes=[x for x in added if x in self.remote_tx_hashes], txs=[after[x] for x in added if x not in self.remote_tx_hashes])
             t1 = time.time()
             if p2pool.BENCH and (t1-t0) > .01: print "%8.3f ms for update_remote_view_of_my_mining_txs" % ((t1-t0)*1000.)
@@ -267,7 +281,8 @@ class Protocol(p2protocol.Protocol):
         self.connection_lost_event.watch(lambda: self.node.mining_txs_var.transitioned.unwatch(watch_id2))
         
         self.remote_remembered_txs_size += sum(100 + get_tx_packed_size(x) for x in self.node.mining_txs_var.value.values())
-        assert self.remote_remembered_txs_size <= self.max_remembered_txs_size
+        if self.remote_remembered_txs_size > self.max_remembered_txs_size:
+            raise ValueError('remote_remembered_txs_size %d exceeds max %d' % (self.remote_remembered_txs_size, self.max_remembered_txs_size))
         fragment(self.send_remember_tx, tx_hashes=[], txs=self.node.mining_txs_var.value.values())
     
     message_ping = pack.ComposedType([])
@@ -339,7 +354,12 @@ class Protocol(p2protocol.Protocol):
                 share = p2pool_data.load_share(wrappedshare, self.node.net, self.addr)
             except (ValueError, struct.error) as e:
                 # MWEB transactions can cause parsing errors - skip this share
-                print '[MWEB-SKIP] Skipping unparseable share in handle_shares (likely MWEB tx): %s' % (e,)
+                # Rate-limit: log first occurrence, then every 100th
+                if not hasattr(self, '_mweb_share_skip_count'):
+                    self._mweb_share_skip_count = 0
+                self._mweb_share_skip_count += 1
+                if self._mweb_share_skip_count == 1 or self._mweb_share_skip_count % 100 == 0:
+                    print '[MWEB-SKIP] Skipped %d unparseable shares so far (likely MWEB tx): %s' % (self._mweb_share_skip_count, e)
                 continue
             if 13 <= wrappedshare['type'] < 34:
                 txs = []
@@ -455,7 +475,12 @@ class Protocol(p2protocol.Protocol):
                 res = [p2pool_data.load_share(share, self.node.net, self.addr) for share in shares if share['type'] >= p2pool_data.Share.VERSION]
             except (ValueError, struct.error) as e:
                 # MWEB transactions can cause parsing errors - skip these shares but don't disconnect
-                print '[MWEB-SKIP] Skipping sharereply with unparseable shares (likely MWEB tx): %s' % (e,)
+                # Rate-limit: log first occurrence, then every 100th
+                if not hasattr(self, '_mweb_reply_skip_count'):
+                    self._mweb_reply_skip_count = 0
+                self._mweb_reply_skip_count += 1
+                if self._mweb_reply_skip_count == 1 or self._mweb_reply_skip_count % 100 == 0:
+                    print '[MWEB-SKIP] Skipped %d sharereply parse errors so far (likely MWEB tx): %s' % (self._mweb_reply_skip_count, e)
                 res = []  # Return empty list - we'll get these shares from other peers
         else:
             res = failure.Failure(self.ShareReplyError(result))
@@ -544,9 +569,14 @@ class Protocol(p2protocol.Protocol):
     ])
     def handle_forget_tx(self, tx_hashes):
         for tx_hash in tx_hashes:
-            self.remembered_txs_size -= 100 + get_tx_packed_size(self.remembered_txs[tx_hash])
-            assert self.remembered_txs_size >= 0
-            del self.remembered_txs[tx_hash]
+            tx = self.remembered_txs.pop(tx_hash, None)
+            if tx is None:
+                if p2pool.DEBUG:
+                    print >>sys.stderr, '[P2P] forget_tx: Unknown transaction %064x - ignoring' % (tx_hash,)
+                continue
+            self.remembered_txs_size -= 100 + get_tx_packed_size(tx)
+            if self.remembered_txs_size < 0:
+                self.remembered_txs_size = 0
     
     
     def connectionLost(self, reason):
@@ -592,8 +622,10 @@ class ServerFactory(protocol.ServerFactory):
         return p
     
     def _host_to_ident(self, host):
-        a, b, c, d = host.split('.')
-        return a, b
+        parts = host.split('.')
+        if len(parts) == 4:
+            return parts[0], parts[1]
+        return (host,)  # IPv6 — use full address as ident
     
     def proto_made_connection(self, proto):
         ident = self._host_to_ident(proto.transport.getPeer().host)
@@ -635,8 +667,10 @@ class ClientFactory(protocol.ClientFactory):
         self.running = False
     
     def _host_to_ident(self, host):
-        a, b, c, d = host.split('.')
-        return a, b
+        parts = host.split('.')
+        if len(parts) == 4:
+            return parts[0], parts[1]
+        return (host,)  # IPv6 — use full address as ident
     
     def buildProtocol(self, addr):
         p = Protocol(self.node, False)
@@ -681,7 +715,9 @@ class ClientFactory(protocol.ClientFactory):
             if len(self.conns) < self.desired_conns and len(self.attempts) < self.max_attempts and self.node.addr_store:
                 (host, port), = self.node.get_good_peers(1)
                 
-                if self._host_to_ident(host) in self.attempts:
+                if ':' in host:
+                    pass # skip IPv6 - connectTCP triggers IDNA encoding errors
+                elif self._host_to_ident(host) in self.attempts:
                     pass
                 elif host in self.node.bans and self.node.bans[host] > time.time():
                     pass

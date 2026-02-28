@@ -32,7 +32,19 @@
 #include <stdint.h>
 #include <string.h>
 
-static __inline uint32_t
+/* MSVC compatibility: __inline is supported by MSVC but map to the
+ * standard C99 inline keyword when available.  For older MSVC that
+ * lacks stdint.h (< VS2010), typedefs would need to be provided
+ * via a compat header; MSVC 2015+ includes stdint.h natively. */
+#if defined(_MSC_VER)
+#  define SCRYPT_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#  define SCRYPT_INLINE __inline
+#else
+#  define SCRYPT_INLINE inline
+#endif
+
+static SCRYPT_INLINE uint32_t
 be32dec(const void *pp)
 {
 	const uint8_t *p = (uint8_t const *)pp;
@@ -41,7 +53,7 @@ be32dec(const void *pp)
 	    ((uint32_t)(p[1]) << 16) + ((uint32_t)(p[0]) << 24));
 }
 
-static __inline void
+static SCRYPT_INLINE void
 be32enc(void *pp, uint32_t x)
 {
 	uint8_t * p = (uint8_t *)pp;
@@ -52,7 +64,7 @@ be32enc(void *pp, uint32_t x)
 	p[0] = (x >> 24) & 0xff;
 }
 
-static __inline uint32_t
+static SCRYPT_INLINE uint32_t
 le32dec(const void *pp)
 {
 	const uint8_t *p = (uint8_t const *)pp;
@@ -61,7 +73,7 @@ le32dec(const void *pp)
 	    ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
 }
 
-static __inline void
+static SCRYPT_INLINE void
 le32enc(void *pp, uint32_t x)
 {
 	uint8_t * p = (uint8_t *)pp;
