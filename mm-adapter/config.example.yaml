@@ -1,0 +1,42 @@
+# Merged Mining RPC Adapter Configuration
+#
+# This adapter bridges P2Pool (parent chain miner) and the Dogecoin daemon
+# (merged chain). P2Pool connects to the adapter's server port; the adapter
+# forwards work requests to the upstream Dogecoin daemon.
+#
+# Copy this file to config.yaml and edit to match your setup.
+# See also: config.example.testnet.yaml for a testnet-specific example.
+
+# ── Adapter server settings (P2Pool connects here) ──────────────────────
+server:
+  host: "127.0.0.1"          # Bind address (use 0.0.0.0 to listen on all interfaces)
+  port: 44556                 # Port P2Pool's --merged-coind-rpc-port points to
+  rpc_user: "dogecoinrpc"    # Must match P2Pool's --merged-coind-rpc-user
+  rpc_password: "CHANGE_ME"  # Must match P2Pool's --merged-coind-rpc-password
+
+# ── Upstream Dogecoin daemon ────────────────────────────────────────────
+upstream:
+  host: "127.0.0.1"          # Dogecoin Core RPC host
+  port: 22555                 # Dogecoin mainnet RPC port (testnet: 44555)
+  rpc_user: "dogecoinrpc"    # Must match dogecoin.conf rpcuser
+  rpc_password: "CHANGE_ME"  # Must match dogecoin.conf rpcpassword
+  timeout: 30                 # RPC call timeout in seconds
+
+# ── Chain configuration ─────────────────────────────────────────────────
+chain:
+  name: "dogecoin"            # Human-readable label (no runtime effect)
+  chain_id: 98                # Dogecoin AuxPOW chain ID (decimal)
+  # Network magic bytes — used for block validation
+  # mainnet: c0c0c0c0 | testnet: fcc1b7dc
+  network_magic: "c0c0c0c0"
+
+# ── Pool identification ─────────────────────────────────────────────────
+# Embedded in OP_RETURN outputs of merged blocks to identify the pool.
+# Can be overridden per-request via {"coinbase_text": "..."} in getblocktemplate params.
+coinbase_text: "technocore"
+
+# ── Logging ──────────────────────────────────────────────────────────────
+logging:
+  level: "INFO"               # DEBUG | INFO | WARNING | ERROR
+  format: "text"              # text (human-readable) | json (structured)
+  file: null                  # Optional: path to a log file (null = stdout only)

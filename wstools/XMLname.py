@@ -59,7 +59,7 @@ def toXMLname(string):
 
     N = len(localname)
     X = [];
-    for i in range(N) :
+    for i in xrange(N) :
         if i< N-1 and T[i]==u'_' and T[i+1]==u'x':
             X.append(u'_x005F_')
         elif i==0 and N >= 3 and \

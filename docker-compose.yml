@@ -1,0 +1,73 @@
+# P2Pool Merged Mining — Full Stack (Litecoin + Dogecoin)
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in your values
+#   2. Copy mm-adapter/config.example.yaml to mm-adapter/config.docker.yaml and edit
+#   3. docker compose up -d
+#   4. Open http://localhost:9327/static/dashboard.html
+#
+# To run LTC-only (no merged mining), comment out the mm-adapter service
+# and remove the --merged-* flags from p2pool command.
+
+services:
+  # ── P2Pool Node ────────────────────────────────────────────────────────
+  p2pool:
+    build: .
+    container_name: p2pool
+    restart: unless-stopped
+    ports:
+      - "${P2POOL_STRATUM_PORT:-9327}:9327"   # Stratum + Web UI
+      - "${P2POOL_P2P_PORT:-9326}:9326"       # P2Pool P2P
+    volumes:
+      - p2pool-data:/app/data
+    environment:
+      - TZ=${TZ:-UTC}
+    command: >
+      --net litecoin
+      --coind-address ${LTC_DAEMON_HOST:-host.docker.internal}
+      --coind-rpc-port ${LTC_RPC_PORT:-9332}
+      --coind-p2p-port ${LTC_P2P_PORT:-9333}
+      --merged-coind-address mm-adapter
+      --merged-coind-rpc-port 44556
+      --merged-coind-p2p-port ${DOGE_P2P_PORT:-22556}
+      --merged-coind-p2p-address ${DOGE_DAEMON_HOST:-host.docker.internal}
+      --merged-coind-rpc-user ${DOGE_RPC_USER:-dogecoinrpc}
+      --merged-coind-rpc-password ${DOGE_RPC_PASSWORD:?Set DOGE_RPC_PASSWORD in .env}
+      --address ${LTC_PAYOUT_ADDRESS:?Set LTC_PAYOUT_ADDRESS in .env}
+      --give-author ${DONATE_PERCENT:-2}
+      -f ${NODE_FEE:-0}
+      --disable-upnp
+      --max-conns ${MAX_CONNS:-20}
+      --redistribute ${REDISTRIBUTE:-boost}
+      ${LTC_RPC_USER:-litecoinrpc} ${LTC_RPC_PASSWORD:?Set LTC_RPC_PASSWORD in .env}
+    depends_on:
+      mm-adapter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pypy", "-c", "import urllib2; urllib2.urlopen('http://localhost:9327/local_stats').read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  # ── MM-Adapter (Dogecoin bridge) ──────────────────────────────────────
+  mm-adapter:
+    build: ./mm-adapter
+    container_name: mm-adapter
+    restart: unless-stopped
+    expose:
+      - "44556"
+    volumes:
+      - ./mm-adapter/config.docker.yaml:/app/config.yaml:ro
+    environment:
+      - TZ=${TZ:-UTC}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:44556/')"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  p2pool-data:
+    name: p2pool-data

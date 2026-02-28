@@ -6,18 +6,67 @@ CHAIN_LENGTH = 24*60*60//10 # shares
 REAL_CHAIN_LENGTH = 24*60*60//10 # shares
 TARGET_LOOKBEHIND = 200 # shares
 SPREAD = 3 # blocks
+# Global Litecoin P2Pool network identifiers
 IDENTIFIER = 'e037d5b8c6923410'.decode('hex')
 PREFIX = '7208c1a53ef629b0'.decode('hex')
-P2P_PORT = 9338
+P2P_PORT = 9326
 MIN_TARGET = 0
+# MAX_TARGET: Share Difficulty Floor (easiest allowed)
+# =====================================================
+# This sets the MINIMUM share difficulty. Vardiff auto-adjusts UP from here.
+#
+# Formula: stratum_diff = (0xffff0000 * 2**192 / target) * 65536
+#   2**256//2**20 = diff 16  -> 5.3 sec/share at 13 GH/s (jtoomim default)
+#   2**256//2**21 = diff 32  -> 10.6 sec/share at 13 GH/s
+#   2**256//2**22 = diff 64  -> 21.1 sec/share at 13 GH/s
+#   2**256//2**24 = diff 256 -> 84.6 sec/share at 13 GH/s (too slow for small pools)
+#
+# If floor is too easy: share flooding -> network can't propagate -> orphans
+# If floor is too hard: small miners wait too long -> vardiff stuck at floor
+#
+# NOTE: MUST match jtoomim/p2pool for V35 compatibility!
 MAX_TARGET = 2**256//2**20 - 1
+# PERSIST: Sharechain persistence and peer sync mode
+# ===================================================
+# Controls whether node participates in sharechain sync with network:
+#
+# True  = Normal operation (RECOMMENDED for production):
+#         - Saves sharechain to disk (shares.0, shares.1, ...)
+#         - Loads sharechain from disk at startup
+#         - Downloads missing parent shares from peers
+#         - Connects to BOOTSTRAP_ADDRS and syncs with network
+#         - Stricter work event tolerance (3 events) for network consistency
+#
+# False = Bootstrap/solo mode (for testing or new network):
+#         - Does NOT save shares to disk (fresh start each time)
+#         - Does NOT require peers - can start its own sharechain
+#         - Higher work event tolerance (30 events) for isolated testing
+#         - Use when: bootstrapping new sharechain, running solo, testing
 PERSIST = True
 WORKER_PORT = 9327
-BOOTSTRAP_ADDRS = 'forre.st vps.forre.st litecoin-p2pool.com 95.211.21.103 37.229.117.57 66.228.48.21 180.169.60.179 112.84.181.102 74.214.62.115 209.141.46.154 78.27.191.182 66.187.70.88 88.190.223.96 78.47.242.59 158.182.39.43 180.177.114.80 216.230.232.35 94.231.56.87 62.38.194.17 82.67.167.12 183.129.157.220 71.19.240.182 216.177.81.88 109.106.0.130 113.10.168.210 218.22.102.12 85.69.35.7:54396 201.52.162.167 95.66.173.110:8331 109.65.171.93 95.243.237.90 208.68.17.67 87.103.197.163 101.1.25.211 144.76.17.34 209.99.52.72 198.23.245.250 46.151.21.226 66.43.209.193 59.127.188.231 178.194.42.169 85.10.35.90 110.175.53.212 98.232.129.196 116.228.192.46 94.251.42.75 195.216.115.94 24.49.138.81 61.158.7.36 213.168.187.27 37.59.10.166 72.44.88.49 98.221.44.200 178.19.104.251 87.198.219.221 85.237.59.130:9310 218.16.251.86 151.236.11.119 94.23.215.27 60.190.203.228 176.31.208.222 46.163.105.201 198.84.186.74 199.175.50.102 188.142.102.15 202.191.108.46 125.65.108.19 15.185.107.232 108.161.131.248 188.116.33.39 78.142.148.62 69.42.217.130 213.110.14.23 185.10.51.18 74.71.113.207 77.89.41.253 69.171.153.219 58.210.42.10 174.107.165.198 50.53.105.6 116.213.73.50 83.150.90.211 210.28.136.11 86.58.41.122 70.63.34.88 78.155.217.76 68.193.128.182 198.199.73.40 193.6.148.18 188.177.188.189 83.109.6.82 204.10.105.113 64.91.214.180 46.4.74.44 98.234.11.149 71.189.207.226'.split(' ')
+BOOTSTRAP_ADDRS = [
+        # Active p2pool nodes (verified 2026-02-26 via peer_addresses API)
+        'ml.toom.im',           # jtoomim's node (protocol 3502)
+        'usa.p2p-spb.xyz',      # p2p-spb pool node (protocol 3502)
+        # V36 nodes (protocol 3503)
+        '102.160.209.121',      # technocore node29 (v36)
+        '5.188.104.245',        # V36 peer
+        # Live peers seen by ml.toom.im and usa.p2p-spb.xyz
+        '20.127.82.115',        # Azure peer
+        '31.25.241.224',        # EU peer
+        '20.113.157.65',        # Azure peer
+        '20.106.76.227',        # Azure peer
+        '15.218.180.55',        # AWS peer
+        '173.79.139.224',       # US peer
+        '174.60.78.162',        # US peer
+]
 ANNOUNCE_CHANNEL = '#p2pool-ltc'
 VERSION_CHECK = lambda v: None if 100400 <= v else 'Litecoin version too old. Upgrade to 0.10.4 or newer!'
 VERSION_WARNING = lambda v: None
-SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit'])
-MINIMUM_PROTOCOL_VERSION = 1600
-NEW_MINIMUM_PROTOCOL_VERSION = 1700
+SOFTFORKS_REQUIRED = set(['bip65', 'csv', 'segwit', 'taproot', 'mweb'])
+MINIMUM_PROTOCOL_VERSION = 3301  # Runtime ratchet in data.py raises this when share versions reach 95%
 SEGWIT_ACTIVATION_VERSION = 17
+BLOCK_MAX_SIZE = 1000000
+BLOCK_MAX_WEIGHT = 4000000
+# Some networks have block inclusion/order rules that p2pool doesn't understand (e.g. Litecoin's MWEB)
+IMMUTABLE_BLOCKS = True

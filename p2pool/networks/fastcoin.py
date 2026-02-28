@@ -19,3 +19,5 @@ BOOTSTRAP_ADDRS = 'inetrader.com'.split(' ')
 ANNOUNCE_CHANNEL = '#p2pool-fst'
 VERSION_CHECK = lambda v: True
 VERSION_WARNING = lambda v: 'Upgrade Fastcoin to >= 0.10.2.2!' if v < 100202 else None
+BLOCK_MAX_SIZE = 1000000
+BLOCK_MAX_WEIGHT = 4000000

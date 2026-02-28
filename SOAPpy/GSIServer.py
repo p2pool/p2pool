@@ -1,5 +1,3 @@
-from __future__ import nested_scopes
-
 """
 GSIServer - Contributed by Ivan R. Judson <judson@mcs.anl.gov>
 
@@ -43,7 +41,9 @@ GSIServer - Contributed by Ivan R. Judson <judson@mcs.anl.gov>
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 ################################################################################
+
 """
+from __future__ import nested_scopes
 
 ident = '$Id: GSIServer.py 1468 2008-05-24 01:55:33Z warnes $'
 from version import __version__

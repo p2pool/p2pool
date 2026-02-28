@@ -55,6 +55,37 @@ class Protocol(protocol.Protocol):
             
             try:
                 self.packetReceived(command, type_.unpack(payload, self.ignore_trailing_payload))
+            except (struct.error, ValueError) as e:
+                # TODO: Implement proper MWEB (MimbleWimble Extension Block) transaction parsing
+                # MWEB transactions on Litecoin use a different serialization format that
+                # our standard Bitcoin tx parser cannot decode. For now, we gracefully skip
+                # these messages rather than disconnecting from the peer.
+                # See: https://github.com/litecoin-project/lips/blob/master/lip-0002.mediawiki
+                # 
+                # Messages containing transactions that may have MWEB data:
+                # - 'tx': standalone transaction message
+                # - 'remember_tx': P2Pool protocol message with list of transactions
+                # - 'shares': P2Pool shares which reference transactions
+                # - 'sharereply': P2Pool sharereply which contains full share data with txs
+                if command in ('tx', 'remember_tx', 'shares', 'sharereply'):
+                    # Rate-limit MWEB skip logs: print summary every 100 skips
+                    if not hasattr(self, '_mweb_skip_count'):
+                        self._mweb_skip_count = 0
+                        self._mweb_skip_first_time = None
+                    self._mweb_skip_count += 1
+                    import time as _time
+                    now = _time.time()
+                    if self._mweb_skip_count == 1:
+                        self._mweb_skip_first_time = now
+                        print '[MWEB-SKIP] Skipping unparseable %s message (likely contains MWEB tx): %s' % (command, e,)
+                    elif self._mweb_skip_count % 100 == 0:
+                        elapsed = now - self._mweb_skip_first_time if self._mweb_skip_first_time else 0
+                        print '[MWEB-SKIP] Skipped %d unparseable messages in %.0fs (latest: %s)' % (self._mweb_skip_count, elapsed, command)
+                    continue  # Skip this message but stay connected
+                else:
+                    print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
+                    log.err(None, 'Error handling message: (see RECV line)')
+                    self.disconnect()
             except:
                 print 'RECV', command, payload[:100].encode('hex') + ('...' if len(payload) > 100 else '')
                 log.err(None, 'Error handling message: (see RECV line)')

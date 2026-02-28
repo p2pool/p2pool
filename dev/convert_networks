@@ -13,8 +13,8 @@ python dev/convert_networks.py p2pool/networks.py p2pool/networks/ p2pool
 git add p2pool/networks/*.py
 git rm p2pool/networks.py
 
-mkdir -p p2pool/bitcoin/networks/
-cat > p2pool/bitcoin/networks/__init__.py << END
+mkdir -p p2pool/dash/networks/
+cat > p2pool/dash/networks/__init__.py << END
 import pkgutil
 
 nets = dict((name, __import__(name, globals(), fromlist="dummy"))
@@ -22,6 +22,6 @@ nets = dict((name, __import__(name, globals(), fromlist="dummy"))
 for net_name, net in nets.iteritems():
     net.NAME = net_name
 END
-python dev/convert_networks.py p2pool/bitcoin/networks.py p2pool/bitcoin/networks/ bitcoin
-git add p2pool/bitcoin/networks/*.py
-git rm p2pool/bitcoin/networks.py
+python dev/convert_networks.py p2pool/dash/networks.py p2pool/dash/networks/ dash
+git add p2pool/dash/networks/*.py
+git rm p2pool/dash/networks.py

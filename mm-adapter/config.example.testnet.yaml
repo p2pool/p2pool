@@ -1,0 +1,29 @@
+# Merged Mining RPC Adapter — Testnet Configuration
+#
+# Testnet-specific settings for Litecoin testnet + Dogecoin testnet merged mining.
+# Copy to config.yaml and adjust passwords to match your dogecoin.conf.
+
+server:
+  host: "127.0.0.1"
+  port: 44556
+  rpc_user: "dogecoinrpc"
+  rpc_password: "CHANGE_ME"
+
+upstream:
+  host: "127.0.0.1"
+  port: 44555                 # Dogecoin testnet RPC port
+  rpc_user: "dogecoinrpc"
+  rpc_password: "CHANGE_ME"
+  timeout: 30
+
+chain:
+  name: "dogecoin_testnet"
+  chain_id: 98
+  network_magic: "fcc1b7dc"  # Dogecoin testnet magic
+
+coinbase_text: "technocore"
+
+logging:
+  level: "DEBUG"              # Verbose logging for testnet debugging
+  format: "text"
+  file: null

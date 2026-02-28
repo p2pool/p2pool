@@ -1,0 +1,84 @@
+================================================================================
+LITECOIN P2POOL NETWORK - QUICK REFERENCE (2025-02-08)
+================================================================================
+
+LIVE NODES (2/15):
+┌──────────────────┬─────────────┬────────────┬──────────────┬────────────┐
+│ Node             │ Status      │ Hashrate   │ Peers (I/O)  │ Stale Rate │
+├──────────────────┼─────────────┼────────────┼──────────────┼────────────┤
+│ ml.toom.im       │ ONLINE 228d │ 10.7 GH/s  │ 5/3 (8 conn) │ 5.88%      │
+│ 20.106.76.227    │ ONLINE      │ 23.0 GH/s  │ 5/3 (8 conn) │ 1.80%      │
+├──────────────────┼─────────────┼────────────┼──────────────┼────────────┤
+│ TOTAL NETWORK    │ ONLINE      │ 33.7 GH/s  │              │            │
+└──────────────────┴─────────────┴────────────┴──────────────┴────────────┘
+
+OFFLINE NODES (13/15):
+  31.25.241.224, 83.221.211.116, crypto.office-on-the.net, 
+  ltc.p2pool.leblancnet.us, 51.148.43.34, 68.131.29.131, 87.102.46.100,
+  89.237.60.231, 95.79.35.133, 96.255.61.32, 174.56.93.93, 
+  178.238.236.130, 194.190.93.235
+
+KEY FINDINGS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ ml.toom.im is jtoomim's primary P2Pool global node (228+ days uptime)
+✓ 20.106.76.227 is secondary node with BETTER performance (1.8% vs 5.88% stale)
+✓ Both nodes are interconnected and reference each other as peers
+✓ All 13 legacy bootstrap addresses are OFFLINE (stale/discontinued)
+✓ Network has consolidated to 2 primary nodes with ~8 peer connections each
+✓ Internal IPs (10.0.1.2, 10.8.0.7) suggest same infrastructure/datacenter
+
+NETWORK TOPOLOGY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your 3 nodes (.29, .30, .31)
+         │
+         └─→ BOOTSTRAP_ADDRS
+              │
+              └─→ ml.toom.im (10.7 GH/s, 8 peers)
+                   │
+                   └─→ 20.106.76.227 (23.0 GH/s, 8 peers)
+                        │
+                        └─→ Other peers (mostly offline)
+
+RISKS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠ Single point of failure: Only 2 live nodes (ml.toom.im, 20.106.76.227)
+⚠ If ml.toom.im goes offline, network topology breaks
+⚠ Legacy bootstrap addresses are deprecated/stale
+⚠ New deployments need updated BOOTSTRAP_ADDRS
+
+V36 PROPAGATION PATH:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Local V36 shares (.29, .30, .31)
+         │
+         └─→ ml.toom.im (jtoomim) [depends on its signaling]
+              │
+              └─→ 20.106.76.227 [depends on its signaling]
+                   │
+                   └─→ Rest of network
+
+After LiF7 migration (08:50 Feb 8): All your miners now V36-signaling
+Expected activation: ~Feb 9 06:00-09:00 UTC (when old V35 shares age out)
+
+OPERATIONAL NOTES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Peer addresses obtained via /peer_addresses endpoint (HTTP)
+• ml.toom.im version: 16.0-204-g29fc6fc (jtoomim fork)
+• 20.106.76.227 has more diverse miners (8 vs 3-4)
+• Secondary node has significantly better performance metrics
+• All peer communication uses P2P protocol 3502
+
+RECOMMENDATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Update BOOTSTRAP_ADDRS in p2pool/networks/litecoin.py to only include:
+  - ml.toom.im (primary)
+  - 20.106.76.227 (secondary - optional)
+
+Remove all 13 offline legacy addresses to improve connection reliability.
+
+================================================================================

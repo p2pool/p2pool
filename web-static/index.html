@@ -46,13 +46,177 @@
                 d3.select('#efficiency').text(local_stats.efficiency != null ? d3.format('.4p')(local_stats.efficiency) : '???')
                 d3.select('#uptime').text(format_dt(local_stats.uptime));
                 d3.select('#block_value').text(local_stats.block_value);
+                d3.select('#block_value_payments').text(local_stats.block_value_payments || 0);
+                d3.select('#block_value_miner').text(local_stats.block_value_miner || local_stats.block_value);
                 
                 d3.select('#warnings').selectAll().data(local_stats.warnings).enter().append('p')
                     .text(function(w){ return 'Warning: ' + w })
                     .attr('style', 'color:red;border:1px solid red;padding:5px');
                 
+                // Version Signaling Status - Universal transition display
+                d3.json('../version_signaling', function(vs) {
+                    if (!vs || !vs.show_transition) {
+                        d3.select('#version-signaling').style('display', 'none');
+                        return;
+                    }
+                    d3.select('#version-signaling').style('display', 'block');
+                    d3.select('#version-transition-title').text(
+                        'V' + vs.current_share_type + ' \u2192 V' + vs.target_version + ' Transition');
+                    var statusBadge = d3.select('#version-signaling-status');
+                    statusBadge.text(vs.status.toUpperCase().replace(/_/g, ' '));
+                    var badgeColors = {
+                        'building_chain': '#FFC107', 'waiting': '#888',
+                        'propagating': '#2196F3', 'signaling': '#6f42c1',
+                        'signaling_strong': '#FF9800', 'activating': '#28a745',
+                        'no_transition': '#6f42c1'
+                    };
+                    statusBadge.style('background', badgeColors[vs.status] || '#888')
+                        .style('color', (vs.status === 'building_chain') ? '#000' : '#fff');
+                    if (!vs.chain_ready) {
+                        d3.select('#index-chain-maturity').style('display', 'block');
+                        d3.select('#index-chain-bar').style('width', vs.chain_maturity + '%');
+                        d3.select('#index-chain-bar-label').text(d3.format('.1f')(vs.chain_maturity) + '%');
+                        d3.select('#index-chain-progress-text').text(
+                            vs.chain_height + ' / ' + vs.chain_length_required + 
+                            ' (' + d3.format('.1f')(vs.chain_maturity) + '%) \u2014 need ' +
+                            (vs.chain_length_required - vs.chain_height) + ' more');
+                    } else {
+                        d3.select('#index-chain-maturity').style('display', 'none');
+                    }
+                    if (vs.status === 'propagating') {
+                        d3.select('#index-propagation').style('display', 'block');
+                        d3.select('#index-propagation-bar').style('width', vs.propagation_pct + '%');
+                        d3.select('#index-propagation-bar-label').text(d3.format('.1f')(vs.overall_v36_vote_pct) + '% V36');
+                        var etaMin = Math.round(vs.time_to_window_seconds / 60);
+                        var etaH = Math.floor(etaMin / 60); var etaM = etaMin % 60;
+                        var etaStr = etaH > 0 ? etaH + 'h ' + etaM + 'm' : etaM + 'm';
+                        d3.select('#index-propagation-text').text(
+                            'V' + vs.target_version + ' votes: ' + vs.overall_v36_votes + '/' + vs.overall_total +
+                            ' (' + d3.format('.1f')(vs.overall_v36_vote_pct) + '% of full chain). ' +
+                            'Reach sampling window in ~' + etaStr);
+                    } else {
+                        d3.select('#index-propagation').style('display', 'none');
+                    }
+                    var sigPct = vs.sampling_signaling;
+                    var barPct = vs.overall_v36_vote_pct > sigPct ? vs.overall_v36_vote_pct : sigPct;
+                    d3.select('#version-signaling-bar').style('width', Math.min(100, barPct) + '%');
+                    var idxSigLabel = barPct >= 15 ? d3.format('.1f')(barPct) + '%' : '';
+                    if (vs.overall_v36_vote_pct > sigPct + 0.1 && barPct >= 20) {
+                        idxSigLabel = d3.format('.1f')(vs.overall_v36_vote_pct) + '% chain / ' + d3.format('.1f')(sigPct) + '% window';
+                    }
+                    d3.select('#index-signaling-bar-label').text(idxSigLabel);
+                    if (barPct < 15) {
+                        d3.select('#index-signaling-bar-label')
+                            .style('right', 'auto').style('left', 'calc(100% + 6px)')
+                            .style('color', '#555').style('text-shadow', 'none')
+                            .text(d3.format('.1f')(barPct) + '%');
+                    } else {
+                        d3.select('#index-signaling-bar-label')
+                            .style('left', null).style('right', '6px')
+                            .style('color', '#fff').style('text-shadow', '0 1px 2px rgba(0,0,0,0.5)');
+                    }
+                    var samplingStr;
+                    if (vs.chain_ready) {
+                        if (vs.overall_v36_vote_pct > sigPct + 0.1) {
+                            samplingStr = d3.format('.1f')(vs.overall_v36_vote_pct) + '% V' + vs.target_version +
+                                ' desired in full chain (' + vs.overall_v36_votes + '/' + vs.overall_total + '). ' +
+                                'Sampling: ' + d3.format('.1f')(sigPct) + '% of ' + vs.sampling_window_size +
+                                ' (need 95%)';
+                        } else {
+                            samplingStr = d3.format('.1f')(sigPct) + '% of ' + vs.sampling_window_size + 
+                                ' shares voting V' + vs.target_version + ' (need 95%)';
+                        }
+                    } else {
+                        samplingStr = d3.format('.1f')(vs.overall_v36_vote_pct || vs.target_percentage) + '% overall (activates at ' +
+                            vs.chain_length_required + ' shares)';
+                    }
+                    d3.select('#index-sampling-text').text(samplingStr);
+                    d3.select('#index-status-message').text(vs.message);
+                    d3.select('#index-current-type').text(
+                        vs.current_share_name + ' (V' + vs.current_share_type + ')');
+                    if (vs.share_types) {
+                        var parts = [];
+                        for (var ver in vs.share_types) {
+                            var t = vs.share_types[ver];
+                            parts.push('V' + ver + ' format: ' + d3.format('.1f')(t.percentage) + '% (' + t.count + ')');
+                        }
+                        // Full-chain desired_version vote counts
+                        var fcv = vs.full_chain_versions;
+                        if (fcv) {
+                            var voteParts = [];
+                            for (var ver in fcv) {
+                                voteParts.push('V' + ver + ' desired: ' + fcv[ver].count + ' (' +
+                                    d3.format('.1f')(fcv[ver].percentage) + '%)');
+                            }
+                            parts.push(voteParts.join(', '));
+                        }
+                        d3.select('#index-chain-types').text(parts.join(' | '));
+                    }
+                    // Transition message from share messaging system
+                    var tmsg = vs.transition_message;
+                    if (tmsg && tmsg.msg) {
+                        d3.select('#index-transition-msg').style('display', 'block');
+                        d3.select('#index-tmsg-text').text(tmsg.msg);
+                        var label = 'Transition Signal';
+                        if (tmsg.from_ver && tmsg.to_ver) {
+                            label = 'V' + tmsg.from_ver + ' → V' + tmsg.to_ver + ' Transition Signal';
+                        }
+                        d3.select('#index-tmsg-label').text(label);
+                        var urg = tmsg.urgency || 'info';
+                        var urgColors = { 'info': '#2196F3', 'recommended': '#FF9800', 'required': '#F44336' };
+                        var urgBorder = urgColors[urg] || '#2196F3';
+                        d3.select('#index-transition-msg').style('border-left-color', urgBorder);
+                        d3.select('#index-tmsg-label').style('color', urgBorder);
+                        d3.select('#index-tmsg-urgency').text(urg.toUpperCase()).style('color', urgBorder);
+                        if (tmsg.url) {
+                            d3.select('#index-tmsg-url-row').style('display', 'block');
+                            d3.select('#index-tmsg-url').attr('href', tmsg.url).text(tmsg.url);
+                        } else {
+                            d3.select('#index-tmsg-url-row').style('display', 'none');
+                        }
+                    } else {
+                        d3.select('#index-transition-msg').style('display', 'none');
+                    }
+                    // Authority announcements (shown independent of transition)
+                    var announcements = vs.authority_announcements || [];
+                    var annDiv = d3.select('#index-announcements');
+                    annDiv.selectAll('*').remove();
+                    if (announcements.length > 0) {
+                        var urgStyles = {
+                            'info': { bg: '#e8f4fd', border: '#2196F3', fg: '#1976D2' },
+                            'recommended': { bg: '#fff3e0', border: '#FF9800', fg: '#E65100' },
+                            'required': { bg: '#ffebee', border: '#F44336', fg: '#C62828' },
+                            'alert': { bg: '#ffebee', border: '#F44336', fg: '#C62828' }
+                        };
+                        announcements.forEach(function(ann) {
+                            if (!ann.text) return;
+                            var urg = ann.urgency || 'info';
+                            var style = urgStyles[urg] || urgStyles['info'];
+                            if (ann.type_id === 16) { style = urgStyles['alert']; urg = 'alert'; }
+                            var card = annDiv.append('div')
+                                .style('padding', '8px 12px').style('border-left', '3px solid ' + style.border)
+                                .style('background', style.bg).style('border-radius', '3px').style('margin-bottom', '6px');
+                            var hdr = card.append('div').style('display', 'flex').style('align-items', 'center').style('gap', '6px');
+                            hdr.append('strong').style('font-size', '0.9em').style('color', style.fg).text(ann.type || 'Announcement');
+                            hdr.append('span').style('font-size', '0.75em').style('font-weight', 'bold').style('color', style.fg).text(urg.toUpperCase());
+                            if (ann.age != null) {
+                                var ageText = ann.age < 3600 ? Math.floor(ann.age/60) + 'm ago' :
+                                              ann.age < 86400 ? Math.floor(ann.age/3600) + 'h ago' :
+                                              Math.floor(ann.age/86400) + 'd ago';
+                                hdr.append('span').style('font-size', '0.72em').style('color', '#888').style('margin-left', 'auto').text(ageText);
+                            }
+                            card.append('div').style('font-size', '0.85em').style('color', '#333').style('margin-top', '4px').text(ann.text);
+                            if (ann.url) {
+                                card.append('div').style('margin-top', '4px')
+                                    .append('a').attr('href', ann.url).attr('target', '_blank').attr('rel', 'noopener')
+                                    .style('font-size', '0.8em').style('color', '#1976D2').text(ann.url);
+                            }
+                        });
+                    }
+                });
+                
                 var time_to_share = local_stats.attempts_to_share/local;
-                d3.select('#time_to_share').text(format_dt(time_to_share));
+                d3.select('#time_to_share').text(local > 0 ? format_dt(time_to_share) : 'Infinity years');
                 
                 d3.json('../global_stats', function(global_stats) {
                     d3.select('#pool_rate').text(d3.format('.3s')(global_stats.pool_hash_rate) + 'H/s');
@@ -62,7 +226,37 @@
                     var time_to_block = local_stats.attempts_to_block/global_stats.pool_hash_rate;
                     d3.select('#time_to_block').text(format_dt(time_to_block));
                     
-                    d3.select('#expected_payout_amount').text(d3.format('.3r')(local/global_stats.pool_hash_rate*local_stats.block_value*(1-local_stats.donation_proportion)));
+                    // Calculate expected payout for 24 hours of mining
+                    var block_value = local_stats.block_value_miner || local_stats.block_value || 0;
+                    var donation = local_stats.donation_proportion || 0;
+                    if (local > 0 && global_stats.pool_hash_rate > 0 && time_to_block > 0 && block_value > 0) {
+                        var blocks_in_24h = (24 * 3600) / time_to_block;
+                        var payout_per_block = (local/global_stats.pool_hash_rate) * block_value * (1 - donation);
+                        var expected_24h_payout = payout_per_block * blocks_in_24h;
+                        d3.select('#expected_payout_amount').text(d3.format('.3r')(expected_24h_payout));
+                    } else {
+                        d3.select('#expected_payout_amount').text('0');
+                    }
+                    
+                    // Fetch and display merged mining expected payout
+                    d3.json('../merged_stats', function(merged_stats) {
+                        if (merged_stats && merged_stats.block_value && merged_stats.symbol) {
+                            d3.select('#merged_block_value').text(d3.format('.2f')(merged_stats.block_value));
+                            d3.select('#merged_symbol').text(merged_stats.symbol);
+                            d3.select('#merged_symbol2').text(merged_stats.symbol);
+                            d3.select('#merged_info').style('display', 'block');
+                            
+                            // Calculate merged expected payout for 24 hours
+                            if (local > 0 && global_stats.pool_hash_rate > 0 && time_to_block > 0) {
+                                var blocks_in_24h = (24 * 3600) / time_to_block;
+                                var merged_payout_per_block = (local/global_stats.pool_hash_rate) * merged_stats.block_value * (1 - donation);
+                                var expected_merged_24h = merged_payout_per_block * blocks_in_24h;
+                                d3.select('#expected_merged_payout').text(d3.format('.2f')(expected_merged_24h));
+                            } else {
+                                d3.select('#expected_merged_payout').text('0');
+                            }
+                        }
+                    });
                 });
             });
             
@@ -73,39 +267,199 @@
             d3.json('../web/currency_info', function(currency_info) {
                 d3.selectAll('.symbol').text(currency_info.symbol);
                 
-                d3.json('../current_payouts', function(pays) {
+                // Use current_merged_payouts which includes derived merged addresses
+                d3.json('../current_merged_payouts', function(mergedPays) {
                     var totamount=0.0;
-
-                    d3.json('../payout_addr', function(addr) {
-                        d3.select('#payout_addr').text(addr).attr('href', currency_info.address_explorer_url_prefix + addr);
-                        d3.select('#payout_amount').text(addr in pays ? pays[addr] : 0);
-                    });
-                    d3.json('../payout_addrs', function(addrs) {
-                        d3.select('#payout_addrs').text(addrs);
-
-                        for (var i in addrs) {
-                        	totamount = totamount + (addrs[i] in pays ? pays[addrs[i]] : 0);
-                        }
-	                d3.select('#payout_totamount').text(totamount);
-                    });
-
-                    var arr = []; for(var i in pays) arr.push(i); arr.sort(function(a, b){return pays[b] - pays[a]});
+                    var mergedTotal=0.0;
+                    var mergedSymbol='';
                     
-                    var tr = d3.select('#payouts').selectAll().data(arr).enter().append('tr');
-                    tr.append('td').append('a').text(function(addr){return addr}).attr('href', function(addr){return currency_info.address_explorer_url_prefix + addr});
-                    tr.append('td').text(function(addr){return pays[addr]});
+                    // Calculate totals
+                    for (var addr in mergedPays) {
+                        totamount += mergedPays[addr].amount || 0;
+                        if (mergedPays[addr].merged) {
+                            mergedPays[addr].merged.forEach(function(m) {
+                                mergedTotal += m.amount || 0;
+                                if (!mergedSymbol) mergedSymbol = m.symbol;
+                            });
+                        }
+                    }
+                    d3.select('#payout_totamount').text(totamount.toFixed(8));
+
+                    var arr = []; for(var i in mergedPays) arr.push(i); 
+                    arr.sort(function(a, b){return (mergedPays[b].amount || 0) - (mergedPays[a].amount || 0)});
+                    
+                    // Render payouts table with merged chain sub-rows
+                    arr.forEach(function(addr) {
+                        var entry = mergedPays[addr];
+                        
+                        // Main row for parent chain
+                        var mainRow = d3.select('#payouts').append('tr');
+                        mainRow.append('td').append('a')
+                            .text(addr)
+                            .attr('href', currency_info.address_explorer_url_prefix + addr);
+                        mainRow.append('td').text((entry.amount || 0).toFixed(8));
+                        
+                        // Sub-rows for merged chain addresses
+                        if (entry.merged && entry.merged.length > 0) {
+                            entry.merged.forEach(function(merged) {
+                                var subRow = d3.select('#payouts').append('tr')
+                                    .style('background', 'rgba(111, 66, 193, 0.15)');
+                                
+                                var addrCell = subRow.append('td')
+                                    .style('padding-left', '20px');
+                                addrCell.append('span')
+                                    .style('color', '#6f42c1')
+                                    .style('font-weight', 'bold')
+                                    .text('↳ ' + merged.symbol + ': ');
+                                addrCell.append('a')
+                                    .style('color', '#6f42c1')
+                                    .text(merged.address)
+                                    .attr('href', getMergedExplorerUrl(merged.symbol, merged.address));
+                                
+                                subRow.append('td')
+                                    .style('color', '#6f42c1')
+                                    .text(d3.format('.2f')(merged.amount || 0));
+                            });
+                        }
+                    });
                     
                     var total_tr = d3.select('#payouts').append('tr');
                     total_tr.append('td').append('strong').text('Total');
-                    total_tr.append('td').text(d3.sum(arr, function(addr){return pays[addr]}).toFixed(8));
+                    total_tr.append('td').text(totamount.toFixed(8));
+                    
+                    // Add merged total row if we have merged payouts
+                    if (mergedTotal > 0 && mergedSymbol) {
+                        var merged_total_tr = d3.select('#payouts').append('tr')
+                            .style('background', 'rgba(111, 66, 193, 0.2)');
+                        merged_total_tr.append('td').append('strong')
+                            .style('color', '#6f42c1')
+                            .text('Total Merged (' + mergedSymbol + ')');
+                        merged_total_tr.append('td')
+                            .style('color', '#6f42c1')
+                            .style('font-weight', 'bold')
+                            .text(d3.format('.2f')(mergedTotal));
+                    }
                 });
                 
+                function getMergedExplorerUrl(symbol, address) {
+                    var explorers = {
+                        'tDOGE': 'https://dogechain.info/address/',
+                        'DOGE': 'https://dogechain.info/address/',
+                    };
+                    return (explorers[symbol] || '#') + address;
+                }
+                
                 d3.json('../recent_blocks', function(blocks) {
-                    var tr = d3.select('#blocks').selectAll().data(blocks).enter().append('tr');
+                    // Limit to 10 most recent blocks
+                    var displayBlocks = blocks.slice(0, 10);
+                    var tr = d3.select('#blocks').selectAll().data(displayBlocks).enter().append('tr');
                     tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
                     tr.append('td').text(function(block){return block.number});
                     tr.append('td').append('a').text(function(block){return block.hash}).attr('href', function(block){return currency_info.block_explorer_url_prefix + block.hash});
                     tr.append('td').append('a').text('→').attr('href', function(block){return 'share.html#' + block.share});
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (!block.luck) return '#888';
+                            if (block.luck >= 100) return '#28a745';
+                            if (block.luck >= 75) return '#ffc107';
+                            return '#dc3545';
+                        })
+                        .style('font-weight', 'bold')
+                        .attr('title', function(block){
+                            if (!block.time_to_find) return '';
+                            var msg = 'Found in ' + format_dt(block.time_to_find);
+                            if (block.expected_time) msg += ' (expected: ' + format_dt(block.expected_time) + ')';
+                            if (block.luck_method) msg += ' [' + block.luck_method + ']';
+                            return msg;
+                        })
+                        .text(function(block){
+                            if (!block.luck) return '-';
+                            return d3.format('.0f')(block.luck) + '%';
+                        });
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (block.status === 'confirmed') return '#28a745';
+                            if (block.status === 'orphaned') return '#dc3545';
+                            return '#ffc107';
+                        })
+                        .style('font-weight', 'bold')
+                        .text(function(block){
+                            if (block.status === 'confirmed') return '✓ Confirmed';
+                            if (block.status === 'orphaned') return '✗ Orphaned';
+                            return '⏳ Pending';
+                        });
+                });
+                
+                // Merged mining blocks
+                d3.json('../recent_merged_blocks', function(merged_blocks) {
+                    if (!merged_blocks || merged_blocks.length === 0) {
+                        d3.select('#merged_blocks_section').style('display', 'none');
+                        return;
+                    }
+                    d3.select('#merged_blocks_section').style('display', 'block');
+                    
+                    // Limit to 10 most recent merged blocks
+                    var displayBlocks = merged_blocks.slice(0, 10);
+                    
+                    // Block explorer URLs for different merged mining chains
+                    // Note: Use block hash (not pow_hash) for explorer links
+                    var merged_explorers = {
+                        98: {  // Dogecoin (chainid 98)
+                            testnet: 'https://dogechain.info/block/',
+                            mainnet: 'https://dogechain.info/block/',
+                        },
+                        // Add more chain explorers here as needed
+                    };
+                    
+                    var tr = d3.select('#merged_blocks').selectAll().data(displayBlocks).enter().append('tr');
+                    tr.append('td').text(function(block){return new Date(1000*block.ts).toString()});
+                    tr.append('td')
+                        .style('font-weight', 'bold')
+                        .style('color', '#6f42c1')
+                        .text(function(block){return block.symbol || block.network || 'AUX'});
+                    tr.append('td').text(function(block){return block.chainid || '-'});
+                    // Display pow_hash (unique per found block) with explorer link
+                    tr.append('td').append('a')
+                        .text(function(block){
+                            // Show pow_hash which is unique per found block
+                            var display_hash = block.pow_hash || '-';
+                            return display_hash.substring(0, 16) + '...';
+                        })
+                        .attr('href', function(block){
+                            var explorer_config = merged_explorers[block.chainid];
+                            if (explorer_config && block.pow_hash) {
+                                // Use testnet explorer for now (could detect from network name)
+                                var explorer = explorer_config.testnet;
+                                return explorer + block.pow_hash;
+                            }
+                            return '#';
+                        })
+                        .attr('target', '_blank')
+                        .attr('title', function(block){
+                            return 'POW Hash: ' + (block.pow_hash || 'N/A') + '\nTemplate Hash: ' + (block.hash || 'N/A');
+                        });
+                    tr.append('td').text(function(block){return block.miner || '-'});
+                    tr.append('td').text(function(block){return block.txs || '-'});
+                    tr.append('td')
+                        .style('color', function(block){
+                            if (block.is_testnet) {
+                                // Testnet: show verification status
+                                if (block.verified === true) return '#28a745';  // Green for verified
+                                if (block.verified === false) return '#dc3545';  // Red for orphaned
+                                return '#ffc107';  // Yellow for pending verification
+                            }
+                            return '#17a2b8';  // Blue for mainnet (submitted)
+                        })
+                        .style('font-weight', 'bold')
+                        .text(function(block){
+                            if (block.is_testnet) {
+                                // Testnet: show verification status
+                                if (block.verified === true) return '✓ Verified';
+                                if (block.verified === false) return '✗ Orphaned';
+                                return '⏳ Verifying...';
+                            }
+                            return '↑ Submitted';  // Mainnet: just show submitted
+                        });
                 });
             });
             
@@ -123,22 +477,68 @@
             fill('../web/heads', '#heads');
             fill('../web/verified_tails', '#verified_tails');
             fill('../web/tails', '#tails');
-            fill('../web/my_share_hashes', '#my_share_hashes');
+            fill('../web/my_share_hashes50', '#my_share_hashes');
         </script>
     </head>
     <body>
         <h1>P2Pool <span class="symbol"></span></h1>
-        <p><a href="graphs.html">Graphs</a></p>
+        <p><a href="dashboard.html"><strong>🆕 New Dashboard</strong></a> | <a href="graphs.html">Graphs</a> | <a href="stratum.html">Stratum Stats</a></p>
         <p>Version: <span id="version"></span></p>
         <p>Pool rate: <span id="pool_rate"></span> (<span id="pool_stale"></span> DOA+orphan) Share difficulty: <span id="difficulty"></span></p>
         <p>Node uptime: <span id="uptime"></span> Peers: <span id="peers_out"></span> out, <span id="peers_in"></span> in</p>
         <p>Local rate: <span id="local_rate"></span> (<span id="local_doa"></span> DOA) Expected time to share: <span id="time_to_share"></span></p>
         <p>Shares: <span id="shares_total"></span> total (<span id="shares_orphan"></span> orphaned, <span id="shares_dead"></span> dead) Efficiency: <span id="efficiency"></span></p>
-        <p>Payout if a block were found NOW: <span id="payout_totamount"></span> <span class="symbol"></span> to <a id="payout_addrs"></a>. Expected after mining for 24 hours:  <span id="expected_payout_amount"></span> <span class="symbol"></span> per block.</p>
-        <p>Current block value: <span id="block_value"></span> <span class="symbol"></span> Expected time to block: <span id="time_to_block"></span></p>
+        <p>Payout if a block were found NOW: <span id="payout_totamount"></span> <span class="symbol"></span> to <a id="payout_addrs"></a>. Expected payout after mining for 24 hours: <span id="expected_payout_amount"></span> <span class="symbol"></span></p>
+        <p id="merged_info" style="display:none; color:#6f42c1; font-weight:bold;">Merged mining block value: <span id="merged_block_value"></span> <span id="merged_symbol"></span>. Expected merged payout (24h): <span id="expected_merged_payout"></span> <span id="merged_symbol2"></span></p>
+        <p>Current block value: <span id="block_value"></span> <span class="symbol"></span>. Expected time to block: <span id="time_to_block"></span></p>
         <div id="warnings"></div>
         
-        <h2>Share explorer</h2>
+        <!-- Version Signaling Status -->
+        <div id="version-signaling" style="display:none; background:#f0e6ff; border:2px solid #6f42c1; border-radius:5px; padding:10px; margin:10px 0;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span style="font-size:1.2em;">🔄</span>
+                <strong id="version-transition-title">Version Transition</strong>
+                <span id="version-signaling-status" style="padding:2px 8px; border-radius:3px; font-size:0.8em; font-weight:bold;">-</span>
+            </div>
+            <div id="index-chain-maturity" style="display:none; margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;">Chain Maturity: <span id="index-chain-progress-text">-</span></div>
+                <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:hidden; position:relative;">
+                    <div id="index-chain-bar" style="height:100%; background:linear-gradient(90deg, #FFC107, #FF9800); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-chain-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+                </div>
+            </div>
+            <div id="index-propagation" style="display:none; margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;"><span id="index-propagation-text">-</span></div>
+                <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:visible; position:relative;">
+                    <div id="index-propagation-bar" style="height:100%; background:linear-gradient(90deg, #2196F3, #03A9F4); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-propagation-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+                </div>
+            </div>
+            <div style="margin-top:8px; font-size:0.85em; color:#555;">Sampling Window: <span id="index-sampling-text">-</span></div>
+            <div style="background:#ddd; height:20px; border-radius:10px; margin-top:4px; overflow:visible; position:relative;">
+                <div id="version-signaling-bar" style="height:100%; background:linear-gradient(90deg, #6f42c1, #28a745); width:0%; transition:width 0.5s; position:relative; border-radius:10px;"><span id="index-signaling-bar-label" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); font-size:0.72em; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); white-space:nowrap;"></span></div>
+            </div>
+            <div style="margin-top:8px;">
+                <div style="font-size:0.85em; color:#555;" id="index-status-message"></div>
+                <div style="font-size:0.8em; color:#888; margin-top:4px;">
+                    Current: <span id="index-current-type">-</span>
+                    &nbsp;|&nbsp; Chain: <span id="index-chain-types">-</span>
+                </div>
+            </div>
+            <!-- Transition Message -->
+            <div id="index-transition-msg" style="display:none; margin-top:8px; padding:8px 12px; border-left:3px solid #2196F3; background:#e8f4fd; border-radius:3px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <strong id="index-tmsg-label" style="font-size:0.9em; color:#2196F3;">Transition Signal</strong>
+                    <span id="index-tmsg-urgency" style="font-size:0.75em; font-weight:bold; color:#2196F3;">INFO</span>
+                </div>
+                <div id="index-tmsg-text" style="font-size:0.85em; color:#333; margin-top:4px;"></div>
+                <div id="index-tmsg-url-row" style="display:none; margin-top:4px;">
+                    <a id="index-tmsg-url" href="#" target="_blank" rel="noopener" style="font-size:0.8em; color:#1976D2;">Get latest release</a>
+                </div>
+            </div>
+            <!-- Authority Announcements -->
+            <div id="index-announcements" style="margin-top:8px;"></div>
+        </div>
+        
+<h2>Share explorer</h2>
         <p>Best share: <span id="best_share"></span></p>
         <p>Verified heads: <span id="verified_heads"></span></p>
         <p>Heads: <span id="heads"></span></p>
@@ -146,11 +546,19 @@
         <p>Tails: <span id="tails"></span></p>
         <p>My shares: <span id="my_share_hashes"></span></p>
         
-        <h2>Blocks found in last day:</h2>
+        <h2>Blocks found recently:</h2>
         <p>Note that blocks may have been orphaned from the P2Pool chain and so not be here.</p>
         <table border="1" id="blocks">
-            <tr><th>time</th><th>number</th><th>hash/explorer link</th><th>share</th></tr>
+            <tr><th>time</th><th>number</th><th>hash/explorer link</th><th>share</th><th>luck</th><th>status</th></tr>
         </table>
+        
+        <div id="merged_blocks_section" style="display:none;">
+            <h2>Merged Mining Blocks found recently:</h2>
+            <p>Blocks found on auxiliary chains via merged mining.</p>
+            <table border="1" id="merged_blocks">
+                <tr><th>time</th><th>network</th><th>chain id</th><th>block hash/explorer</th><th>miner</th><th>txs</th><th>status</th></tr>
+            </table>
+        </div>
         
         <h2>Payouts if a block were found NOW:</h2>
         <table border="1" id="payouts">

@@ -1,0 +1,159 @@
+P2POOL LITECOIN NETWORK - COMPLETE DISCOVERY & ANALYSIS SUMMARY
+                          2025-02-08
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 NETWORK OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total Nodes Discovered:     13 (9 online, 4 offline)
+Total Online Hashrate:      61.01 GH/s
+Network Size:              47,000x smaller than Litecoin global network
+
+Improvement from Previous Scan:
+  ✓ 4.5x more nodes discovered (2→9 online)
+  ✓ 81% more hashrate found (33.7→61.01 GH/s)
+  ✓ Discovered hidden cluster controlling 66% of hashrate
+  ✓ Network much larger than bootstrap list suggested
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 CRITICAL FINDING: NEW ACTIVE CLUSTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Three new nodes deployed 2 days ago now control 66% of network hashrate!
+
+  Node                Hashrate      Uptime    Version              Status
+  ────────────────────────────────────────────────────────────────────────
+  20.106.76.227       22.16 GH/s     2 days    16.0-203-g95b882a0   DOMINANT
+  20.113.157.65       13.19 GH/s     2 days    16.0-203-g95b882a0   HIGH
+  20.127.82.115        5.04 GH/s     2 days    16.0-203-g95b882a0   MEDIUM
+  ────────────────────────────────────────────────────────────────────────
+  CLUSTER TOTAL       40.39 GH/s     2 days                         66% NETWORK
+
+⚠️  Key Concern: Running DIFFERENT code version than jtoomim's legacy nodes!
+    16.0-203-* (new) vs 16.0-204-* (jtoomim) — version divergence
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏛️ LEGACY NODES (jtoomim's Original Infrastructure)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Node                Hashrate      Uptime      Version             Status
+  ────────────────────────────────────────────────────────────────────────
+  ml.toom.im          10.01 GH/s     228 days    16.0-204-g29fc6fc   STABLE
+  15.218.180.55       10.00 GH/s     228 days    16.0-204-g29fc6fc   STABLE
+  ────────────────────────────────────────────────────────────────────────
+  TOTAL               20.01 GH/s     228 days                        33% NETWORK
+
+✓ Rock-solid uptime (228 days each)
+✓ Stable version (jtoomim's production fork)
+✓ Well-connected (5in/3out peers each)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📉 ARCHIVE NODES (Low/Zero Hashrate)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Node                Hashrate      Uptime      Version             Notes
+  ────────────────────────────────────────────────────────────────────────
+  174.60.78.162       0.42 GH/s      58 days     16.0-202-gece15b0   OLD
+  173.79.139.224      0.19 GH/s      58 days     16.0-202-gece15b0   OLD
+  66.151.242.154      0.00 GH/s     173 days     77.0.0-12-g5493200  OBSOLETE!
+  31.25.241.224       0.00 GH/s      53 days     77.0.0-12-g5493200  OBSOLETE!
+
+⚠️  Note: Last 2 nodes running incompatible codebase (version 77!)
+     Likely from different P2Pool fork, dead relay nodes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 HASHRATE BREAKDOWN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+New Cluster (2 days):           40.39 GH/s  (66.2% of network)  DOMINANT
+Legacy jtoomim (228 days):      20.01 GH/s  (32.8% of network)  STABLE
+Old/Archive nodes:              0.61 GH/s   (1.0% of network)   DECAY
+
+Total P2Pool Network:           61.01 GH/s
+Litecoin Global Network:        2,880 EH/s  (~47,000x larger)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ VERSION DISTRIBUTION (Code Divergence!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+16.0-203-g95b882a0 (NEWER):     40.39 GH/s (66%) - New cluster
+16.0-204-g29fc6fc (LEGACY):     20.01 GH/s (33%) - jtoomim main
+16.0-202-gece15b0 (OLD):         0.61 GH/s  (1%)  - Archive
+77.0.0-12-g5493200 (OBSOLETE):  0.00 GH/s  (0%)  - Dead (incompatible)
+
+⚠️ Network running 4 different code versions! Potential fork risk.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ NETWORK HEALTH SCORE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Redundancy:              ✓✓✓ (9 nodes, 4 offline internal)
+Connectivity:           ✓✓✓ (8-peer mesh, no bottlenecks)
+Stability:              ✓✓  (Legacy nodes 228d, new cluster 2d risk)
+Version Cohesion:       ✓   (4 different code versions = fragmentation)
+Geographic Distribution: ✓✓✓ (Multiple IP blocks, likely multi-datacenter)
+Long-term Viability:    ⚠️  (New cluster 66% hashrate, high volatility risk)
+
+OVERALL HEALTH RATING: GOOD with CAUTION on new cluster stability
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎬 CRITICAL ACTION ITEMS FOR V36 DEPLOYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 🔴 URGENT: Check new cluster's V36 signaling
+   Action: Query /version_signaling on 20.106.76.227, 20.113.157.65
+   Impact: Determines if V36 activation happens in 12 hours or gets delayed
+
+2. 🟡 Monitor new cluster stability
+   Action: Track uptime/downtime of 20.x nodes over next 72 hours
+   Concern: Only 2 days old, could be test deployment that reverts
+
+3. 🟡 Verify LiF7 miner is producing V36 shares
+   Action: Check your node logs for "Share V36" entries
+   Expected: See increase in V36 voting % as old shares age out
+
+4. 🟢 Update bootstrap addresses in your config
+   Consider adding: 20.106.76.227, 20.113.157.65 (new cluster)
+   Or wait for stability confirmation first
+
+5. 🟢 Plan contingency for delayed V36 activation
+   Scenario: If new cluster doesn't signal V36, activation delayed weeks
+   Options: Contact operators, check their V36 signaling status
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+V36 SHARE PROPAGATION PATH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your V36 Shares (from nodes .29, .31):
+         ↓
+    ml.toom.im (PRIMARY RELAY - 10.01 GH, stable)
+         ↓
+    20.106.76.227 (DOMINANT NEW NODE - 22.16 GH, 66% hashrate!)
+         ↓
+    15.218.180.55 (LEGACY PEER - 10.00 GH, stable)
+         ↓
+    20.113.157.65 (NEW NODE - 13.19 GH, critical for V36)
+         ↓
+    20.127.82.115 (NEW NODE - 5.04 GH, final new cluster node)
+         ↓
+    Archive nodes (minimal impact - 0.6 GH combined)
+
+CRITICAL: V36 activation depends on what new 20.x cluster signals!
+  If signals V36: activation ~12-24 hours
+  If signals V35: activation indefinitely delayed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 BOTTOM LINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+P2Pool Litecoin is a healthy, interconnected 9-node network with 61 GH/s
+hashrate. Your V36 migration is sound, but activation timing depends heavily
+on what code the new cluster (66% hashrate, deployed 2 days ago) is running.
+
+Network is NOT a centralized single point of failure, but V36 voting outcome
+is controlled by new cluster's signaling choice. Monitor 20.106.76.227 and
+20.113.157.65 for /version_signaling over next 12-24 hours for activation ETA.
+
+After old V35 shares age out (~Feb 9 06:00-09:00 UTC), voting will reflect
+your 100% V36-signaling miners + whatever new cluster signals. If both signal
+V36: activation imminent. If new cluster signals V35: activation delayed.

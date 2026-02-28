@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Miner Stats - P2Pool</title>
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+    <script src="d3.v2.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <style>
+        :root {
+            --primary: #008de4;
+            --primary-dark: #0066a9;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --dark: #1a1a2e;
+            --darker: #16162a;
+            --card-bg: #252540;
+            --text: #e0e0e0;
+            --text-muted: #8888a0;
+            --border: #3a3a5a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .logo .symbol {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        nav a, nav button {
+            color: var(--text);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            background: var(--darker);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        nav a:hover, nav button:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Miner Header */
+        .miner-header {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        
+        .miner-address {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            color: var(--primary);
+            word-break: break-all;
+            margin-bottom: 10px;
+        }
+        
+        .miner-address a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .miner-address a:hover {
+            text-decoration: underline;
+        }
+        
+        .miner-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.inactive {
+            background: var(--text-muted);
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+        
+        .stat-value.success {
+            color: var(--success);
+        }
+        
+        .stat-value.warning {
+            color: var(--warning);
+        }
+        
+        .stat-value.danger {
+            color: var(--danger);
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section-header h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .period-selector {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .period-btn {
+            padding: 5px 12px;
+            background: var(--darker);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .period-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .period-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        /* Charts */
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+            min-height: 400px;
+        }
+        
+        .chart-container h3 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: var(--text);
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+        
+        .loading-spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Error State */
+        .error-message {
+            background: rgba(220, 53, 69, 0.15);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: var(--danger);
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--darker);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        thead {
+            background: var(--dark);
+        }
+        
+        th {
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        td {
+            padding: 12px 15px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:hover {
+            background: rgba(0, 141, 228, 0.1);
+        }
+        
+        .hash-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .hash-link:hover {
+            text-decoration: underline;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-confirmed {
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success);
+        }
+        
+        .status-pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+        
+        .status-maturing {
+            background: rgba(0, 141, 228, 0.2);
+            color: var(--primary);
+        }
+        
+        .status-orphaned {
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--card-bg);
+            border-top: 1px solid var(--border);
+            padding: 20px 0;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            nav {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>⛏️ Miner Statistics</h1>
+                    <span class="symbol" id="currency_symbol">---</span>
+                </div>
+                <nav>
+                    <a href="dashboard.html">Dashboard</a>
+                    <a href="graphs.html">Graphs</a>
+                    <a href="stratum.html">Stratum</a>
+                    <a href="miners.html">Miners</a>
+                    <a href="index.html">Classic</a>
+                    <a href="#" onclick="location.reload(); return false;">🔄 Refresh</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div id="miner_loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div>Loading miner data...</div>
+        </div>
+        
+        <div id="miner_error" style="display: none;"></div>
+        
+        <div id="miner_content" style="display: none;">
+            <!-- Miner Header -->
+            <div class="miner-header">
+                <div class="miner-address" id="miner_address">...</div>
+                <div class="miner-status">
+                    <span class="status-indicator" id="status_indicator"></span>
+                    <span id="status_text">Active</span>
+                </div>
+            </div>
+            
+            <!-- Current Stats - BitAxe Style -->
+            <div class="stats-grid">
+                <!-- Hashrate Card - Enhanced -->
+                <div class="stat-card">
+                    <h3>Hashrate</h3>
+                    <div class="stat-value success" id="current_hashrate">0 H/s</div>
+                    <div style="display: flex; gap: 15px; margin-top: 8px; font-size: 0.75rem;">
+                        <span style="color: var(--danger);">Error <span id="doa_rate_inline">0.00%</span></span>
+                        <span style="color: var(--text-muted);">Expected <span id="expected_hashrate" style="color: var(--success);">-</span></span>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 0.8rem;">
+                        <div style="text-align: center; flex: 1;">
+                            <div style="color: var(--text-muted); font-size: 0.7rem;">1m</div>
+                            <div id="hashrate_1m" style="color: var(--success);">-</div>
+                        </div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="color: var(--text-muted); font-size: 0.7rem;">10m</div>
+                            <div id="hashrate_10m" style="color: var(--success);">-</div>
+                        </div>
+                        <div style="text-align: center; flex: 1;">
+                            <div style="color: var(--text-muted); font-size: 0.7rem;">1h</div>
+                            <div id="hashrate_1h" style="color: var(--success);">-</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Efficiency Card (DOA-based) -->
+                <div class="stat-card">
+                    <h3>Efficiency</h3>
+                    <div class="stat-value" id="efficiency_value">100%</div>
+                    <div style="margin-top: 8px; font-size: 0.75rem;">
+                        <span style="color: var(--success);"><span id="good_shares_pct">100%</span> good shares</span>
+                    </div>
+                    <div class="stat-label" style="margin-top: 5px;">
+                        DOA Rate: <span id="doa_rate_detail">0%</span>
+                    </div>
+                </div>
+                
+                <!-- Shares Card -->
+                <div class="stat-card">
+                    <h3>Shares</h3>
+                    <div class="stat-value" id="total_shares">0</div>
+                    <div style="margin-top: 8px; font-size: 0.75rem;">
+                        <span style="color: var(--danger);"><span id="dead_shares">0</span> dead (<span id="dead_shares_pct">0%</span>)</span>
+                    </div>
+                    <div class="stat-label">Current window</div>
+                </div>
+                
+                <!-- Best Difficulty Card -->
+                <div class="stat-card">
+                    <h3>Best Difficulty</h3>
+                    <div class="stat-value" id="best_diff_all_time">0</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">all-time record</div>
+                    <div style="margin-top: 8px; font-size: 0.8rem;">
+                        <span style="color: var(--primary);">(<span id="chance_to_find">0%</span>)</span>
+                        <span class="tooltip" title="Best share as % of block difficulty" style="cursor: help; margin-left: 4px;">ⓘ</span>
+                    </div>
+                    <div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                            <span style="color: var(--text-muted);">Round</span>
+                            <span id="best_diff_round" style="color: var(--warning);">0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 4px;">
+                            <span style="color: var(--text-muted);">Session</span>
+                            <span id="best_diff_session" style="color: var(--primary);">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Secondary Stats Row -->
+            <div class="stats-grid" style="margin-top: 10px;">
+                <div class="stat-card">
+                    <h3>Share Difficulty</h3>
+                    <div class="stat-value" id="share_difficulty">0</div>
+                    <div class="stat-label">Current share target</div>
+                </div>
+                <div class="stat-card">
+                    <h3>24h Avg Hashrate</h3>
+                    <div class="stat-value" id="avg_24h_hashrate">0 H/s</div>
+                    <div class="stat-label">24-hour average</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Current Payout</h3>
+                    <div class="stat-value success" id="current_payout">0</div>
+                    <div class="stat-label" id="payout_label">On next block</div>
+                </div>
+                <div class="stat-card">
+                    <h3>DOA Hashrate</h3>
+                    <div class="stat-value" id="doa_hashrate">0 H/s</div>
+                    <div class="stat-label">Dead share hashrate</div>
+                </div>
+            </div>
+            
+            <!-- Merged Mining Payouts -->
+            <div class="section-header" id="merged_section" style="display: none;">
+                <h2>🔗 Merged Mining Rewards</h2>
+            </div>
+            <div class="stats-grid" id="merged_payouts_grid" style="display: none;">
+                <!-- Dynamically populated with merged mining payouts -->
+            </div>
+            
+            <!-- Combined Hashrate & DOA Chart -->
+            <div class="section-header">
+                <h2>Hashrate & DOA History</h2>
+                <div class="period-selector">
+                    <button class="period-btn active" onclick="changePeriod('hour')">1 Hour</button>
+                    <button class="period-btn" onclick="changePeriod('day')">1 Day</button>
+                    <button class="period-btn" onclick="changePeriod('week')">1 Week</button>
+                    <button class="period-btn" onclick="changePeriod('month')">1 Month</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div id="combined_chart"></div>
+            </div>
+            
+            <!-- Payout Chart -->
+            <div class="section-header">
+                <h2>Predicted Payout History</h2>
+            </div>
+            <div class="chart-container">
+                <div id="payout_chart"></div>
+            </div>
+            
+            <!-- Blocks Found & Payouts -->
+            <div class="section-header">
+                <h2>Blocks Found & Rewards</h2>
+            </div>
+            
+            <!-- Payout Summary Stats -->
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <h3>Blocks Found</h3>
+                    <div class="stat-value success" id="blocks_found">0</div>
+                    <div class="stat-label">Total blocks mined</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Rewards</h3>
+                    <div class="stat-value" id="total_rewards">0</div>
+                    <div class="stat-label">Estimated total earned</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Confirmed Rewards</h3>
+                    <div class="stat-value success" id="confirmed_rewards">0</div>
+                    <div class="stat-label">Confirmed payouts</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Maturing Rewards</h3>
+                    <div class="stat-value warning" id="pending_rewards">0</div>
+                    <div class="stat-label">Coinbase maturity (100 blocks)</div>
+                </div>
+            </div>
+            
+            <!-- Blocks Table -->
+            <div class="chart-container">
+                <h3>Recent Blocks</h3>
+                <div id="blocks_loading" class="loading" style="padding: 20px;">
+                    <div class="loading-spinner"></div>
+                    <div>Loading blocks data...</div>
+                </div>
+                <div id="blocks_container" style="display: none;">
+                    <table id="blocks_table" style="width: 100%; margin-top: 15px;">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Block Height</th>
+                                <th>Block Hash</th>
+                                <th>Block Reward</th>
+                                <th>Est. Payout</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blocks_tbody">
+                        </tbody>
+                    </table>
+                    <div id="no_blocks" style="display: none; text-align: center; padding: 20px; color: #8888a0;">
+                        No blocks found by this miner yet
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Merged Mining Blocks Table -->
+            <div class="section-header" id="merged_blocks_header">
+                <h2>🔗 Merged Mining Blocks Found</h2>
+            </div>
+            
+            <!-- Merged Payout Summary Stats -->
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card">
+                    <h3>Merged Blocks Found</h3>
+                    <div class="stat-value success" id="merged_blocks_found">0</div>
+                    <div class="stat-label">Total merged blocks mined</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Merged Rewards</h3>
+                    <div class="stat-value" id="merged_total_rewards">0</div>
+                    <div class="stat-label">Estimated total earned</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Confirmed Merged Rewards</h3>
+                    <div class="stat-value success" id="merged_confirmed_rewards">0</div>
+                    <div class="stat-label">Confirmed payouts</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Maturing Merged Rewards</h3>
+                    <div class="stat-value warning" id="merged_pending_rewards">0</div>
+                    <div class="stat-label">Coinbase maturity (240 blocks)</div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div id="merged_blocks_loading" class="loading" style="padding: 20px;">
+                    <div class="loading-spinner"></div>
+                    <div>Loading merged blocks data...</div>
+                </div>
+                <div id="merged_blocks_container" style="display: none;">
+                    <table id="merged_blocks_table" style="width: 100%; margin-top: 15px;">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Network</th>
+                                <th>Block Height</th>
+                                <th>Block Hash</th>
+                                <th>Block Reward</th>
+                                <th>Est. Payout</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="merged_blocks_tbody">
+                        </tbody>
+                    </table>
+                    <div id="no_merged_blocks" style="display: none; text-align: center; padding: 20px; color: #8888a0;">
+                        No merged mining blocks found by this miner yet
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>P2Pool - Decentralized Mining Pool</p>
+        </div>
+    </footer>
+    
+    <script>
+        let currentPeriod = 'hour';
+        let minerAddress = null;
+        let currency_info = {};
+        
+        // Get miner address from URL
+        function getMinerAddress() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('address');
+        }
+        
+        function format_hashrate(h) {
+            if (h == null || !isFinite(h) || h < 0) return '0 H/s';
+            if (h < 1000) return d3.format('.2r')(h) + ' H/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' kH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' MH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' GH/s';
+            h = h / 1000;
+            if (h < 1000) return d3.format('.3r')(h) + ' TH/s';
+            h = h / 1000;
+            return d3.format('.3r')(h) + ' PH/s';
+        }
+        
+        function format_difficulty(d) {
+            if (d == null || !isFinite(d) || d <= 0) return '0';
+            if (d < 1000) return d3.format('.2f')(d);
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' K';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' M';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' G';
+            d = d / 1000;
+            if (d < 1000) return d3.format('.2f')(d) + ' T';
+            d = d / 1000;
+            return d3.format('.2f')(d) + ' P';
+        }
+        
+        function format_dt(dt) {
+            if (!isFinite(dt)) return '∞';
+            if (dt < 0) return '?';
+            if (dt < 60) return d3.format('.1f')(dt) + 's';
+            dt = dt / 60;
+            if (dt < 60) return d3.format('.1f')(dt) + 'm';
+            dt = dt / 60;
+            if (dt < 24) return d3.format('.1f')(dt) + 'h';
+            dt = dt / 24;
+            return d3.format('.1f')(dt) + 'd';
+        }
+        
+        function showError(message) {
+            document.getElementById('miner_loading').style.display = 'none';
+            document.getElementById('miner_content').style.display = 'none';
+            const errorDiv = document.getElementById('miner_error');
+            errorDiv.innerHTML = '<div class="error-message">' + message + '</div>';
+            errorDiv.style.display = 'block';
+        }
+        
+        function loadMinerStats() {
+            minerAddress = getMinerAddress();
+            
+            if (!minerAddress) {
+                showError('No miner address specified. Please provide an address in the URL.');
+                return;
+            }
+            
+            d3.json('../miner_stats/' + minerAddress, function(stats) {
+                document.getElementById('miner_loading').style.display = 'none';
+                
+                if (!stats) {
+                    showError('Failed to load miner data');
+                    return;
+                }
+                
+                var isActive = stats.active && !stats.error;
+                
+                document.getElementById('miner_content').style.display = 'block';
+                
+                // Update header
+                const addrDiv = document.getElementById('miner_address');
+                var displayAddr = stats.address || minerAddress;
+                addrDiv.innerHTML = '<a href="' + (currency_info.address_explorer_url_prefix || '') + displayAddr + '" target="_blank">' + displayAddr + '</a>';
+                
+                // Update status indicator
+                var statusIndicator = document.getElementById('status_indicator');
+                var statusText = document.getElementById('status_text');
+                if (!isActive) {
+                    statusIndicator.style.background = '#888';
+                    statusText.textContent = 'Not connected';
+                    statusText.style.color = '#8888a0';
+                }
+                
+                if (isActive) {
+                    // Update current stats - show ~ prefix if estimated from difficulty
+                    var hashrateText = format_hashrate(stats.hashrate);
+                    if (stats.estimated_hashrate) {
+                        hashrateText = '~' + hashrateText;
+                        document.getElementById('current_hashrate').title = 'Estimated from vardiff difficulty';
+                    }
+                    document.getElementById('current_hashrate').textContent = hashrateText;
+                    
+                    // DOA Rate - update multiple elements
+                    const doaRate = stats.doa_rate * 100;
+                    document.getElementById('doa_rate_inline').textContent = d3.format('.2f')(doaRate) + '%';
+                    document.getElementById('doa_rate_detail').textContent = d3.format('.2f')(doaRate) + '%';
+                    
+                    // Efficiency (inverse of DOA rate)
+                    var efficiency = 100 - doaRate;
+                    var effElement = document.getElementById('efficiency_value');
+                    effElement.textContent = d3.format('.2f')(efficiency) + '%';
+                    effElement.className = 'stat-value ' + (efficiency > 98 ? 'success' : (efficiency > 95 ? 'warning' : 'danger'));
+                    document.getElementById('good_shares_pct').textContent = d3.format('.2f')(efficiency) + '%';
+                    
+                    // Hashrate periods
+                    if (stats.hashrate_periods) {
+                        document.getElementById('hashrate_1m').textContent = format_hashrate(stats.hashrate_periods['1m'] ? stats.hashrate_periods['1m'].hashrate : 0);
+                        document.getElementById('hashrate_10m').textContent = format_hashrate(stats.hashrate_periods['10m'] ? stats.hashrate_periods['10m'].hashrate : 0);
+                        document.getElementById('hashrate_1h').textContent = format_hashrate(stats.hashrate_periods['1h'] ? stats.hashrate_periods['1h'].hashrate : 0);
+                    }
+                    
+                    // Best difficulty
+                    if (stats.best_difficulty_all_time !== undefined) {
+                        document.getElementById('best_diff_all_time').textContent = format_difficulty(stats.best_difficulty_all_time);
+                        document.getElementById('best_diff_session').textContent = format_difficulty(stats.best_difficulty_session || 0);
+                        document.getElementById('best_diff_round').textContent = format_difficulty(stats.best_difficulty_round || 0);
+                        
+                        // Chance to find block
+                        var chance = stats.chance_to_find_block || 0;
+                        document.getElementById('chance_to_find').textContent = d3.format('.6f')(chance) + '%';
+                    }
+                    
+                    document.getElementById('share_difficulty').textContent = d3.format('.3r')(stats.share_difficulty);
+                    document.getElementById('current_payout').textContent = d3.format('.4f')(stats.current_payout);
+                    document.getElementById('doa_hashrate').textContent = format_hashrate(stats.dead_hashrate);
+                    
+                    // Display merged mining payouts
+                    if (stats.merged_payouts && stats.merged_payouts.length > 0) {
+                        document.getElementById('merged_section').style.display = 'block';
+                        var mergedGrid = document.getElementById('merged_payouts_grid');
+                        mergedGrid.style.display = 'grid';
+                        mergedGrid.innerHTML = '';
+                        
+                        // Show merged address(es) in the header
+                        var headerDiv = document.querySelector('.miner-header');
+                        stats.merged_payouts.forEach(function(mp) {
+                            if (mp.address) {
+                                var mergedAddrDiv = document.createElement('div');
+                                mergedAddrDiv.style.cssText = 'font-family: "Courier New", monospace; font-size: 0.9rem; color: #c3a634; margin-top: 4px;';
+                                var dogeSpan = document.createElement('span');
+                                dogeSpan.textContent = '🐕 ';
+                                mergedAddrDiv.appendChild(dogeSpan);
+                                var addrLink = document.createElement('a');
+                                addrLink.href = 'https://dogechain.info/address/' + encodeURIComponent(mp.address);
+                                addrLink.target = '_blank';
+                                addrLink.style.cssText = 'color: #c3a634; text-decoration: none;';
+                                addrLink.textContent = mp.address;
+                                mergedAddrDiv.appendChild(addrLink);
+                                var symbolSpan = document.createElement('span');
+                                symbolSpan.style.cssText = 'font-size: 0.75rem; color: #8888a0;';
+                                symbolSpan.textContent = ' (' + (mp.symbol || 'DOGE') + ' merged mining)';
+                                mergedAddrDiv.appendChild(symbolSpan);
+                                headerDiv.insertBefore(mergedAddrDiv, headerDiv.querySelector('.miner-status'));
+                            }
+                        });
+                        
+                        stats.merged_payouts.forEach(function(mp) {
+                            var card = document.createElement('div');
+                            card.className = 'stat-card';
+                            var h3 = document.createElement('h3');
+                            h3.textContent = mp.symbol + ' Payout';
+                            card.appendChild(h3);
+                            var valDiv = document.createElement('div');
+                            valDiv.className = 'stat-value success';
+                            valDiv.textContent = d3.format(',.4f')(mp.amount);
+                            card.appendChild(valDiv);
+                            var labelDiv = document.createElement('div');
+                            labelDiv.className = 'stat-label';
+                            labelDiv.textContent = mp.network + ' on next block';
+                            card.appendChild(labelDiv);
+                            var addrLabelDiv = document.createElement('div');
+                            addrLabelDiv.className = 'stat-label';
+                            addrLabelDiv.style.cssText = 'font-size: 0.7rem; margin-top: 5px;';
+                            var addrLink2 = document.createElement('a');
+                            addrLink2.href = 'https://dogechain.info/address/' + encodeURIComponent(mp.address);
+                            addrLink2.target = '_blank';
+                            addrLink2.style.cssText = 'color: var(--primary);';
+                            addrLink2.textContent = mp.address.substring(0, 12) + '...' + mp.address.substring(mp.address.length - 4);
+                            addrLabelDiv.appendChild(addrLink2);
+                            card.appendChild(addrLabelDiv);
+                            mergedGrid.appendChild(card);
+                        });
+                    }
+                    
+                    // Update share counts
+                    if (stats.total_shares !== undefined) {
+                        document.getElementById('total_shares').textContent = stats.total_shares;
+                        document.getElementById('dead_shares').textContent = stats.dead_shares || 0;
+                        var deadPct = stats.total_shares > 0 ? (stats.dead_shares / stats.total_shares * 100) : 0;
+                        document.getElementById('dead_shares_pct').textContent = d3.format('.1f')(deadPct) + '%';
+                    }
+                }
+                
+                // Calculate 24h average hashrate (always load - works from graph history)
+                d3.json('../web/graph_data/miner_hash_rates/last_day', function(graph_data) {
+                    var avg_24h = 0;
+                    if (graph_data && graph_data.length > 0) {
+                        var total = 0;
+                        var count = 0;
+                        
+                        // Helper to extract base address
+                        // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
+                        function extractBaseAddress(workerName) {
+                            return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+                        }
+                        
+                        graph_data.forEach(function(point) {
+                            if (point && point[1]) {
+                                var hashrate = 0;
+                                for (var workerName in point[1]) {
+                                    if (extractBaseAddress(workerName) === minerAddress) {
+                                        hashrate += point[1][workerName];
+                                    }
+                                }
+                                if (hashrate > 0) {
+                                    total += hashrate;
+                                    count++;
+                                }
+                            }
+                        });
+                        
+                        avg_24h = count > 0 ? total / count : 0;
+                    }
+                    
+                    document.getElementById('avg_24h_hashrate').textContent = format_hashrate(avg_24h);
+                });
+                
+                // Load graph data (always - shows history even if miner disconnected)
+                loadGraphs();
+                
+                // Always load payouts/blocks data regardless of active status
+                loadPayouts();
+                
+                // Load merged blocks
+                loadMergedBlocks();
+            });
+        }
+        
+        function loadMergedBlocks() {
+            d3.json('../merged_miner_payouts/' + minerAddress, function(payouts) {
+                document.getElementById('merged_blocks_loading').style.display = 'none';
+                document.getElementById('merged_blocks_container').style.display = 'block';
+                
+                if (!payouts || payouts.error) {
+                    document.getElementById('no_merged_blocks').style.display = 'block';
+                    return;
+                }
+                
+                // Update merged summary stats
+                var msym = payouts.symbol || 'COIN';
+                document.getElementById('merged_blocks_found').textContent = payouts.blocks_found || 0;
+                document.getElementById('merged_total_rewards').textContent = d3.format('.4f')(payouts.total_estimated_rewards || 0) + ' ' + msym;
+                document.getElementById('merged_confirmed_rewards').textContent = d3.format('.4f')(payouts.confirmed_rewards || 0) + ' ' + msym;
+                document.getElementById('merged_pending_rewards').textContent = d3.format('.4f')(payouts.maturing_rewards || 0) + ' ' + msym;
+                
+                if (!payouts.blocks || payouts.blocks.length === 0) {
+                    document.getElementById('no_merged_blocks').style.display = 'block';
+                    return;
+                }
+                
+                var tbody = document.getElementById('merged_blocks_tbody');
+                tbody.innerHTML = '';
+                
+                payouts.blocks.forEach(function(block) {
+                    var tr = document.createElement('tr');
+                    var sym = block.symbol || msym;
+                    
+                    // Time
+                    var tdTime = document.createElement('td');
+                    tdTime.textContent = new Date(block.timestamp * 1000).toLocaleString();
+                    tr.appendChild(tdTime);
+                    
+                    // Network
+                    var tdNet = document.createElement('td');
+                    tdNet.style.fontWeight = 'bold';
+                    tdNet.style.color = '#6f42c1';
+                    tdNet.textContent = sym;
+                    tr.appendChild(tdNet);
+                    
+                    // Block Height
+                    var tdHeight = document.createElement('td');
+                    tdHeight.textContent = block.block_height || 'N/A';
+                    tr.appendChild(tdHeight);
+                    
+                    // Block Hash
+                    var tdHash = document.createElement('td');
+                    var hashLink = document.createElement('a');
+                    hashLink.className = 'hash-link';
+                    hashLink.href = block.explorer_url || '#';
+                    hashLink.target = '_blank';
+                    var hash = block.pow_hash || block.block_hash || '-';
+                    hashLink.title = 'POW Hash: ' + hash;
+                    hashLink.textContent = hash.substring(0, 16) + '...';
+                    tdHash.appendChild(hashLink);
+                    tr.appendChild(tdHash);
+                    
+                    // Block Reward
+                    var tdReward = document.createElement('td');
+                    tdReward.textContent = block.block_reward > 0 ? d3.format('.4f')(block.block_reward) + ' ' + sym : '\u2014';
+                    tr.appendChild(tdReward);
+                    
+                    // Estimated Payout
+                    var tdPayout = document.createElement('td');
+                    tdPayout.textContent = block.estimated_payout > 0 ? d3.format('.4f')(block.estimated_payout) + ' ' + sym : '\u2014';
+                    tr.appendChild(tdPayout);
+                    
+                    // Status with confirmation progress
+                    var tdStatus = document.createElement('td');
+                    var statusBadge = document.createElement('span');
+                    statusBadge.className = 'status-badge status-' + block.status;
+                    if (block.status === 'confirmed') {
+                        statusBadge.textContent = '\u2713 Confirmed';
+                    } else if (block.status === 'maturing') {
+                        var confs = block.confirmations || 0;
+                        var required = block.confirmations_required || 240;
+                        var remaining = Math.max(0, required - confs);
+                        statusBadge.textContent = '\u23f3 ' + confs + '/' + required + ' (' + remaining + ' left)';
+                        statusBadge.title = confs + ' of ' + required + ' confirmations';
+                    } else if (block.status === 'pending') {
+                        statusBadge.textContent = '\u23f3 Pending';
+                    } else {
+                        statusBadge.textContent = '\u2717 Orphaned';
+                    }
+                    tdStatus.appendChild(statusBadge);
+                    tr.appendChild(tdStatus);
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+        
+        function loadPayouts() {
+            d3.json('../miner_payouts/' + minerAddress, function(payouts) {
+                document.getElementById('blocks_loading').style.display = 'none';
+                
+                if (!payouts || payouts.error) {
+                    document.getElementById('blocks_container').style.display = 'block';
+                    document.getElementById('no_blocks').style.display = 'block';
+                    return;
+                }
+                
+                // Update summary stats
+                var sym = currency_info.symbol || 'COIN';
+                document.getElementById('blocks_found').textContent = payouts.blocks_found || 0;
+                document.getElementById('total_rewards').textContent = d3.format('.4f')(payouts.total_estimated_rewards || 0) + ' ' + sym;
+                document.getElementById('confirmed_rewards').textContent = d3.format('.4f')(payouts.confirmed_rewards || 0) + ' ' + sym;
+                document.getElementById('pending_rewards').textContent = d3.format('.4f')(payouts.maturing_rewards || 0) + ' ' + sym;
+                
+                // Render blocks table
+                if (!payouts.blocks || payouts.blocks.length === 0) {
+                    document.getElementById('blocks_container').style.display = 'block';
+                    document.getElementById('no_blocks').style.display = 'block';
+                    return;
+                }
+                
+                document.getElementById('blocks_container').style.display = 'block';
+                const tbody = document.getElementById('blocks_tbody');
+                tbody.innerHTML = '';
+                
+                payouts.blocks.forEach(function(block) {
+                    const tr = document.createElement('tr');
+                    
+                    // Time
+                    const tdTime = document.createElement('td');
+                    const date = new Date(block.timestamp * 1000);
+                    tdTime.textContent = date.toLocaleString();
+                    tr.appendChild(tdTime);
+                    
+                    // Block Height
+                    const tdHeight = document.createElement('td');
+                    tdHeight.textContent = block.block_height || 'N/A';
+                    tr.appendChild(tdHeight);
+                    
+                    // Block Hash (link to explorer)
+                    const tdHash = document.createElement('td');
+                    const hashLink = document.createElement('a');
+                    hashLink.className = 'hash-link';
+                    hashLink.href = block.explorer_url || '#';
+                    hashLink.target = '_blank';
+                    hashLink.textContent = block.block_hash.substring(0, 16) + '...';
+                    tdHash.appendChild(hashLink);
+                    tr.appendChild(tdHash);
+                    
+                    // Block Reward
+                    const tdReward = document.createElement('td');
+                    tdReward.textContent = block.block_reward > 0 ? d3.format('.4f')(block.block_reward) + ' ' + sym : '—';
+                    tr.appendChild(tdReward);
+                    
+                    // Estimated Payout
+                    const tdPayout = document.createElement('td');
+                    tdPayout.textContent = block.estimated_payout > 0 ? d3.format('.4f')(block.estimated_payout) + ' ' + sym : '—';
+                    tr.appendChild(tdPayout);
+                    
+                    // Status with confirmation progress
+                    const tdStatus = document.createElement('td');
+                    const statusBadge = document.createElement('span');
+                    statusBadge.className = 'status-badge status-' + block.status;
+                    if (block.status === 'confirmed') {
+                        statusBadge.textContent = '✓ Confirmed';
+                    } else if (block.status === 'maturing') {
+                        var confs = block.confirmations || 0;
+                        var required = block.confirmations_required || 100;
+                        var remaining = Math.max(0, required - confs);
+                        statusBadge.textContent = '⏳ ' + confs + '/' + required + ' (' + remaining + ' left)';
+                        statusBadge.title = confs + ' of ' + required + ' confirmations';
+                    } else if (block.status === 'pending') {
+                        statusBadge.textContent = '⏳ Pending';
+                    } else {
+                        statusBadge.textContent = '✗ Orphaned';
+                    }
+                    tdStatus.appendChild(statusBadge);
+                    tr.appendChild(tdStatus);
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+        
+        function loadGraphs() {
+            const periodMap = {
+                'hour': 'hour',
+                'day': 'day',
+                'week': 'week',
+                'month': 'month'
+            };
+            
+            const period = periodMap[currentPeriod] || 'hour';
+            
+            // Load hashrate data
+            d3.json('../web/graph_data/miner_hash_rates/last_' + period, function(data) {
+                if (!data) return;
+                
+                d3.json('../web/graph_data/miner_dead_hash_rates/last_' + period, function(dead_data) {
+                    renderHashrateChart(data, dead_data);
+                });
+            });
+            
+            // Load payout data (LTC + DOGE merged)
+            d3.json('../web/graph_data/current_payouts/last_' + period, function(ltcData) {
+                d3.json('../web/graph_data/merged_current_payouts/last_' + period, function(dogeData) {
+                    renderPayoutChart(ltcData, dogeData);
+                });
+            });
+        }
+        
+        function renderHashrateChart(data, dead_data) {
+            if (!data || !minerAddress) return;
+            
+            const hashrateData = [];
+            const doaData = [];
+            
+            // Helper to extract base address from worker name
+            // Split on comma first (merged mining: LTC_ADDR,DOGE_ADDR.worker)
+            function extractBaseAddress(workerName) {
+                return workerName.split(',')[0].split('+')[0].split('/')[0].split('.')[0].split('_')[0];
+            }
+            
+            for (let i = 0; i < data.length; i++) {
+                const point = data[i];
+                if (point && point[1]) {
+                    const timestamp = point[0] * 1000;
+                    let hashrate = 0;
+                    let dead_hashrate = 0;
+                    
+                    // Aggregate all workers for this address
+                    // Note: point[1][workerName] already contains the averaged hashrate value
+                    // Do NOT divide by point[2] - that's the sample count used for backend averaging
+                    for (const workerName in point[1]) {
+                        if (extractBaseAddress(workerName) === minerAddress) {
+                            hashrate += point[1][workerName];
+                        }
+                    }
+                    
+                    // DOA data
+                    if (dead_data && dead_data[i] && dead_data[i][1]) {
+                        for (const workerName in dead_data[i][1]) {
+                            if (extractBaseAddress(workerName) === minerAddress) {
+                                dead_hashrate += dead_data[i][1][workerName];
+                            }
+                        }
+                    }
+                    
+                    if (hashrate > 0 || dead_hashrate > 0) {
+                        hashrateData.push([timestamp, hashrate]);
+                        doaData.push([timestamp, dead_hashrate]);
+                    }
+                }
+            }
+            
+            // Render combined hashrate & DOA chart
+            Highcharts.chart('combined_chart', {
+                chart: {
+                    type: 'line',
+                    backgroundColor: 'transparent',
+                    style: { fontFamily: 'inherit' },
+                    zoomType: 'x',
+                    panning: true,
+                    panKey: 'shift'
+                },
+                title: { text: null },
+                xAxis: {
+                    type: 'datetime',
+                    gridLineColor: '#3a3a5a',
+                    lineColor: '#3a3a5a',
+                    tickColor: '#3a3a5a',
+                    labels: { style: { color: '#8888a0' } }
+                },
+                yAxis: [{
+                    // Primary Y axis - Hashrate
+                    title: { text: 'Hashrate', style: { color: '#008de4' } },
+                    gridLineColor: '#3a3a5a',
+                    labels: {
+                        style: { color: '#008de4' },
+                        formatter: function() {
+                            return format_hashrate(this.value);
+                        }
+                    },
+                    min: 0
+                }],
+                legend: {
+                    enabled: true,
+                    itemStyle: { color: '#8888a0' },
+                    itemHoverStyle: { color: '#e0e0e0' }
+                },
+                tooltip: {
+                    backgroundColor: '#16162a',
+                    borderColor: '#3a3a5a',
+                    style: { color: '#e0e0e0' },
+                    shared: true,
+                    crosshairs: true
+                },
+                plotOptions: {
+                    series: {
+                        marker: {
+                            enabled: true,
+                            radius: 3
+                        },
+                        states: {
+                            hover: {
+                                lineWidthPlus: 1
+                            }
+                        }
+                    }
+                },
+                series: [{
+                    name: 'Hashrate',
+                    data: hashrateData,
+                    color: '#008de4',
+                    lineWidth: 2,
+                    yAxis: 0,
+                    tooltip: {
+                        valueSuffix: ' H/s',
+                        valueDecimals: 2,
+                        pointFormatter: function() {
+                            return '<span style="color:' + this.series.color + '">●</span> ' + 
+                                   this.series.name + ': <b>' + format_hashrate(this.y) + '</b><br/>';
+                        }
+                    }
+                }, {
+                    name: 'DOA Hashrate',
+                    data: doaData,
+                    color: '#ff6b6b',
+                    lineWidth: 2,
+                    yAxis: 0,
+                    tooltip: {
+                        valueSuffix: ' H/s',
+                        valueDecimals: 2,
+                        pointFormatter: function() {
+                            return '<span style="color:' + this.series.color + '">●</span> ' + 
+                                   this.series.name + ': <b>' + format_hashrate(this.y) + '</b><br/>';
+                        }
+                    },
+                    visible: doaData.length > 0
+                }],
+                credits: { enabled: false },
+                exporting: {
+                    buttons: {
+                        contextButton: {
+                            menuItems: ['viewFullscreen', 'separator', 'downloadPNG', 'downloadJPEG', 'downloadPDF', 'downloadSVG']
+                        }
+                    }
+                }
+            });
+            
+            // Keep old DOA chart code for compatibility but don't render
+            if (false && doaData.length > 0) {
+                Highcharts.chart('old_doa_chart', {
+                    chart: {
+                        type: 'line',
+                        backgroundColor: 'transparent',
+                        style: { fontFamily: 'inherit' }
+                    },
+                    title: { text: null },
+                    xAxis: {
+                        type: 'datetime',
+                        gridLineColor: '#3a3a5a',
+                        lineColor: '#3a3a5a',
+                        tickColor: '#3a3a5a',
+                        labels: { style: { color: '#8888a0' } }
+                    },
+                    yAxis: {
+                        title: { text: 'DOA Rate (%)', style: { color: '#8888a0' } },
+                        gridLineColor: '#3a3a5a',
+                        labels: { style: { color: '#8888a0' } },
+                        min: 0,
+                        max: 100,
+                        plotLines: [{
+                            value: 2,
+                            color: '#ffc107',
+                            width: 1,
+                            dashStyle: 'dash',
+                            label: {
+                                text: 'Warning (2%)',
+                                style: { color: '#ffc107' }
+                            }
+                        }, {
+                            value: 5,
+                            color: '#dc3545',
+                            width: 1,
+                            dashStyle: 'dash',
+                            label: {
+                                text: 'Critical (5%)',
+                                style: { color: '#dc3545' }
+                            }
+                        }]
+                    },
+                    legend: { enabled: false },
+                    tooltip: {
+                        backgroundColor: '#16162a',
+                        borderColor: '#3a3a5a',
+                        style: { color: '#e0e0e0' },
+                        formatter: function() {
+                            return '<b>' + Highcharts.dateFormat('%Y-%m-%d %H:%M', this.x) + '</b><br/>' +
+                                   'DOA Rate: ' + d3.format('.2f')(this.y) + '%';
+                        }
+                    },
+                    plotOptions: {
+                        line: {
+                            color: '#ffc107',
+                            lineWidth: 2,
+                            marker: { enabled: false }
+                        }
+                    },
+                    series: [{
+                        name: 'DOA Rate',
+                        data: doaData
+                    }],
+                    credits: { enabled: false }
+                });
+            }
+        }
+        
+        function renderPayoutChart(ltcData, dogeData) {
+            if (!minerAddress) return;
+            
+            const ltcPayoutData = [];
+            const dogePayoutData = [];
+            
+            // Process LTC payout data
+            if (ltcData) {
+                for (let i = 0; i < ltcData.length; i++) {
+                    const point = ltcData[i];
+                    if (point && point[1] && point[1][minerAddress] !== undefined) {
+                        const timestamp = point[0] * 1000;
+                        const payout = point[1][minerAddress];
+                        ltcPayoutData.push([timestamp, payout]);
+                    }
+                }
+            }
+            
+            // Process DOGE merged payout data
+            if (dogeData) {
+                for (let i = 0; i < dogeData.length; i++) {
+                    const point = dogeData[i];
+                    if (point && point[1] && point[1][minerAddress] !== undefined) {
+                        const timestamp = point[0] * 1000;
+                        const payout = point[1][minerAddress];
+                        dogePayoutData.push([timestamp, payout]);
+                    }
+                }
+            }
+            
+            const hasDoge = dogePayoutData.length > 0;
+            const ltcSymbol = currency_info.symbol || 'LTC';
+            
+            Highcharts.chart('payout_chart', {
+                chart: {
+                    backgroundColor: 'transparent',
+                    style: { fontFamily: 'inherit' }
+                },
+                title: { text: null },
+                xAxis: {
+                    type: 'datetime',
+                    gridLineColor: '#3a3a5a',
+                    lineColor: '#3a3a5a',
+                    tickColor: '#3a3a5a',
+                    labels: { style: { color: '#8888a0' } }
+                },
+                yAxis: hasDoge ? [
+                    {
+                        // Left Y-axis for LTC
+                        title: { text: ltcSymbol, style: { color: '#28a745' } },
+                        gridLineColor: '#3a3a5a',
+                        labels: { style: { color: '#28a745' }, format: '{value:.2f}' },
+                        min: 0
+                    },
+                    {
+                        // Right Y-axis for DOGE
+                        title: { text: 'DOGE', style: { color: '#c3a634' } },
+                        labels: { style: { color: '#c3a634' }, format: '{value:.0f}' },
+                        opposite: true,
+                        min: 0
+                    }
+                ] : {
+                    title: { text: ltcSymbol, style: { color: '#8888a0' } },
+                    gridLineColor: '#3a3a5a',
+                    labels: { style: { color: '#8888a0' } },
+                    min: 0
+                },
+                legend: {
+                    enabled: hasDoge,
+                    itemStyle: { color: '#e0e0e0' },
+                    itemHoverStyle: { color: '#fff' }
+                },
+                tooltip: {
+                    shared: true,
+                    backgroundColor: '#16162a',
+                    borderColor: '#3a3a5a',
+                    style: { color: '#e0e0e0' },
+                    formatter: function() {
+                        let html = '<b>' + Highcharts.dateFormat('%Y-%m-%d %H:%M', this.x) + '</b>';
+                        this.points.forEach(function(point) {
+                            const symbol = point.series.name === 'DOGE Payout' ? 'DOGE' : ltcSymbol;
+                            const format = point.series.name === 'DOGE Payout' ? ',.2f' : '.4f';
+                            html += '<br/><span style="color:' + point.color + '">●</span> ' +
+                                   point.series.name + ': ' + d3.format(format)(point.y) + ' ' + symbol;
+                        });
+                        return html;
+                    }
+                },
+                plotOptions: {
+                    area: {
+                        lineWidth: 2,
+                        marker: { enabled: false }
+                    }
+                },
+                series: hasDoge ? [
+                    {
+                        name: ltcSymbol + ' Payout',
+                        type: 'area',
+                        yAxis: 0,
+                        data: ltcPayoutData,
+                        color: '#28a745',
+                        fillColor: {
+                            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+                            stops: [
+                                [0, 'rgba(40, 167, 69, 0.3)'],
+                                [1, 'rgba(40, 167, 69, 0.0)']
+                            ]
+                        }
+                    },
+                    {
+                        name: 'DOGE Payout',
+                        type: 'area',
+                        yAxis: 1,
+                        data: dogePayoutData,
+                        color: '#c3a634',
+                        fillColor: {
+                            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+                            stops: [
+                                [0, 'rgba(195, 166, 52, 0.3)'],
+                                [1, 'rgba(195, 166, 52, 0.0)']
+                            ]
+                        }
+                    }
+                ] : [{
+                    name: ltcSymbol + ' Payout',
+                    type: 'area',
+                    data: ltcPayoutData,
+                    color: '#28a745',
+                    fillColor: {
+                        linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+                        stops: [
+                            [0, 'rgba(40, 167, 69, 0.3)'],
+                            [1, 'rgba(40, 167, 69, 0.0)']
+                        ]
+                    }
+                }],
+                credits: { enabled: false }
+            });
+        }
+        
+        function changePeriod(period) {
+            currentPeriod = period;
+            
+            // Update button states
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Reload graphs
+            loadGraphs();
+        }
+        
+        // Load currency info
+        d3.json('../web/currency_info', function(info) {
+            currency_info = info || {};
+            // Update currency symbol throughout the page
+            var symbol = currency_info.symbol || 'COIN';
+            document.getElementById('currency_symbol').textContent = symbol;
+            document.getElementById('payout_label').textContent = symbol + ' on next block';
+            loadMinerStats();
+        });
+        
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+            if (minerAddress) {
+                d3.json('../miner_stats/' + minerAddress, function(stats) {
+                    if (stats && stats.active) {
+                        document.getElementById('current_hashrate').textContent = format_hashrate(stats.hashrate);
+                        
+                        var doaRate = stats.doa_rate * 100;
+                        document.getElementById('doa_rate_inline').textContent = d3.format('.2f')(doaRate) + '%';
+                        document.getElementById('doa_rate_detail').textContent = d3.format('.2f')(doaRate) + '%';
+                        
+                        var efficiency = 100 - doaRate;
+                        var effElement = document.getElementById('efficiency_value');
+                        effElement.textContent = d3.format('.2f')(efficiency) + '%';
+                        effElement.className = 'stat-value ' + (efficiency > 98 ? 'success' : (efficiency > 95 ? 'warning' : 'danger'));
+                        document.getElementById('good_shares_pct').textContent = d3.format('.2f')(efficiency) + '%';
+                        
+                        document.getElementById('share_difficulty').textContent = d3.format('.3r')(stats.share_difficulty);
+                        document.getElementById('current_payout').textContent = d3.format('.4f')(stats.current_payout);
+                        document.getElementById('doa_hashrate').textContent = format_hashrate(stats.dead_hashrate);
+                    }
+                });
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

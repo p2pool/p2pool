@@ -69,7 +69,7 @@ _inclusive = lambda n: n.unsuppressedPrefixes == None
 
 # Does a document/PI has lesser/greater document order than the
 # first element?
-_LesserElement, _Element, _GreaterElement = range(3)
+_LesserElement, _Element, _GreaterElement = xrange(3)
 
 def _sorter(n1,n2):
     '''_sorter(n1,n2) -> int

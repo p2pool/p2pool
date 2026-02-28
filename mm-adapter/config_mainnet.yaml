@@ -1,0 +1,35 @@
+# MM Adapter - Mainnet Configuration
+# Litecoin + Dogecoin Merged Mining
+#
+# Run: python3 adapter.py --config config_mainnet.yaml
+
+# Adapter server settings (P2Pool connects here)
+server:
+  host: "0.0.0.0"
+  port: 44556
+  # Credentials P2Pool uses to connect to this adapter
+  rpc_user: "dogecoinrpc"
+  rpc_password: "YOUR_DOGE_RPC_PASSWORD"
+
+# Upstream daemon (Dogecoin Mainnet)
+upstream:
+  host: "DOGE_DAEMON_IP"
+  port: 22555  # Dogecoin mainnet RPC port
+  rpc_user: "dogecoinrpc"
+  rpc_password: "YOUR_DOGE_RPC_PASSWORD"
+  # Timeout for RPC calls (seconds)
+  timeout: 30
+
+# Chain configuration
+chain:
+  name: "dogecoin_mainnet"
+  chain_id: 98
+
+# Pool branding in OP_RETURN
+coinbase_text: "technocore"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "text"
+  file: null

@@ -126,7 +126,7 @@ class UPnPMapper(portmapper.NATMapper):
         ptype = port.getHost().type
         intport = port.getHost().port
         
-        for extport in [random.randrange(1025, 65536) for val in range(20)]:
+        for extport in [random.randrange(1025, 65536) for val in xrange(20)]:
             # Check if there is an existing mapping, if it does not exist, bingo
             if not (ptype, extport) in mappings:
                 break

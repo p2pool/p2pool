@@ -1,5 +1,3 @@
-from __future__ import nested_scopes
-
 """
 ################################################################################
 #
@@ -40,7 +38,10 @@ from __future__ import nested_scopes
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 ################################################################################
+
 """
+from __future__ import nested_scopes
+
 ident = '$Id: Client.py 1496 2010-03-04 23:46:17Z pooryorick $'
 
 from version import __version__
@@ -134,17 +135,19 @@ class HTTPWithTimeout(HTTP):
 
     _connection_class = HTTPConnectionWithTimeout
 
-    ## this __init__ copied from httplib.HTML class
     def __init__(self, host='', port=None, strict=None, timeout=None):
-        "Provide a default host, since the superclass requires one."
+        """Slight modification of superclass (httplib.HTTP) constructor.
 
-        # some joker passed 0 explicitly, meaning default port
+        The only change is that arg ``timeout`` is also passed in the
+        initialization of :attr:`_connection_class`.
+
+        :param timeout: for the socket connection (seconds); None to disable
+        :type timeout: float or None
+
+        """
         if port == 0:
             port = None
 
-        # Note that we may pass an empty string as the host; this will throw
-        # an error when we attempt to connect. Presumably, the client code
-        # will call connect before then, with a proper host.
         self._setup(self._connection_class(host, port, strict, timeout))
 
 class HTTPTransport:
@@ -220,7 +223,7 @@ class HTTPTransport:
         # if user is not a user:passwd format
         #    we'll receive a failure from the server. . .I guess (??)
         if addr.user != None:
-            val = base64.encodestring(addr.user) 
+            val = base64.encodestring(urllib.unquote_plus(addr.user))
             r.putheader('Authorization','Basic ' + val.replace('\012',''))
 
         # This fixes sending either "" or "None"
@@ -280,13 +283,17 @@ class HTTPTransport:
         except:
             message_len = -1
             
+        f = r.getfile()
+        if f is None:
+            raise HTTPError(code, "Empty response from server\nCode: %s\nHeaders: %s" % (msg, headers))
+
         if message_len < 0:
             # Content-Length missing or invalid; just read the whole socket
             # This won't work with HTTP/1.1 chunked encoding
-            data = r.getfile().read()
+            data = f.read()
             message_len = len(data)
         else:
-            data = r.getfile().read(message_len)
+            data = f.read(message_len)
 
         if(config.debug):
             print "code=",code
@@ -470,7 +477,7 @@ class SOAPProxy:
             throw_struct = 0
 
         if throw_struct:
-            if Config.debug:
+            if self.config.debug:
                 print p
             raise p
 

@@ -77,6 +77,7 @@ class SOAPConfig:
             self.strictNamespaces = 0
             self.typed = 1
             self.buildWithNamespacePrefix = 1
+            self.buildWithGlobalNamespacePrefix = False
             self.returnAllAttrs = 0
 
             # Strict checking of range for floats and doubles
@@ -115,6 +116,13 @@ class SOAPConfig:
             # authorization error.
             self.authMethod = None
 
+            # The tuple of type and dump handler function pairs for
+            # SOAPBuilder dump dispatch. Used for handling additional types
+            # and overriding built-in types. Functions are expected to have
+            # the same parameters as SOAPBuilder dump_<type> methods
+            # (including self; possibility to call any SOAPBuilder dump method)
+            self.dumpmap = tuple()
+
             # Globus Support if pyGlobus.io available
             try:
                 from pyGlobus import io;
@@ -142,6 +150,12 @@ class SOAPConfig:
             # Cert support
             if d['SSLclient'] or d['SSLserver']:
                 d['SSL'] = self.SSLconfig()
+
+        dumpmap = kw.pop("dumpmap", None)
+        if dumpmap:
+            if not isinstance(dumpmap, tuple):
+                raise TypeError("Config dumpmap parameter must be a tuple")
+            self.dumpmap = dumpmap + self.dumpmap
 
         for k, v in kw.items():
             if k[0] != '_':

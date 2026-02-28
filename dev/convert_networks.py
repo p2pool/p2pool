@@ -14,7 +14,7 @@ def nesting(l):
 
 def write_header(f, name):
     if sys.argv[3] == 'p2pool':
-        f2.write('from p2pool.bitcoin import networks\n\n')
+        f2.write('from p2pool.dash import networks\n\n')
         if name == 'bitcoin':
             f2.write('''# CHAIN_LENGTH = number of shares back client keeps
 # REAL_CHAIN_LENGTH = maximum number of shares back client uses to compute payout
@@ -23,7 +23,7 @@ def write_header(f, name):
 # changes can be done by changing one, then the other
 
 ''')
-    elif sys.argv[3] == 'bitcoin':
+    elif sys.argv[3] == 'dash':
         f2.write('''import os
 import platform
 
